@@ -1,0 +1,325 @@
+## Canonical Aliases
+## Maps canonical terms to known aliases for search and normalization.
+## Format: canonical_term: [alias1, alias2, ...]
+##
+## Canonical terms are either vocabulary terms from data/tags.yaml or nodes of
+## the architecture tree in data/architectures.yaml.
+## No alias may map to two canonical terms (compared case-insensitively).
+
+# Architecture nodes — vendors
+amd:
+  - AMD
+
+intel:
+  - Intel
+
+nvidia:
+  - NVIDIA
+
+qualcomm:
+  - Qualcomm
+  - Adreno
+
+arm:
+  - ARM
+  - Mali
+
+# Architecture nodes — generations
+rdna3:
+  - "RDNA 3"
+  - RDNA3
+
+xe2:
+  - Xe2
+  - Battlemage
+  - BMG
+
+# Architecture nodes — devices
+radeon-780m:
+  - 780M
+  - "Radeon 780M"
+  - Phoenix
+  - PHOENIX
+  - gfx1103
+
+rx-7900-xtx:
+  - "7900 XTX"
+  - "RX 7900 XTX"
+  - "Radeon RX 7900 XTX"
+  - Navi31
+  - gfx1100
+
+rx-7600:
+  - "RX 7600"
+  - "Radeon RX 7600"
+  - Navi33
+  - gfx1102
+
+arc-b580:
+  - B580
+  - "Arc B580"
+
+arc-pro-b70:
+  - B70
+  - "Arc Pro B70"
+
+rtx-4070-ti-super:
+  - "4070 Ti SUPER"
+  - "RTX 4070 Ti SUPER"
+  - "4070 Ti"
+  - 4070ti
+
+jetson-orin:
+  - Orin
+  - "Jetson Orin"
+
+adreno-840:
+  - "Adreno 840"
+
+mali-g1:
+  - "Mali-G1"
+  - "Mali G1"
+  - "Mali-G1-Ultra"
+
+# Hardware features
+cooperative-matrix:
+  - coopmat
+  - "cooperative matrix"
+  - VK_KHR_cooperative_matrix
+  - GL_KHR_cooperative_matrix
+
+int8-cooperative-matrix:
+  - "int8 coopmat"
+  - int8_coopmat
+  - "int8 cooperative matrix"
+
+coopmat-shape:
+  - "coopmat shape"
+  - "coopmat shapes"
+  - "MMA shape"
+
+coopmat-fp32-accumulator:
+  - "fp32 accumulator coopmat"
+  - "fp32 accumulator"
+
+subgroup-size:
+  - "subgroup size"
+  - gl_SubgroupSize
+
+subgroup-size-control:
+  - "subgroup size control"
+  - VK_EXT_subgroup_size_control
+
+wave64:
+  - "wave 64"
+  - "subgroup 64"
+
+shared-memory-limit:
+  - LDS
+  - SLM
+  - "shared memory"
+  - maxComputeSharedMemorySize
+  - max_compute_shared_memory_size
+
+storage-buffer:
+  - SSBO
+  - "buffer storage"
+
+storage-texture3d:
+  - texture3d
+  - "texture3d storage"
+
+storage-texture2d:
+  - texture2d
+  - "texture2d weights"
+
+fp16-arithmetic:
+  - fp16
+  - float16_t
+  - GL_EXT_shader_explicit_arithmetic_types_float16
+
+int8-arithmetic:
+  - int8_t
+  - GL_EXT_shader_explicit_arithmetic_types_int8
+
+8bit-storage:
+  - GL_EXT_shader_8bit_storage
+
+integer-dot-product:
+  - "int8 dot product"
+  - GL_EXT_integer_dot_product
+  - dotPacked4x8AccSatEXT
+
+specialization-constants:
+  - "spec constants"
+  - "specialization constant"
+  - local_size_x_id
+
+# Techniques
+workgroup-tile-sizing:
+  - WG_TILE_M
+  - WG_TILE_N
+  - "tile sizing"
+  - "workgroup tile"
+
+k-chunk-sizing:
+  - WG_TILE_K
+  - "K chunk"
+
+subgroup-grid:
+  - SG_GRID_X
+  - SG_GRID_Y
+  - "subgroup grid"
+
+required-subgroup-size:
+  - SUBGROUP_SIZE
+  - "required subgroup size"
+
+mma-shape-selection:
+  - MMA_M
+  - MMA_N
+  - MMA_K
+
+per-shape-tile-selection:
+  - "per-shape tiles"
+  - "shape predicate"
+
+fp32-accumulation:
+  - ACC_FP32
+  - "fp32 accumulate"
+  - "fp32 accumulation"
+
+group-fp32-accumulation:
+  - ACC_GROUP_FP32
+  - "per-group fp32 total"
+
+register-fp32-total:
+  - ACC_GROUP_FP32_REG
+
+double-buffering:
+  - dbuf4
+  - "double-buffered"
+  - "ping-pong"
+
+shared-memory-fence:
+  - "lds-fence"
+  - "coopmat-lds-fence"
+  - "LDS fence"
+
+fragment-contiguous-layout:
+  - FRAG_LAYOUT
+  - "fragment-contiguous LDS"
+
+f16vec4-shared-memory:
+  - SH_F16V4
+
+shared-memory-pool:
+  - CSH_POOL
+  - "LDS pool"
+
+storage-image-loads:
+  - IMG_A
+  - IMG_W
+  - imageLoad
+
+column-major-b-staging:
+  - B_COLMAJOR
+  - "column-major B"
+
+full-a-map:
+  - A_MAP_FULL
+
+multi-block-a-staging:
+  - A_MULTI_BLOCK
+  - A_BLOCKS
+
+raw-a-staging:
+  - A_RAW
+
+paired-b-nibbles:
+  - B_PAIR
+
+early-b-select:
+  - B_SEL_EARLY_N
+
+drain-in-a-staging:
+  - CSH_IN_ASH
+
+full-tile-drain:
+  - CSH_FULL
+  - "one-pass drain"
+
+band-drain:
+  - CSH_BAND
+
+drain-unroll:
+  - DRAIN_UNROLL
+
+zero-point-hoisting:
+  - "zero-point hoisted"
+  - "zero point hoisting"
+
+group-sums:
+  - "group sums"
+  - "per-group sums"
+
+row-major-activations:
+  - kPackedInt8_4W
+  - "row-major int8"
+  - rowmajor_a
+
+causal-truncation:
+  - "causal-mask truncation"
+  - "causal-tail truncation"
+  - "causally truncated softmax"
+
+# Kernel types
+linear-4w:
+  - 4w
+  - q4gsw
+
+linear-8da4w:
+  - 8da4w
+  - dq8ca
+
+linear-8da4w-zpg:
+  - zpg
+  - 4h4w
+
+linear-8da4w-zpgtr:
+  - zpgtr
+
+tiled-linear:
+  - "tiled kernel"
+  - "tiled baseline"
+  - linear_q4gsw_tiled
+
+quantize-and-pack:
+  - "quantize and pack"
+
+sdpa:
+  - SDPA
+  - "scaled dot-product attention"
+
+sdpa-qk:
+  - "QK^T"
+
+sdpa-av:
+  - "attn*V"
+
+sdpa-softmax:
+  - "attention softmax"
+
+gemm:
+  - GEMM
+
+gemv:
+  - GEMV
+  - "single-token"
+
+# Languages
+spirv:
+  - "SPIR-V"
+
+cpp:
+  - "C++"

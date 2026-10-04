@@ -1,0 +1,43 @@
+## Version-sensitive claim registry.
+##
+## Central side of the version-sensitive mechanism. A page that makes a claim
+## whose truth depends on a tool or driver version carries a frontmatter
+## pointer:
+##
+##   version_sensitive: vs-<slug>          # or a mapping: {id: vs-<slug>}
+##
+## and that id must resolve to one entry in the 'claims' list below.
+## Schema: data/schemas.yaml, sections 'version-claims-registry' and
+## 'version-sensitive-pointer'. Checked by scripts/validate.py.
+##
+## Fields of one claim entry:
+##   id                    (required) unique, starts with 'vs-'
+##   tool                  (required) one of: mesa-radv, mesa-anv, glslc,
+##                         vulkan-sdk, adreno-driver, mali-driver,
+##                         nvidia-driver, executorch
+##   claim_valid_for       (required) version or version range the claim holds for
+##   last_verified_release (required) newest release the claim was checked against
+##   last_verified_at      (required) ISO date (YYYY-MM-DD) of that check
+##   applies_to            (required) list of >= 1 repo-relative page paths
+##   source_ids            (required) list of >= 1 existing source page ids
+##   notes                 (optional) free text
+##
+## Bidirectional consistency:
+##   - every page pointer resolves to an entry here whose applies_to lists
+##     that page;
+##   - every applies_to path exists and carries the matching pointer.
+##
+## Shape of an entry (placeholder values, not a real claim):
+##
+##   - id: vs-example-claim
+##     tool: glslc
+##     claim_valid_for: "<version range>"
+##     last_verified_release: "<release>"
+##     last_verified_at: 'YYYY-MM-DD'
+##     applies_to:
+##       - wiki/techniques/<page>.md
+##     source_ids:
+##       - doc-<source-id>
+##     notes: "<optional>"
+
+claims: []

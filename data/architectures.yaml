@@ -1,0 +1,85 @@
+## Architecture tree
+##
+## Single source of truth for every value accepted by the `architectures`
+## frontmatter field and for the `device` field of source-measurement pages.
+## Loaded by scripts/arch_policy.py; no script hardcodes any name listed here.
+##
+## Shape
+## -----
+## architectures:            # top-level key; its value is a mapping of root nodes
+##   <node-name>:            # lowercase, hyphen-separated, globally unique
+##     kind: vendor          # one of: vendor | generation | device
+##     children:             # optional mapping of child nodes, same shape
+##       <node-name>:
+##         kind: device
+##
+## Rules
+## -----
+## - Node names are unique across the whole tree (a name identifies one node).
+## - `children` may be omitted or empty. A vendor with no children is a
+##   reserved node: valid as a tag, but it has no devices yet.
+## - `kind` may be omitted; it then defaults to `vendor` for a root node,
+##   `generation` for a non-root node with children, and `device` otherwise.
+## - Mapping order is meaningful: generated indices list nodes in this order.
+## - A `generation` level is optional; devices may hang directly off a vendor.
+## - Levels only go down: a root node is a `vendor`, a child's kind is always
+##   below its parent's (vendor > generation > device), and a `device` node
+##   never has children.
+##
+## Query semantics (scripts/arch_policy.py)
+## ----------------------------------------
+## - Asking for a node matches pages tagged with that node or any descendant.
+## - Asking for a node never matches pages tagged only with one of its
+##   ancestors; query.py reports how many such pages were excluded.
+## - Human-facing spellings live in data/aliases.yaml and are resolved to a
+##   node name before matching.
+
+architectures:
+  amd:
+    kind: vendor
+    children:
+      rdna3:
+        kind: generation
+        children:
+          radeon-780m:
+            kind: device
+          rx-7900-xtx:
+            kind: device
+          rx-7600:
+            kind: device
+
+  intel:
+    kind: vendor
+    children:
+      xe2:
+        kind: generation
+        children:
+          arc-b580:
+            kind: device
+          arc-pro-b70:
+            kind: device
+
+  nvidia:
+    kind: vendor
+    children:
+      rtx-4070-ti-super:
+        kind: device
+      jetson-orin:
+        kind: device
+
+  qualcomm:
+    kind: vendor
+    children:
+      adreno-840:
+        kind: device
+
+  arm:
+    kind: vendor
+    children:
+      mali-g1:
+        kind: device
+
+  # Reserved vendor node. Intentionally empty.
+  samsung:
+    kind: vendor
+    children: {}

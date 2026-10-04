@@ -1,0 +1,4 @@
+## FIXTURE: merged into a copy of the real data/aliases.yaml by the test.
+## '780M' is already an alias of radeon-780m, so adding it here collides.
+rx-7600:
+  - 780M

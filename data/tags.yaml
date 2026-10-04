@@ -1,0 +1,120 @@
+## Controlled Vocabulary — Tags
+## All tags used in source and wiki frontmatter must appear here.
+## The validator (scripts/validate.py) rejects unknown tags.
+##
+## Architecture names are NOT listed here. The architecture tree in
+## data/architectures.yaml is the single source of truth for the
+## 'architectures' frontmatter field.
+##
+## Every topical term below names something that exists in the Vulkan GLSL
+## compute-shader kernels this wiki documents (a device capability the kernel
+## selection keys on, a compile-time shader parameter, or an operator family).
+
+# Vulkan / GPU capabilities the kernels and the kernel selection key on.
+hardware_features:
+  - cooperative-matrix          # VK_KHR_cooperative_matrix / GL_KHR_cooperative_matrix
+  - int8-cooperative-matrix     # an int8 cooperative-matrix shape is enumerated
+  - coopmat-shape               # the M x N x K shapes a device exposes
+  - coopmat-fp32-accumulator    # fp32 accumulator matrix for fp16 operands
+  - subgroup-size               # default subgroup size of the device
+  - subgroup-size-control       # VK_EXT_subgroup_size_control (required size per pipeline)
+  - wave64                      # adapters whose native subgroup is 64 lanes
+  - shared-memory-limit         # maxComputeSharedMemorySize
+  - storage-buffer              # tensor stored as a buffer (SSBO)
+  - storage-texture3d           # tensor stored as a 3D texture
+  - storage-texture2d           # packed weights stored as a 2D texture
+  - fp16-arithmetic             # GL_EXT_shader_explicit_arithmetic_types_float16
+  - int8-arithmetic             # GL_EXT_shader_explicit_arithmetic_types_int8
+  - 8bit-storage                # GL_EXT_shader_8bit_storage
+  - integer-dot-product         # GL_EXT_integer_dot_product
+  - specialization-constants    # local_size_*_id and spec-constant shape parameters
+
+# Optimization techniques present in the shader parameters and shader bodies.
+techniques:
+  # Tile geometry
+  - workgroup-tile-sizing       # output tile per workgroup (M x N)
+  - k-chunk-sizing              # K consumed per main-loop iteration
+  - subgroup-grid               # subgroup grid inside the workgroup
+  - required-subgroup-size      # pipeline pinned to one subgroup size
+  - mma-shape-selection         # shape of one cooperative-matrix multiply-add
+  - per-shape-tile-selection    # different tiles for different operator shapes
+  # Accumulation precision
+  - fp32-accumulation           # fp32 accumulator matrix
+  - group-fp32-accumulation     # fp16 within a quantization group, fp32 running total
+  - register-fp32-total         # fp32 running total kept in per-invocation registers
+  # Shared-memory staging and pipeline
+  - double-buffering            # ping-pong shared-memory slices, prefetch ahead of the multiply
+  - shared-memory-fence         # explicit ordering of shared stores against matrix loads
+  - fragment-contiguous-layout  # unpadded, fragment-contiguous shared-memory layout
+  - f16vec4-shared-memory       # shared memory stored as f16vec4
+  - shared-memory-pool          # operands and output drain share one pool
+  - storage-image-loads         # imageLoad instead of sampler fetches
+  - column-major-b-staging      # B staged N-major and loaded column-major
+  - full-a-map                  # each thread stages exactly one A block
+  - multi-block-a-staging       # each thread stages several A blocks
+  - raw-a-staging               # A copied to shared memory as raw words
+  - paired-b-nibbles            # one weight texel feeds both nibble parities
+  - early-b-select              # keep only the selected weight word after the fetch
+  # Output drain (texture3d output)
+  - drain-in-a-staging          # drain staged in the dead A shared-memory region
+  - full-tile-drain             # whole tile staged and drained in one pass
+  - band-drain                  # one subgroup-grid band drained at a time
+  - drain-unroll                # hand-expanded drain loop with constant indices
+  # Quantization handling
+  - zero-point-hoisting         # zero-point correction moved out of the group loop
+  - group-sums                  # per-group sums computed when activations are packed
+  - row-major-activations       # row-major packed int8 activations
+  # Attention
+  - causal-truncation           # skip work above the causal diagonal
+
+# Operator families.
+kernel_types:
+  - gemm
+  - gemv
+  - linear-4w                   # fp16 activations, 4-bit group-symmetric weights
+  - linear-8da4w                # dynamic int8 activations, 4-bit weights
+  - linear-8da4w-zpg            # 8da4w family reading 4h4w activation blocks
+  - linear-8da4w-zpgtr          # 8da4w family reading row-major activations
+  - tiled-linear                # non-cooperative-matrix tiled baseline / fallback
+  - quantize-and-pack           # activation quantization and packing
+  - sdpa                        # scaled dot-product attention
+  - sdpa-qk                     # attention weights, Q K^T
+  - sdpa-av                     # attention output, attn V
+  - sdpa-softmax                # attention-weight softmax
+  - prefill
+  - decode
+
+languages:
+  - glsl
+  - spirv
+  - cpp
+  - python
+
+confidence:
+  - verified
+  - source-reported
+  - inferred
+  - experimental
+
+reproducibility:
+  - concept
+  - pseudocode
+  - snippet
+  - runnable
+  - benchmarked
+
+source_categories:
+  - official-doc
+  - upstream-code
+  - paper
+  - benchmark-blog
+  - community-note
+  - measurement
+
+evidence_types:
+  - official-doc
+  - upstream-code
+  - paper
+  - benchmark
+  - measurement
+  - inference

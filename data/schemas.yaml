@@ -1,0 +1,434 @@
+## Page-Type Schemas
+## Defines required and optional frontmatter fields per page type, plus the
+## shared sub-schemas (performance claims, the 'verified' evidence rule and
+## the version-sensitive claim registry).
+## Consumed by scripts/validate.py. Human reference: references/schema.md.
+##
+## Shape conventions (derived from KernelWiki's data/schemas.yaml):
+##   required / optional : lists of frontmatter field names
+##   constraints         : id_prefix, type, reproducibility_minimum,
+##                         source_category, status, *_required_when ...
+## Page type is detected from the file path:
+##   sources/prs -> source-pr            wiki/hardware   -> wiki-hardware
+##   sources/docs -> source-doc          wiki/techniques -> wiki-technique
+##   sources/blogs -> source-blog        wiki/patterns   -> wiki-pattern
+##   sources/measurements                wiki/kernels    -> wiki-kernel
+##        -> source-measurement          wiki/languages  -> wiki-language
+##                                       wiki/migration  -> wiki-migration
+## Controlled values (tags, techniques, hardware_features, kernel_types,
+## languages, confidence, reproducibility, source_categories, evidence_types)
+## live in data/tags.yaml. Architecture nodes live in data/architectures.yaml.
+
+## ---------------------------------------------------------------------------
+## Source pages
+## Body rule for every source-* type: no model-written summaries. A source
+## body holds verbatim excerpts and locators only.
+## ---------------------------------------------------------------------------
+
+source-pr:
+  required:
+    - id
+    - repo
+    - pr
+    - title
+    - author
+    - date
+    - url
+    - source_category
+    - architectures
+    - tags
+    - techniques
+    - hardware_features
+    - kernel_types
+    - languages
+    - captured_at
+    - status
+  optional:
+    - merge_sha
+    - description
+    - changed_paths
+    - inclusion_reason
+  constraints:
+    id_prefix: pr-
+    source_category: upstream-code
+    status: [open, merged, closed]
+    merge_sha_required_when: "status == merged"
+    merge_sha_pattern: "^[0-9a-f]{40}$"
+    date_fields: [date, captured_at]
+    body_excerpt_required: true
+    body_excerpt_start_marker: "<!-- upstream-excerpt-start -->"
+    body_excerpt_end_marker: "<!-- upstream-excerpt-end -->"
+
+source-doc:
+  required:
+    - id
+    - title
+    - url
+    - source_category
+    - architectures
+    - tags
+    - retrieved_at
+  optional:
+    - author
+    - description
+  constraints:
+    id_prefix: doc-
+    source_category: [official-doc, paper]
+    date_fields: [retrieved_at]
+
+source-blog:
+  required:
+    - id
+    - title
+    - author
+    - url
+    - source_category
+    - architectures
+    - tags
+    - retrieved_at
+  optional:
+    - description
+  constraints:
+    id_prefix: blog-
+    source_category: [benchmark-blog, community-note]
+    date_fields: [retrieved_at]
+
+## First-party measurements: the most trusted source type.
+source-measurement:
+  required:
+    - id
+    - title
+    - source_category
+    - architectures
+    - tags
+    - device
+    - driver
+    - measured_at
+    - method
+    - raw_data
+    - captured_at
+  optional:
+    - os
+    - kernel_version
+    - glslc_version
+    - commit
+    - baseline
+    - description
+  constraints:
+    id_prefix: meas-
+    source_category: measurement
+    ## device: exactly one device (leaf) node from data/architectures.yaml.
+    ## Vendor and generation nodes are rejected; aliases are not accepted here.
+    device_node_kind: device
+    ## The page's own 'architectures' list must contain the device node.
+    device_must_be_in: architectures
+    ## driver: non-empty string naming the driver AND its version.
+    non_empty_string_fields: [driver, method]
+    pattern_fields:
+      driver:
+        pattern: '^\S+\s.*\d'
+        hint: "name the driver and its version, e.g. 'RADV Mesa 25.2.7'"
+    ## date_fields hold a plain ISO date (YYYY-MM-DD), not a timestamp.
+    date_fields: [measured_at, captured_at]
+    raw_data_required_min: 1
+  raw_data_schema:
+    required:
+      - locator
+      - description
+    optional:
+      - repo
+      - commit
+    constraints:
+      ## An entry has one of two forms.
+      ##
+      ## In-repository form (no 'repo', no 'commit'):
+      ##   locator: an http(s) URL, or a repo-relative path (optionally
+      ##   followed by '#fragment') to a file that exists in this repository.
+      ##   Absolute paths, home paths ('~') and '..' are rejected.
+      ##
+      ## External-repository form ('repo' AND 'commit'; see external_locator):
+      ##   locator: a path relative to the root of that repository (optionally
+      ##   followed by '#fragment'). Absolute paths, home paths ('~'), '..' and
+      ##   URLs are rejected. The file is not looked up in this repository;
+      ##   scripts/check_external_locators.py verifies it against a local
+      ##   checkout of the external repository at that commit.
+      ##
+      ## description: free text.
+      non_empty_string_fields: [locator, description]
+      locator_fields: [locator]
+      external_locator:
+        ## If any of these fields is present, all of them are required, and
+        ## the entry is in the external-repository form.
+        together_fields: [repo, commit]
+        pattern_fields:
+          repo:
+            pattern: '^https://[^\s/]+/\S+$'
+            hint: "an https URL of the git repository, e.g. 'https://example.org/owner/name'"
+          commit:
+            pattern: '^[0-9a-f]{40}$'
+            hint: "exactly 40 lowercase hex characters; quote a sha that is all digits"
+        ## locator_fields listed here are checked for form only; the
+        ## in-repository file-existence check is skipped.
+        skip_exists_check_fields: [locator]
+
+## ---------------------------------------------------------------------------
+## Wiki pages
+## ---------------------------------------------------------------------------
+
+wiki-hardware:
+  required:
+    - id
+    - title
+    - type
+    - architectures
+    - tags
+    - confidence
+    - related
+    - sources
+    - aliases
+  optional:
+    - reproducibility
+    - prerequisites
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: hardware
+    id_prefix: hw-
+
+wiki-technique:
+  required:
+    - id
+    - title
+    - type
+    - architectures
+    - tags
+    - confidence
+    - reproducibility
+    - prerequisites
+    - related
+    - sources
+  optional:
+    - aliases
+    - symptoms
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: technique
+    id_prefix: technique-
+    reproducibility_minimum: snippet
+
+wiki-pattern:
+  required:
+    - id
+    - title
+    - type
+    - tags
+    - symptoms
+    - candidate_techniques
+    - related
+    - sources
+  optional:
+    - architectures
+    - confidence
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: pattern
+    id_prefix: pattern-
+    ## candidate_techniques entries are remedies: ids of technique, hardware
+    ## or migration pages only.
+    candidate_techniques_id_prefixes: [technique-, hw-, migration-]
+
+wiki-kernel:
+  required:
+    - id
+    - title
+    - type
+    - architectures
+    - tags
+    - confidence
+    - reproducibility
+    - kernel_types
+    - languages
+    - related
+    - sources
+    - performance_claims
+  optional:
+    - aliases
+    - prerequisites
+    - symptoms
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: kernel
+    id_prefix: kernel-
+    reproducibility_minimum: snippet
+
+wiki-language:
+  required:
+    - id
+    - title
+    - type
+    - tags
+    - related
+    - sources
+    - reproducibility
+  optional:
+    - architectures
+    - confidence
+    - aliases
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: language
+    id_prefix: lang-
+    reproducibility_minimum: snippet
+
+wiki-migration:
+  required:
+    - id
+    - title
+    - type
+    - from_arch
+    - to_arch
+    - tags
+    - related
+    - sources
+  optional:
+    - confidence
+    - reproducibility
+    - prerequisites
+    - evidence_basis
+    - version_sensitive
+  constraints:
+    type: migration
+    id_prefix: migration-
+    ## from_arch / to_arch: any node name from data/architectures.yaml.
+    architecture_node_fields: [from_arch, to_arch]
+
+## ---------------------------------------------------------------------------
+## performance_claims entries (a list of mappings). Only wiki-kernel declares
+## the field, so the unknown-field check rejects it on every other page type.
+## ---------------------------------------------------------------------------
+performance-claim:
+  field: performance_claims
+  required:
+    - gpu
+    - driver
+    - dtype
+    - shape
+    - metric
+    - value
+    - measured_at
+    - source_id
+    - source_locator
+  optional:
+    - baseline
+    - utilization
+    - notes
+  constraints:
+    ## A kernel page with no backed numbers yet carries 'performance_claims: []'.
+    required_min: 0
+    ## value: a finite int or float (not a string, bool, NaN or infinity).
+    numeric_fields: [value]
+    ## measured_at: a plain ISO date (YYYY-MM-DD), not a timestamp.
+    date_fields: [measured_at]
+    ## source_id must be the id of an existing source page (any source-* type).
+    source_id_must_resolve: true
+    ## source_locator must be a non-empty exact locator into that source.
+    non_empty_string_fields: [gpu, driver, dtype, shape, metric, source_locator]
+    ## gpu: exactly one device node from data/architectures.yaml (no vendor or
+    ## generation node, no alias).
+    device_node_fields: [gpu]
+    ## driver: names the driver AND its version.
+    pattern_fields:
+      driver:
+        pattern: '^\S+\s.*\d'
+        hint: "name the driver and its version, e.g. 'RADV Mesa 25.2.7'"
+
+## ---------------------------------------------------------------------------
+## 'verified' confidence rule (wiki-* pages with confidence: verified).
+## The page needs a non-empty evidence_basis list; every entry carries the
+## entry_required fields; every entry's source_id is listed in the page's
+## 'sources'. The rule passes when ANY ONE alternative in any_of is satisfied;
+## an alternative is satisfied when ALL of its 'require' items are met.
+## A 'require' item may bind its evidence_type to the cited source page through
+## source_page_type and/or source_category. A bound evidence_type is checked on
+## every entry that uses it, so a label alone never satisfies the rule.
+## ---------------------------------------------------------------------------
+verified_evidence_rule:
+  applies_to_page_type_prefix: wiki-
+  applies_when:
+    field: confidence
+    value: verified
+  evidence_field: evidence_basis
+  evidence_required_min: 1
+  entry_required:
+    - evidence_type
+    - source_id
+  entry_optional:
+    - locator
+    - notes
+  source_id_must_be_in: sources
+  any_of:
+    - name: first-party-measurement
+      require:
+        - evidence_type: measurement
+          min_count: 1
+          ## the entry's source_id must resolve to a page of this type
+          source_page_type: source-measurement
+    - name: official-doc-plus-upstream-code
+      require:
+        - evidence_type: official-doc
+          min_count: 1
+          ## the cited source page must have this source_category
+          source_category: official-doc
+        - evidence_type: upstream-code
+          min_count: 1
+          source_page_type: source-pr
+
+## ---------------------------------------------------------------------------
+## version_sensitive frontmatter pointer (per-page side of the registry).
+## A page making a tool-version dependent claim carries a 'version_sensitive'
+## pointer whose id resolves to an entry in data/version-claims.yaml. The
+## pointer is either a bare id string or a mapping with at least 'id'.
+## ---------------------------------------------------------------------------
+version-sensitive-pointer:
+  required:
+    - id
+  optional:
+    - tool
+    - claim_valid_for
+    - last_verified_release
+    - last_verified_at
+  constraints:
+    id_prefix: vs-
+
+## ---------------------------------------------------------------------------
+## data/version-claims.yaml registry (central side). Every entry is a complete
+## claim record. The validator enforces bidirectional consistency: every
+## per-page pointer resolves here to an entry whose applies_to lists that
+## page, and every entry's applies_to path exists and carries the matching
+## pointer.
+## ---------------------------------------------------------------------------
+version-claims-registry:
+  required:
+    - claims
+  claim_schema:
+    required:
+      - id
+      - tool
+      - claim_valid_for
+      - last_verified_release
+      - last_verified_at
+      - applies_to
+      - source_ids
+    optional:
+      - notes
+    constraints:
+      tool: [mesa-radv, mesa-anv, glslc, vulkan-sdk, adreno-driver, mali-driver, nvidia-driver, executorch]
+      applies_to_required_min: 1
+      source_ids_required_min: 1
+      id_prefix: vs-
+      date_fields: [last_verified_at]
+      non_empty_string_fields: [claim_valid_for, last_verified_release]

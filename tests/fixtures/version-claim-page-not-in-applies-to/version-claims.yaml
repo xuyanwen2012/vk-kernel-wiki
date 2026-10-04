@@ -1,0 +1,11 @@
+## FIXTURE: replaces data/version-claims.yaml in a temp root assembled by the test.
+claims:
+  - id: vs-fixture-claim
+    tool: glslc
+    claim_valid_for: "FIXTURE 0.0.x"
+    last_verified_release: "FIXTURE 0.0.0"
+    last_verified_at: 2000-01-01
+    applies_to:
+      - wiki/hardware/fixture-hardware.md
+    source_ids:
+      - doc-fixture-spec

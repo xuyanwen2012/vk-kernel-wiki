@@ -1,0 +1,26 @@
+# Captured 2026-10-04 on the Radeon 780M host. Commands and their verbatim output.
+
+$ rpm -q --qf "%{NAME}-%{VERSION}-%{RELEASE} installed %{INSTALLTIME:date} built %{BUILDTIME:date}\n" mesa-vulkan-drivers mesa-dri-drivers
+mesa-vulkan-drivers-25.2.7-4.el10.rocky.0.1 installed Fri 29 May 2026 10:08:07 PM PDT built Wed 25 Feb 2026 06:58:58 AM PST
+mesa-dri-drivers-25.2.7-4.el10.rocky.0.1 installed Fri 29 May 2026 10:08:06 PM PDT built Wed 25 Feb 2026 06:58:58 AM PST
+
+$ rpm -qf /usr/lib64/libvulkan_radeon.so
+mesa-vulkan-drivers-25.2.7-4.el10.rocky.0.1.x86_64
+
+$ grep -h -E "mesa-(vulkan|dri)-drivers" /var/log/dnf.rpm.log*
+2026-05-29T22:08:06-0700 SUBDEBUG Upgrade: mesa-dri-drivers-25.2.7-4.el10.rocky.0.1.x86_64
+2026-05-29T22:08:06-0700 SUBDEBUG Upgrade: mesa-vulkan-drivers-25.2.7-4.el10.rocky.0.1.x86_64
+2026-05-29T22:10:09-0700 SUBDEBUG Upgraded: mesa-vulkan-drivers-25.0.7-6.el10_1.x86_64
+2026-05-29T22:10:20-0700 SUBDEBUG Upgraded: mesa-dri-drivers-25.0.7-6.el10_1.x86_64
+
+$ ls /var/log/dnf.rpm.log*   (oldest entry of the retained log)
+/var/log/dnf.rpm.log
+2026-02-23T19:29:04-0800 INFO --- logging initialized ---
+
+$ last reboot | head -6
+reboot   system boot  6.12.0-211.61.1. Thu Oct  1 09:52   still running
+reboot   system boot  6.12.0-211.60.1. Sat Sep 26 21:45 - 09:52 (4+12:07)
+reboot   system boot  6.12.0-211.58.1. Thu Sep 24 07:00 - 21:44 (2+14:44)
+reboot   system boot  6.12.0-211.56.1. Wed Sep 23 20:59 - 06:59  (10:00)
+reboot   system boot  6.12.0-211.56.1. Sat Sep 19 13:56 - crash (4+07:02)
+reboot   system boot  6.12.0-211.55.1. Wed Sep 16 13:46 - 13:56 (3+00:10)

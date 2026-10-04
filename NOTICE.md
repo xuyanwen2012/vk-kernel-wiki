@@ -1,0 +1,21 @@
+# Notice
+
+## License of this repository
+
+The license of this repository's own content has not been chosen yet. Until a license file is added at the repository root, no license is granted for that content. The third-party components below keep their own licenses.
+
+## KernelWiki
+
+The directory structure, page schema layout, and the scripts under `scripts/` are derived from KernelWiki by mit-han-lab, which is distributed under the MIT license.
+
+- Upstream revision the derivation started from: `third_party/KernelWiki-REVISION`
+- Upstream license text: `third_party/KernelWiki-LICENSE`
+
+The derived files have been modified for this repository: the subject matter, controlled vocabulary, architecture model, page types and validation rules differ from upstream. No knowledge pages were copied from KernelWiki.
+
+## PyYAML
+
+`scripts/_vendor/yaml/` is a bundled copy of the pure-Python portion of PyYAML, taken over from KernelWiki and used as a fallback when the host Python has no PyYAML installed. It is distributed under the MIT license.
+
+- License text: `scripts/_vendor/LICENSE`
+- Description of the bundled copy: `scripts/_vendor/README.md`
