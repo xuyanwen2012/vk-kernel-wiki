@@ -117,6 +117,7 @@ vk-kernel-wiki/
 ├── CLAUDE.md                   # Schema and authoring rules
 ├── index.md                    # Curated top-level navigation
 ├── NOTICE.md                   # Attribution and third-party licenses
+├── LICENSE                     # MIT license of this repository's own content
 │
 ├── data/
 │   ├── schemas.yaml            # Required and optional fields per page type
@@ -176,4 +177,4 @@ vk-kernel-wiki/
 
 ## Attribution and License
 
-The structure and scripts are derived from KernelWiki (MIT, mit-han-lab). This repository's own license has not been chosen yet. See [`NOTICE.md`](NOTICE.md).
+The structure and scripts are derived from KernelWiki (MIT, mit-han-lab). This repository's own content is distributed under the MIT license ([`LICENSE`](LICENSE)). Upstream pull-request excerpts and shader patches keep their upstream license. See [`NOTICE.md`](NOTICE.md).

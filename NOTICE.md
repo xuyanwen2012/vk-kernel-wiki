@@ -2,7 +2,7 @@
 
 ## License of this repository
 
-The license of this repository's own content has not been chosen yet. Until a license file is added at the repository root, no license is granted for that content. The third-party components below keep their own licenses.
+This repository's own content (scripts, schemas, wiki pages, measurement pages and documentation) is distributed under the MIT license; see [`LICENSE`](LICENSE). The third-party components below keep their own licenses.
 
 ## KernelWiki
 
