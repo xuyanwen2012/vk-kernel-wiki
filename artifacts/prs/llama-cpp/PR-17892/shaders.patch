@@ -1,0 +1,275 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large1.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large1.comp
+@@ -0,0 +1,62 @@
++#version 450
++
++#include "soft_max_large_common.glsl"
++
++void main() {
++    const uint tid = gl_LocalInvocationID.x;
++    const uint rowx = gl_WorkGroupID.y;
++    const uint wg_start = gl_WorkGroupID.x * BLOCK_SIZE * num_iters;
++
++    const uint32_t i03 = rowx / (p.ne01 * p.ne02);
++    const uint32_t i02 = (rowx - i03 * p.ne01 * p.ne02) / p.ne01;
++    const uint32_t i01 = rowx % p.ne01;
++
++    uint rowy_start = 0;
++    if (p.KY > 0) {
++        rowy_start = i01 * p.nb11 + (i02 % p.ne12) * p.nb12 + (i03 % p.ne13) * p.nb13;
++    }
++
++    if (rowx >= p.nrows_x) {
++        return;
++    }
++
++    float slope = get_slope(rowx);
++
++    // Find max
++    FLOAT_TYPE max_val = p.has_sinks == 0 ? uintBitsToFloat(0xFF800000) : data_c[i02];
++
++    [[unroll]] for (uint col0 = wg_start, idx = 0; idx < num_iters; col0 += BLOCK_SIZE, ++idx) {
++        const uint col = col0 + tid;
++
++        FLOAT_TYPE a = FLOAT_TYPE(0);
++        if (col < p.KX) {
++            a = data_a[rowx * p.KX + col];
++        }
++
++        FLOAT_TYPE b = FLOAT_TYPE(0);
++        if (p.KY > 0 && col < p.KX) {
++            b = data_b[rowy_start + col];
++        }
++
++        FLOAT_TYPE v = a * p.scale + slope * b;
++
++        if (col < p.KX) {
++            max_val = max(max_val, v);
++        }
++    }
++
++    // reduce across the workgroup
++    vals[tid] = max_val;
++    barrier();
++    [[unroll]] for (uint s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
++        if (tid < s) {
++            vals[tid] = max(vals[tid], vals[tid + s]);
++        }
++        barrier();
++    }
++
++    if (tid == 0) {
++        max_val = vals[0];
++        data_m[rowx * gl_NumWorkGroups.x + gl_WorkGroupID.x] = max_val;
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large2.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large2.comp
+@@ -0,0 +1,79 @@
++#version 450
++
++#include "soft_max_large_common.glsl"
++
++void main() {
++    const uint tid = gl_LocalInvocationID.x;
++    const uint rowx = gl_WorkGroupID.y;
++    const uint wg_start = gl_WorkGroupID.x * BLOCK_SIZE * num_iters;
++
++    const uint32_t i03 = rowx / (p.ne01 * p.ne02);
++    const uint32_t i02 = (rowx - i03 * p.ne01 * p.ne02) / p.ne01;
++    const uint32_t i01 = rowx % p.ne01;
++
++    uint rowy_start = 0;
++    if (p.KY > 0) {
++        rowy_start = i01 * p.nb11 + (i02 % p.ne12) * p.nb12 + (i03 % p.ne13) * p.nb13;
++    }
++
++    if (rowx >= p.nrows_x) {
++        return;
++    }
++
++    float slope = get_slope(rowx);
++
++    // Find max
++    FLOAT_TYPE max_val = p.has_sinks == 0 ? uintBitsToFloat(0xFF800000) : data_c[i02];
++
++    [[unroll]] for (uint i = 0; i < gl_NumWorkGroups.x; i += BLOCK_SIZE) {
++        if (i + tid < gl_NumWorkGroups.x) {
++            max_val = max(max_val, data_m[rowx * gl_NumWorkGroups.x + i + tid]);
++        }
++    }
++
++    // reduce across the workgroup
++    vals[tid] = max_val;
++    barrier();
++    [[unroll]] for (uint s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
++        if (tid < s) {
++            vals[tid] = max(max_val, vals[tid + s]);
++        }
++        barrier();
++    }
++
++    max_val = vals[0];
++    barrier();
++
++    FLOAT_TYPE sum = FLOAT_TYPE(0.0f);
++
++    // Compute sum{exp(x - max)}
++    [[unroll]] for (uint col0 = wg_start, idx = 0; idx < num_iters; col0 += BLOCK_SIZE, ++idx) {
++        const uint col = col0 + tid;
++
++        if (col >= p.KX) {
++            break;
++        }
++
++        // compute exp(a*scale+b*slope), add it to sum
++        const uint i = rowx * p.KX + col;
++        FLOAT_TYPE val;
++        val = exp(FLOAT_TYPE(data_a[i]) * p.scale + (p.KY > 0 ? slope * FLOAT_TYPE(data_b[rowy_start + col]) : FLOAT_TYPE(0.0f)) - max_val);
++        sum += val;
++        data_d[i] = D_TYPE(val);
++    }
++
++    // reduce across the workgroup
++    vals[tid] = sum;
++    barrier();
++    [[unroll]] for (uint s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
++        if (tid < s) {
++            vals[tid] += vals[tid + s];
++        }
++        barrier();
++    }
++
++    if (tid == 0) {
++        sum = vals[0];
++        data_s[rowx * gl_NumWorkGroups.x + gl_WorkGroupID.x] = sum;
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large3.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large3.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large3.comp
+@@ -0,0 +1,65 @@
++#version 450
++
++#include "soft_max_large_common.glsl"
++
++shared FLOAT_TYPE sumsh[BLOCK_SIZE];
++
++void main() {
++    const uint tid = gl_LocalInvocationID.x;
++    const uint rowx = gl_WorkGroupID.y;
++    const uint wg_start = gl_WorkGroupID.x * BLOCK_SIZE * num_iters;
++
++    const uint32_t i03 = rowx / (p.ne01 * p.ne02);
++    const uint32_t i02 = (rowx - i03 * p.ne01 * p.ne02) / p.ne01;
++    const uint32_t i01 = rowx % p.ne01;
++
++    uint rowy_start = 0;
++    if (p.KY > 0) {
++        rowy_start = i01 * p.nb11 + (i02 % p.ne12) * p.nb12 + (i03 % p.ne13) * p.nb13;
++    }
++
++    if (rowx >= p.nrows_x) {
++        return;
++    }
++
++    FLOAT_TYPE max_val = p.has_sinks == 0 ? uintBitsToFloat(0xFF800000) : data_c[i02];
++    FLOAT_TYPE sum = FLOAT_TYPE(0.0f);
++
++    [[unroll]] for (uint i = 0; i < gl_NumWorkGroups.x; i += BLOCK_SIZE) {
++        if (i + tid < gl_NumWorkGroups.x) {
++            max_val = max(max_val, data_m[rowx * gl_NumWorkGroups.x + i + tid]);
++            sum += data_s[rowx * gl_NumWorkGroups.x + i + tid];
++        }
++    }
++
++    // reduce across the workgroup
++    vals[tid] = max_val;
++    sumsh[tid] = sum;
++    barrier();
++    [[unroll]] for (uint s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
++        if (tid < s) {
++            vals[tid] = max(max_val, vals[tid + s]);
++            sumsh[tid] += sumsh[tid + s];
++        }
++        barrier();
++    }
++
++    max_val = vals[0];
++    sum = sumsh[0];
++
++    if (p.has_sinks != 0) {
++        sum += FLOAT_TYPE(exp(FLOAT_TYPE(data_c[i02]) - max_val));
++    }
++
++    FLOAT_TYPE rcpdivisor = 1.0/sum;
++
++    [[unroll]] for (uint col0 = wg_start, idx = 0; idx < num_iters; col0 += BLOCK_SIZE, ++idx) {
++        const uint col = col0 + tid;
++
++        if (col >= p.KX) {
++            continue;
++        }
++
++        data_d[rowx*p.KX + col] *= D_TYPE(rcpdivisor);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large_common.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large_common.glsl
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_large_common.glsl
+@@ -0,0 +1,53 @@
++#extension GL_EXT_control_flow_attributes : enable
++
++layout (push_constant) uniform parameter
++{
++    uint KX;
++    uint KY;
++    uint ne00;
++    uint ne01;
++    uint ne02;
++    uint ne12;
++    uint ne13;
++    uint nb11;
++    uint nb12;
++    uint nb13;
++    float scale;
++    float max_bias;
++    float m0;
++    float m1;
++    uint n_head_log2;
++    uint nrows_x;
++    uint has_sinks;
++} p;
++
++#include "types.glsl"
++
++layout(constant_id = 0) const uint BLOCK_SIZE = 128;
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++layout(constant_id = 1) const uint num_iters = 4;
++
++layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
++layout (binding = 1) readonly buffer Y {B_TYPE data_b[];};
++layout (binding = 2) readonly buffer Z {float data_c[];};
++layout (binding = 3) buffer D {D_TYPE data_d[];};
++layout (binding = 4) buffer M {float data_m[];};
++layout (binding = 5) buffer S {float data_s[];};
++
++shared FLOAT_TYPE vals[BLOCK_SIZE];
++
++float get_slope(uint rowx) {
++    float slope = 1.0f;
++
++    // ALiBi
++    if (p.max_bias > 0.0f) {
++        const uint h = (rowx / p.ne01) % p.ne02; // head index
++
++        const float base = h < p.n_head_log2 ? p.m0 : p.m1;
++        const uint   exp = h < p.n_head_log2 ? h + 1 : 2*(h - p.n_head_log2) + 1;
++
++        slope = pow(base, exp);
++    }
++
++    return slope;
++}

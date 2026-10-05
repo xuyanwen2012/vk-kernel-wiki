@@ -1,0 +1,71 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+@@ -10,6 +10,7 @@ layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+ layout (binding = 1) readonly buffer Y {int data_pos[];};
+ layout (binding = 2) readonly buffer Z {float data_ff[];};
+ layout (binding = 3) writeonly buffer D {D_TYPE data_d[];};
++layout (binding = 4) readonly buffer I {uvec2 data_i[];}; // indices for set_rows
+ 
+ layout (push_constant) uniform parameter {
+     uint ncols;
+@@ -27,6 +28,7 @@ layout (push_constant) uniform parameter {
+     uint s2;
+     int sections[4];
+     uint is_back;
++    uint set_rows_stride;
+ } p;
+ 
+ float rope_yarn_ramp(const float low, const float high, const uint i0) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+@@ -16,12 +16,19 @@ void main() {
+     const uint row_x     = row_dst % ne1;
+     const uint channel_x = row_dst / ne1;
+ 
+-    const uint idst = row_dst*ne0 + i0/2;
++    uint idst = row_dst*ne0 + i0/2;
+     const uint ix   = channel_x*p.s2 + row_x*p.s1 + i0/2;
+ 
++    // Fusion optimization: ROPE + VIEW + SET_ROWS..
++    // The rope output is viewed as a 1D tensor and offset based on a row index in data_i.
++    if (p.set_rows_stride != 0) {
++        idst = row_x*ne0 + i0/2;
++        idst += data_i[channel_x].x * p.set_rows_stride;
++    }
++
+     if (i0 >= p.n_dims) {
+-        data_d[idst + i0/2 + 0] = data_a[ix + i0/2 + 0];
+-        data_d[idst + i0/2 + 1] = data_a[ix + i0/2 + 1];
++        data_d[idst + i0/2 + 0] = D_TYPE(data_a[ix + i0/2 + 0]);
++        data_d[idst + i0/2 + 1] = D_TYPE(data_a[ix + i0/2 + 1]);
+ 
+         return;
+     }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+@@ -16,12 +16,19 @@ void main() {
+     const uint row_x     = row_dst % ne1;
+     const uint channel_x = row_dst / ne1;
+ 
+-    const uint idst = row_dst*ne0 + i0;
++    uint idst = row_dst*ne0 + i0;
+     const uint ix   = channel_x*p.s2 + row_x*p.s1 + i0;
+ 
++    // Fusion optimization: ROPE + VIEW + SET_ROWS..
++    // The rope output is viewed as a 1D tensor and offset based on a row index in data_i.
++    if (p.set_rows_stride != 0) {
++        idst = row_x*ne0 + i0;
++        idst += data_i[channel_x].x * p.set_rows_stride;
++    }
++
+     if (i0 >= p.n_dims) {
+-        data_d[idst + 0] = data_a[ix + 0];
+-        data_d[idst + 1] = data_a[ix + 1];
++        data_d[idst + 0] = D_TYPE(data_a[ix + 0]);
++        data_d[idst + 1] = D_TYPE(data_a[ix + 1]);
+ 
+         return;
+     }

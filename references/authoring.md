@@ -182,6 +182,15 @@ Confirm that the measurement appears under its device in `queries/by-device.md` 
 
 ## Adding a PR Source Page
 
+Pull-request pages are normally generated, not written by hand. Add or edit a ledger in `candidates/` (see `candidates/README.md`), then:
+
+```bash
+python3 scripts/refresh_candidate_ledger.py --cutoff YYYY-MM-DD --repos <slug>
+python3 scripts/generate-pr-pages.py --repos <slug>
+```
+
+Review the `defer` rows of the ledger by hand: they changed backend host source but no shader. To promote one, set `decision: include` and `decision_source: manual` on the row and run the generator again. A page written by hand follows the rules below.
+
 Same discipline, different fields: create `sources/prs/<repo>/<file>.md` (one directory per repository; all pages in it carry the same `repo`) with an id starting with `pr-`, `source_category: upstream-code`, `status` (`open`, `merged` or `closed`), and `merge_sha` (40 hex characters) when the status is `merged`. The body must contain the verbatim upstream text between these markers:
 
 ```markdown

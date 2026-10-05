@@ -1,0 +1,238 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -53,7 +53,7 @@ void main() {
+     const uint32_t d_tid = gl_LocalInvocationIndex % D_split;
+     const uint32_t col_tid = gl_LocalInvocationIndex / D_split;
+ 
+-    uint32_t q_offset = (iq2*p.nb02+iq3*p.nb03) / 4;
++    uint32_t q_offset = gqa_iq1*p.nb01 + (iq2*p.nb02 + iq3*p.nb03) / 4;
+ 
+     [[unroll]] for (uint32_t idx = 0; idx < Br * HSK / 4; idx += gl_WorkGroupSize.x) {
+         uint32_t d = (idx + tid) % (HSK / 4);
+@@ -101,9 +101,9 @@ void main() {
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / 2;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / 2;
+ #endif
+-    uint32_t m_offset = 0;
++    uint32_t m_offset = gqa_iq1*KV;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+-        m_offset = ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
++        m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
+     }
+ 
+     [[dont_unroll]]
+@@ -320,7 +320,8 @@ void main() {
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + iq3 * p.k_num);
++        // note: O and Q have swapped coord 1,2.
++        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+ 
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+             if (r < N) {
+@@ -332,7 +333,7 @@ void main() {
+             }
+         }
+ 
+-        o_offset = HSV * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
++        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+             if (r < N) {
+                 perElemOpStoreCol0(r, 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+@@ -378,7 +379,7 @@ void main() {
+         }
+     }
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1*HSV;
++    uint32_t o_offset = gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV;
+ 
+     if (p.gqa_ratio > 1) {
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -165,20 +165,27 @@ ACC_TYPE perElemOpGetSink(const in uint32_t r, const in uint32_t c, const in ACC
+ }
+ 
+ uint32_t i, N, KV, split_k_index, Tr, start_j, end_j,
+-         iq2, iq3, rk2, rk3, rv2, rv3, ik2, ik3, iv2, iv3,
++         gqa_iq1, iq2, iq3, rk2, rk3, rv2, rv3, ik2, ik3, iv2, iv3,
+          q_stride, k_stride, v_stride, m_stride;
+ 
+ void init_indices()
+ {
+     N = p.N;
+     KV = p.KV;
+ 
+-    i = gl_WorkGroupID.x;
+-    split_k_index = 0;
+-
+     if (p.k_num > 1) {
+         i = 0;
+-        split_k_index = gl_WorkGroupID.x;
++        // batch and split_k share gl_WorkGroupID.x
++        gqa_iq1 = gl_WorkGroupID.x / p.k_num;
++        split_k_index = gl_WorkGroupID.x % p.k_num;
++    } else if (p.gqa_ratio > 1) {
++        i = 0;
++        gqa_iq1 = gl_WorkGroupID.x;
++        split_k_index = 0;
++    } else {
++        i = gl_WorkGroupID.x;
++        gqa_iq1 = 0;
++        split_k_index = 0;
+     }
+ 
+     Tr = CEIL_DIV(N, Br);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -90,7 +90,7 @@ void main() {
+         barrier();
+     }
+ 
+-    uint32_t q_offset = (iq2*p.nb02+iq3*p.nb03) / 4;
++    uint32_t q_offset = gqa_iq1*p.nb01 + (iq2*p.nb02+iq3*p.nb03) / 4;
+ 
+     [[unroll]] for (uint32_t idx = 0; idx < Br * HSK / 4; idx += gl_WorkGroupSize.x) {
+         uint32_t d = (idx + tid) % (HSK / 4);
+@@ -141,9 +141,9 @@ void main() {
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / 2;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / 2;
+ #endif
+-    uint32_t m_offset = 0;
++    uint32_t m_offset = gqa_iq1*KV;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+-        m_offset = ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
++        m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
+     }
+ 
+     [[dont_unroll]]
+@@ -370,7 +370,8 @@ void main() {
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + iq3 * p.k_num);
++        // note: O and Q have swapped coord 1,2.
++        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+ 
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             if (tile_row(r) < N) {
+@@ -382,7 +383,7 @@ void main() {
+             }
+         }
+ 
+-        o_offset = HSV * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
++        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             if (tile_row(r) < N) {
+                 perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+@@ -428,7 +429,7 @@ void main() {
+         }
+     }
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1*HSV;
++    uint32_t o_offset = gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV;
+ 
+     if (p.gqa_ratio > 1) {
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -111,7 +111,7 @@ void main() {
+     coopmat<Q_TYPE, gl_ScopeWorkgroup, Br, HSK_pad, gl_MatrixUseAccumulator> Q;
+     coopmat<float16_t, gl_ScopeWorkgroup, Br, HSK_pad, gl_MatrixUseA> Qf16;
+ 
+-    uint32_t q_offset = iq2*p.nb02+iq3*p.nb03;
++    uint32_t q_offset = gqa_iq1*p.nb01*4/*sizeof(float)*/ + iq2*p.nb02+iq3*p.nb03;
+     coopMatLoadTensorNV(Q, data_q, q_offset, sliceTensorLayoutNV(tensorLayoutQ, i * Br, Br, 0, HSK_pad));
+ 
+     Qf16 = coopmat<float16_t, gl_ScopeWorkgroup, Br, HSK_pad, gl_MatrixUseA>(Q);
+@@ -138,9 +138,9 @@ void main() {
+         coopMatPerElementNV(slopeMat, slopeMat, perElemOpComputeSlope, iq2);
+     }
+ 
+-    uint32_t m_offset = 0;
++    uint32_t m_offset = gqa_iq1*KV * 2 /*sizeof(float16_t)*/;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+-        m_offset = ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV * 2 /*sizeof(float16_t)*/;
++        m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV * 2 /*sizeof(float16_t)*/;
+     }
+ 
+     [[dont_unroll]]
+@@ -272,10 +272,11 @@ void main() {
+     if (p.k_num > 1) {
+         coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator>(O);
+ 
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + iq3 * p.k_num);
++        // note: O and Q have swapped coord 1,2.
++        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+         coopMatPerElementNV(O_D, O_D, perElemOpGqaStore, o_offset, iq2, N);
+ 
+-        o_offset = HSV * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
++        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+         coopMatPerElementNV(L, L, perElemOpStoreCol0, o_offset, iq2, N);
+         coopMatPerElementNV(M, M, perElemOpStoreCol0, o_offset + p.ne1, iq2, N);
+         return;
+@@ -325,7 +326,7 @@ void main() {
+     [[unroll]] for (uint i = 0; i < O.length(); ++i) { O[i] = clamp(O[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
+ #endif
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1*HSV;
++    uint32_t o_offset = gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV;
+ 
+     coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator>(O);
+     if (p.gqa_ratio > 1) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+@@ -12,7 +12,8 @@ layout (binding = 2) writeonly buffer D {float data_d[];};
+ 
+ layout (push_constant) uniform parameter {
+     uint D;
+-    uint N;
++    uint ne1;
++    uint ne2;
+     uint ne3;
+     uint k_num;
+     uint sinks;
+@@ -24,15 +25,15 @@ void main() {
+     // Each workgroup handles a row
+     const uint n = gl_WorkGroupID.x;
+     const uint tid = gl_LocalInvocationID.x;
+-    const uint iq3 = gl_WorkGroupID.z;
++    const uint i2 = gl_WorkGroupID.z % p.ne2;
++    const uint i3 = gl_WorkGroupID.z / p.ne2;
+ 
+     uint D = p.D;
+-    uint N = p.N;
+     uint k_num = p.k_num;
+ 
+-    uint l_offset = D * N * p.ne3 * k_num + N * iq3 * k_num * 2 + n;
+-    uint m_offset = D * N * p.ne3 * k_num + N * iq3 * k_num * 2 + N + n;
+-    uint lm_stride = N * 2;
++    uint l_offset = D * p.ne1 * p.ne2 * p.ne3 * k_num + p.ne1 * 2 * (0/*split_k_index*/ + p.k_num * (i2 + p.ne2 * i3)) + n;
++    uint m_offset = D * p.ne1 * p.ne2 * p.ne3 * k_num + p.ne1 * 2 * (0/*split_k_index*/ + p.k_num * (i2 + p.ne2 * i3)) + p.ne1 + n;
++    uint lm_stride = p.ne1 * 2;
+ 
+     // Compute the max m value for the row
+     float m_max = -1.0/0.0;
+@@ -99,7 +100,7 @@ void main() {
+     if (d < D) {
+         float O = 0.0;
+         [[unroll]] for (uint k = 0; k < k_num; ++k) {
+-            uint o_offset = D * N * (k + iq3 * k_num) + D * n + d;
++            uint o_offset = D * p.ne1 * (k + p.k_num * (i2 + p.ne2 * i3)) + D * n + d;
+             float m = data_a[m_offset + k * lm_stride];
+             O += exp(m - m_max) * data_a[o_offset];
+         }
+@@ -115,6 +116,6 @@ void main() {
+         const float FLT_MAX = uintBitsToFloat(0x7F7FFFFF);
+         O = clamp(O, -FLT_MAX, FLT_MAX);
+ 
+-        data_d[iq3 * D * N + D * n + d] = O;
++        data_d[(i3 * p.ne2 + i2) * p.ne1 * D + D * n + d] = O;
+     }
+ }

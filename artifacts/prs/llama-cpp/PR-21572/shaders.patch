@@ -1,0 +1,136 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+@@ -1,6 +1,5 @@
+ #version 450
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ 
+ #if defined(SET_ROWS) && QUANT_K == 1
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp b/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+@@ -1,6 +1,5 @@
+ #version 450
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ #include "generic_unary_head.glsl"
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+@@ -1,6 +1,5 @@
+ #version 450
+ 
+-#include "rte.glsl"
+ #include "generic_head.glsl"
+ #include "types.glsl"
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
+@@ -1,7 +1,6 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#include "rte.glsl"
+ #include "utils.glsl"
+ #if RMS_NORM_ROPE_FUSION
+ #include "rope_params.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+@@ -1,6 +1,5 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#include "rte.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+@@ -3,7 +3,6 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp b/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
+@@ -4,7 +4,6 @@
+ #extension GL_EXT_control_flow_attributes : require
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/log.comp b/ggml/src/ggml-vulkan/vulkan-shaders/log.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/log.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/log.comp
+@@ -1,6 +1,5 @@
+ #version 450
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ #include "generic_unary_head.glsl"
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+@@ -8,7 +8,6 @@
+ #extension GL_KHR_shader_subgroup_basic : enable
+ #endif
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ #include "utils.glsl"
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+@@ -2,7 +2,6 @@
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#include "rte.glsl"
+ #include "rope_params.glsl"
+ 
+ layout(local_size_x = 1, local_size_y = 256, local_size_z = 1) in;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+@@ -1,8 +1,6 @@
+ #if !defined(GGML_ROPE_PARAMS)
+ #define GGML_ROPE_PARAMS
+ 
+-#include "rte.glsl"
+-
+ struct rope_params {
+     uint rope_mode;
+     uint nrows;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rte.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rte.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rte.glsl
++++ /dev/null
+@@ -1,5 +0,0 @@
+-
+-#if RTE16
+-#extension GL_EXT_spirv_intrinsics : enable
+-spirv_execution_mode(capabilities = [4467], 4462, 16); // RoundingModeRTE, 16 bits
+-#endif // RTE16
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp b/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+@@ -1,6 +1,5 @@
+ #version 450
+ 
+-#include "rte.glsl"
+ #include "types.glsl"
+ #include "generic_unary_head.glsl"
+ 

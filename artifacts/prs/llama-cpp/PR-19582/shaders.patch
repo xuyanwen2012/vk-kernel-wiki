@@ -1,0 +1,112 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -130,19 +130,33 @@ void main() {
+         if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
++            float max_mask = NEG_FLT_MAX_OVER_2;
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br) {
+                     if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+                         float m = float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
+                         masksh[c][r] = m;
++                        max_mask = max(max_mask, m);
+                     } else {
+                         masksh[c][r] = float(0);
+                     }
+                 }
+             }
++            // skip the block if the mask is entirely -inf
++            bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
+             barrier();
++            if (gl_SubgroupInvocationID == 0) {
++                tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
++            }
++            barrier();
++            [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
++                max_mask = max(max_mask, tmpsh[s]);
++            }
++            if (max_mask <= NEG_FLT_MAX_OVER_2) {
++                continue;
++            }
+         }
+ 
+         float Sf[Br][cols_per_thread];
+@@ -260,6 +274,9 @@ void main() {
+         barrier();
+     }
+ 
++    // prevent race on tmpsh
++    barrier();
++
+     // reduce across threads
+ 
+     [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -42,6 +42,8 @@ D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TY
+     return elem;
+ }
+ 
++shared float tmpsh[row_split];
++
+ const uint32_t qstride = HSK_pad / 4 + 2; // in units of f16vec4
+ shared f16vec4 Qf[Br * qstride];
+ 
+@@ -213,6 +215,19 @@ void main() {
+                         }
+                     }
+                 }
++                // skip the block if the mask is entirely -inf
++                bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
++                barrier();
++                if (gl_SubgroupInvocationID == 0) {
++                    tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
++                }
++                barrier();
++                [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
++                    max_mask = max(max_mask, tmpsh[s]);
++                }
++                if (max_mask <= NEG_FLT_MAX_OVER_2) {
++                    continue;
++                }
+             }
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -176,15 +176,29 @@ void main() {
+                     tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
+                     tensorLayoutM = setTensorLayoutClampValueNV(tensorLayoutM, 0xfc00); // -inf in float16_t
+ 
++                    coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mvmax;
++
+                     coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++                    // skip the block if the mask is entirely -inf
++                    coopMatReduceNV(mvmax, mv, gl_CooperativeMatrixReduceRowAndColumnNV, maxReduceFp16);
++                    if (mvmax[0] <= NEG_FLT_MAX_OVER_2) {
++                        continue;
++                    }
+                 } else {
+                     tensorLayoutNV<2, Clamp> tensorLayoutM = createTensorLayoutNV(2, Clamp);
+                     // Don't clamp against nem1 when GQA is enabled
+                     uint32_t m_height = p.gqa_ratio > 1 ? ~0 : p.nem1;
+                     tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, m_height, KV);
+                     tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
+ 
++                    coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mvmax;
++
+                     coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++                    // skip the block if the mask is entirely -inf
++                    coopMatReduceNV(mvmax, mv, gl_CooperativeMatrixReduceRowAndColumnNV, maxReduceFp16);
++                    if (mvmax[0] <= NEG_FLT_MAX_OVER_2) {
++                        continue;
++                    }
+                 }
+             }
+         }

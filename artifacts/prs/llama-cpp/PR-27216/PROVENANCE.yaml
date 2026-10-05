@@ -1,0 +1,16 @@
+repo: ggml-org/llama.cpp
+pr: 27216
+url: https://github.com/ggml-org/llama.cpp/pull/27216
+merge_sha: bf942164697d2d62c2237a17b677dc2c017ea8e7
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/27216/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/cross_entropy_loss.comp
+  status: added
+  sha256: 974b60b7cdad7722b2627144cbadd6b25eb010ff327fd139a686396b22c4ee2d
+- path: ggml/src/ggml-vulkan/vulkan-shaders/cross_entropy_loss_back.comp
+  status: added
+  sha256: 502655ebcd2c420e8d0f6987fed6ca82babc161e767c93a24175f15f7b126e18

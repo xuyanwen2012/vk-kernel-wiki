@@ -1,0 +1,49 @@
+repo: ggml-org/llama.cpp
+pr: 21572
+url: https://github.com/ggml-org/llama.cpp/pull/21572
+merge_sha: 1f30ac0ceac0e2b4400069d81857089b6e04872a
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/21572/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+  status: modified
+  sha256: ae19d07a7f817c8308ef932ad90e28f97ae193ec763614c6309aa463e453c397
+- path: ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+  status: modified
+  sha256: 3a45873aded85788be0104150d4668169c805b02d2930ebad2f806f4078885fe
+- path: ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+  status: modified
+  sha256: f6afe6385d365d06cbd256a26e76027a66074fe01c0baef73d77f164afa8959d
+- path: ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
+  status: modified
+  sha256: bd62e87cbc60eaed4e46ab9605115ac2f397a1e0b30befe75b064467eac8e012
+- path: ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+  status: modified
+  sha256: d8a22c4f31699ebe568806d4a25cc3c94e99bd91546af0e1dd075fe67af08494
+- path: ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+  status: modified
+  sha256: 64ef0957041775bd43c61cfaca407db6353ab810e5f6a4a3dad13d5f620015c7
+- path: ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
+  status: modified
+  sha256: 3696520017a3ff1c039246218764e2a473331186450cbb112055c250f91c5f46
+- path: ggml/src/ggml-vulkan/vulkan-shaders/log.comp
+  status: modified
+  sha256: 3a45873aded85788be0104150d4668169c805b02d2930ebad2f806f4078885fe
+- path: ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+  status: modified
+  sha256: e4be64a77dd9e0dae91621ee38de41a66ce573d10f1061f485dc9c27aff7e218
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+  status: modified
+  sha256: 08e6afe929b3c35403b08b94fe50861202b9bb9032115e4eebdfc46e83197295
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+  status: modified
+  sha256: 75643f3f0d448c50a0c939efa7630b6e07604ee773537de8ab3fc8ce39766dc9
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rte.glsl
+  status: removed
+  sha256: 5e017564a9b973909b05ee1161cb5d3b6c69ac3ae611c912fe02c8251e773573
+- path: ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+  status: modified
+  sha256: 3a45873aded85788be0104150d4668169c805b02d2930ebad2f806f4078885fe

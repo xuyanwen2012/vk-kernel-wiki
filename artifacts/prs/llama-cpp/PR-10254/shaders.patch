@@ -1,0 +1,179 @@
+diff --git a/ggml/src/vulkan-shaders/clamp.comp b/ggml/src/vulkan-shaders/clamp.comp
+--- a/ggml/src/vulkan-shaders/clamp.comp
++++ b/ggml/src/vulkan-shaders/clamp.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = get_idx();
+ 
+diff --git a/ggml/src/vulkan-shaders/contig_copy.comp b/ggml/src/vulkan-shaders/contig_copy.comp
+--- /dev/null
++++ b/ggml/src/vulkan-shaders/contig_copy.comp
+@@ -0,0 +1,42 @@
++#version 450
++
++#include "types.comp"
++#include "generic_unary_head.comp"
++
++#extension GL_EXT_control_flow_attributes : require
++
++const uint num_threads = 128;
++
++layout(local_size_x = num_threads, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    uint idx = get_idx();
++
++    // num_threads * num_iter must equal 512, to match the wg_denoms and get_idx calculation
++    const uint num_iter = 4;
++
++    // fast path for when all four iterations are in-bounds
++    if (idx + (num_iter-1)*num_threads < p.ne) {
++        [[unroll]] for (uint i = 0; i < num_iter; ++i) {
++#ifndef OPTIMIZATION_ERROR_WORKAROUND
++            data_d[p.d_offset + idx] = D_TYPE(data_a[idx]);
++#else
++            data_d[p.d_offset + idx] = data_a[idx];
++#endif
++            idx += num_threads;
++        }
++    } else {
++        [[unroll]] for (uint i = 0; i < num_iter; ++i) {
++            if (idx >= p.ne) {
++                continue;
++            }
++
++#ifndef OPTIMIZATION_ERROR_WORKAROUND
++            data_d[p.d_offset + idx] = D_TYPE(data_a[idx]);
++#else
++            data_d[p.d_offset + idx] = data_a[idx];
++#endif
++            idx += num_threads;
++        }
++    }
++}
+diff --git a/ggml/src/vulkan-shaders/copy.comp b/ggml/src/vulkan-shaders/copy.comp
+--- a/ggml/src/vulkan-shaders/copy.comp
++++ b/ggml/src/vulkan-shaders/copy.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = get_idx();
+ 
+diff --git a/ggml/src/vulkan-shaders/cos.comp b/ggml/src/vulkan-shaders/cos.comp
+--- a/ggml/src/vulkan-shaders/cos.comp
++++ b/ggml/src/vulkan-shaders/cos.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = get_idx();
+ 
+diff --git a/ggml/src/vulkan-shaders/generic_unary_head.comp b/ggml/src/vulkan-shaders/generic_unary_head.comp
+--- a/ggml/src/vulkan-shaders/generic_unary_head.comp
++++ b/ggml/src/vulkan-shaders/generic_unary_head.comp
+@@ -1,4 +1,5 @@
+ #extension GL_EXT_shader_16bit_storage : require
++#extension GL_EXT_control_flow_attributes : require
+ 
+ layout (push_constant) uniform parameter
+ {
+@@ -9,8 +10,6 @@ layout (push_constant) uniform parameter
+     float param1; float param2;
+ } p;
+ 
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+ layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+ 
+diff --git a/ggml/src/vulkan-shaders/pad.comp b/ggml/src/vulkan-shaders/pad.comp
+--- a/ggml/src/vulkan-shaders/pad.comp
++++ b/ggml/src/vulkan-shaders/pad.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+ 
+diff --git a/ggml/src/vulkan-shaders/repeat.comp b/ggml/src/vulkan-shaders/repeat.comp
+--- a/ggml/src/vulkan-shaders/repeat.comp
++++ b/ggml/src/vulkan-shaders/repeat.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ uint src0_idx_mod(uint idx) {
+     const uint i13 = idx / (p.ne12*p.ne11*p.ne10);
+     const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
+diff --git a/ggml/src/vulkan-shaders/scale.comp b/ggml/src/vulkan-shaders/scale.comp
+--- a/ggml/src/vulkan-shaders/scale.comp
++++ b/ggml/src/vulkan-shaders/scale.comp
+@@ -3,12 +3,22 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++const uint num_threads = 128;
++
++layout(local_size_x = num_threads, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+-    const uint idx = get_idx();
++    uint idx = get_idx();
+ 
+-    if (idx >= p.ne) {
+-        return;
+-    }
++    // num_threads * num_iter must equal 512, to match the wg_denoms and get_idx calculation
++    const uint num_iter = 4;
+ 
+-    data_d[p.d_offset + dst_idx(idx)] = D_TYPE(FLOAT_TYPE(data_a[src0_idx(idx)]) * FLOAT_TYPE(p.param1));
++    [[unroll]] for (uint i = 0; i < num_iter; ++i) {
++        if (idx >= p.ne) {
++            continue;
++        }
++
++        data_d[p.d_offset + idx] = D_TYPE(FLOAT_TYPE(data_a[idx]) * FLOAT_TYPE(p.param1));
++        idx += num_threads;
++    }
+ }
+diff --git a/ggml/src/vulkan-shaders/sin.comp b/ggml/src/vulkan-shaders/sin.comp
+--- a/ggml/src/vulkan-shaders/sin.comp
++++ b/ggml/src/vulkan-shaders/sin.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = get_idx();
+ 
+diff --git a/ggml/src/vulkan-shaders/square.comp b/ggml/src/vulkan-shaders/square.comp
+--- a/ggml/src/vulkan-shaders/square.comp
++++ b/ggml/src/vulkan-shaders/square.comp
+@@ -3,6 +3,8 @@
+ #include "types.comp"
+ #include "generic_unary_head.comp"
+ 
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
+ void main() {
+     const uint idx = get_idx();
+ 

@@ -1,0 +1,10 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+@@ -1,5 +1,6 @@
+ #version 450
+ 
++#include "rte.comp"
+ #include "generic_head.comp"
+ #include "types.comp"
+ 

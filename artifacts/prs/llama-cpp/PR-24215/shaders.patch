@@ -1,0 +1,978 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/abs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/abs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/abs.comp
++++ /dev/null
+@@ -1,21 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    data_d[i] = D_TYPE(abs(float(data_a[i])));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/ceil.comp b/ggml/src/ggml-vulkan/vulkan-shaders/ceil.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/ceil.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(ceil(x));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp b/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+@@ -12,11 +12,11 @@ void main() {
+         return;
+     }
+ 
+-    const uint i13 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i13 = fastdiv(idx, p.ne1_012mp, fastdiv_L(p.ne1_Ls, 0));
+     const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
+-    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, fastdiv_L(p.ne1_Ls, 1));
+     const uint i12_offset = i12*p.ne11*p.ne10;
+-    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, fastdiv_L(p.ne1_Ls, 2));
+     const uint i10 = idx - i13_offset - i12_offset - i11*p.ne10;
+ 
+     if (i10 == i11) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/elu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/elu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/elu.comp
++++ /dev/null
+@@ -1,27 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    float x = float(data_a[i]);
+-
+-    if (x < 0.0f) {
+-        x = exp(x) - 1;
+-    }
+-
+-    data_d[i] = D_TYPE(x);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-    data_d[i] = D_TYPE(exp(float(data_a[i])));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/floor.comp b/ggml/src/ggml-vulkan/vulkan-shaders/floor.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/floor.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(floor(x));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
++++ /dev/null
+@@ -1,25 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const float GELU_COEF_A    = 0.044715f;
+-    const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float xi = float(data_a[i]);
+-    const float val = SQRT_2_OVER_PI*xi*(1.0f + GELU_COEF_A*xi*xi);
+-    data_d[i] = D_TYPE(0.5f*xi*(2.0f - 2.0f / (exp(2 * val) + 1)));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
++++ /dev/null
+@@ -1,39 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    // based on Abramowitz and Stegun formula 7.1.26 or similar Hastings' approximation
+-    // ref: https://www.johndcook.com/blog/python_erf/
+-    const float p_erf  = 0.3275911f;
+-    const float a1_erf = 0.254829592f;
+-    const float a2_erf = -0.284496736f;
+-    const float a3_erf = 1.421413741f;
+-    const float a4_erf = -1.453152027f;
+-    const float a5_erf = 1.061405429f;
+-
+-    const float SQRT_2_INV = 0.70710678118654752440084436210484f;
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float a = float(data_a[i]);
+-    const float a_div_sqr2 = a * SQRT_2_INV;
+-    const float sign_x = sign(a_div_sqr2);
+-    const float x = abs(a_div_sqr2);
+-    const float t = 1.0f / (1.0f + p_erf * x);
+-    const float y = 1.0f - (((((a5_erf * t + a4_erf) * t) + a3_erf) * t + a2_erf) * t + a1_erf) * t * exp(-x * x);
+-    const float erf_approx = sign_x * y;
+-
+-    data_d[i] = D_TYPE(0.5f * a * (1.0f + erf_approx));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
++++ /dev/null
+@@ -1,23 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const float GELU_QUICK_COEF = -1.702f;
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(x * (1.0f / (1.0f + exp(GELU_QUICK_COEF * x))));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
+@@ -7,14 +7,12 @@ layout (push_constant) uniform parameter
+     uint ne00; uint ne01; uint ne02; uint ne03; uint nb00; uint nb01; uint nb02; uint nb03;
+     uint ne10; uint ne11; uint ne12; uint ne13; uint nb10; uint nb11; uint nb12; uint nb13;
+     uint misalign_offsets;
+-    float param1; float param2;
++    float param1; float param2; float param3; float param4;
+ 
+-    uint ne0_012mp; uint ne0_012L;
+-    uint ne0_01mp;  uint ne0_01L;
+-    uint ne0_0mp;   uint ne0_0L;
+-    uint ne1_012mp; uint ne1_012L;
+-    uint ne1_01mp;  uint ne1_01L;
+-    uint ne1_0mp;   uint ne1_0L;
++    // The three L values are packed as bytes to keep this layout under the 128B
++    // push constant limit while still leaving room for four float parameters.
++    uint ne0_012mp; uint ne0_01mp;  uint ne0_0mp;  uint ne0_Ls;
++    uint ne1_012mp; uint ne1_01mp;  uint ne1_0mp;  uint ne1_Ls;
+ } p;
+ 
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+@@ -42,42 +40,46 @@ uint fastdiv(uint n, uint mp, uint L) {
+     return (msbs + n) >> L;
+ }
+ 
++uint fastdiv_L(uint packed, uint slot) {
++    return (packed >> (slot * 8)) & 0x3Fu;
++}
++
+ uint src0_idx(uint idx) {
+-    const uint i03 = fastdiv(idx, p.ne0_012mp, p.ne0_012L);
++    const uint i03 = fastdiv(idx, p.ne0_012mp, fastdiv_L(p.ne0_Ls, 0));
+     const uint i03_offset = i03 * p.ne02*p.ne01*p.ne00;
+-    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, p.ne0_01L);
++    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, fastdiv_L(p.ne0_Ls, 1));
+     const uint i02_offset = i02*p.ne01*p.ne00;
+-    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, p.ne0_0L);
++    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, fastdiv_L(p.ne0_Ls, 2));
+     const uint i00 = idx - i03_offset - i02_offset - i01*p.ne00;
+     return i03*p.nb03 + i02*p.nb02 + i01*p.nb01 + i00*p.nb00;
+ }
+ 
+ uint dst_idx(uint idx) {
+-    const uint i13 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i13 = fastdiv(idx, p.ne1_012mp, fastdiv_L(p.ne1_Ls, 0));
+     const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
+-    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, fastdiv_L(p.ne1_Ls, 1));
+     const uint i12_offset = i12*p.ne11*p.ne10;
+-    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, fastdiv_L(p.ne1_Ls, 2));
+     const uint i10 = idx - i13_offset - i12_offset - i11*p.ne10;
+     return i13*p.nb13 + i12*p.nb12 + i11*p.nb11 + i10*p.nb10;
+ }
+ 
+ uint src0_idx_quant(uint idx, uint qk) {
+-    const uint i03 = fastdiv(idx, p.ne0_012mp, p.ne0_012L);
++    const uint i03 = fastdiv(idx, p.ne0_012mp, fastdiv_L(p.ne0_Ls, 0));
+     const uint i03_offset = i03 * p.ne02*p.ne01*p.ne00;
+-    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, p.ne0_01L);
++    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, fastdiv_L(p.ne0_Ls, 1));
+     const uint i02_offset = i02*p.ne01*p.ne00;
+-    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, p.ne0_0L);
++    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, fastdiv_L(p.ne0_Ls, 2));
+     const uint i00 = idx - i03_offset - i02_offset - i01*p.ne00;
+     return i03*p.nb03 + i02*p.nb02 + i01*p.nb01 + (i00/qk)*p.nb00;
+ }
+ 
+ uint dst_idx_quant(uint idx, uint qk) {
+-    const uint i13 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i13 = fastdiv(idx, p.ne1_012mp, fastdiv_L(p.ne1_Ls, 0));
+     const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
+-    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, fastdiv_L(p.ne1_Ls, 1));
+     const uint i12_offset = i12*p.ne11*p.ne10;
+-    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, fastdiv_L(p.ne1_Ls, 2));
+     const uint i10 = idx - i13_offset - i12_offset - i11*p.ne10;
+     return i13*p.nb13 + i12*p.nb12 + i11*p.nb11 + (i10/qk)*p.nb10;
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+@@ -15,14 +15,33 @@ layout (push_constant) uniform parameter
+     uint mode;
+     float alpha;
+     float limit;
++    uint nb00;
+     uint nb01;
+     uint nb02;
+     uint nb03;
+-    uint ne01;
+-    uint ne02;
++    uint nb10;
+     uint nb11;
+     uint nb12;
+     uint nb13;
+-    uint ne11;
+-    uint ne12;
++    uint nb20;
++    uint nb21;
++    uint nb22;
++    uint nb23;
++    uint ne21;
++    uint ne22;
++    uint misalign_offsets;
++    uint ne2_012mp; uint ne2_012L;
++    uint ne2_01mp;  uint ne2_01L;
++    uint ne2_0mp;   uint ne2_0L;
+ } p;
++
++uint get_aoffset() { return p.misalign_offsets >> 16; }
++uint get_boffset() { return (p.misalign_offsets >> 8) & 0xFF; }
++uint get_doffset() { return p.misalign_offsets & 0xFF; }
++
++// see init_fastdiv_values in ggml-vulkan.cpp
++uint fastdiv(uint n, uint mp, uint L) {
++    uint msbs, lsbs;
++    umulExtended(n, mp, msbs, lsbs);
++    return (msbs + n) >> L;
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_main.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/glu_main.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_main.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_main.glsl
+@@ -5,35 +5,31 @@ void main() {
+         return;
+     }
+ 
+-    const uint row = i / p.ne20;
+-    const uint col = i - row * p.ne20;
++    const uint i23 = fastdiv(i, p.ne2_012mp, p.ne2_012L);
++    const uint i23_offset = i23 * p.ne22*p.ne21*p.ne20;
++    const uint i22 = fastdiv(i - i23_offset, p.ne2_01mp, p.ne2_01L);
++    const uint i22_offset = i22*p.ne21*p.ne20;
++    const uint i21 = fastdiv(i - i23_offset - i22_offset, p.ne2_0mp, p.ne2_0L);
++    const uint i20 = i - i23_offset - i22_offset - i21*p.ne20;
+ 
+-    const uint i3 = row / (p.ne01 * p.ne02);
+-    const uint i2 = (row % (p.ne01 * p.ne02)) / p.ne01;
+-    const uint i1 = row % p.ne01;
+-    const uint src_idx = i3 * p.nb03 + i2 * p.nb02 + i1 * p.nb01 + col;
+-
+-    const uint dst_i3 = row / (p.ne11 * p.ne12);
+-    const uint dst_i2 = (row % (p.ne11 * p.ne12)) / p.ne11;
+-    const uint dst_i1 = row % p.ne11;
+-    const uint dst_idx = dst_i3 * p.nb13 + dst_i2 * p.nb12 + dst_i1 * p.nb11 + col;
++    const uint src_idx_a = get_aoffset() + i23 * p.nb03 + i22 * p.nb02 + i21 * p.nb01 + i20 * p.nb00;
++    const uint src_idx_b = get_boffset() + i23 * p.nb13 + i22 * p.nb12 + i21 * p.nb11 + i20 * p.nb10;
++    const uint dst_idx = get_doffset() + i23 * p.nb23 + i22 * p.nb22 + i21 * p.nb21 + i20 * p.nb20;
+ 
+     if (p.mode == 0) {
+         // Default
+-        const uint offset = p.ne00 / 2;
+-        const uint idx = src_idx;
++        const uint offset = (p.ne00 / 2) * p.nb00;
++        const uint idx = src_idx_a;
+ 
+         data_d[dst_idx] = D_TYPE(op(float(data_a[idx]), float(data_a[idx + offset])));
+     } else if (p.mode == 1) {
+         // Swapped
+-        const uint offset = p.ne00 / 2;
+-        const uint idx = src_idx;
++        const uint offset = (p.ne00 / 2) * p.nb00;
++        const uint idx = src_idx_a;
+ 
+         data_d[dst_idx] = D_TYPE(op(float(data_a[idx + offset]), float(data_a[idx])));
+     } else {
+         // Split
+-        const uint idx = src_idx;
+-
+-        data_d[dst_idx] = D_TYPE(op(float(data_a[idx]), float(data_b[idx])));
++        data_d[dst_idx] = D_TYPE(op(float(data_a[src_idx_a]), float(data_b[src_idx_b])));
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp b/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(min(1.0f, max(0.0f, (x + 3.0f) / 6.0f)));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp b/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(x * min(1.0f, max(0.0f, (x + 3.0f) / 6.0f)));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/neg.comp b/ggml/src/ggml-vulkan/vulkan-shaders/neg.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/neg.comp
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-    data_d[i] = D_TYPE(-float(data_a[i]));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
++++ /dev/null
+@@ -1,21 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    data_d[i] = D_TYPE(max(float(data_a[i]), 0));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+@@ -13,11 +13,11 @@ void main() {
+     }
+ 
+     // Destination multi-index (inlined dst_idx)
+-    const uint i13 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i13 = fastdiv(idx, p.ne1_012mp, fastdiv_L(p.ne1_Ls, 0));
+     const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
+-    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, fastdiv_L(p.ne1_Ls, 1));
+     const uint i12_offset = i12*p.ne11*p.ne10;
+-    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, fastdiv_L(p.ne1_Ls, 2));
+     const uint i10 = idx - i13_offset - i12_offset - i11*p.ne10;
+     const uint d_idx = i13*p.nb13 + i12*p.nb12 + i11*p.nb11 + i10*p.nb10;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp b/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
+@@ -20,11 +20,11 @@ void main() {
+         return;
+     }
+ 
+-    const uint i3 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i3 = fastdiv(idx, p.ne1_012mp, fastdiv_L(p.ne1_Ls, 0));
+     const uint i3_offset = i3 * p.ne12*p.ne11*p.ne10;
+-    const uint i2 = fastdiv(idx - i3_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i2 = fastdiv(idx - i3_offset, p.ne1_01mp, fastdiv_L(p.ne1_Ls, 1));
+     const uint i2_offset = i2*p.ne11*p.ne10;
+-    const uint i1 = fastdiv(idx - i3_offset - i2_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i1 = fastdiv(idx - i3_offset - i2_offset, p.ne1_0mp, fastdiv_L(p.ne1_Ls, 2));
+     const uint i0 = idx - i3_offset - i2_offset - i1*p.ne10;
+ 
+     const uint p1 = floatBitsToUint(p.param1);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/round.comp b/ggml/src/ggml-vulkan/vulkan-shaders/round.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/round.comp
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    float result;
+-    // Round halfway cases away from zero as roundf does.
+-    if (x >= 0.0) {
+-        result = floor(x + 0.5);
+-    } else {
+-        result = ceil(x - 0.5);
+-    }
+-    data_d[i] = D_TYPE(result);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sgn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sgn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sgn.comp
++++ /dev/null
+@@ -1,21 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    data_d[i] = D_TYPE(sign(float(data_a[i])));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-    data_d[i] = D_TYPE(1. / (1 + exp(-1. * float(data_a[i]))));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float xi = float(data_a[i]);
+-    data_d[i] = D_TYPE(xi / (1.0f + exp(-xi)));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/softplus.comp b/ggml/src/ggml-vulkan/vulkan-shaders/softplus.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/softplus.comp
++++ /dev/null
+@@ -1,23 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    const float result = (x > 20.0f) ? x : log(1.0f + exp(x));
+-    data_d[i] = D_TYPE(result);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/step.comp b/ggml/src/ggml-vulkan/vulkan-shaders/step.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/step.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(x >= 0.0f ? 1.0f : 0.0f);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp b/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
++++ /dev/null
+@@ -1,20 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-    data_d[i] = D_TYPE(1. - 2. / (exp(2.*float(data_a[i])) + 1.));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp b/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+@@ -17,11 +17,11 @@ void main() {
+         return;
+     }
+ 
+-    const uint i03 = fastdiv(idx, p.ne0_012mp, p.ne0_012L);
++    const uint i03 = fastdiv(idx, p.ne0_012mp, fastdiv_L(p.ne0_Ls, 0));
+     const uint i03_offset = i03 * p.ne02*p.ne01*p.ne00;
+-    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, p.ne0_01L);
++    const uint i02 = fastdiv(idx - i03_offset, p.ne0_01mp, fastdiv_L(p.ne0_Ls, 1));
+     const uint i02_offset = i02*p.ne01*p.ne00;
+-    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, p.ne0_0L);
++    const uint i01 = fastdiv(idx - i03_offset - i02_offset, p.ne0_0mp, fastdiv_L(p.ne0_Ls, 2));
+     const uint i00 = idx - i03_offset - i02_offset - i01*p.ne00;
+ 
+     int param = floatBitsToInt(p.param1);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/trunc.comp b/ggml/src/ggml-vulkan/vulkan-shaders/trunc.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/trunc.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float x = float(data_a[i]);
+-    data_d[i] = D_TYPE(trunc(x));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp b/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
+@@ -0,0 +1,144 @@
++#version 450
++
++#include "types.glsl"
++#include "generic_unary_head.glsl"
++
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
++float op_abs(float x) {
++    return abs(x);
++}
++
++float op_sgn(float x) {
++    return sign(x);
++}
++
++float op_neg(float x) {
++    return -x;
++}
++
++float op_step(float x) {
++    return x >= 0.0f ? 1.0f : 0.0f;
++}
++
++float op_tanh(float x) {
++    return 1.0f - 2.0f / (exp(2.0f*x) + 1.0f);
++}
++
++float op_elu(float x) {
++    return x < 0.0f ? exp(x) - 1.0f : x;
++}
++
++float op_relu(float x) {
++    return max(x, 0.0f);
++}
++
++float op_sigmoid(float x) {
++    return 1.0f / (1.0f + exp(-x));
++}
++
++float op_gelu(float x) {
++    const float GELU_COEF_A    = 0.044715f;
++    const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
++    const float val = SQRT_2_OVER_PI*x*(1.0f + GELU_COEF_A*x*x);
++    return 0.5f*x*(2.0f - 2.0f / (exp(2.0f * val) + 1.0f));
++}
++
++float op_gelu_quick(float x) {
++    const float GELU_QUICK_COEF = -1.702f;
++    return x * (1.0f / (1.0f + exp(GELU_QUICK_COEF * x)));
++}
++
++float op_silu(float x) {
++    return x / (1.0f + exp(-x));
++}
++
++float op_hardswish(float x) {
++    return x * min(1.0f, max(0.0f, (x + 3.0f) / 6.0f));
++}
++
++float op_hardsigmoid(float x) {
++    return min(1.0f, max(0.0f, (x + 3.0f) / 6.0f));
++}
++
++float op_exp(float x) {
++    return exp(x);
++}
++
++float op_expm1(float x) {
++    // exp(x) - 1 loses many ulps to cancellation near zero.  Use a degree-6
++    // Taylor expansion for |x| <= 1/4: the omitted x^7/5040 term is < 1.3e-8,
++    // about 0.5 ulp at expm1(0.25), and a host-side f32 model stays within
++    // 2 ulps over the interval.  The first native exp(x)-1 values outside the
++    // cutoff are about 1 ulp for +0.25 and 2 ulps for -0.25.
++    if (abs(x) <= 0.25f) {
++        return x * (1.0f + x * (0.5f + x * ((1.0f/6.0f) + x * ((1.0f/24.0f) + x * ((1.0f/120.0f) + x * (1.0f/720.0f))))));
++    }
++    return exp(x) - 1.0f;
++}
++
++float op_softplus(float x) {
++    return (x > 20.0f) ? x : log(1.0f + exp(x));
++}
++
++float op_gelu_erf(float a) {
++    // based on Abramowitz and Stegun formula 7.1.26 or similar Hastings' approximation
++    const float p_erf  = 0.3275911f;
++    const float a1_erf = 0.254829592f;
++    const float a2_erf = -0.284496736f;
++    const float a3_erf = 1.421413741f;
++    const float a4_erf = -1.453152027f;
++    const float a5_erf = 1.061405429f;
++
++    const float SQRT_2_INV = 0.70710678118654752440084436210484f;
++    const float a_div_sqr2 = a * SQRT_2_INV;
++    const float sign_x = sign(a_div_sqr2);
++    const float x = abs(a_div_sqr2);
++    const float t = 1.0f / (1.0f + p_erf * x);
++    const float y = 1.0f - (((((a5_erf * t + a4_erf) * t) + a3_erf) * t + a2_erf) * t + a1_erf) * t * exp(-x * x);
++    return 0.5f * a * (1.0f + sign_x * y);
++}
++
++float op_xielu(float x) {
++    const float alpha_n = p.param1;
++    const float alpha_p = p.param2;
++    const float beta = p.param3;
++    const float eps = p.param4;
++
++    if (x > 0.0f) {
++        return alpha_p * x * x + beta * x;
++    }
++
++    const float min_x_eps = min(x, eps);
++    return (op_expm1(min_x_eps) - x) * alpha_n + beta * x;
++}
++
++float op_floor(float x) {
++    return floor(x);
++}
++
++float op_ceil(float x) {
++    return ceil(x);
++}
++
++float op_round(float x) {
++    // Round halfway cases away from zero as roundf does.
++    return x >= 0.0f ? floor(x + 0.5f) : ceil(x - 0.5f);
++}
++
++float op_trunc(float x) {
++    return trunc(x);
++}
++
++void main() {
++    const uint idx = get_idx();
++
++    if (idx >= p.ne) {
++        return;
++    }
++
++    const uint a_idx = get_aoffset() + src0_idx(idx);
++    const uint d_idx = get_doffset() + dst_idx(idx);
++
++    data_d[d_idx] = D_TYPE(OP(float(data_a[a_idx])));
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/xielu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/xielu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/xielu.comp
++++ /dev/null
+@@ -1,35 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    float x = float(data_a[i]);
+-
+-    float alpha_n = p.param1;
+-    float alpha_p = p.param2;
+-    float beta = p.param3;
+-    float eps = p.param4;
+-
+-    if (x > 0.0f) {
+-        x = alpha_p * x * x + beta * x;
+-    } else {
+-        const float min_x_eps = min(x, eps);
+-        x = (exp(min_x_eps) - 1 - x) * alpha_n + beta * x;
+-    }
+-
+-    data_d[i] = D_TYPE(x);
+-}

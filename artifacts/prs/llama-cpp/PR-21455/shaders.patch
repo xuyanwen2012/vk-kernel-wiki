@@ -1,0 +1,239 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+@@ -4,7 +4,7 @@
+ #include "generic_unary_head.glsl"
+ #include "dequant_funcs.glsl"
+ 
+-#if defined(DATA_A_IQ4_NL) || defined(DATA_A_MXFP4)
++#if defined(DATA_A_IQ4_NL) || defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)
+ // 16 invocations needed for init_iq_shmem
+ layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+ #else
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+@@ -450,6 +450,25 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+ }
+ #endif
+ 
++#if defined(DATA_A_NVFP4)
++vec2 dequantize(uint ib, uint iqs, uint a_offset) {
++    const uint sub = iqs >> 4;
++    const float d = ue4m3_to_fp32(data_a[a_offset + ib].d[sub]);
++    const uint j = iqs & 7;
++    const uint shift = (iqs & 8) >> 1; // 0 or 4
++    const uint vui0 = uint(data_a[a_offset + ib].qs[sub * 8u + j]);
++    const uint vui1 = uint(data_a[a_offset + ib].qs[sub * 8u + j + 1]);
++    const uint qs0 = (vui0 >> shift) & 0xF;
++    const uint qs1 = (vui1 >> shift) & 0xF;
++    return vec2(float(kvalues_mxfp4[qs0]), float(kvalues_mxfp4[qs1])) * d * 0.5;
++}
++vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
++    const vec2 v0 = dequantize(ib, iqs, a_offset);
++    const vec2 v1 = dequantize(ib, iqs + 2u, a_offset);
++    return vec4(v0.x, v0.y, v1.x, v1.y);
++}
++#endif
++
+ #if defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)
+ vec2 get_dm(uint ib, uint a_offset) {
+     return vec2(0, 0);
+@@ -484,6 +503,12 @@ vec2 get_dm(uint ib, uint a_offset) {
+ }
+ #endif
+ 
++#if defined(DATA_A_NVFP4)
++vec2 get_dm(uint ib, uint a_offset) {
++    return vec2(1.0, 0.0);
++}
++#endif
++
+ #if defined(DATA_A_Q4_1) || defined(DATA_A_Q5_1)
+ vec2 get_dm(uint ib, uint a_offset) {
+     const vec2 dm = vec2(data_a_packed32[a_offset + ib].dm);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+@@ -697,6 +697,24 @@ float16_t dequantFuncMXFP4(const in decodeBufMXFP4 bl, const in uint blockCoords
+ }
+ #endif
+ 
++#if defined(DATA_A_NVFP4)
++layout(buffer_reference, std430, buffer_reference_align = 4) buffer decodeBufNVFP4 {
++   block_nvfp4 block;
++};
++
++float16_t dequantFuncNVFP4(const in decodeBufNVFP4 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
++{
++    const uint idx = coordInBlock[1];
++    const uint sub = (idx & 0x30) >> 4;
++    const uint iqs = ((idx & 0x30) >> 1) + (idx & 0x7);
++    const uint shift = (idx & 0x8) >> 1;
++    const float d = ue4m3_to_fp32(bl.block.d[sub]);
++    uint qs = uint(bl.block.qs[iqs]);
++    qs = (qs >> shift) & 0xF;
++    return float16_t(kvalues_mxfp4[qs] * d * 0.5);
++}
++#endif
++
+ #if defined(DATA_A_Q1_0)
+ #define dequantFuncA dequantFuncQ1_0
+ #elif defined(DATA_A_Q4_0)
+@@ -743,6 +761,8 @@ float16_t dequantFuncMXFP4(const in decodeBufMXFP4 bl, const in uint blockCoords
+ #define dequantFuncA dequantFuncIQ4_NL
+ #elif defined(DATA_A_MXFP4)
+ #define dequantFuncA dequantFuncMXFP4
++#elif defined(DATA_A_NVFP4)
++#define dequantFuncA dequantFuncNVFP4
+ #elif defined(DATA_A_F32)
+ #define dequantFuncA dequantFuncF32
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_nvfp4.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_nvfp4.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_nvfp4.comp
+@@ -0,0 +1,32 @@
++#version 450
++
++#include "dequant_head.glsl"
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {block_nvfp4 data_a[];};
++layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
++
++void main() {
++    const uint i = gl_WorkGroupID.x * 4 + gl_LocalInvocationID.x / 64;
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    const uint tid = gl_LocalInvocationID.x % 64;
++    const uint sub = tid / 16;
++    const uint ir = tid % 16;
++    const uint ib = 16 * i + ir;
++    if (ib >= p.nel / 64) {
++        return;
++    }
++
++    const uint q_idx = 8 * sub;
++    const uint b_idx = 1024 * i + 64 * ir + 16 * sub;
++
++    const float d = ue4m3_to_fp32(data_a[ib].d[sub]);
++
++    [[unroll]] for (uint l = 0; l < 8; ++l) {
++        data_b[b_idx + l +  0] = D_TYPE(d * 0.5 * float(kvalues_mxfp4[data_a[ib].qs[q_idx + l] & 0xF]));
++        data_b[b_idx + l +  8] = D_TYPE(d * 0.5 * float(kvalues_mxfp4[data_a[ib].qs[q_idx + l] >>  4]));
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+@@ -501,6 +501,23 @@ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uin
+                                               kvalues_mxfp4[vui2 & 0xF] * d);
+             buf_a[buf_idx + 8] = FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
+                                               kvalues_mxfp4[vui2 >>  4] * d);
++#elif defined(DATA_A_NVFP4)
++            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++            // lo and hi nibbles are 8 elements apart, which doesn't quite line up with
++            // how the thread mapping and buf_idx calculation works for other types.
++            const uint buf_idx = col * SHMEM_STRIDE + (row & 3) + (row & ~3) * 2;
++
++            const uint ib = idx / 16u;
++            const uint sub = (idx & 0xC) >> 2;
++            const uint iqs = (idx & 0xF) * 2;
++            const float d = ue4m3_to_fp32(data_a[ib].d[sub]) * 0.5;
++            const uint vui = uint(data_a[ib].qs[iqs]);
++            const uint vui2 = uint(data_a[ib].qs[iqs+1]);
++
++            buf_a[buf_idx    ] = FLOAT_TYPEV2(kvalues_mxfp4[vui  & 0xF] * d,
++                                              kvalues_mxfp4[vui2 & 0xF] * d);
++            buf_a[buf_idx + 4] = FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
++                                              kvalues_mxfp4[vui2 >>  4] * d);
+ #endif
+ }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+@@ -1712,6 +1712,22 @@ struct block_mxfp4
+ #define A_TYPE block_mxfp4
+ #endif
+ 
++#define QUANT_K_NVFP4 64
++#define QUANT_R_NVFP4 1
++
++struct block_nvfp4
++{
++    uint8_t d[QUANT_K_NVFP4 / 16];
++    uint8_t qs[QUANT_K_NVFP4 / 2];
++};
++
++#if defined(DATA_A_NVFP4)
++#define QUANT_K QUANT_K_NVFP4
++#define QUANT_R QUANT_R_NVFP4
++#define QUANT_AUXF 1
++#define A_TYPE block_nvfp4
++#endif
++
+ #if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)
+ const int8_t kvalues_iq4nl_const[16] = {
+     int8_t(-127), int8_t(-104), int8_t(-83), int8_t(-65), int8_t(-49), int8_t(-35), int8_t(-22), int8_t(-10),
+@@ -1731,21 +1747,44 @@ void init_iq_shmem(uvec3 wgsize)
+ }
+ #endif
+ 
+-#if defined(DATA_A_MXFP4)
++#if defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)
+ const int8_t kvalues_mxfp4_const[16] = {
+     int8_t(0), int8_t(1), int8_t(2), int8_t(3), int8_t(4), int8_t(6), int8_t(8), int8_t(12),
+     int8_t(0), int8_t(-1), int8_t(-2), int8_t(-3), int8_t(-4), int8_t(-6), int8_t(-8), int8_t(-12),
+ };
+ 
+ shared int8_t kvalues_mxfp4[16];
+ 
++#if defined(DATA_A_NVFP4)
++// UE4M3 scale in NVFP4 blocks use only 7 bits; sign (bit 7) is always zero.
++shared float ue4m3_fp32_lut[128];
++
++float ue4m3_to_fp32_build(uint u) {
++    if (u == 0u || u == 127u) {
++        return 0.0;
++    }
++    const uint exp = (u >> 3) & 15u;
++    const uint man = u & 7u;
++    if (exp == 0u) {
++        return float(man) * (1.0 / 512.0);
++    }
++    const uint bits = (exp + 120u) << 23 | (man << 20);
++    return uintBitsToFloat(bits);
++}
++#endif
++
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+     for (uint i = gl_LocalInvocationIndex.x; i < kvalues_mxfp4.length(); i += wgsize.x) {
+         kvalues_mxfp4[i] = kvalues_mxfp4_const[i];
+     }
++#if defined(DATA_A_NVFP4)
++    for (uint i = gl_LocalInvocationIndex.x; i < 128u; i += wgsize.x) {
++        ue4m3_fp32_lut[i] = ue4m3_to_fp32_build(i);
++    }
++#endif
+     barrier();
+ }
+ #endif
+@@ -1782,6 +1821,12 @@ float e8m0_to_fp32(uint8_t x) {
+     return uintBitsToFloat(bits);
+ }
+ 
++#if defined(DATA_A_NVFP4)
++float ue4m3_to_fp32(uint8_t x) {
++    return ue4m3_fp32_lut[uint(x)];
++}
++#endif
++
+ #if BDA
+ 
+ #extension GL_EXT_buffer_reference : enable

@@ -6,7 +6,24 @@
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Vulkan: VK_KHR_cooperative_matrix support to speed up prompt processing](../sources/prs/llama-cpp/PR-10597.md) | `sources/prs/llama-cpp/PR-10597.md` |
+| [vulkan: small mul_mat_vec optimizations](../sources/prs/llama-cpp/PR-10665.md) | `sources/prs/llama-cpp/PR-10665.md` |
+| [Vulkan: fix NaN in tanh.comp with AMD proprietary driver on Windows](../sources/prs/llama-cpp/PR-10723.md) | `sources/prs/llama-cpp/PR-10723.md` |
+| [Vulkan: Add device-specific blacklist for coopmat for the AMD proprietary driver](../sources/prs/llama-cpp/PR-11074.md) | `sources/prs/llama-cpp/PR-11074.md` |
+| [Vulkan: Add Integer Dot Product mul_mat_vec shader for legacy quants](../sources/prs/llama-cpp/PR-14903.md) | `sources/prs/llama-cpp/PR-14903.md` |
+| [vulkan: optimizations for direct convolution](../sources/prs/llama-cpp/PR-14933.md) | `sources/prs/llama-cpp/PR-14933.md` |
+| [vulkan: MMQ Workaround for legacy Windows AMD driver bug](../sources/prs/llama-cpp/PR-17285.md) | `sources/prs/llama-cpp/PR-17285.md` |
+| [Vulkan: Tune Flash Attention for MoE on AMD GPUs](../sources/prs/llama-cpp/PR-18280.md) | `sources/prs/llama-cpp/PR-18280.md` |
+| [vulkan: Optimize GGML_OP_CUMSUM](../sources/prs/llama-cpp/PR-18417.md) | `sources/prs/llama-cpp/PR-18417.md` |
+| [Vulkan: Optimize Matmul parameters for AMD GPUs with Coopmat support](../sources/prs/llama-cpp/PR-18749.md) | `sources/prs/llama-cpp/PR-18749.md` |
+| [vulkan: Disable large coopmat matmul configuration on proprietary AMD driver](../sources/prs/llama-cpp/PR-18763.md) | `sources/prs/llama-cpp/PR-18763.md` |
+| [Vulkan Scalar Flash Attention Refactor](../sources/prs/llama-cpp/PR-19625.md) | `sources/prs/llama-cpp/PR-19625.md` |
+| [vulkan: fix fp16 Flash Attention on Windows AMD RDNA2 and below](../sources/prs/llama-cpp/PR-19921.md) | `sources/prs/llama-cpp/PR-19921.md` |
+| [vulkan: optimize im2col](../sources/prs/llama-cpp/PR-21713.md) | `sources/prs/llama-cpp/PR-21713.md` |
+| [vulkan: add fwht support for Intel with shmem reduction](../sources/prs/llama-cpp/PR-23964.md) | `sources/prs/llama-cpp/PR-23964.md` |
+| [Vulkan Phi Fix for AMD Proprietary Drivers](../sources/prs/llama-cpp/PR-5260.md) | `sources/prs/llama-cpp/PR-5260.md` |
+| [vulkan: only use M-sized matmul on Apple GPUs](../sources/prs/llama-cpp/PR-5412.md) | `sources/prs/llama-cpp/PR-5412.md` |
+| [Fix Vulkan Quantized Matrix Vector Multiplication on AMD GPUs when ncols < 64](../sources/prs/llama-cpp/PR-8855.md) | `sources/prs/llama-cpp/PR-8855.md` |
 
 ### `rdna3` (generation)
 
@@ -14,7 +31,9 @@ Path: `amd` > `rdna3`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [vulkan: subgroup size tuning](../sources/prs/llama-cpp/PR-12087.md) | `sources/prs/llama-cpp/PR-12087.md` |
+| [vulkan: tune mat-vec rows for batched inference on Strix Halo](../sources/prs/llama-cpp/PR-27909.md) | `sources/prs/llama-cpp/PR-27909.md` |
+| [vulkan: int8 coopmat1 matmul implementation for AMD RDNA3 and RDNA4](../sources/prs/llama-cpp/PR-27952.md) | `sources/prs/llama-cpp/PR-27952.md` |
 
 #### `radeon-780m` (device)
 
@@ -61,7 +80,29 @@ Path: `amd` > `rdna3` > `rx-7600`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Vulkan: VK_KHR_cooperative_matrix support to speed up prompt processing](../sources/prs/llama-cpp/PR-10597.md) | `sources/prs/llama-cpp/PR-10597.md` |
+| [vulkan: small mul_mat_vec optimizations](../sources/prs/llama-cpp/PR-10665.md) | `sources/prs/llama-cpp/PR-10665.md` |
+| [ggml: adds CONV_2D op and direct GEMM Vulkan implementation](../sources/prs/llama-cpp/PR-14316.md) | `sources/prs/llama-cpp/PR-14316.md` |
+| [Vulkan: Add Integer Dot Product mul_mat_vec shader for legacy quants](../sources/prs/llama-cpp/PR-14903.md) | `sources/prs/llama-cpp/PR-14903.md` |
+| [vulkan: optimizations for direct convolution](../sources/prs/llama-cpp/PR-14933.md) | `sources/prs/llama-cpp/PR-14933.md` |
+| [vulkan: fuse adds](../sources/prs/llama-cpp/PR-15252.md) | `sources/prs/llama-cpp/PR-15252.md` |
+| [vulkan: optimize rms_norm, and allow the work to spread across multiple SMs](../sources/prs/llama-cpp/PR-15281.md) | `sources/prs/llama-cpp/PR-15281.md` |
+| [vulkan: Use larger workgroups for mul_mat_vec when M is small](../sources/prs/llama-cpp/PR-15355.md) | `sources/prs/llama-cpp/PR-15355.md` |
+| [vulkan: apply MUL_MAT_ID subgroup optimization to non-coopmat devices](../sources/prs/llama-cpp/PR-15524.md) | `sources/prs/llama-cpp/PR-15524.md` |
+| [Vulkan: MMVQ Integer Dot K-Quant and MUL_MAT_ID support](../sources/prs/llama-cpp/PR-16900.md) | `sources/prs/llama-cpp/PR-16900.md` |
+| [vulkan: force full subgroups for flash attention to fix intel subgroup crash](../sources/prs/llama-cpp/PR-17356.md) | `sources/prs/llama-cpp/PR-17356.md` |
+| [vulkan: Optimize GGML_OP_CUMSUM](../sources/prs/llama-cpp/PR-18417.md) | `sources/prs/llama-cpp/PR-18417.md` |
+| [vulkan: work around Intel ANV fp16 bug in MMQ](../sources/prs/llama-cpp/PR-18814.md) | `sources/prs/llama-cpp/PR-18814.md` |
+| [vulkan: tune MMVQ for Intel Windows](../sources/prs/llama-cpp/PR-19988.md) | `sources/prs/llama-cpp/PR-19988.md` |
+| [vulkan: disable mmvq on Intel Windows driver](../sources/prs/llama-cpp/PR-20672.md) | `sources/prs/llama-cpp/PR-20672.md` |
+| [vulkan: fast path for walsh-hadamard transform](../sources/prs/llama-cpp/PR-23687.md) | `sources/prs/llama-cpp/PR-23687.md` |
+| [vulkan: add fwht support for Intel with shmem reduction](../sources/prs/llama-cpp/PR-23964.md) | `sources/prs/llama-cpp/PR-23964.md` |
+| [vulkan: add INTEL_XE1 arch enum and enable coopmat1 on Intel Xe-LPG Plus](../sources/prs/llama-cpp/PR-24404.md) | `sources/prs/llama-cpp/PR-24404.md` |
+| [vulkan: add SHMEM_STRIDE_PAD/APPLY_SLM_A_RESHAPE for coopmat1 on Intel Xe](../sources/prs/llama-cpp/PR-25380.md) | `sources/prs/llama-cpp/PR-25380.md` |
+| [vulkan : dequant q8_0 KV once in coopmat1](../sources/prs/llama-cpp/PR-25494.md) | `sources/prs/llama-cpp/PR-25494.md` |
+| [vulkan: add f16 B-type matmul pipelines and warp tile size tuning for Intel coopmat1](../sources/prs/llama-cpp/PR-27471.md) | `sources/prs/llama-cpp/PR-27471.md` |
+| [vulkan: Tune GDN kernel, fix Intel performance](../sources/prs/llama-cpp/PR-29476.md) | `sources/prs/llama-cpp/PR-29476.md` |
+| [Vulkan Intel Fixes, Optimizations and Debugging Flags](../sources/prs/llama-cpp/PR-5301.md) | `sources/prs/llama-cpp/PR-5301.md` |
 
 ### `xe2` (generation)
 
@@ -69,7 +110,12 @@ Path: `intel` > `xe2`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [vulkan: Enable VK_KHR_cooperative_matrix extension for Intel Xe2 GPUs](../sources/prs/llama-cpp/PR-14001.md) | `sources/prs/llama-cpp/PR-14001.md` |
+| [vulkan: Warptile tuning for Intel Xe2/Xe3](../sources/prs/llama-cpp/PR-18178.md) | `sources/prs/llama-cpp/PR-18178.md` |
+| [Vulkan Scalar Flash Attention Refactor](../sources/prs/llama-cpp/PR-19625.md) | `sources/prs/llama-cpp/PR-19625.md` |
+| [vulkan: Fix Windows performance regression on Intel GPU BF16 workloads for Xe2 and newer](../sources/prs/llama-cpp/PR-22461.md) | `sources/prs/llama-cpp/PR-22461.md` |
+| [vulkan: Block-load Q3_K/Q6_K block data and subtract on 32b ints](../sources/prs/llama-cpp/PR-23056.md) | `sources/prs/llama-cpp/PR-23056.md` |
+| [vulkan: add Intel Xe flash attention optimization kernels (2/3, Xe-LPG Plus/Xe2/Xe3)](../sources/prs/llama-cpp/PR-24406.md) | `sources/prs/llama-cpp/PR-24406.md` |
 
 #### `arc-b580` (device)
 
@@ -91,7 +137,15 @@ Path: `intel` > `xe2` > `arc-pro-b70`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Vulkan: Add Integer Dot Product mul_mat_vec shader for legacy quants](../sources/prs/llama-cpp/PR-14903.md) | `sources/prs/llama-cpp/PR-14903.md` |
+| [vulkan: optimizations for direct convolution](../sources/prs/llama-cpp/PR-14933.md) | `sources/prs/llama-cpp/PR-14933.md` |
+| [vulkan: Use larger workgroups for mul_mat_vec when M is small](../sources/prs/llama-cpp/PR-15355.md) | `sources/prs/llama-cpp/PR-15355.md` |
+| [vulkan: disable large mmv subgroups on older Nvidia GPUs](../sources/prs/llama-cpp/PR-15717.md) | `sources/prs/llama-cpp/PR-15717.md` |
+| [Vulkan: MMVQ Integer Dot K-Quant and MUL_MAT_ID support](../sources/prs/llama-cpp/PR-16900.md) | `sources/prs/llama-cpp/PR-16900.md` |
+| [vulkan: add log RTE support to fix Nvidia CI](../sources/prs/llama-cpp/PR-17320.md) | `sources/prs/llama-cpp/PR-17320.md` |
+| [vulkan: enable mmvq for q2_k on NVIDIA](../sources/prs/llama-cpp/PR-17675.md) | `sources/prs/llama-cpp/PR-17675.md` |
+| [Vulkan Flash Attention Coopmat1 Refactor](../sources/prs/llama-cpp/PR-19075.md) | `sources/prs/llama-cpp/PR-19075.md` |
+| [vulkan: disable coopmat1 flash attention on Nvidia Turing](../sources/prs/llama-cpp/PR-19290.md) | `sources/prs/llama-cpp/PR-19290.md` |
 
 ### `rtx-4070-ti-super` (device)
 
@@ -113,7 +167,9 @@ Path: `nvidia` > `jetson-orin`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Vulkan: route large matmuls to medium tile on Adreno](../sources/prs/llama-cpp/PR-24877.md) | `sources/prs/llama-cpp/PR-24877.md` |
+| [vulkan: tune KHR cooperative matrix support for Adreno GPUs](../sources/prs/llama-cpp/PR-29328.md) | `sources/prs/llama-cpp/PR-29328.md` |
+| [vulkan: fix argsort kernel selection for Adreno](../sources/prs/llama-cpp/PR-29469.md) | `sources/prs/llama-cpp/PR-29469.md` |
 
 ### `adreno-840` (device)
 

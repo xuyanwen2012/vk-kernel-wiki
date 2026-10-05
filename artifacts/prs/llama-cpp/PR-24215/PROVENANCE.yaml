@@ -1,0 +1,97 @@
+repo: ggml-org/llama.cpp
+pr: 24215
+url: https://github.com/ggml-org/llama.cpp/pull/24215
+merge_sha: 1a7718b4c57227a6c6187a2359c883c4d3089936
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/24215/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/abs.comp
+  status: removed
+  sha256: 5211d3f1d8a09c78e4f7ce7ec806686fb6994ab371cd414a2e1a5d4339d7a30f
+- path: ggml/src/ggml-vulkan/vulkan-shaders/ceil.comp
+  status: removed
+  sha256: 253c8c55b6c85bfe1805313e25394b8b833941b594f180e1dd57d0cb87ed43ab
+- path: ggml/src/ggml-vulkan/vulkan-shaders/diag.comp
+  status: modified
+  sha256: 8e9b9efeda34062c933002c9e133dce371cc927e847c6b822e7433e7f3d523c1
+- path: ggml/src/ggml-vulkan/vulkan-shaders/elu.comp
+  status: removed
+  sha256: cc798fc5c0bc18dd4add98a8f46d79d53f6a3e89343dc7646f8fa94db1177cd4
+- path: ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+  status: removed
+  sha256: a0bdd5d0be069fdef80cda539ee0c4882bf3624dc54234a1c076f1397311f04d
+- path: ggml/src/ggml-vulkan/vulkan-shaders/floor.comp
+  status: removed
+  sha256: 176490089304933c97bf8b46148d48271d4218c057159f4f5738c09819bcd784
+- path: ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
+  status: removed
+  sha256: 302b740a190d03846cfe268e3d92c904ac9ef5c467f50f5f0a1150ed86754a28
+- path: ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
+  status: removed
+  sha256: 397e995fbe7e80e036b56128ea0da8be23687f6ef3d7890ff419118492c1eb66
+- path: ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
+  status: removed
+  sha256: ebb987291935ee6c9e38a9553b13dfe0fa5cb250453833181395c9512cd87893
+- path: ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
+  status: modified
+  sha256: 8b0aae5836316ec8a854b3ddcb8ff4ff3fff6313674b5a2323e78972f34704ff
+- path: ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+  status: modified
+  sha256: 367bed59f357f180d1ddec4a392d67f8b2e06e6b8718d2dc9cc5eb49332240f1
+- path: ggml/src/ggml-vulkan/vulkan-shaders/glu_main.glsl
+  status: modified
+  sha256: 7e15fa4786a34d7dbb1a98eae1712561b64da51ff921064eb9979d7fd46accdb
+- path: ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
+  status: removed
+  sha256: 655b98636ae2f6f685e4901c8d61e9fdf460265539e611f173d0103b6efbbc83
+- path: ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
+  status: removed
+  sha256: c875bb988b8221a610315102623bd73cc13708bdad61fd2e41218b2018584387
+- path: ggml/src/ggml-vulkan/vulkan-shaders/neg.comp
+  status: removed
+  sha256: c2cf708526d9923d7833d4e37aa7443a39766a27165a2381b8657045bd756346
+- path: ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
+  status: removed
+  sha256: 91e221e7b75c80561febd79fddf9d0ef0fa58692e0529a4db4d83c1d98c4aa1a
+- path: ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+  status: modified
+  sha256: 20211bc5897c1fc8e79fb859c35eddca02ebef4bd373c6f2de801162994c1b5d
+- path: ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
+  status: modified
+  sha256: e59b129adc7c0db150a0095930111daf579bacb8a75bc4a6265a971a785070d4
+- path: ggml/src/ggml-vulkan/vulkan-shaders/round.comp
+  status: removed
+  sha256: eab192a67016ed277572c3aeb95c5468343d106f716886a69af4b8e639556297
+- path: ggml/src/ggml-vulkan/vulkan-shaders/sgn.comp
+  status: removed
+  sha256: eb147ba2af500c695aff09ece3035f0494bdf80073b307a8a8b06979cc6a7af8
+- path: ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
+  status: removed
+  sha256: 0cba5dc3f5f4495257938db2e94428cc9173a4e49dcbe0d8baeb2d828e3699a0
+- path: ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
+  status: removed
+  sha256: 0b61b70f395dd59d07a8cb46a060463ff7435721986006dea9c6b23af90c4c59
+- path: ggml/src/ggml-vulkan/vulkan-shaders/softplus.comp
+  status: removed
+  sha256: 816eacaedac5ee0c6769bb33f43962c6194509821c404751914072a84ef7ede6
+- path: ggml/src/ggml-vulkan/vulkan-shaders/step.comp
+  status: removed
+  sha256: d8b6bf74713104eab8037dbc7a8aa151e5d2ac7a48ea33b087ad0a94a6876319
+- path: ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+  status: removed
+  sha256: 35534e32f8b0cfaa96959ed8879da19a4a27237fd054385b0c453ad84e99a0d3
+- path: ggml/src/ggml-vulkan/vulkan-shaders/tri.comp
+  status: modified
+  sha256: bdeff2328046946f71016312505dcf90bd336aa66da31d20b7df68f52eec6d59
+- path: ggml/src/ggml-vulkan/vulkan-shaders/trunc.comp
+  status: removed
+  sha256: 02bea6b003b76dfebcec68856ef9546fae6ecfd98eaa31b723899e2dfca07c5e
+- path: ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
+  status: added
+  sha256: 22bc3992ee627675ef36d8ab70d126837a191665645d5986be8168227942b480
+- path: ggml/src/ggml-vulkan/vulkan-shaders/xielu.comp
+  status: removed
+  sha256: e93660c342380c03dabd82dfffea594733a54dc383d7a1efe61bdd80f66d6222

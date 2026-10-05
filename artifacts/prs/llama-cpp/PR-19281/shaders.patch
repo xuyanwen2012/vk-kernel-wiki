@@ -1,0 +1,494 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -94,6 +94,10 @@ void main() {
+         }
+     }
+ 
++    const uint32_t mo_stride = CEIL_DIV(KV, 16 * Bc);
++    // mo_offset will point to the tile starting at row i*Br and col 0
++    uint32_t mo_offset = mo_stride * i;
++
+ #if BLOCK_SIZE > 1
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / BLOCK_BYTE_SIZE;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / BLOCK_BYTE_SIZE;
+@@ -104,41 +108,41 @@ void main() {
+     uint32_t m_offset = gqa_iq1*KV;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+         m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
++        mo_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * CEIL_DIV(p.nem1, Br) * mo_stride;
+     }
+ 
++    uint32_t mask_opt = 0;
++    uint32_t mask_opt_idx = ~0;
++
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if (USE_MASK_OPT && mask_opt_idx != j / 16) {
++            mask_opt_idx = j / 16;
++            mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
++        }
++        uint32_t mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
++        if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
++            // skip this block
++            continue;
++        }
++        // Only load if the block is not all zeros
++        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0 && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+-            float max_mask = NEG_FLT_MAX_OVER_2;
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br) {
+                     if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+                         float m = float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
+                         masksh[c][r] = m;
+-                        max_mask = max(max_mask, m);
+                     } else {
+                         masksh[c][r] = float(0);
+                     }
+                 }
+             }
+-            // skip the block if the mask is entirely -inf
+-            bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
+-            barrier();
+-            if (gl_SubgroupInvocationID == 0) {
+-                tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
+-            }
+             barrier();
+-            [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
+-                max_mask = max(max_mask, tmpsh[s]);
+-            }
+-            if (max_mask <= NEG_FLT_MAX_OVER_2) {
+-                continue;
+-            }
+         }
+ 
+         float Sf[Br][cols_per_thread];
+@@ -185,7 +189,7 @@ void main() {
+             }
+         }
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0 && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+                 [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+                     float mvf = masksh[c * cols_per_iter + col_tid][r];
+@@ -256,9 +260,6 @@ void main() {
+         barrier();
+     }
+ 
+-    // prevent race on tmpsh
+-    barrier();
+-
+     // reduce across threads
+ 
+     [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -10,6 +10,7 @@ layout (constant_id = 5) const uint32_t Clamp = 0;
+ layout (constant_id = 6) const uint32_t D_split = 16;
+ layout (constant_id = 7) const uint32_t SubGroupSize = 32;
+ layout (constant_id = 8) const uint32_t K_LOAD_SHMEM = 0;
++layout (constant_id = 9) const bool     USE_MASK_OPT = false;
+ 
+ // Round up head sizes to a multiple of 16, for coopmat1/coopmat2 paths
+ const uint32_t HSK_pad = (HSK + 15) & ~15;
+@@ -66,6 +67,11 @@ layout (binding = 4) readonly buffer S {float data_s[];};
+ 
+ layout (binding = 5) writeonly buffer O {D_TYPE data_o[];};
+ 
++layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
++
++#define MASK_OPT_ALL_NEG_INF 1
++#define MASK_OPT_ALL_ZERO 2
++
+ #define BINDING_IDX_K 0
+ #define BINDING_IDX_V 1
+ #if defined(DATA_A_F32)
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -42,8 +42,6 @@ D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TY
+     return elem;
+ }
+ 
+-shared float tmpsh[row_split];
+-
+ const uint32_t qstride = HSK_pad / 4 + 2; // in units of f16vec4
+ shared f16vec4 Qf[Br * qstride];
+ 
+@@ -134,6 +132,10 @@ void main() {
+         }
+     }
+ 
++    const uint32_t mo_stride = CEIL_DIV(KV, 16 * Bc);
++    // mo_offset will point to the tile starting at row i*Br and col 0
++    uint32_t mo_offset = mo_stride * i;
++
+ #if BLOCK_SIZE > 1
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / BLOCK_BYTE_SIZE;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / BLOCK_BYTE_SIZE;
+@@ -144,66 +146,74 @@ void main() {
+     uint32_t m_offset = gqa_iq1*KV;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+         m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV;
++        mo_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * CEIL_DIV(p.nem1, Br) * mo_stride;
+     }
+ 
++    uint32_t mask_opt = 0;
++    uint32_t mask_opt_idx = ~0;
++
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+         f16vec4 mask_cache[Bc * Br / 4 / WorkGroupSize];
++        [[unroll]] for (uint32_t idx = 0; idx < mask_cache.length(); ++idx) {
++            mask_cache[idx] = f16vec4(0);
++        }
++
+         if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
+-            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+-            float max_mask = NEG_FLT_MAX_OVER_2;
+-            [[unroll]] for (uint32_t idx = 0; idx < Bc * Br / 4; idx += gl_WorkGroupSize.x) {
+-                uint32_t c = (idx + tid) / (Br / 4);
+-                uint32_t r = (idx + tid) % (Br / 4);
+-                if (idx + tid < Bc * Br / 4 || idx + gl_WorkGroupSize.x <= Bc * Br / 4) {
+-                    if ((!KV_bounds_check || j * Bc + c < KV)) {
+-                        f16vec4 m;
+-                        if (!nem1_bounds_check || i * Br + r * 4 + 3 < p.nem1) {
+-                            m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 2) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 3) * m_stride + (j * Bc + c)]);
+-                            max_mask = max(max(max(max(max_mask, float(m[0])), float(m[1])), float(m[2])), float(m[3]));
+-                        } else if (i * Br + r * 4 + 2 < p.nem1) {
+-                            m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 2) * m_stride + (j * Bc + c)],
+-                                        0.0);
+-                            max_mask = max(max(max(max_mask, float(m[0])), float(m[1])), float(m[2]));
+-                        } else if (i * Br + r * 4 + 1 < p.nem1) {
+-                            m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
+-                                        data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
+-                                        0.0,
+-                                        0.0);
+-                            max_mask = max(max(max_mask, float(m[0])), float(m[1]));
+-                        } else if (i * Br + r * 4 < p.nem1) {
+-                            m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
+-                                        0.0,
+-                                        0.0,
+-                                        0.0);
+-                            max_mask = max(max_mask, float(m[0]));
+-                        } else {
+-                            m = f16vec4(0.0);
++            if (USE_MASK_OPT && mask_opt_idx != j / 16) {
++                mask_opt_idx = j / 16;
++                mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
++            }
++            uint32_t mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
++            if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
++                // skip this block
++                continue;
++            }
++            // Only load if the block is not all zeros
++            if (mask_opt_bits != MASK_OPT_ALL_ZERO) {
++                bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
++
++                float max_mask = NEG_FLT_MAX_OVER_2;
++                [[unroll]] for (uint32_t idx = 0; idx < Bc * Br / 4; idx += gl_WorkGroupSize.x) {
++                    uint32_t c = (idx + tid) / (Br / 4);
++                    uint32_t r = (idx + tid) % (Br / 4);
++                    if (idx + tid < Bc * Br / 4 || idx + gl_WorkGroupSize.x <= Bc * Br / 4) {
++                        if ((!KV_bounds_check || j * Bc + c < KV)) {
++                            f16vec4 m;
++                            if (!nem1_bounds_check || i * Br + r * 4 + 3 < p.nem1) {
++                                m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 2) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 3) * m_stride + (j * Bc + c)]);
++                                max_mask = max(max(max(max(max_mask, float(m[0])), float(m[1])), float(m[2])), float(m[3]));
++                            } else if (i * Br + r * 4 + 2 < p.nem1) {
++                                m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 2) * m_stride + (j * Bc + c)],
++                                            0.0);
++                                max_mask = max(max(max(max_mask, float(m[0])), float(m[1])), float(m[2]));
++                            } else if (i * Br + r * 4 + 1 < p.nem1) {
++                                m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
++                                            data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
++                                            0.0,
++                                            0.0);
++                                max_mask = max(max(max_mask, float(m[0])), float(m[1]));
++                            } else if (i * Br + r * 4 < p.nem1) {
++                                m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
++                                            0.0,
++                                            0.0,
++                                            0.0);
++                                max_mask = max(max_mask, float(m[0]));
++                            } else {
++                                m = f16vec4(0.0);
++                            }
++                            mask_cache[idx / WorkGroupSize] = m;
+                         }
+-                        mask_cache[idx / WorkGroupSize] = m;
+                     }
+                 }
+             }
+-            // skip the block if the mask is entirely -inf
+-            bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
+-            barrier();
+-            if (gl_SubgroupInvocationID == 0) {
+-                tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
+-            }
+-            barrier();
+-            [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
+-                max_mask = max(max_mask, tmpsh[s]);
+-            }
+-            if (max_mask <= NEG_FLT_MAX_OVER_2) {
+-                continue;
+-            }
+         }
+ 
+         if (K_LOAD_SHMEM != 0) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -138,48 +138,53 @@ void main() {
+         coopMatPerElementNV(slopeMat, slopeMat, perElemOpComputeSlope, iq2);
+     }
+ 
++    const uint32_t mo_stride = CEIL_DIV(KV, 16 * Bc);
++    // mo_offset will point to the tile starting at row i*Br and col 0
++    uint32_t mo_offset = mo_stride * i;
++
+     uint32_t m_offset = gqa_iq1*KV * 2 /*sizeof(float16_t)*/;
+     if (p.nem2 != 1 || p.nem3 != 1) {
+         m_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 * KV * 2 /*sizeof(float16_t)*/;
++        mo_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * CEIL_DIV(p.nem1, Br) * mo_stride;
+     }
+ 
++    uint32_t mask_opt = 0;
++    uint32_t mask_opt_idx = ~0;
++
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+-        coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv;
++        coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv = coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(0);
+         if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
+-            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+-
+-            if (nem1_bounds_check) {
+-                tensorLayoutNV<2, gl_CooperativeMatrixClampModeConstantNV> tensorLayoutM = createTensorLayoutNV(2, gl_CooperativeMatrixClampModeConstantNV);
+-                tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, p.nem1, KV);
+-                tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
+-                tensorLayoutM = setTensorLayoutClampValueNV(tensorLayoutM, 0xfc00); // -inf in float16_t
+-
+-                coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mvmax;
+-
+-                coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
+-
+-                // skip the block if the mask is entirely -inf
+-                coopMatReduceNV(mvmax, mv, gl_CooperativeMatrixReduceRowAndColumnNV, maxReduceFp16);
+-                if (mvmax[0] <= NEG_FLT_MAX_OVER_2) {
+-                    continue;
+-                }
+-            } else {
+-                tensorLayoutNV<2, Clamp> tensorLayoutM = createTensorLayoutNV(2, Clamp);
+-                // Don't clamp against nem1 when GQA is enabled
+-                uint32_t m_height = p.gqa_ratio > 1 ? ~0 : p.nem1;
+-                tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, m_height, KV);
+-                tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
+-
+-                coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mvmax;
+ 
+-                coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
+-
+-                // skip the block if the mask is entirely -inf
+-                coopMatReduceNV(mvmax, mv, gl_CooperativeMatrixReduceRowAndColumnNV, maxReduceFp16);
+-                if (mvmax[0] <= NEG_FLT_MAX_OVER_2) {
+-                    continue;
++            if (USE_MASK_OPT && mask_opt_idx != j / 16) {
++                mask_opt_idx = j / 16;
++                mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
++            }
++            uint32_t mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
++            if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
++                // skip this block
++                continue;
++            }
++            // Only load if the block is not all zeros
++            if (mask_opt_bits != MASK_OPT_ALL_ZERO) {
++                bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
++
++                if (nem1_bounds_check) {
++                    tensorLayoutNV<2, gl_CooperativeMatrixClampModeConstantNV> tensorLayoutM = createTensorLayoutNV(2, gl_CooperativeMatrixClampModeConstantNV);
++                    tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, p.nem1, KV);
++                    tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
++                    tensorLayoutM = setTensorLayoutClampValueNV(tensorLayoutM, 0xfc00); // -inf in float16_t
++
++                    coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++                } else {
++                    tensorLayoutNV<2, Clamp> tensorLayoutM = createTensorLayoutNV(2, Clamp);
++                    // Don't clamp against nem1 when GQA is enabled
++                    uint32_t m_height = p.gqa_ratio > 1 ? ~0 : p.nem1;
++                    tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, m_height, KV);
++                    tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
++
++                    coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
+                 }
+             }
+         }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp
+@@ -0,0 +1,142 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : enable
++#extension GL_EXT_shader_16bit_storage : enable
++#extension GL_KHR_shader_subgroup_arithmetic : enable
++
++layout (constant_id = 0) const uint BLOCK_SIZE = 128;
++layout (constant_id = 1) const uint NUM_SUBGROUPS = 4;
++layout (constant_id = 2) const uint Br = 32;
++layout (constant_id = 3) const uint Bc = 32;
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {float16_t data_a[];};
++layout (binding = 0) readonly buffer Av4 {f16vec4 data_av4[];};
++layout (binding = 1) writeonly buffer D {uint data_d[];};
++
++layout (push_constant) uniform parameter {
++    uint nem0;
++    uint nem1;
++    uint nem2;
++    uint nbm1;
++    uint nbm2;
++    uint nbm3;
++    uint nbd1;
++    uint nbd2;
++    uint nbd3;
++};
++
++#define MASK_OPT_ALL_NEG_INF 1
++#define MASK_OPT_ALL_ZERO 2
++
++shared float minsh[NUM_SUBGROUPS];
++shared float maxsh[NUM_SUBGROUPS];
++
++// For each Br x Bc block of the mask (input) buffer, read all values and check
++// if it's all -inf or all zero. Write out a two-bit code indicating which it is
++// (or zero for neither). Each workgroup processes 16 tiles and writes out a
++// 32-bit result mask.
++//
++// TODO: This is a lot of work per workgroup, might make sense to split this into
++// more workgroups in the future.
++void main() {
++    // Each workgroup handles a row
++    const uint tid = gl_LocalInvocationIndex;
++    const uint i0 = gl_WorkGroupID.x;
++    const uint i1 = gl_WorkGroupID.y;
++    const uint i2 = gl_WorkGroupID.z % nem2;
++    const uint i3 = gl_WorkGroupID.z / nem2;
++
++    float FLT_MAX_OVER_2 = uintBitsToFloat(0x7EFFFFFF);
++
++    uint result = 0;
++
++    // Fast path for fully in-bounds blocks where we can do f16vec4 loads
++    if ((nem0 % Bc) == 0 && (nem1 % Br) == 0 &&
++        ((Br * Bc) % (BLOCK_SIZE * 4)) == 0) {
++        [[unroll]] for (uint block_x = 0; block_x < 16; ++block_x) {
++            float min_v = FLT_MAX_OVER_2;
++            float max_v = -FLT_MAX_OVER_2;
++            [[unroll]] for (uint i = 0; i < Br * Bc / 4; i += BLOCK_SIZE) {
++                uint j0 = (i + tid) % (Bc / 4);
++                uint j1 = (i + tid) / (Bc / 4);
++
++                j0 *= 4;
++                j0 += (i0 * 16 + block_x) * Bc;
++                j1 += i1 * Br;
++
++                vec4 f = vec4(data_av4[(j0 + j1 * nbm1 + i2 * nbm2 + i3 * nbm3) / 4]);
++                [[unroll]] for (int c = 0; c < 4; ++c) {
++                    min_v = min(min_v, f[c]);
++                    max_v = max(max_v, f[c]);
++                }
++            }
++            min_v = subgroupMin(min_v);
++            max_v = subgroupMax(max_v);
++            if (gl_SubgroupInvocationID == 0) {
++                minsh[gl_SubgroupID] = min_v;
++                maxsh[gl_SubgroupID] = max_v;
++            }
++            barrier();
++            if (tid == 0) {
++                [[unroll]] for (uint i = 0; i < NUM_SUBGROUPS; ++i) {
++                    min_v = min(min_v, minsh[i]);
++                    max_v = max(max_v, maxsh[i]);
++                }
++                if (max_v <= -FLT_MAX_OVER_2) {
++                    result |= 1 << (2*block_x);
++                }
++                if (min_v == 0.0f && max_v == 0.0f) {
++                    result |= 2 << (2*block_x);
++                }
++            }
++            barrier();
++        }
++    } else {
++        [[unroll]] for (uint block_x = 0; block_x < 16; ++block_x) {
++            float min_v = FLT_MAX_OVER_2;
++            float max_v = -FLT_MAX_OVER_2;
++            [[unroll]] for (uint i = 0; i < Br * Bc; i += BLOCK_SIZE) {
++                if ((Br * Bc % BLOCK_SIZE) != 0 && i + tid >= Br * Bc) {
++                    continue;
++                }
++                uint j0 = (i + tid) % Bc;
++                uint j1 = (i + tid) / Bc;
++
++                j0 += (i0 * 16 + block_x) * Bc;
++                j1 += i1 * Br;
++
++                if (j0 < nem0 && j1 < nem1) {
++                    float f = float(data_a[j0 + j1 * nbm1 + i2 * nbm2 + i3 * nbm3]);
++                    min_v = min(min_v, f);
++                    max_v = max(max_v, f);
++                }
++            }
++            min_v = subgroupMin(min_v);
++            max_v = subgroupMax(max_v);
++            if (gl_SubgroupInvocationID == 0) {
++                minsh[gl_SubgroupID] = min_v;
++                maxsh[gl_SubgroupID] = max_v;
++            }
++            barrier();
++            if (tid == 0) {
++                [[unroll]] for (uint i = 0; i < NUM_SUBGROUPS; ++i) {
++                    min_v = min(min_v, minsh[i]);
++                    max_v = max(max_v, maxsh[i]);
++                }
++                if (max_v <= -FLT_MAX_OVER_2) {
++                    result |= 1 << (2*block_x);
++                }
++                if (min_v == 0.0f && max_v == 0.0f) {
++                    result |= 2 << (2*block_x);
++                }
++            }
++            barrier();
++        }
++    }
++
++    if (tid == 0) {
++        data_d[i0 + i1 * nbd1 + i2 * nbd2 + i3 * nbd3] = result;
++    }
++}

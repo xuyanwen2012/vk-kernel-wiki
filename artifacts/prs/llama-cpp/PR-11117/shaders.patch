@@ -1,0 +1,11 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/test_coopmat_support.comp b/ggml/src/ggml-vulkan/vulkan-shaders/test_coopmat_support.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/test_coopmat_support.comp
+@@ -0,0 +1,7 @@
++#version 460
++
++#extension GL_KHR_cooperative_matrix : require
++
++void main()
++{
++}

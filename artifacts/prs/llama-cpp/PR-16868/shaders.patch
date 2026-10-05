@@ -1,0 +1,147 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+@@ -28,8 +28,11 @@ layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+ #endif
+ 
+ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
++
++layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
++
+ #ifdef MUL_MAT_ID
+-layout (binding = 3) readonly buffer IDS {int data_ids[];};
++layout (binding = 4) readonly buffer IDS {int data_ids[];};
+ #endif
+ 
+ #include "dequant_funcs.glsl"
+@@ -45,6 +48,8 @@ layout (push_constant) uniform parameter
+     uint batch_stride_b;
+     uint batch_stride_d;
+ 
++    uint enable_bias;
++
+ #ifdef MUL_MAT_ID
+     uint nei0;
+     uint ne11;
+@@ -56,6 +61,10 @@ layout (push_constant) uniform parameter
+ #endif
+ } p;
+ 
++#ifdef MUL_MAT_ID
++uint expert_id;
++#endif
++
+ void get_offsets(out uint a_offset, out uint b_offset, out uint d_offset) {
+ #ifdef MUL_MAT_ID
+     const uint expert_idx = gl_GlobalInvocationID.y;
+@@ -75,7 +84,7 @@ void get_offsets(out uint a_offset, out uint b_offset, out uint d_offset) {
+         batch_idx_a = i03 * p.ne02 + i02;
+     }
+ #else
+-    const uint expert_id = data_ids[expert_idx];
++    expert_id = data_ids[expert_idx];
+ #endif
+ 
+     a_offset =
+@@ -113,6 +122,13 @@ void reduce_result(inout FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t
+     if (tid == 0) {
+         [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
+             [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++                if (p.enable_bias != 0) {
++#ifdef MUL_MAT_ID
++                    temp[j][n] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
++#else
++                    temp[j][n] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
++#endif
++                }
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(temp[j][n]);
+             }
+         }
+@@ -148,6 +164,13 @@ void reduce_result(FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t d_offs
+                 [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
+                     temp[j][n] += tmpsh[j][n][s];
+                 }
++                if (p.enable_bias != 0) {
++#ifdef MUL_MAT_ID
++                    temp[j][n] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
++#else
++                    temp[j][n] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
++#endif
++                }
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(temp[j][n]);
+             }
+         }
+@@ -173,6 +196,13 @@ void reduce_result(FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t d_offs
+     if (tid == 0) {
+         [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
+             [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++                if (p.enable_bias != 0) {
++#ifdef MUL_MAT_ID
++                    tmpsh[j][n][0] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
++#else
++                    tmpsh[j][n][0] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
++#endif
++                }
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(tmpsh[j][n][0]);
+             }
+         }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
+@@ -15,6 +15,8 @@ layout (binding = 2) writeonly buffer D {D_TYPE dst[];};
+ layout (binding = 0) readonly buffer AV4 {A_TYPE_VEC4 data_a_v4[];};
+ layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+ 
++layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
++
+ layout (push_constant) uniform parameter
+ {
+     uint ncols_x;
+@@ -29,6 +31,7 @@ layout (push_constant) uniform parameter
+     uint nb03;
+     uint nb13;
+     uint nb23;
++    uint enable_bias;
+ } p;
+ 
+ shared FLOAT_TYPE tmp[BLOCK_SIZE];
+@@ -117,6 +120,9 @@ void main() {
+     }
+ 
+     if (tid == 0) {
++        if (p.enable_bias != 0) {
++            tmp[0] += FLOAT_TYPE(data_bias[idst]);
++        }
+         dst[idst] = tmp[0];
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
+@@ -17,6 +17,8 @@ layout (binding = 2) writeonly buffer D {D_TYPE dst[];};
+ layout (binding = 0) readonly buffer AV4 {A_TYPE_VEC4 data_a_v4[];};
+ layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+ 
++layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
++
+ layout(constant_id = 0) const int BLOCK_SIZE = 32;
+ // gqa_ratio is in the range [1,8]
+ layout(constant_id = 1) const uint gqa_ratio = 1;
+@@ -29,6 +31,7 @@ layout (push_constant) uniform parameter
+     uint nchannels_y;
+     uint b_offset;
+     uint d_offset;
++    uint enable_bias;
+ } p;
+ 
+ #if !USE_SUBGROUP_ADD
+@@ -148,6 +151,9 @@ void main() {
+         [[unroll]] for (uint c = 0; c < gqa_ratio; ++c) {
+             // dst is not transposed and not permuted
+             const uint idst = (channel + c)*nrows_dst + row_dst;
++            if (p.enable_bias != 0) {
++                temp[c] += FLOAT_TYPE(data_bias[idst]);
++            }
+             dst[idst] = temp[c];
+         }
+     }

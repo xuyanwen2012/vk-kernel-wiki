@@ -1,0 +1,67 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
+@@ -6,6 +6,9 @@
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+     // i1 is actually i2*nb2+i1, but the rows are contiguous
+-    const uint i1 = gl_GlobalInvocationID.x;
++    const uint i1 = gl_GlobalInvocationID.x + 32768 * gl_GlobalInvocationID.z;
++    if (i1 >= pc.nrows) {
++        return;
++    }
+     rope_multi(i0, i1, pc);
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+@@ -6,6 +6,9 @@
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+     // i1 is actually i2*nb2+i1, but the rows are contiguous
+-    const uint i1 = gl_GlobalInvocationID.x;
++    const uint i1 = gl_GlobalInvocationID.x + 32768 * gl_GlobalInvocationID.z;
++    if (i1 >= pc.nrows) {
++        return;
++    }
+     rope_neox(i0, i1, pc);
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+@@ -6,6 +6,9 @@
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+     // i1 is actually i2*nb2+i1, but the rows are contiguous
+-    const uint i1 = gl_GlobalInvocationID.x;
++    const uint i1 = gl_GlobalInvocationID.x + 32768 * gl_GlobalInvocationID.z;
++    if (i1 >= pc.nrows) {
++        return;
++    }
+     rope_norm(i0, i1, pc);
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+@@ -6,6 +6,7 @@
+ struct rope_params {
+     uint rope_mode;
+     uint ncols;
++    uint nrows;
+     uint n_dims;
+     float freq_scale;
+     uint p_delta_rows;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
+@@ -6,6 +6,9 @@
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+     // i1 is actually i2*nb2+i1, but the rows are contiguous
+-    const uint i1 = gl_GlobalInvocationID.x;
++    const uint i1 = gl_GlobalInvocationID.x + 32768 * gl_GlobalInvocationID.z;
++    if (i1 >= pc.nrows) {
++        return;
++    }
+     rope_vision(i0, i1, pc);
+ }

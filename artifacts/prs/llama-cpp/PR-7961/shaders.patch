@@ -1,0 +1,72 @@
+diff --git a/vulkan-shaders/mul_mat_vec.comp b/vulkan-shaders/mul_mat_vec.comp
+--- a/vulkan-shaders/mul_mat_vec.comp
++++ b/vulkan-shaders/mul_mat_vec.comp
+@@ -13,7 +13,7 @@ layout (constant_id = 0) const uint BLOCK_SIZE = 32;
+ shared FLOAT_TYPE tmp[BLOCK_SIZE];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+     const uint tid = gl_LocalInvocationID.x;
+ 
+     uint a_offset, b_offset, d_offset;
+diff --git a/vulkan-shaders/mul_mat_vec_q2_k.comp b/vulkan-shaders/mul_mat_vec_q2_k.comp
+--- a/vulkan-shaders/mul_mat_vec_q2_k.comp
++++ b/vulkan-shaders/mul_mat_vec_q2_k.comp
+@@ -7,7 +7,7 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ shared FLOAT_TYPE tmp[32];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+ 
+     uint a_offset, b_offset, d_offset;
+     get_offsets(a_offset, b_offset, d_offset);
+diff --git a/vulkan-shaders/mul_mat_vec_q3_k.comp b/vulkan-shaders/mul_mat_vec_q3_k.comp
+--- a/vulkan-shaders/mul_mat_vec_q3_k.comp
++++ b/vulkan-shaders/mul_mat_vec_q3_k.comp
+@@ -7,7 +7,7 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ shared FLOAT_TYPE tmp[32];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+ 
+     uint a_offset, b_offset, d_offset;
+     get_offsets(a_offset, b_offset, d_offset);
+diff --git a/vulkan-shaders/mul_mat_vec_q4_k.comp b/vulkan-shaders/mul_mat_vec_q4_k.comp
+--- a/vulkan-shaders/mul_mat_vec_q4_k.comp
++++ b/vulkan-shaders/mul_mat_vec_q4_k.comp
+@@ -7,7 +7,7 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ shared FLOAT_TYPE tmp[32];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+ 
+     uint a_offset, b_offset, d_offset;
+     get_offsets(a_offset, b_offset, d_offset);
+diff --git a/vulkan-shaders/mul_mat_vec_q5_k.comp b/vulkan-shaders/mul_mat_vec_q5_k.comp
+--- a/vulkan-shaders/mul_mat_vec_q5_k.comp
++++ b/vulkan-shaders/mul_mat_vec_q5_k.comp
+@@ -7,7 +7,7 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ shared FLOAT_TYPE tmp[32];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+ 
+     uint a_offset, b_offset, d_offset;
+     get_offsets(a_offset, b_offset, d_offset);
+diff --git a/vulkan-shaders/mul_mat_vec_q6_k.comp b/vulkan-shaders/mul_mat_vec_q6_k.comp
+--- a/vulkan-shaders/mul_mat_vec_q6_k.comp
++++ b/vulkan-shaders/mul_mat_vec_q6_k.comp
+@@ -7,7 +7,7 @@ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ shared FLOAT_TYPE tmp[32];
+ 
+ void main() {
+-    const uint row = gl_WorkGroupID.x;
++    const uint row = gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z;
+ 
+     uint a_offset, b_offset, d_offset;
+     get_offsets(a_offset, b_offset, d_offset);

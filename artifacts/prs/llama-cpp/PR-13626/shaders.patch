@@ -1,0 +1,23 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
++#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ 
+ #include "dequant_head.comp"
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -7,7 +7,7 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+ #endif
+ #if defined(DATA_A_IQ1_M)
+-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
++#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #endif
+ 
+ #if defined(DATA_A_BF16) && defined(COOPMAT)

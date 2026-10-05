@@ -1,0 +1,356 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -38,17 +38,7 @@
+ #define LOAD_VEC_B 1
+ #endif
+ 
+-// Load 2 values at once without affecting index calculations through LOAD_VEC
+-#if (defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)) && !defined(ALIGNED)
+-#define LOAD_VEC_BATCH_A 2
+-#else
+-#define LOAD_VEC_BATCH_A 1
+-#endif
+-#if !defined(ALIGNED)
+-#define LOAD_VEC_BATCH_B 2
+-#else
+-#define LOAD_VEC_BATCH_B 1
+-#endif
++layout (constant_id = 11) const uint ALIGNED = 0;
+ 
+ #if !defined(TO_FLOAT_TYPE)
+ #define TO_FLOAT_TYPE FLOAT_TYPE
+@@ -57,6 +47,13 @@
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
++#if defined(DATA_A_F32)
++layout (binding = 0) readonly buffer A_SCALAR {float data_a_scalar[];};
++#elif defined(DATA_A_F16)
++layout (binding = 0) readonly buffer A_SCALAR {float16_t data_a_scalar[];};
++#elif defined(DATA_A_BF16)
++layout (binding = 0) readonly buffer A_SCALAR {uint16_t data_a_scalar[];};
++#endif
+ #if defined(A_TYPE_PACKED16)
+ layout (binding = 0) readonly buffer A_PACKED16 {A_TYPE_PACKED16 data_a_packed16[];};
+ #endif
+@@ -65,6 +62,7 @@ layout (binding = 0) readonly buffer A_PACKED32 {A_TYPE_PACKED32 data_a_packed32
+ #endif
+ 
+ layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
++layout (binding = 1) readonly buffer B_SCALAR {B_TYPE_SCALAR data_b_scalar[];};
+ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ 
+ #ifdef MUL_MAT_ID
+@@ -194,13 +192,23 @@ void main() {
+     const uint warp_r = warp_i % (BM / WM);
+     const uint warp_c = warp_i / (BM / WM);
+ 
+-    const uint loadr_a = gl_LocalInvocationID.x % (BK / LOAD_VEC_A / LOAD_VEC_BATCH_A);
+-    const uint loadc_a = gl_LocalInvocationID.x / (BK / LOAD_VEC_A / LOAD_VEC_BATCH_A);
+-    const uint loadr_b = gl_LocalInvocationID.x % (BK / LOAD_VEC_B / LOAD_VEC_BATCH_B);
+-    const uint loadc_b = gl_LocalInvocationID.x / (BK / LOAD_VEC_B / LOAD_VEC_BATCH_B);
++#if defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)
++    const uint LOAD_VEC_A_EFF = (ALIGNED != 0) ? LOAD_VEC_A : 1;
++    const uint LOAD_VEC_BATCH_A = (ALIGNED != 0) ? 1 : 2;
++#else
++    const uint LOAD_VEC_A_EFF = LOAD_VEC_A;
++    const uint LOAD_VEC_BATCH_A = 1;
++#endif
++    const uint LOAD_VEC_B_EFF = (ALIGNED != 0) ? LOAD_VEC_B : 1;
++    const uint LOAD_VEC_BATCH_B = (ALIGNED != 0) ? 1 : 2;
++
++    const uint loadr_a = gl_LocalInvocationID.x % (BK / LOAD_VEC_A_EFF / LOAD_VEC_BATCH_A);
++    const uint loadc_a = gl_LocalInvocationID.x / (BK / LOAD_VEC_A_EFF / LOAD_VEC_BATCH_A);
++    const uint loadr_b = gl_LocalInvocationID.x % (BK / LOAD_VEC_B_EFF / LOAD_VEC_BATCH_B);
++    const uint loadc_b = gl_LocalInvocationID.x / (BK / LOAD_VEC_B_EFF / LOAD_VEC_BATCH_B);
+ 
+-    const uint loadstride_a = gl_WorkGroupSize.x * LOAD_VEC_A * LOAD_VEC_BATCH_A / BK;
+-    const uint loadstride_b = gl_WorkGroupSize.x * LOAD_VEC_B * LOAD_VEC_BATCH_B / BK;
++    const uint loadstride_a = gl_WorkGroupSize.x * LOAD_VEC_A_EFF * LOAD_VEC_BATCH_A / BK;
++    const uint loadstride_b = gl_WorkGroupSize.x * LOAD_VEC_B_EFF * LOAD_VEC_BATCH_B / BK;
+ 
+ #ifdef MUL_MAT_ID
+ #ifdef MUL_MAT_ID_USE_SUBGROUPS
+@@ -239,15 +247,15 @@ void main() {
+ 
+     uint pos_a =
+ #ifdef MUL_MAT_ID
+-        expert_idx * (p.batch_stride_a / LOAD_VEC_A) +
++        expert_idx * (p.batch_stride_a / LOAD_VEC_A_EFF) +
+ #else
+-        batch_idx_a * (p.batch_stride_a / LOAD_VEC_A) +
++        batch_idx_a * (p.batch_stride_a / LOAD_VEC_A_EFF) +
+ #endif
+-        (ir * BM * p.stride_a + start_k) / LOAD_VEC_A;
++        (ir * BM * p.stride_a + start_k) / LOAD_VEC_A_EFF;
+ #ifdef MUL_MAT_ID
+     uint pos_b = 0;
+ #else
+-    uint pos_b = (batch_idx * p.batch_stride_b + ic * BN * p.stride_b + start_k) / LOAD_VEC_B;
++    uint pos_b = (batch_idx * p.batch_stride_b + ic * BN * p.stride_b + start_k) / LOAD_VEC_B_EFF;
+ #endif
+ 
+ #ifdef COOPMAT
+@@ -287,8 +295,8 @@ void main() {
+ 
+         barrier();
+ 
+-        pos_a += BK / LOAD_VEC_A;
+-        pos_b += BK / LOAD_VEC_B;
++        pos_a += BK / LOAD_VEC_A_EFF;
++        pos_b += BK / LOAD_VEC_B_EFF;
+ 
+ #ifdef COOPMAT
+         [[unroll]] for (uint i = 0; i < BK; i += TK) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -36,6 +36,7 @@ layout (constant_id = 3) const uint BK = 16;  // Assumed to be 32 if working wit
+ layout (constant_id = 4) const bool enable_smaller_matrices = false;
+ const uint BNover2 = enable_smaller_matrices ? (BN / 2) : BN;
+ const uint BNover4 = enable_smaller_matrices ? (BN / 4) : BN;
++layout (constant_id = 5) const uint ALIGNED = 0;
+ 
+ layout (push_constant) uniform parameter
+ {
+@@ -111,7 +112,7 @@ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufB {
+ };
+ 
+ uint _ne1;
+-layout (constant_id = 5) const uint subgroup_size = 32;
++layout (constant_id = 6) const uint subgroup_size = 32;
+ shared uvec4 ballots_sh[BLOCK_SIZE / subgroup_size];
+ 
+ B_TYPE decodeFuncB(const in decodeBufB bl, const in uint blockCoords[2], const in uint coordInBlock[2])
+@@ -297,12 +298,12 @@ void main() {
+ 
+     // Hint to the compiler that values are aligned (want 16B alignment).
+     // Quants are always block-aligned, no alignment needed.
+-#if ALIGNED
++    if (ALIGNED != 0) {
+ #if QUANT_K == 1
+-    stride_a &= ~7;
+-#endif
+-    stride_b &= ~7;
++        stride_a &= ~7;
+ #endif
++        stride_b &= ~7;
++    }
+ 
+     // Create layouts for both clamped and unclamped accesses
+     tensorLayoutNV<2> tensorLayoutA = createTensorLayoutNV(2);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+@@ -1,50 +1,57 @@
+ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uint idx_m, const uint block, const uint end_k) {
+ #if defined(DATA_A_F32) || defined(DATA_A_F16)
+ #if LOAD_VEC_A == 8
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
+-            FLOAT_TYPEV8 aa = FLOAT_TYPEV8(data_a[idx]);
+-            buf_a[buf_idx    ] = aa[0].xy;
+-            buf_a[buf_idx + 1] = aa[0].zw;
+-            buf_a[buf_idx + 2] = aa[1].xy;
+-            buf_a[buf_idx + 3] = aa[1].zw;
++            if (ALIGNED != 0) {
++                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
++                FLOAT_TYPEV8 aa = FLOAT_TYPEV8(data_a[idx]);
++                buf_a[buf_idx    ] = aa[0].xy;
++                buf_a[buf_idx + 1] = aa[0].zw;
++                buf_a[buf_idx + 2] = aa[1].xy;
++                buf_a[buf_idx + 3] = aa[1].zw;
++                return;
++            }
+ #elif LOAD_VEC_A == 4
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
+-            FLOAT_TYPEV4 aa = FLOAT_TYPEV4(data_a[idx]);
+-            buf_a[buf_idx    ] = aa.xy;
+-            buf_a[buf_idx + 1] = aa.zw;
+-#else // LOAD_VEC_BATCH_A == 2
++            if (ALIGNED != 0) {
++                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
++                FLOAT_TYPEV4 aa = FLOAT_TYPEV4(data_a[idx]);
++                buf_a[buf_idx    ] = aa.xy;
++                buf_a[buf_idx + 1] = aa.zw;
++                return;
++            }
++#endif
+             const uint idx = pos_a + col * p.stride_a + row * 2;
+             const uint buf_idx = col * SHMEM_STRIDE + row;
+             if (idx_m < p.M && block + row * 2 + 1 < end_k) {
+-                buf_a[buf_idx] = FLOAT_TYPEV2(data_a[idx],
+-                                              data_a[idx + 1]);
++                buf_a[buf_idx] = FLOAT_TYPEV2(data_a_scalar[idx],
++                                              data_a_scalar[idx + 1]);
+             } else if (idx_m < p.M && block + row * 2 < end_k) {
+-                buf_a[buf_idx] = FLOAT_TYPEV2(data_a[idx], 0.0f);
++                buf_a[buf_idx] = FLOAT_TYPEV2(data_a_scalar[idx], 0.0f);
+             } else {
+                 buf_a[buf_idx] = FLOAT_TYPEV2(0.0f);
+             }
+-#endif
+ #elif defined(DATA_A_BF16)
+ #if LOAD_VEC_A == 4
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
+-            FLOAT_TYPEV4 aa = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_a[idx]));
+-            buf_a[buf_idx    ] = aa.xy;
+-            buf_a[buf_idx + 1] = aa.zw;
+-#else // LOAD_VEC_BATCH_A == 2
++            if (ALIGNED != 0) {
++                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
++                FLOAT_TYPEV4 aa = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_a[idx]));
++                buf_a[buf_idx    ] = aa.xy;
++                buf_a[buf_idx + 1] = aa.zw;
++                return;
++            }
++#endif
+             const uint idx = pos_a + col * p.stride_a + row * 2;
+             const uint buf_idx = col * SHMEM_STRIDE + row;
+             if (idx_m < p.M && block + row * 2 + 1 < end_k) {
+-                buf_a[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a[idx]),
+-                                              TO_FLOAT_TYPE(data_a[idx + 1]));
++                buf_a[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]),
++                                              TO_FLOAT_TYPE(data_a_scalar[idx + 1]));
+             } else if (idx_m < p.M && block + row * 2 < end_k) {
+-                buf_a[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a[idx]), 0.0f);
++                buf_a[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]), 0.0f);
+             } else {
+                 buf_a[buf_idx] = FLOAT_TYPEV2(0.0f);
+             }
+-#endif
+ #elif defined(DATA_A_Q4_0)
+             const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+             const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 4;
+@@ -526,75 +533,85 @@ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uin
+ #if !defined(MUL_MAT_ID)
+ void load_b_to_shmem(const uint pos_b, const uint row, const uint col, const uint idx_n, const uint block, const uint end_k) {
+ #if LOAD_VEC_B == 8
+-            // Not supported for b_type bf16 because bf16mat2x4 does not exist
+-            const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+-            FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
+-            buf_b[buf_idx + 0] = bb[0].xy;
+-            buf_b[buf_idx + 1] = bb[0].zw;
+-            buf_b[buf_idx + 2] = bb[1].xy;
+-            buf_b[buf_idx + 3] = bb[1].zw;
++            if (ALIGNED != 0) {
++                // Not supported for b_type bf16 because bf16mat2x4 does not exist
++                const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++                FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
++                buf_b[buf_idx + 0] = bb[0].xy;
++                buf_b[buf_idx + 1] = bb[0].zw;
++                buf_b[buf_idx + 2] = bb[1].xy;
++                buf_b[buf_idx + 3] = bb[1].zw;
++                return;
++            }
+ #elif LOAD_VEC_B == 4
+-            const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++            if (ALIGNED != 0) {
++                const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+ #if defined(DATA_B_BF16)
+-            FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
++                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
+ #else
+-            FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++#endif
++                buf_b[buf_idx + 0] = bb.xy;
++                buf_b[buf_idx + 1] = bb.zw;
++                return;
++            }
+ #endif
+-            buf_b[buf_idx + 0] = bb.xy;
+-            buf_b[buf_idx + 1] = bb.zw;
+-#else // LOAD_VEC_BATCH_B == 2
+             const uint idx = pos_b + col * p.stride_b + row * 2;
+             const uint buf_idx = col * SHMEM_STRIDE + row;
+             if (idx_n < p.N && block + row * 2 + 1 < end_k) {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b[idx]),
+-                                              TO_FLOAT_TYPE(data_b[idx + 1]));
++                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
++                                              TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
+             } else if (idx_n < p.N && block + row * 2 < end_k) {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b[idx]), 0.0f);
++                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
+             } else {
+                 buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
+             }
+-#endif
+ }
+ #else
+ void load_b_to_shmem(const uint pos_b, const uint row, const uint col, const uint ic, const uint _ne1, const uint block, const uint end_k) {
+ #if LOAD_VEC_B == 8
+-            // Not supported for b_type bf16 because bf16mat2x4 does not exist
+-            const u16vec2 row_idx = row_ids[col];
+-            const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+-            FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
+-            buf_b[buf_idx + 0] = bb[0].xy;
+-            buf_b[buf_idx + 1] = bb[0].zw;
+-            buf_b[buf_idx + 2] = bb[1].xy;
+-            buf_b[buf_idx + 3] = bb[1].zw;
++            if (ALIGNED != 0) {
++                // Not supported for b_type bf16 because bf16mat2x4 does not exist
++                const u16vec2 row_idx = row_ids[col];
++                const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++                FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
++                buf_b[buf_idx + 0] = bb[0].xy;
++                buf_b[buf_idx + 1] = bb[0].zw;
++                buf_b[buf_idx + 2] = bb[1].xy;
++                buf_b[buf_idx + 3] = bb[1].zw;
++                return;
++            }
+ #elif LOAD_VEC_B == 4
+-            const u16vec2 row_idx = row_ids[col];
+-            const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
+-            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++            if (ALIGNED != 0) {
++                const u16vec2 row_idx = row_ids[col];
++                const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
++                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+ #if defined(DATA_B_BF16)
+-            FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
++                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
+ #else
+-            FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++#endif
++                buf_b[buf_idx + 0] = bb.xy;
++                buf_b[buf_idx + 1] = bb.zw;
++                return;
++            }
+ #endif
+-            buf_b[buf_idx + 0] = bb.xy;
+-            buf_b[buf_idx + 1] = bb.zw;
+-#else // LOAD_VEC_BATCH_B == 2
+             const uint row_i = ic * BN + col;
+             const uint buf_idx = col * SHMEM_STRIDE + row;
+             if (row_i < _ne1 && block + row * 2 + 1 < end_k) {
+                 const u16vec2 row_idx = row_ids[col];
+                 const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b[idx]),
+-                                              TO_FLOAT_TYPE(data_b[idx + 1]));
++                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
++                                              TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
+             } else if (row_i < _ne1 && block + row * 2 < end_k) {
+                 const u16vec2 row_idx = row_ids[col];
+                 const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b[idx]), 0.0f);
++                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
+             } else {
+                 buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
+             }
+-#endif
+ }
+ #endif

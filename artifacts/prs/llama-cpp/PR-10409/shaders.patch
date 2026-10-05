@@ -1,0 +1,78 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
+@@ -10,6 +10,8 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     const uint i = gl_WorkGroupID.x * 4 + gl_LocalInvocationID.x / 64;
+ 
++    init_iq4nl_shmem();
++
+     const uint tid = gl_LocalInvocationID.x % 64;
+     const uint il  = tid/32;
+     const uint ir  = tid%32;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+@@ -12,6 +12,10 @@ void main() {
+     const uint i11 = (gl_GlobalInvocationID.z)/p.ne12;
+     const uint i12 = (gl_GlobalInvocationID.z)%p.ne12;
+ 
++#if defined(DATA_A_IQ4_NL)
++    init_iq4nl_shmem();
++#endif
++
+     if (i00 >= p.ne00) {
+         return;
+     }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -102,6 +102,10 @@ void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
+ void main() {
+     const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
+ 
++#if defined(DATA_A_IQ4_NL)
++    init_iq4nl_shmem();
++#endif
++
+     // do NUM_ROWS at a time, unless there aren't enough remaining rows
+     if (first_row + NUM_ROWS <= p.stride_d) {
+         compute_outputs(first_row, NUM_ROWS);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -75,6 +75,10 @@ shared u16vec2 row_ids[3072];
+ #endif
+ 
+ void main() {
++#if defined(DATA_A_IQ4_NL)
++    init_iq4nl_shmem();
++#endif
++
+ #ifdef MUL_MAT_ID
+     const uint expert_idx = gl_GlobalInvocationID.z;
+ #else
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+@@ -193,8 +193,19 @@ struct block_iq4_nl
+ 
+ #define A_TYPE block_iq4_nl
+ 
+-const int8_t kvalues_iq4nl[16] = {
++const int8_t kvalues_iq4nl_const[16] = {
+     int8_t(-127), int8_t(-104), int8_t(-83), int8_t(-65), int8_t(-49), int8_t(-35), int8_t(-22), int8_t(-10),
+     int8_t(1), int8_t(13), int8_t(25), int8_t(38), int8_t(53), int8_t(69), int8_t(89), int8_t(113)
+ };
++
++shared FLOAT_TYPE kvalues_iq4nl[16];
++
++void init_iq4nl_shmem()
++{
++    // copy the table into shared memory and sync
++    if (gl_LocalInvocationIndex.x < 16) {
++        kvalues_iq4nl[gl_LocalInvocationIndex.x] = FLOAT_TYPE(kvalues_iq4nl_const[gl_LocalInvocationIndex.x]);
++    }
++    barrier();
++}
+ #endif

@@ -1,0 +1,269 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -99,6 +99,10 @@ void main() {
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / 2;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / 2;
+ #endif
++    uint32_t m_offset = 0;
++    if (p.nem2 != 1) {
++        m_offset = (iq3 % p.nem2) * p.nem1 * KV;
++    }
+ 
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+@@ -150,7 +154,7 @@ void main() {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br) {
+-                    masksh[c][r] = float(data_m[(i * Br + r) * m_stride + (j * Bc + c)]);
++                    masksh[c][r] = float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
+                 }
+             }
+             barrier();
+@@ -277,7 +281,7 @@ void main() {
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        uint32_t o_offset = D * p.ne1 * split_k_index;
++        uint32_t o_offset = D * p.ne1 * (split_k_index + iq3 * p.k_num);
+ 
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+             if (r < N) {
+@@ -289,7 +293,7 @@ void main() {
+             }
+         }
+ 
+-        o_offset = D * p.ne1 * p.k_num + p.ne1 * split_k_index * 2;
++        o_offset = D * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+             if (r < N) {
+                 perElemOpStoreCol0(r, 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+@@ -311,7 +315,7 @@ void main() {
+         }
+     }
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1;
++    uint32_t o_offset = iq3*p.ne2*p.ne1*D;
+ 
+     if (p.gqa_ratio > 1) {
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.comp
+@@ -24,6 +24,7 @@ layout (push_constant) uniform parameter {
+     uint32_t nev2;
+     uint32_t nev3;
+     uint32_t nem1;
++    uint32_t nem2;
+ 
+     uint32_t nb01;
+     uint32_t nb02;
+@@ -34,7 +35,6 @@ layout (push_constant) uniform parameter {
+     uint32_t nb21;
+     uint32_t nb22;
+     uint32_t nb23;
+-    uint32_t nb31;
+ 
+     float scale;
+     float max_bias;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -123,6 +123,10 @@ void main() {
+     uint32_t k_offset = (ik2*p.nb12 + ik3*p.nb13) / 2;
+     uint32_t v_offset = (iv2*p.nb22 + iv3*p.nb23) / 2;
+ #endif
++    uint32_t m_offset = 0;
++    if (p.nem2 != 1) {
++        m_offset = (iq3 % p.nem2) * p.nem1 * KV;
++    }
+ 
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+@@ -181,7 +185,7 @@ void main() {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br || idx + gl_WorkGroupSize.x <= Bc * Br) {
+-                    sfsh[c * sfshstride + r] += ACC_TYPE(slope[r] * float(data_m[(i * Br + r) * m_stride + (j * Bc + c)]));
++                    sfsh[c * sfshstride + r] += ACC_TYPE(slope[r] * float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]));
+                 }
+             }
+             barrier();
+@@ -300,7 +304,7 @@ void main() {
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        uint32_t o_offset = D * p.ne1 * split_k_index;
++        uint32_t o_offset = D * p.ne1 * (split_k_index + iq3 * p.k_num);
+ 
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             if (tile_row(r) < N) {
+@@ -312,7 +316,7 @@ void main() {
+             }
+         }
+ 
+-        o_offset = D * p.ne1 * p.k_num + p.ne1 * split_k_index * 2;
++        o_offset = D * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             if (tile_row(r) < N) {
+                 perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+@@ -334,7 +338,7 @@ void main() {
+         }
+     }
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1;
++    uint32_t o_offset = iq3*p.ne2*p.ne1*D;
+ 
+     if (p.gqa_ratio > 1) {
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -130,6 +130,11 @@ void main() {
+         coopMatPerElementNV(slopeMat, slopeMat, perElemOpComputeSlope, iq2);
+     }
+ 
++    uint32_t m_offset = 0;
++    if (p.nem2 != 1) {
++        m_offset = (iq3 % p.nem2) * p.nem1 * KV * 2 /*sizeof(float16_t)*/;
++    }
++
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+@@ -155,7 +160,7 @@ void main() {
+ 
+             coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv;
+ 
+-            coopMatLoadTensorNV(mv, data_m, 0, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++            coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
+ 
+             S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
+         }
+@@ -229,10 +234,10 @@ void main() {
+     if (p.k_num > 1) {
+         coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator>(O);
+ 
+-        uint32_t o_offset = D * p.ne1 * split_k_index;
++        uint32_t o_offset = D * p.ne1 * (split_k_index + iq3 * p.k_num);
+         coopMatPerElementNV(O_D, O_D, perElemOpGqaStore, o_offset, iq2, N);
+ 
+-        o_offset = D * p.ne1 * p.k_num + p.ne1 * split_k_index * 2;
++        o_offset = D * p.ne1 * p.ne3 * p.k_num + p.ne1 * (split_k_index + iq3 * p.k_num) * 2;
+         coopMatPerElementNV(L, L, perElemOpStoreCol0, o_offset, iq2, N);
+         coopMatPerElementNV(M, M, perElemOpStoreCol0, o_offset + p.ne1, iq2, N);
+         return;
+@@ -250,7 +255,7 @@ void main() {
+ 
+     O = Ldiag*O;
+ 
+-    uint32_t o_offset = iq3*p.ne2*p.ne1;
++    uint32_t o_offset = iq3*p.ne2*p.ne1*D;
+ 
+     coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator>(O);
+     if (p.gqa_ratio > 1) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+@@ -12,20 +12,22 @@ layout (binding = 1) writeonly buffer D {float data_d[];};
+ layout (push_constant) uniform parameter {
+     uint D;
+     uint N;
++    uint ne3;
+     uint k_num;
+ } p;
+ 
+ void main() {
+     // Each workgroup handles a row
+     const uint n = gl_WorkGroupID.x;
+     const uint tid = gl_LocalInvocationID.x;
++    const uint iq3 = gl_WorkGroupID.z;
+ 
+     uint D = p.D;
+     uint N = p.N;
+     uint k_num = p.k_num;
+ 
+-    uint l_offset = D * N * k_num + n;
+-    uint m_offset = D * N * k_num + N + n;
++    uint l_offset = D * N * p.ne3 * k_num + N * iq3 * k_num * 2 + n;
++    uint m_offset = D * N * p.ne3 * k_num + N * iq3 * k_num * 2 + N + n;
+     uint lm_stride = N * 2;
+ 
+     // Compute the max m value for the row
+@@ -49,11 +51,11 @@ void main() {
+     for (uint d = tid; d < D; d += BLOCK_SIZE) {
+         float O = 0.0;
+         [[unroll]] for (uint k = 0; k < k_num; ++k) {
+-            uint o_offset = D * N * k + D * n + d;
++            uint o_offset = D * N * (k + iq3 * k_num) + D * n + d;
+             float m = data_a[m_offset + k * lm_stride];
+             O += exp(m - m_max) * data_a[o_offset];
+         }
+         O *= L;
+-        data_d[D * n + d] = O;
++        data_d[iq3 * D * N + D * n + d] = O;
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
+@@ -6,6 +6,14 @@ layout (push_constant) uniform parameter
+ {
+     uint KX;
+     uint KY;
++    uint ne00;
++    uint ne01;
++    uint ne02;
++    uint ne12;
++    uint ne13;
++    uint nb11;
++    uint nb12;
++    uint nb13;
+     float scale;
+     float max_bias;
+     float m0;
+@@ -31,7 +39,15 @@ shared FLOAT_TYPE vals[BLOCK_SIZE];
+ void soft_max(uint num_iters) {
+     const uint tid = gl_LocalInvocationID.x;
+     const uint rowx = gl_WorkGroupID.z * 262144 + gl_WorkGroupID.y * 512 + gl_WorkGroupID.x;
+-    const uint rowy = (p.KY > 0) ? (rowx % p.KY) : 0;
++
++    const uint32_t i03 = rowx / (p.ne01 * p.ne02);
++    const uint32_t i02 = (rowx - i03 * p.ne01 * p.ne02) / p.ne01;
++    const uint32_t i01 = rowx % p.ne01;
++
++    uint rowy_start = 0;
++    if (p.KY > 0) {
++        rowy_start = i01 * p.nb11 + (i02 % p.ne12) * p.nb12 + (i03 % p.ne13) * p.nb13;
++    }
+ 
+     if (rowx >= p.nrows_x) {
+         return;
+@@ -41,7 +57,7 @@ void soft_max(uint num_iters) {
+ 
+     // ALiBi
+     if (p.max_bias > 0.0f) {
+-        const uint h = rowx/p.KY; // head index
++        const uint h = (rowx / p.ne01) % p.ne02; // head index
+ 
+         const float base = h < p.n_head_log2 ? p.m0 : p.m1;
+         const uint   exp  = h < p.n_head_log2 ? h + 1 : 2*(h - p.n_head_log2) + 1;
+@@ -67,7 +83,7 @@ void soft_max(uint num_iters) {
+ 
+         FLOAT_TYPE b = FLOAT_TYPE(0);
+         if (p.KY > 0 && col < p.KX) {
+-            b = data_b[rowy * p.KX + col];
++            b = data_b[rowy_start + col];
+         }
+ 
+         FLOAT_TYPE v = a * p.scale + slope * b;
+@@ -111,7 +127,7 @@ void soft_max(uint num_iters) {
+         if (idx < DATA_CACHE_SIZE) {
+             val = exp(data_cache[idx] - max_val);
+         } else {
+-            val = exp(FLOAT_TYPE(data_a[i]) * p.scale + (p.KY > 0 ? slope * FLOAT_TYPE(data_b[rowy * p.KX + col]) : FLOAT_TYPE(0.0f)) - max_val);
++            val = exp(FLOAT_TYPE(data_a[i]) * p.scale + (p.KY > 0 ? slope * FLOAT_TYPE(data_b[rowy_start + col]) : FLOAT_TYPE(0.0f)) - max_val);
+         }
+         sum += val;
+         if (idx < DATA_CACHE_SIZE) {

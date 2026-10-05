@@ -9,7 +9,7 @@ allowed-tools: "Bash Read Grep Glob"
 
 Query a structured, cross-referenced knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference across GPU vendors. Run `python3 scripts/repo_status.py` for current corpus counts.
 
-**Corpus status: one device.** The corpus holds 18 pages (5 source-measurement, 13 wiki), all for the AMD Radeon 780M on RADV Mesa 25.2.7. See "Current Contents" below before relying on this skill for an answer about any other device or driver.
+**Corpus status: one measured device.** The corpus holds 423 pages. 18 of them (5 source-measurement, 13 wiki) are for the AMD Radeon 780M on RADV Mesa 25.2.7. The other 405 are upstream pull-request pages from `ggml-org/llama.cpp`: verbatim excerpts of what upstream wrote, not first-party measurements. See "Current Contents" below before relying on this skill for an answer about any other device or driver.
 
 ## When To Use This Skill
 
@@ -112,17 +112,18 @@ When answering from this knowledge base:
 
 ## Current Contents
 
-Counts from `python3 scripts/repo_status.py`: 18 pages, of which 5 source pages (all in `sources/measurements/`) and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 0 language, 0 migration).
+Counts from `python3 scripts/repo_status.py`: 423 pages, of which 410 source pages (5 in `sources/measurements/`, 405 in `sources/prs/llama-cpp/`) and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 0 language, 0 migration).
 
-- **Scope: the AMD Radeon 780M only.** Every page is tagged with the device node `radeon-780m` and no other node. Nothing in the corpus is established for another device.
+- **Measured scope: the AMD Radeon 780M only.** Every measurement and wiki page is tagged with the device node `radeon-780m` and no other node. Nothing in the corpus is measured for another device.
+- **Pull-request pages**: 405 upstream pull-request pages generated from `ggml-org/llama.cpp` (Vulkan backend pull requests merged up to 2026-10-05; 340 of them with the shader patches saved under `artifacts/`), listed in `queries/by-repo.md`. Each holds the first 1200 characters of the upstream description (the title on the 12 pages whose description is empty) and the changed paths; when `artifact_dir` is set, the shader patch of that pull request is at `<artifact_dir>/shaders.patch` (search them with `python3 scripts/grep_wiki.py "<regex>" --only artifacts`). 65 of the pages were included by manual review although they change only backend host source (kernel selection, tile and subgroup tuning, device workarounds); those have no saved patch. Tags are derived mechanically from the title and the changed shader file names, `techniques` is empty on every one, and no wiki page cites them yet. Of the pull-request pages, 51 carry an architecture node (`amd`, `rdna3`, `intel`, `xe2`, `nvidia`, `qualcomm`), taken from the pull-request title or from a device check the pull request adds to the code and recorded in `architecture_evidence`; the other 354 carry none. Treat a statement in an excerpt as source-reported by its author for the hardware that author names.
 - **Driver and dates as recorded on the pages.** All five measurement pages carry the driver RADV Mesa 25.2.7. Measurement dates: 2026-09-01 (`meas-780m-vulkaninfo`, device-properties export), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version.
 - **Source pages**: `meas-780m-vulkaninfo` (raw file in this repository), `meas-780m-4w-bootstrap` and `meas-780m-e2e-prefill` (raw files in https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae), `meas-780m-8da4w-port` and `meas-780m-sdpa-port` (raw files at the same commit, plus the install-history file in this repository).
 - **Hardware pages**: `hw-radeon-780m` (verified), `hw-cooperative-matrix-rdna3` (source-reported; evidence is the 780M only, despite the id).
 - **Kernel pages**: `kernel-linear-4w-780m` (verified, 93 performance claims), `kernel-linear-8da4w-780m` (verified, 88 claims from `meas-780m-8da4w-port`, `meas-780m-sdpa-port` and `meas-780m-e2e-prefill`), `kernel-sdpa-prefill-780m` (source-reported, 84 claims from `meas-780m-sdpa-port` and `meas-780m-e2e-prefill`).
 - **Technique pages** (all source-reported): `technique-fp32-accumulation`, `technique-drain-in-a-staging`, `technique-workgroup-tile-sizing`, `technique-causal-truncation`, `technique-full-a-map`.
 - **Pattern pages** (all source-reported): `pattern-unaligned-m-fallback`, `pattern-sdpa-release-gap`, `pattern-coopmat-name-check-false-failure`.
-- **No pages** of type language, migration, PR, doc or blog. The version-claim registry `data/version-claims.yaml` has no claims.
-- **Controlled vocabulary** in `data/tags.yaml` and an alias map in `data/aliases.yaml`; **architecture tree** in `data/architectures.yaml`: `amd` (generation `rdna3`), `intel` (generation `xe2`), `nvidia`, `qualcomm`, `arm`, and one reserved vendor node with no devices. Only `radeon-780m` has pages.
+- **No pages** of type language, migration, doc or blog. The version-claim registry `data/version-claims.yaml` has no claims.
+- **Controlled vocabulary** in `data/tags.yaml` and an alias map in `data/aliases.yaml`; **architecture tree** in `data/architectures.yaml`: `amd` (generation `rdna3`), `intel` (generation `xe2`), `nvidia`, `qualcomm`, `arm`, and one reserved vendor node with no devices. Only `radeon-780m` has measurement and wiki pages.
 - **Schemas** in `data/schemas.yaml` for six wiki page types and four source page types.
 - **Tooling**: `scripts/query.py`, `scripts/get_page.py`, `scripts/grep_wiki.py`, `scripts/generate-indices.py`, `scripts/repo_status.py`, `scripts/validate.py`, `scripts/check_external_locators.py`.
 

@@ -1,0 +1,36 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -103,7 +103,7 @@ shared FLOAT_TYPE buf_a[BM * SHMEM_STRIDE];
+ shared FLOAT_TYPE buf_b[BN * SHMEM_STRIDE];
+ 
+ #ifdef MUL_MAT_ID
+-shared u16vec2 row_ids[3072];
++shared u16vec2 row_ids[4096];
+ #endif // MUL_MAT_ID
+ 
+ #define NUM_WARPS (BLOCK_SIZE / WARP)
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -92,7 +92,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ #ifdef MUL_MAT_ID
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
+ 
+-shared u16vec4 row_ids[3072];
++shared u16vec4 row_ids[4096];
+ 
+ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufB {
+    B_TYPE b[];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -101,7 +101,7 @@ shared FLOAT_TYPE_VEC2 buf_b_ds[BN];
+ #define LOAD_VEC_B 4
+ 
+ #ifdef MUL_MAT_ID
+-shared u16vec2 row_ids[3072];
++shared u16vec2 row_ids[4096];
+ #endif // MUL_MAT_ID
+ 
+ #define NUM_WARPS (BLOCK_SIZE / WARP)

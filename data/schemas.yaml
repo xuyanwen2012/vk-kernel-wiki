@@ -48,6 +48,8 @@ source-pr:
     - description
     - changed_paths
     - inclusion_reason
+    - artifact_dir
+    - architecture_evidence
   constraints:
     id_prefix: pr-
     source_category: upstream-code
@@ -58,6 +60,8 @@ source-pr:
     body_excerpt_required: true
     body_excerpt_start_marker: "<!-- upstream-excerpt-start -->"
     body_excerpt_end_marker: "<!-- upstream-excerpt-end -->"
+    artifact_dir_prefix: "artifacts/prs/"
+    artifact_dir_required_file: PROVENANCE.yaml
 
 source-doc:
   required:

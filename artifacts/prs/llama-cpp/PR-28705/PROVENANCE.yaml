@@ -1,0 +1,16 @@
+repo: ggml-org/llama.cpp
+pr: 28705
+url: https://github.com/ggml-org/llama.cpp/pull/28705
+merge_sha: 481c65f091f74c5e7089dd0a3a1cc6b50cced31e
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/28705/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp
+  status: modified
+  sha256: 2bd7eaadcf02cee43332cab005fdc3f4930963e1a2b3d4e0acd57e24970ca469
+- path: ggml/src/ggml-vulkan/vulkan-shaders/argsort_large.comp
+  status: modified
+  sha256: de70bef9b63cb7e200bcef77ef0bbaf493480393971aee841d1cfe8e85a8214f

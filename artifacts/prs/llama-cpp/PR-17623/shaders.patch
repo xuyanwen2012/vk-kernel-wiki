@@ -1,0 +1,122 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/topk_argsort.comp b/ggml/src/ggml-vulkan/vulkan-shaders/topk_argsort.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/topk_argsort.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/topk_argsort.comp
+@@ -19,6 +19,7 @@ layout (push_constant) uniform parameter {
+     uint orig_ncols;
+     uint ncols_input;
+     uint ncols_output;
++    uint k;
+     uint nrows;
+     uint first_pass;
+     uint last_pass;
+@@ -36,15 +37,15 @@ void topk(bool needs_bounds_check, const uint row) {
+             const uint row_offset = row * p.ncols_input;
+             dst_row[col] = ivec2(gl_GlobalInvocationID.x, floatBitsToInt(data_a[row_offset + gl_GlobalInvocationID.x]));
+         } else {
+-            const uint row_offset = row * p.orig_ncols;
++            const uint row_offset = row * p.ncols_input;
+             dst_row[col] = data_s[row_offset + gl_GlobalInvocationID.x];
+         }
+     } else {
+         dst_row[col] = ivec2(p.orig_ncols, 0);
+     }
+     barrier();
+ 
+-    if (p.ncols_output == 1) {
++    if (p.k == 1) {
+         // Fast path for single output - just do a max reduction
+         [[unroll]] for (int s = BLOCK_SIZE / 2; s >= 1; s /= 2) {
+             if (col < s) {
+@@ -84,13 +85,17 @@ void topk(bool needs_bounds_check, const uint row) {
+         }
+     }
+ 
+-    if (col < p.ncols_output && gl_GlobalInvocationID.x < p.orig_ncols) {
++    if (col < p.k) {
+         if (p.last_pass != 0) {
+-            const uint row_offset = row * p.ncols_output;
+-            data_d[row_offset + col] = dst_row[col].x;
++            if (gl_GlobalInvocationID.x < p.ncols_input) {
++                const uint row_offset = row * p.k;
++                data_d[row_offset + col] = dst_row[col].x;
++            }
+         } else {
+-            const uint row_offset = row * p.orig_ncols + gl_WorkGroupID.x * p.ncols_output;
+-            data_t[row_offset + col] = dst_row[col];
++            if (gl_WorkGroupID.x * p.k + col < p.ncols_output) {
++                const uint row_offset = row * p.ncols_output + gl_WorkGroupID.x * p.k;
++                data_t[row_offset + col] = dst_row[col];
++            }
+         }
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/topk_nary_search.comp b/ggml/src/ggml-vulkan/vulkan-shaders/topk_nary_search.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/topk_nary_search.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/topk_nary_search.comp
+@@ -25,6 +25,7 @@ layout (push_constant) uniform parameter {
+     uint orig_ncols;
+     uint ncols_input;
+     uint ncols_output;
++    uint k;
+     uint nrows;
+     uint first_pass;
+     uint last_pass;
+@@ -60,15 +61,15 @@ void topk(const uint row) {
+             const uint row_offset = row * p.ncols_input;
+             dst_row[tid] = ivec2(gl_GlobalInvocationID.x, floatBitsToInt(data_a[row_offset + gl_GlobalInvocationID.x]));
+         } else {
+-            const uint row_offset = row * p.orig_ncols;
++            const uint row_offset = row * p.ncols_input;
+             dst_row[tid] = data_s[row_offset + gl_GlobalInvocationID.x];
+         }
+     } else {
+         dst_row[tid] = ivec2(p.orig_ncols, 0xFF800000); // -inf
+     }
+     barrier();
+ 
+-    if (p.ncols_output == 1) {
++    if (p.k == 1) {
+         // Fast path for single output - just do a max reduction
+         [[unroll]] for (int s = BLOCK_SIZE / 2; s >= 1; s /= 2) {
+             if (tid < s) {
+@@ -98,7 +99,7 @@ void topk(const uint row) {
+         uint range_max = 0xFF800000;
+         // How many are above the current range, and how many we need to find.
+         uint total = 0;
+-        uint limit = min(p.ncols_output, p.ncols_input - gl_WorkGroupID.x * BLOCK_SIZE);
++        uint limit = min(p.k, p.ncols_input - gl_WorkGroupID.x * BLOCK_SIZE);
+ 
+         while (mask != 0) {
+             barrier();
+@@ -139,7 +140,7 @@ void topk(const uint row) {
+             range_max = range_min + ((min_idx + 1) << shift);
+             range_min = range_min + (min_idx << shift);
+ 
+-            if (total == p.ncols_output) {
++            if (total == p.k) {
+                 break;
+             }
+             total -= counts[min_idx];
+@@ -179,13 +180,17 @@ void topk(const uint row) {
+         barrier();
+     }
+ 
+-    if (tid < p.ncols_output && gl_GlobalInvocationID.x < p.orig_ncols) {
++    if (tid < p.k) {
+         if (p.last_pass != 0) {
+-            const uint row_offset = row * p.ncols_output;
+-            data_d[row_offset + tid] = dst_row[tid].x;
++            if (gl_GlobalInvocationID.x < p.ncols_input) {
++                const uint row_offset = row * p.k;
++                data_d[row_offset + tid] = dst_row[tid].x;
++            }
+         } else {
+-            const uint row_offset = row * p.orig_ncols + gl_WorkGroupID.x * p.ncols_output;
+-            data_t[row_offset + tid] = dst_row[tid];
++            if (gl_WorkGroupID.x * p.k + tid < p.ncols_output) {
++                const uint row_offset = row * p.ncols_output + gl_WorkGroupID.x * p.k;
++                data_t[row_offset + tid] = dst_row[tid];
++            }
+         }
+     }
+ }

@@ -2,7 +2,7 @@
 
 A structured knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference across GPU vendors, built for retrieval by LLM agents. This file is the rulebook for agents that edit the repository. For querying, see `SKILL.md`.
 
-Corpus status: 18 pages (5 source-measurement, 13 wiki), all for the device node `radeon-780m` on RADV Mesa 25.2.7. Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
+Corpus status: 423 pages. 18 (5 source-measurement, 13 wiki) are for the device node `radeon-780m` on RADV Mesa 25.2.7; 405 are generated source-pr pages from `ggml-org/llama.cpp`. Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
 
 ## Non-Negotiable Authoring Rules
 
@@ -75,7 +75,7 @@ Generated cross-reference indices. Regenerate with `python3 scripts/generate-ind
 Source-type specifics:
 
 - **source-measurement**: `device` is exactly one device node (not a vendor or generation, not an alias) and must also be listed in the page's `architectures`. `driver` names the driver and its version (`<driver name> <version>`; a bare name is rejected) and `method` is a non-empty string. `raw_data` is a non-empty list of mappings with `locator` and `description`, in one of two forms. In-repository form (no `repo`, no `commit`): `locator` is an `http(s)` URL or a repo-relative path to a file that exists in this repository (no absolute path, no `~`, no `..`). External-repository form (`repo` and `commit`, always both): `repo` is the `https` URL of another git repository, `commit` is exactly 40 lowercase hex characters, and `locator` is a path relative to that repository's root, optionally followed by `#fragment` (no leading `/`, no `~`, no `..`, no URL); the validator does not check that this file exists, `scripts/check_external_locators.py` does.
-- **source-pr**: `status` is `open`, `merged` or `closed`. `merge_sha` is required and must be 40 hex characters when `status` is `merged`. The body must contain a non-empty verbatim excerpt between `<!-- upstream-excerpt-start -->` and `<!-- upstream-excerpt-end -->`. Each `sources/prs/<dir>/` directory holds the pages of exactly one `repo`.
+- **source-pr**: optional `architecture_evidence` lists, per node in `architectures`, where the generator found it (`locator: title` or `added-patch:<path>`, and the `matched` text). Optional `artifact_dir` is a repository path under `artifacts/prs/` that holds a `PROVENANCE.yaml`. `status` is `open`, `merged` or `closed`. `merge_sha` is required and must be 40 hex characters when `status` is `merged`. The body must contain a non-empty verbatim excerpt between `<!-- upstream-excerpt-start -->` and `<!-- upstream-excerpt-end -->`. Each `sources/prs/<dir>/` directory holds the pages of exactly one `repo`.
 
 Wiki-type specifics:
 
@@ -142,6 +142,12 @@ A page whose claim depends on a tool or driver version carries `version_sensitiv
 - `scripts/check_external_locators.py --checkout <path> [--repo <url>]`: for every `raw_data` entry in the external-repository form (limited to `<url>` when `--repo` is given), checks with `git cat-file` that the file exists at the cited commit in a local checkout. Exit 0 when all resolve, 1 on any failure, 2 when the checkout does not contain a cited commit.
 - `scripts/generate-indices.py`: regenerates `queries/*.md` from frontmatter.
 - `scripts/repo_status.py`: prints corpus counts.
+- `scripts/refresh_candidate_ledger.py --cutoff <date> [--repos <slug>]`: searches an upstream repository for merged pull requests and appends one include / defer / exclude row per pull request to `candidates/<slug>.yaml`. Existing rows are never changed; a row edited by hand carries `decision_source: manual`.
+- `scripts/generate-pr-pages.py [--repos <slug>]`: writes `sources/prs/<slug>/PR-<number>.md` for every `include` row. Rows that cannot become a valid page are listed in `data/pr-page-skipped.yaml`.
+- `scripts/pr_policy.py`: the intake rules both scripts share. Pages under `sources/prs/<slug>/` are generated: change the policy or the ledger and regenerate with `--force` instead of editing a page by hand. The generator leaves `techniques` empty; assigning one requires reading the diff.
+- `scripts/fetch_pr_diff.py [--repos <slug>]`: saves the shader patches of included pull requests under `artifacts/prs/<slug>/PR-<number>/` (`shaders.patch`, `PROVENANCE.yaml`) and the upstream licence text at `artifacts/prs/<slug>/LICENSE`. The ledger must name the licence (`license: <SPDX id>`). Run it before the page generator so pages receive `artifact_dir`.
+- `scripts/verify_verbatim.py [--against-cache]`: checks every artifact bundle against its recorded sha256 and against the pages. Never edit a file under `artifacts/` by hand.
+- The intake scripts call GitHub through `gh` and cache what they fetch under `.cache/pr-evidence/` (ignored by git). Everything else, including the test suite, is offline.
 - No Python package is required. The scripts prefer host PyYAML and fall back to the bundled loader, so they run under `python3 -S`.
 - `VK_KERNEL_WIKI_ROOT` points every script at another wiki root (a directory containing `data/tags.yaml`). Tests use it.
 

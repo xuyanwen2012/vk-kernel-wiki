@@ -1,0 +1,28 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -167,7 +167,9 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+         uint id = ids[iter++];
+         uvec4 ballot = subgroupBallot(in_range && id == expert_idx);
+ 
+-        ballots_sh[gl_SubgroupID] = ballot;
++        if (gl_SubgroupInvocationID == 0) {
++            ballots_sh[gl_SubgroupID] = ballot;
++        }
+         barrier();
+ 
+         uint subgroup_base = 0;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+@@ -43,7 +43,9 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+         uint id = ids[iter++];
+         uvec4 ballot = subgroupBallot(in_range && id == expert_idx);
+ 
+-        ballots_sh[gl_SubgroupID] = ballot;
++        if (gl_SubgroupInvocationID == 0) {
++            ballots_sh[gl_SubgroupID] = ballot;
++        }
+         barrier();
+ 
+         uint subgroup_base = 0;

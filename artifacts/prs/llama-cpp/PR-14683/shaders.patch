@@ -1,0 +1,60 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
+@@ -10,7 +10,7 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
+         const uint i = gl_WorkGroupID.x * 256 + wgy;
+-        if (i >= p.M * p.K / QUANT_K) {
++        if (i >= p.nel / QUANT_K) {
+             return;
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
+@@ -10,7 +10,7 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
+         const uint i = uint(gl_WorkGroupID.x * 256 + wgy);
+-        if (i >= p.M * p.K / QUANT_K) {
++        if (i >= p.nel / QUANT_K) {
+             return;
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
+@@ -10,7 +10,7 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
+         const uint ib = gl_WorkGroupID.x * 256 + wgy;
+-        if (ib >= p.M * p.K / QUANT_K) {
++        if (ib >= p.nel / QUANT_K) {
+             return;
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
+@@ -10,7 +10,7 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
+         const uint ib = gl_WorkGroupID.x * 256 + wgy;
+-        if (ib >= p.M * p.K / QUANT_K) {
++        if (ib >= p.nel / QUANT_K) {
+             return;
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
+@@ -10,7 +10,7 @@ layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
+ void main() {
+     [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
+         const uint i = gl_WorkGroupID.x * 256 + wgy;
+-        if (i >= p.M * p.K / QUANT_K) {
++        if (i >= p.nel / QUANT_K) {
+             return;
+         }
+         const uint tid = gl_LocalInvocationID.x;

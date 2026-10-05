@@ -1,0 +1,609 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -218,12 +218,14 @@ void main() {
+                     uint32_t c = (idx + tid) % Bc;
+                     uint32_t r = (idx + tid) / Bc;
+                     if (idx + tid < Bc * Br) {
+-                        if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+-                            FLOAT_TYPE m = FLOAT_TYPE(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
++                        uint32_t kcol;
++                        bool kv_active = fa_kv_index(j * Bc + c, kcol);
++                        if (kv_active && (!nem1_bounds_check || i * Br + r < p.nem1)) {
++                            FLOAT_TYPE m = FLOAT_TYPE(data_m[m_offset + (i * Br + r) * m_stride + kcol]);
+                             masksh[c * masksh_stride + r] = m;
+                             max_mask = max(max_mask, float(m));
+                         } else {
+-                            masksh[c * masksh_stride + r] = FLOAT_TYPE(0);
++                            masksh[c * masksh_stride + r] = USE_SPARSE ? FLOAT_TYPE(NEG_FLT_MAX_OVER_2) : FLOAT_TYPE(0);
+                         }
+                     }
+                 }
+@@ -258,14 +260,15 @@ void main() {
+                 uint32_t c = (idx + tid) / (HSK / 4);
+                 if (idx + gl_WorkGroupSize.x <= Bc * HSK / 4 || c < Bc) {
+                     FLOAT_TYPEV4 K_Tf = FLOAT_TYPEV4(0);
+-                    if (!KV_bounds_check || j * Bc + c < KV) {
++                    uint32_t kcol;
++                    if (fa_kv_index(j * Bc + c, kcol)) {
+                         if (USE_DECODE_K) {
+-                            uint coord = (j * Bc + c) * k_stride * BLOCK_SIZE_K + 4 * d;
++                            uint coord = kcol * k_stride * BLOCK_SIZE_K + 4 * d;
+                             uint ib = coord / BLOCK_SIZE_K;
+                             uint iqs = (coord % BLOCK_SIZE_K);
+                             K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+                         } else {
+-                            K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c) * k_stride / 4 + d]);
++                            K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + kcol * k_stride / 4 + d]);
+                         }
+                     }
+ 
+@@ -305,20 +308,22 @@ void main() {
+                 }
+ 
+                 [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                    if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
++                    uint32_t kcol;
++                    bool kv_active = fa_kv_index(j * Bc + c * cols_per_iter + col_tid, kcol);
++                    if (!kv_active) {
+                         continue;
+                     }
+ 
+                     FLOAT_TYPEV4 K_Tf;
+                     if (SHMEM_STAGING != 0) {
+                         K_Tf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
+                     } else if (USE_DECODE_K) {
+-                        uint coord = (j * Bc + c * cols_per_iter + col_tid) * k_stride * BLOCK_SIZE_K + 4 * (d * D_split + d_tid);
++                        uint coord = kcol * k_stride * BLOCK_SIZE_K + 4 * (d * D_split + d_tid);
+                         uint ib = coord / BLOCK_SIZE_K;
+                         uint iqs = (coord % BLOCK_SIZE_K);
+                         K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+                     } else {
+-                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * k_stride / 4 + d * D_split + d_tid]);
++                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + kcol * k_stride / 4 + d * D_split + d_tid]);
+                     }
+                     [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+                         Sf[r][c] = dot_product(Q_cache[r], K_Tf, Sf[r][c]);
+@@ -327,7 +332,9 @@ void main() {
+             }
+         } else {
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
++                uint32_t kcol;
++                bool kv_active = fa_kv_index(j * Bc + c * cols_per_iter + col_tid, kcol);
++                if (!kv_active) {
+                     continue;
+                 }
+ 
+@@ -336,12 +343,12 @@ void main() {
+                     if (SHMEM_STAGING != 0) {
+                         K_Tf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
+                     } else if (USE_DECODE_K) {
+-                        uint coord = (j * Bc + c * cols_per_iter + col_tid) * k_stride * BLOCK_SIZE_K + 4 * (d * D_split + d_tid);
++                        uint coord = kcol * k_stride * BLOCK_SIZE_K + 4 * (d * D_split + d_tid);
+                         uint ib = coord / BLOCK_SIZE_K;
+                         uint iqs = (coord % BLOCK_SIZE_K);
+                         K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+                     } else {
+-                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * k_stride / 4 + d * D_split + d_tid]);
++                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + kcol * k_stride / 4 + d * D_split + d_tid]);
+                     }
+                     [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+                         Sf[r][c] = dot_product(Qf[tile_row(r) * qf_stride + d * D_split + d_tid], K_Tf, Sf[r][c]);
+@@ -489,14 +496,15 @@ void main() {
+                 uint32_t c = (idx + tid) / (HSV / 4);
+                 if (idx + gl_WorkGroupSize.x <= Bc * HSV / 4 || c < Bc) {
+                     FLOAT_TYPEV4 V_Tf = FLOAT_TYPEV4(0);
+-                    if (!KV_bounds_check || j * Bc + c < KV) {
++                    uint32_t vcol;
++                    if (fa_kv_index(j * Bc + c, vcol)) {
+                         if (USE_DECODE_V) {
+-                            uint coord = (j * Bc + c) * v_stride * BLOCK_SIZE_V + 4 * d;
++                            uint coord = vcol * v_stride * BLOCK_SIZE_V + 4 * d;
+                             uint ib = coord / BLOCK_SIZE_V;
+                             uint iqs = (coord % BLOCK_SIZE_V);
+                             V_Tf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+                         } else {
+-                            V_Tf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + (j * Bc + c) * v_stride / 4 + d]);
++                            V_Tf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + vcol * v_stride / 4 + d]);
+                         }
+                     }
+ 
+@@ -507,7 +515,9 @@ void main() {
+         }
+ 
+         [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-            if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
++            uint32_t vcol;
++            bool kv_active = fa_kv_index(j * Bc + c * cols_per_iter + col_tid, vcol);
++            if (!kv_active) {
+                 continue;
+             }
+ 
+@@ -522,12 +532,12 @@ void main() {
+                 if (SHMEM_STAGING != 0) {
+                     Vf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
+                 } else if (USE_DECODE_V) {
+-                    uint coord = (j * Bc + c * cols_per_iter + col_tid) * v_stride * BLOCK_SIZE_V + 4 * (d * D_split + d_tid);
++                    uint coord = vcol * v_stride * BLOCK_SIZE_V + 4 * (d * D_split + d_tid);
+                     uint ib = coord / BLOCK_SIZE_V;
+                     uint iqs = (coord % BLOCK_SIZE_V);
+                     Vf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+                 } else {
+-                    Vf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * v_stride / 4 + d * D_split + d_tid]);
++                    Vf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + vcol * v_stride / 4 + d * D_split + d_tid]);
+                 }
+                 [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+                     Of[r][d] += FLOAT_TYPEV4(Pf[r] * Vf);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -24,6 +24,8 @@ const bool USE_MASK_OPT    = (Flags & 1) != 0;
+ const bool MASK_ENABLE     = (Flags & 2) != 0;
+ const bool LOGIT_SOFTCAP   = (Flags & 4) != 0;
+ const bool OLD_AMD_WINDOWS = (Flags & 8) != 0;
++// Sparse: gather binding-7 indices instead of scanning [0,KV); p.split_kv = n_kv_max.
++const bool USE_SPARSE      = (Flags & 16) != 0;
+ 
+ // Round up head sizes to a multiple of 16, for coopmat1/coopmat2 paths
+ const uint32_t HSK_pad = (HSK + 15) & ~15;
+@@ -82,6 +84,8 @@ layout (binding = 5) writeonly buffer OV4 {D_TYPEV4 data_ov4[];};
+ 
+ layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
+ 
++layout (binding = 7) readonly buffer SP {int32_t data_sparse[];};
++
+ #define MASK_OPT_ALL_NEG_INF 1
+ #define MASK_OPT_ALL_ZERO 2
+ 
+@@ -144,7 +148,7 @@ ACC_TYPE perElemOpGetSink(const in uint32_t r, const in uint32_t c, const in ACC
+ 
+ uint32_t i, N, KV, split_k_index, Tr, start_j, end_j,
+          gqa_iq1, iq2, iq3, rk2, rk3, rv2, rv3, ik2, ik3, iv2, iv3,
+-         q_stride, k_stride, v_stride, m_stride;
++         q_stride, k_stride, v_stride, m_stride, sparse_base;
+ 
+ void init_indices()
+ {
+@@ -208,6 +212,33 @@ void init_indices()
+     // that prevents the compiler from folding the "&" through the select
+     // and breaking the alignment detection.
+     m_stride = (p.gqa_ratio > 1) ? (p.gqa_ratio >> 16) : KV;
++
++    // Sparse: the tile shares one mask row (gqa heads, or Br==1). split_k
++    // partitions the n_kv_max blocks.
++    if (USE_SPARSE) {
++        uint32_t qrow = (p.gqa_ratio > 1) ? gqa_iq1 : (i * Br);
++        sparse_base = (((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * p.nem1 + qrow) * p.split_kv;
++
++        uint32_t total_blocks = CEIL_DIV(p.split_kv, Bc);
++        uint32_t per_blocks   = CEIL_DIV(total_blocks, p.k_num);
++        start_j = min(split_k_index * per_blocks, total_blocks);
++        end_j   = min((split_k_index + 1) * per_blocks, total_blocks);
++    }
++}
++
++// Resolve a linear KV slot to a real column; false for inactive (sparse padding/-1, or dense OOB).
++bool fa_kv_index(uint lin, out uint kv_col) {
++    if (USE_SPARSE) {
++        if (lin >= p.split_kv) {
++            kv_col = 0;
++            return false;
++        }
++        int idx = data_sparse[sparse_base + lin];
++        kv_col = idx >= 0 ? uint(idx) : 0;
++        return idx >= 0;
++    }
++    kv_col = lin;
++    return !KV_bounds_check || lin < KV;
+ }
+ 
+ // Bias applied to softmax to stay in fp16 range.
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -176,9 +176,16 @@ void main() {
+                     uint32_t c = (idx + tid) / (Br / 4);
+                     uint32_t r = (idx + tid) % (Br / 4);
+                     if (idx + tid < Bc * Br / 4 || idx + gl_WorkGroupSize.x <= Bc * Br / 4) {
+-                        if ((!KV_bounds_check || j * Bc + c < KV)) {
++                        uint32_t kcol;
++                        bool kv_active = fa_kv_index(j * Bc + c, kcol);
++                        if (kv_active) {
+                             f16vec4 m;
+-                            if (!nem1_bounds_check || i * Br + r * 4 + 3 < p.nem1) {
++                            if (USE_SPARSE) {
++                                // sparse is gqa-gated (m_stride == 0): all four rows share the value
++                                FLOAT_TYPE mv = FLOAT_TYPE(data_m[m_offset + kcol]);
++                                m = f16vec4(mv);
++                                max_mask = max(max_mask, float(mv));
++                            } else if (!nem1_bounds_check || i * Br + r * 4 + 3 < p.nem1) {
+                                 m = f16vec4(data_m[m_offset + (i * Br + r * 4    ) * m_stride + (j * Bc + c)],
+                                             data_m[m_offset + (i * Br + r * 4 + 1) * m_stride + (j * Bc + c)],
+                                             data_m[m_offset + (i * Br + r * 4 + 2) * m_stride + (j * Bc + c)],
+@@ -206,6 +213,8 @@ void main() {
+                                 m = f16vec4(0.0);
+                             }
+                             mask_cache[idx / WorkGroupSize] = m;
++                        } else if (USE_SPARSE) {
++                            mask_cache[idx / WorkGroupSize] = f16vec4(NEG_FLT_MAX_OVER_2);
+                         }
+                     }
+                 }
+@@ -231,17 +240,19 @@ void main() {
+                 uint32_t c = (idx + tid) / (HSK_pad / 4);
+                 if (idx + gl_WorkGroupSize.x <= Bc * HSK_pad / 4 || c < Bc) {
+                     FLOAT_TYPEV4 K_Tf = FLOAT_TYPEV4(0);
+-                    if ((!KV_bounds_check || j * Bc + c < KV) && (HSK == HSK_pad || d < HSK / 4)) {
++                    uint32_t kcol;
++                    bool kv_active = fa_kv_index(j * Bc + c, kcol);
++                    if (kv_active && (HSK == HSK_pad || d < HSK / 4)) {
+ #if !defined(BFLOAT16)
+                         if (USE_DECODE_K) {
+-                            uint coord = (j * Bc + c) * k_stride * BLOCK_SIZE_K + 4 * d;
++                            uint coord = kcol * k_stride * BLOCK_SIZE_K + 4 * d;
+                             uint ib = coord / BLOCK_SIZE_K;
+                             uint iqs = (coord % BLOCK_SIZE_K);
+                             K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+                         } else
+ #endif
+                         {
+-                            K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c) * k_stride / 4 + d]);
++                            K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + kcol * k_stride / 4 + d]);
+                         }
+                     }
+ 
+@@ -266,25 +277,27 @@ void main() {
+             if (SHMEM_STAGING == 0) {
+             // For quants we always need to dequant into kvsh; for f16/bf16 we can load
+             // directly from global memory when alignment / bounds allow it.
+-            const bool stage_k = USE_DECODE_K || KV_bounds_check || d * 16 + 16 > HSK;
++            const bool stage_k = USE_DECODE_K || KV_bounds_check || USE_SPARSE || d * 16 + 16 > HSK;
+             if (stage_k) {
+                 barrier();
+                 [[unroll]] for (uint32_t idx = 0; idx < Bc * MatBr / 4; idx += gl_WorkGroupSize.x) {
+                     uint32_t col_vec = (idx + tid) % (MatBr / 4);
+                     uint32_t row = (idx + tid) / (MatBr / 4);
+                     if (idx + tid < Bc * MatBr / 4) {
+                         FLOAT_TYPEV4 K_Tf = FLOAT_TYPEV4(0);
+-                        if ((!KV_bounds_check || j * Bc + row < KV) && (HSK == HSK_pad || d * 16 + col_vec * 4 < HSK)) {
++                        uint32_t kcol;
++                        bool kv_active = fa_kv_index(j * Bc + row, kcol);
++                        if (kv_active && (HSK == HSK_pad || d * 16 + col_vec * 4 < HSK)) {
+ #if !defined(BFLOAT16)
+                             if (USE_DECODE_K) {
+-                                uint coord = (j * Bc + row) * k_stride * BLOCK_SIZE_K + d * 16 + col_vec * 4;
++                                uint coord = kcol * k_stride * BLOCK_SIZE_K + d * 16 + col_vec * 4;
+                                 uint ib = coord / BLOCK_SIZE_K;
+                                 uint iqs = (coord % BLOCK_SIZE_K);
+                                 K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+                             } else
+ #endif
+                             {
+-                                K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + row) * k_stride / 4 + d * 16 / 4 + col_vec]);
++                                K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + kcol * k_stride / 4 + d * 16 / 4 + col_vec]);
+                             }
+                         }
+ 
+@@ -401,17 +414,19 @@ void main() {
+                 uint32_t c = (idx + tid) / (HSV_pad / 4);
+                 if (idx + gl_WorkGroupSize.x <= Bc * HSV_pad / 4 || c < Bc) {
+                     FLOAT_TYPEV4 V_Tf = FLOAT_TYPEV4(0);
+-                    if ((!KV_bounds_check || j * Bc + c < KV) && (HSV == HSV_pad || d < HSV / 4)) {
++                    uint32_t v_row;
++                    bool kv_active = fa_kv_index(j * Bc + c, v_row);
++                    if (kv_active && (HSV == HSV_pad || d < HSV / 4)) {
+ #if !defined(BFLOAT16)
+                         if (USE_DECODE_V) {
+-                            uint coord = (j * Bc + c) * v_stride * BLOCK_SIZE_V + 4 * d;
++                            uint coord = v_row * v_stride * BLOCK_SIZE_V + 4 * d;
+                             uint ib = coord / BLOCK_SIZE_V;
+                             uint iqs = (coord % BLOCK_SIZE_V);
+                             V_Tf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+                         } else
+ #endif
+                         {
+-                            V_Tf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + (j * Bc + c) * v_stride / 4 + d]);
++                            V_Tf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + v_row * v_stride / 4 + d]);
+                         }
+                     }
+ 
+@@ -441,21 +456,22 @@ void main() {
+             if (SHMEM_STAGING == 0) {
+             // For quants we always preload via kvsh. For f16/bf16 we only preload when
+             // alignment / bounds force it (otherwise we coopMatLoad direct from data_vv4).
+-            const bool stage_v = USE_DECODE_V || KV_bounds_check;
++            const bool stage_v = USE_DECODE_V || KV_bounds_check || USE_SPARSE;
+             if (stage_v) {
+                 [[unroll]] for (uint32_t i = 0; i < v_loads_per_thread; ++i) {
+                     const uint idx = i * gl_WorkGroupSize.x + tid;
+                     const uint row = idx / v_cols;
+                     const uint col = idx % v_cols;
+ 
+-                    const uint v_row = j * Bc + row;
++                    uint32_t v_row;
++                    bool kv_active = fa_kv_index(j * Bc + row, v_row);
+                     const uint v_col = hsv_tile * MatBc * row_split + col * 4;
+ 
+                     const uint coord = v_row * v_stride * BLOCK_SIZE_V + v_col;
+                     const uint ib = coord / BLOCK_SIZE_V;
+                     const uint iqs = coord % BLOCK_SIZE_V;
+ 
+-                    if (!KV_bounds_check || (v_row < KV && v_col < HSV)) {
++                    if (USE_SPARSE ? (kv_active && v_col < HSV) : (!KV_bounds_check || (v_row < KV && v_col < HSV))) {
+ #if !defined(BFLOAT16)
+                         if (USE_DECODE_V) {
+                             kvsh[row * vsh_stride + col] = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+@@ -479,7 +495,7 @@ void main() {
+                     coopMatLoad(KMat, Psh, bc_chunk * MatBc * psh_stride, psh_stride, gl_CooperativeMatrixLayoutColumnMajor);
+ 
+                     if (SHMEM_STAGING == 0) {
+-                    if (!USE_DECODE_V && !KV_bounds_check) {
++                    if (!USE_DECODE_V && !KV_bounds_check && !USE_SPARSE) {
+                         // F16/BF16 values can be loaded directly from global memory
+                         const uint v_tile_row = j * Bc + bc_chunk * MatBc;
+                         const uint v_tile_offset = v_offset / 4 + v_tile_row * v_stride / 4 + hsv_offset / 4;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -29,6 +29,12 @@
+ #include "dequant_funcs_cm2.glsl"
+ #endif
+ 
++#ifdef GL_NV_cooperative_matrix_decode_vector
++#define FA_GATHER_BS 4u
++#else
++#define FA_GATHER_BS 1u
++#endif
++
+ // buffer_reference stride = sizeof(struct) = FaBlockBytesK/V.
+ layout(buffer_reference, std430, buffer_reference_align = 1) buffer decodeBufFA_K {
+     uint8_t raw[FaBlockBytesK];
+@@ -107,6 +113,67 @@ layout (binding = 1) readonly buffer K {uint8_t data_k[];};
+ layout (binding = 2) readonly buffer V {uint8_t data_v[];};
+ layout (binding = 3) readonly buffer M {uint8_t data_m[];};
+ 
++// f16 aliases for the sparse gather callbacks.
++layout (binding = 1) readonly buffer KF16 {float16_t data_kf16[];};
++layout (binding = 2) readonly buffer VF16 {float16_t data_vf16[];};
++layout (binding = 3) readonly buffer MF16 {float16_t data_mf16[];};
++#ifdef GL_NV_cooperative_matrix_decode_vector
++layout (binding = 1) readonly buffer KF16V4 {f16vec4 data_kf16v4[];};
++layout (binding = 2) readonly buffer VF16V4 {f16vec4 data_vf16v4[];};
++#endif
++
++// K/V/mask f16-element offsets for the current head/batch, set in main().
++uint32_t g_k_off_elem, g_v_off_elem, g_m_off_elem;
++
++#if !defined(BFLOAT16)
++// blockCoords are in block units: KV slot = blockCoords[0],
++// head dim = blockCoords[1]*FA_GATHER_BS + coordInBlock[1].
++float16_t faGatherK(const decodeBufFA_K unused, const uint32_t blockCoords[2], const uint32_t coordInBlock[2]) {
++    if (blockCoords[0] >= p.split_kv) { return float16_t(0); }
++    const int r = data_sparse[sparse_base + blockCoords[0]];
++    return r < 0 ? float16_t(0) : data_kf16[g_k_off_elem + uint(r) * k_stride + blockCoords[1] * FA_GATHER_BS + coordInBlock[1]];
++}
++
++float16_t faGatherV(const decodeBufFA_V unused, const uint32_t blockCoords[2], const uint32_t coordInBlock[2]) {
++    if (blockCoords[0] >= p.split_kv) { return float16_t(0); }
++    const int r = data_sparse[sparse_base + blockCoords[0]];
++    return r < 0 ? float16_t(0) : data_vf16[g_v_off_elem + uint(r) * v_stride + blockCoords[1] * FA_GATHER_BS + coordInBlock[1]];
++}
++
++#ifdef GL_NV_cooperative_matrix_decode_vector
++f16vec4 faGatherKVector(const decodeBufFA_K unused, const uint32_t blockCoords[2], const uint32_t coordInBlock[2]) {
++    if (blockCoords[0] >= p.split_kv) { return f16vec4(0); }
++    const int r = data_sparse[sparse_base + blockCoords[0]];
++    if (r < 0) { return f16vec4(0); }
++    const uint32_t o = g_k_off_elem + uint(r) * k_stride + blockCoords[1] * FA_GATHER_BS + coordInBlock[1];
++    return data_kf16v4[o / 4];
++}
++
++f16vec4 faGatherVVector(const decodeBufFA_V unused, const uint32_t blockCoords[2], const uint32_t coordInBlock[2]) {
++    if (blockCoords[0] >= p.split_kv) { return f16vec4(0); }
++    const int r = data_sparse[sparse_base + blockCoords[0]];
++    if (r < 0) { return f16vec4(0); }
++    const uint32_t o = g_v_off_elem + uint(r) * v_stride + blockCoords[1] * FA_GATHER_BS + coordInBlock[1];
++    return data_vf16v4[o / 4];
++}
++
++#define FAGATHERK , faGatherK, faGatherKVector
++#define FAGATHERV , faGatherV, faGatherVVector
++#else
++#define FAGATHERK , faGatherK
++#define FAGATHERV , faGatherV
++#endif
++#endif
++
++// Add gathered mask to S (slope==1 since sparse requires max_bias==0). col = slot in block jblk.
++ACC_TYPE faAddSparseMask(const uint32_t row, const uint32_t col, const ACC_TYPE elem, const uint32_t jblk) {
++    const float NEG = uintBitsToFloat(0xFEFFFFFF);
++    const uint32_t kvslot = jblk * Bc + col;
++    if (kvslot >= p.split_kv) { return ACC_TYPE(NEG); }
++    const int r = data_sparse[sparse_base + kvslot];
++    return r < 0 ? ACC_TYPE(NEG) : elem + ACC_TYPE(data_mf16[g_m_off_elem + row * m_stride + uint(r)]);
++}
++
+ ACC_TYPE maxReduce(const in ACC_TYPE x, const in ACC_TYPE y) {
+     return max(x, y);
+ }
+@@ -185,14 +252,16 @@ void main() {
+ 
+     tensorViewNV<2, false, 1, 0> tensorViewTranspose = createTensorViewNV(2, false, 1, 0);
+ 
+-    const uint bs_k = fa_block_elems(FaTypeK);
+-    const uint bs_v = fa_block_elems(FaTypeV);
++    const uint bs_k = USE_SPARSE ? FA_GATHER_BS : fa_block_elems(FaTypeK);
++    const uint bs_v = USE_SPARSE ? FA_GATHER_BS : fa_block_elems(FaTypeV);
+     tensorLayoutK = setTensorLayoutBlockSizeNV(tensorLayoutK, 1, bs_k);
+     tensorLayoutV = setTensorLayoutBlockSizeNV(tensorLayoutV, 1, bs_v);
+ 
++    // Sparse iterates n_kv_max (in split_kv); the decode callbacks remap each slot.
++    const uint32_t KV_iter = USE_SPARSE ? p.split_kv : KV;
+     tensorLayoutQ = setTensorLayoutDimensionNV(tensorLayoutQ, N, HSK);
+-    tensorLayoutK = setTensorLayoutDimensionNV(tensorLayoutK, KV, HSK);
+-    tensorLayoutV = setTensorLayoutDimensionNV(tensorLayoutV, KV, HSV);
++    tensorLayoutK = setTensorLayoutDimensionNV(tensorLayoutK, KV_iter, HSK);
++    tensorLayoutV = setTensorLayoutDimensionNV(tensorLayoutV, KV_iter, HSV);
+ 
+     // hint to the compiler that strides are aligned for the aligned variant of the shader
+     if (Clamp != gl_CooperativeMatrixClampModeConstantNV)
+@@ -250,14 +319,18 @@ void main() {
+         mo_offset += ((iq3 % p.nem3) * p.nem2 + (iq2 % p.nem2)) * CEIL_DIV(p.nem1, Br) * mo_stride;
+     }
+ 
++    g_k_off_elem = (ik2*p.nb12 + ik3*p.nb13) / 2;
++    g_v_off_elem = (iv2*p.nb22 + iv3*p.nb23) / 2;
++    g_m_off_elem = m_offset / 2;
++
+     uint32_t mask_opt = 0;
+     uint32_t mask_opt_idx = ~0;
+ 
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+         coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv = coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(0);
+-        if (MASK_ENABLE) {
++        if (MASK_ENABLE && !USE_SPARSE) {
+ 
+             if (USE_MASK_OPT && mask_opt_idx != j / 16) {
+                 mask_opt_idx = j / 16;
+@@ -315,7 +388,9 @@ void main() {
+         coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose);
+ #else
+         const bool k_use_decode = (bs_k > 1u);
+-        if (k_use_decode) {
++        if (USE_SPARSE) {
++            coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose FAGATHERK);
++        } else if (k_use_decode) {
+             coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose FADECODEK);
+         } else {
+             coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose);
+@@ -330,7 +405,9 @@ void main() {
+             }
+         }
+ 
+-        if (MASK_ENABLE) {
++        if (MASK_ENABLE && USE_SPARSE) {
++            coopMatPerElementNV(S, S, faAddSparseMask, j);
++        } else if (MASK_ENABLE) {
+             S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
+         }
+ 
+@@ -385,7 +462,9 @@ void main() {
+         coopMatLoadTensorNV(V, data_v, v_offset, sliceTensorLayoutNV(tensorLayoutV, j * Bc, Bc, 0, HSV_pad));
+ #else
+         const bool v_use_decode = (bs_v > 1u);
+-        if (v_use_decode) {
++        if (USE_SPARSE) {
++            coopMatLoadTensorNV(V, data_v, v_offset, sliceTensorLayoutNV(tensorLayoutV, j * Bc, Bc, 0, HSV_pad) FAGATHERV);
++        } else if (v_use_decode) {
+             coopMatLoadTensorNV(V, data_v, v_offset, sliceTensorLayoutNV(tensorLayoutV, j * Bc, Bc, 0, HSV_pad) FADECODEV);
+         } else {
+             coopMatLoadTensorNV(V, data_v, v_offset, sliceTensorLayoutNV(tensorLayoutV, j * Bc, Bc, 0, HSV_pad));
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_sparse_compact.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_sparse_compact.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_sparse_compact.comp
+@@ -0,0 +1,102 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : enable
++#extension GL_EXT_shader_16bit_storage : require
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++#ifdef USE_SUBGROUPS
++#extension GL_KHR_shader_subgroup_basic : require
++#extension GL_KHR_shader_subgroup_ballot : require
++#endif
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++layout(constant_id = 0) const uint BLOCK_SIZE = 128;
++layout(constant_id = 1) const uint NUM_SUBGROUPS = 1;
++
++layout (binding = 0) readonly buffer M {float16_t data_m[];};
++layout (binding = 1) writeonly buffer I {int32_t data_i[];};
++
++layout (push_constant) uniform parameter {
++    uint KV;
++    uint nem1;
++    uint nem2;
++    uint nbm1;
++    uint nbm2;
++    uint nbm3;
++    uint n_kv_max;
++} p;
++
++#ifdef USE_SUBGROUPS
++shared uvec4 ballots_sh[NUM_SUBGROUPS];
++#else
++shared uint scan[BLOCK_SIZE];
++#endif
++
++// One workgroup per mask row: compact the finite-mask KV positions into a
++// per-row index list of length n_kv_max, -1 padded. Emitted in ascending KV
++// order so the downstream attention accumulation is deterministic.
++void main() {
++    const uint i1 = gl_WorkGroupID.x;
++    const uint i2 = gl_WorkGroupID.y;
++    const uint i3 = gl_WorkGroupID.z;
++    const uint tid = gl_LocalInvocationIndex;
++
++    const uint m_base   = i3 * p.nbm3 + i2 * p.nbm2 + i1 * p.nbm1;
++    const uint out_base = ((i3 * p.nem2 + i2) * p.nem1 + i1) * p.n_kv_max;
++
++    uint base = 0;
++    for (uint chunk = 0; chunk < p.KV; chunk += BLOCK_SIZE) {
++        const uint k = chunk + tid;
++        bool selected = false;
++        if (k < p.KV) {
++            const float v = float(data_m[m_base + k]);
++            selected = !isinf(v) && !isnan(v);
++        }
++
++#ifdef USE_SUBGROUPS
++        const uvec4 ballot = subgroupBallot(selected);
++        if (subgroupElect()) {
++            ballots_sh[gl_SubgroupID] = ballot;
++        }
++        barrier();
++
++        uint subgroup_base = 0;
++        uint total = 0;
++        [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
++            if (s == gl_SubgroupID) {
++                subgroup_base = total;
++            }
++            total += subgroupBallotBitCount(ballots_sh[s]);
++        }
++        barrier();
++
++        const uint slot = base + subgroup_base + subgroupBallotExclusiveBitCount(ballot);
++#else
++        // Hillis-Steele inclusive prefix sum over the workgroup.
++        scan[tid] = selected ? 1u : 0u;
++        barrier();
++        for (uint off = 1; off < BLOCK_SIZE; off <<= 1) {
++            uint add = 0;
++            if (tid >= off) {
++                add = scan[tid - off];
++            }
++            barrier();
++            scan[tid] += add;
++            barrier();
++        }
++
++        const uint inclusive = scan[tid];
++        const uint total = scan[BLOCK_SIZE - 1];
++        const uint slot = base + inclusive - 1u;
++#endif
++
++        if (selected && slot < p.n_kv_max) {
++            data_i[out_base + slot] = int32_t(k);
++        }
++        base += total;
++        barrier();
++    }
++
++    for (uint s = min(base, p.n_kv_max) + tid; s < p.n_kv_max; s += BLOCK_SIZE) {
++        data_i[out_base + s] = int32_t(-1);
++    }
++}

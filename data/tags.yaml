@@ -14,6 +14,7 @@
 hardware_features:
   - cooperative-matrix          # VK_KHR_cooperative_matrix / GL_KHR_cooperative_matrix
   - int8-cooperative-matrix     # an int8 cooperative-matrix shape is enumerated
+  - cooperative-matrix2         # VK_NV_cooperative_matrix2 / GL_NV_cooperative_matrix2
   - coopmat-shape               # the M x N x K shapes a device exposes
   - coopmat-fp32-accumulator    # fp32 accumulator matrix for fp16 operands
   - subgroup-size               # default subgroup size of the device
@@ -24,6 +25,7 @@ hardware_features:
   - storage-texture3d           # tensor stored as a 3D texture
   - storage-texture2d           # packed weights stored as a 2D texture
   - fp16-arithmetic             # GL_EXT_shader_explicit_arithmetic_types_float16
+  - bfloat16-arithmetic         # GL_EXT_bfloat16 (bf16 scalars, vectors and matrix components)
   - int8-arithmetic             # GL_EXT_shader_explicit_arithmetic_types_int8
   - 8bit-storage                # GL_EXT_shader_8bit_storage
   - integer-dot-product         # GL_EXT_integer_dot_product
@@ -83,6 +85,17 @@ kernel_types:
   - sdpa-softmax                # attention-weight softmax
   - prefill
   - decode
+  # Operator families of general inference backends (upstream pull requests).
+  - moe                         # mixture-of-experts routing and per-expert matrix products
+  - convolution                 # conv1d/2d/3d, transposed convolution, im2col / col2im
+  - dequantize                  # quantized weight blocks expanded to float
+  - rope                        # rotary position embedding
+  - normalization               # RMS, L2, group and layer normalization
+  - softmax                     # standalone softmax
+  - topk-sort                   # argsort, argmax and top-k selection
+  - gated-delta-net             # gated delta-rule linear attention
+  - tensor-copy                 # copy, type conversion, row gather/scatter, concat, pad, repeat
+  - elementwise                 # unary and binary elementwise operators and activations
 
 languages:
   - glsl

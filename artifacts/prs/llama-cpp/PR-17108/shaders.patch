@@ -1,0 +1,80 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -211,7 +211,9 @@ void main() {
+             const uint iqs = loadr_a;
+ 
+             [[unroll]] for (uint k_step = 0; k_step < BK_STEP; k_step++) {
+-                block_a_to_shmem(k_step * BM + buf_ib, ib + k_step, iqs);
++                if (block + k_step * BK < end_k) {
++                    block_a_to_shmem(k_step * BM + buf_ib, ib + k_step, iqs);
++                }
+             }
+         }
+         [[unroll]] for (uint l = 0; loadc_b + l < BN; l += loadstride_b) {
+@@ -226,7 +228,7 @@ void main() {
+             const uint iqs = loadr_b;
+ 
+             [[unroll]] for (uint k_step = 0; k_step < BK_STEP; k_step++) {
+-                block_b_to_shmem(k_step * BN + buf_ib, ib + k_step, iqs);
++                block_b_to_shmem(k_step * BN + buf_ib, ib + k_step, iqs, block + k_step * BK < end_k);
+             }
+         }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+@@ -469,19 +469,30 @@ ACC_TYPE mmq_dot_product(const uint ib_a) {
+ #endif
+ 
+ #ifdef MMQ_SHMEM
+-void block_b_to_shmem(const uint buf_ib, const uint ib, const uint iqs) {
+-    const uint ib_outer = ib / 4;
+-    const uint ib_inner = ib % 4;
++void block_b_to_shmem(const uint buf_ib, const uint ib, const uint iqs, const bool is_in_bounds) {
++    if (is_in_bounds) {
++        const uint ib_outer = ib / 4;
++        const uint ib_inner = ib % 4;
+ 
+-    if (iqs == 0) {
+-        buf_b[buf_ib].ds = FLOAT_TYPE_VEC2(data_b[ib_outer].ds[ib_inner]);
+-    }
++        if (iqs == 0) {
++            buf_b[buf_ib].ds = FLOAT_TYPE_VEC2(data_b[ib_outer].ds[ib_inner]);
++        }
+ 
+-    const ivec4 values = data_b[ib_outer].qs[ib_inner * 2 + iqs];
+-    buf_b[buf_ib].qs[iqs * 4    ] = values.x;
+-    buf_b[buf_ib].qs[iqs * 4 + 1] = values.y;
+-    buf_b[buf_ib].qs[iqs * 4 + 2] = values.z;
+-    buf_b[buf_ib].qs[iqs * 4 + 3] = values.w;
++        const ivec4 values = data_b[ib_outer].qs[ib_inner * 2 + iqs];
++        buf_b[buf_ib].qs[iqs * 4    ] = values.x;
++        buf_b[buf_ib].qs[iqs * 4 + 1] = values.y;
++        buf_b[buf_ib].qs[iqs * 4 + 2] = values.z;
++        buf_b[buf_ib].qs[iqs * 4 + 3] = values.w;
++    } else {
++        if (iqs == 0) {
++            buf_b[buf_ib].ds = FLOAT_TYPE_VEC2(0.0f);
++        }
++
++        buf_b[buf_ib].qs[iqs * 4    ] = 0;
++        buf_b[buf_ib].qs[iqs * 4 + 1] = 0;
++        buf_b[buf_ib].qs[iqs * 4 + 2] = 0;
++        buf_b[buf_ib].qs[iqs * 4 + 3] = 0;
++    }
+ }
+ 
+ void block_b_to_registers(const uint ib) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
+@@ -61,7 +61,7 @@ void quantize() {
+ 
+     const uint a_idx = ib * 8 + iqs;
+ 
+-    vec4 vals = a_idx < p.ne ? data_a[a_idx] : vec4(0.0f);
++    vec4 vals = a_idx < p.ne / 4 ? data_a[a_idx] : vec4(0.0f);
+     const vec4 abs_vals = abs(vals);
+ 
+     // Find absolute max for each block

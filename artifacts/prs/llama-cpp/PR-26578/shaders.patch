@@ -1,0 +1,244 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_comb.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_comb.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_comb.comp
+@@ -0,0 +1,90 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : require
++#extension GL_KHR_shader_subgroup_basic : require
++#extension GL_KHR_shader_subgroup_shuffle : require
++
++// 16 lanes per token, indexed idst + hc*isrc: idst in bits 0..1, isrc in bits 2..3,
++// so subgroupShuffleXor by 1|2 reduces a row and by 4|8 a column.
++
++layout(constant_id = 0) const uint SUBGROUP_SIZE = 32;
++
++layout(local_size_x_id = 0, local_size_y = 4, local_size_z = 1) in;
++
++layout(push_constant) uniform parameter
++{
++    uint n_tokens;
++
++    uint nbm0; uint nbm1;   // mixes
++    uint nbs0;              // scale
++    uint nbb0;              // base
++    uint nbd0; uint nbd1; uint nbd2;   // dst
++
++    uint m_offset;
++    uint s_offset;
++    uint b_offset;
++    uint d_offset;
++
++    float eps;
++    uint n_iter;
++};
++
++layout(binding = 0, std430) readonly buffer M { float data_m[]; };
++layout(binding = 1, std430) readonly buffer S { float data_s[]; };
++layout(binding = 2, std430) readonly buffer B { float data_b[]; };
++layout(binding = 3, std430) writeonly buffer D { float data_d[]; };
++
++const uint hc          = 4;
++const uint comb_offset = 2 * hc;
++
++const uint TOKENS_PER_SUBGROUP = SUBGROUP_SIZE / 16;
++
++void main() {
++    const uint lane = gl_SubgroupInvocationID;
++    const uint blk  = lane >> 4;    // which 16-lane block, i.e. which token
++    const uint idx  = lane & 15;    // idst + hc*isrc
++
++    const uint sg = gl_WorkGroupID.x * gl_WorkGroupSize.y + gl_SubgroupID;
++    const uint it = sg * TOKENS_PER_SUBGROUP + blk;
++
++    // no early return, the shuffles need every lane; out-of-range blocks compute a discarded value
++    const bool in_range = it < n_tokens;
++
++    const float scale_comb = data_s[s_offset + 2 * nbs0];
++
++    float v = 0.0f;
++    if (in_range) {
++        v = data_m[m_offset + (comb_offset + idx) * nbm0 + it * nbm1] * scale_comb
++          + data_b[b_offset + (comb_offset + idx) * nbb0];
++    }
++
++    // Softmax across destinations: the four lanes sharing an isrc.
++    float vmax = max(v, subgroupShuffleXor(v, 1));
++    vmax = max(vmax, subgroupShuffleXor(vmax, 2));
++    v = exp(v - vmax);
++
++    float sum = v + subgroupShuffleXor(v, 1);
++    sum += subgroupShuffleXor(sum, 2);
++    v = v / sum + eps;
++
++    // Normalize columns: equal destination indices are four lanes apart.
++    sum = v + subgroupShuffleXor(v, 4);
++    sum += subgroupShuffleXor(sum, 8);
++    v /= sum + eps;
++
++    for (uint i = 1; i < n_iter; ++i) {
++        sum = v + subgroupShuffleXor(v, 1);
++        sum += subgroupShuffleXor(sum, 2);
++        v /= sum + eps;
++
++        sum = v + subgroupShuffleXor(v, 4);
++        sum += subgroupShuffleXor(sum, 8);
++        v /= sum + eps;
++    }
++
++    if (in_range) {
++        const uint idst = idx & 3;
++        const uint isrc = idx >> 2;
++        data_d[d_offset + idst * nbd0 + isrc * nbd1 + it * nbd2] = v;
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_post.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_post.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_post.comp
+@@ -0,0 +1,83 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : require
++
++// Fan one stream back out to hc streams and add the combination-weighted
++// residuals:
++//
++//   dst[i0, idst, it] = x[i0, it]*post[idst, it]
++//                     + sum_isrc residual[i0, isrc, it]*comb[idst, isrc, it]
++
++layout(constant_id = 0) const uint BLOCK_SIZE = 256;
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout(push_constant) uniform parameter
++{
++    uint n_embd;
++    uint n_tokens;
++
++    uint nbx0; uint nbx1;              // x
++    uint nbr0; uint nbr1; uint nbr2;   // residual
++    uint nbp0; uint nbp1;              // post
++    uint nbc0; uint nbc1; uint nbc2;   // comb
++    uint nbd0; uint nbd1; uint nbd2;   // dst
++
++    uint x_offset;
++    uint r_offset;
++    uint p_offset;
++    uint c_offset;
++    uint d_offset;
++};
++
++layout(binding = 0, std430) readonly buffer X { float data_x[]; };
++layout(binding = 1, std430) readonly buffer R { float data_r[]; };
++layout(binding = 2, std430) readonly buffer P { float data_p[]; };
++layout(binding = 3, std430) readonly buffer C { float data_c[]; };
++layout(binding = 4, std430) writeonly buffer D { float data_d[]; };
++
++const uint hc = 4;
++
++shared float post_s[hc];
++shared float comb_s[hc * hc];
++
++void main() {
++    const uint tid = gl_LocalInvocationID.x;
++    const uint it  = gl_WorkGroupID.y;
++
++    if (tid < hc) {
++        post_s[tid] = data_p[p_offset + tid * nbp0 + it * nbp1];
++    }
++    if (tid < hc * hc) {
++        const uint idst = tid & 3;
++        const uint isrc = tid >> 2;
++        comb_s[tid] = data_c[c_offset + idst * nbc0 + isrc * nbc1 + it * nbc2];
++    }
++    barrier();
++
++    // After the barrier, so every invocation reaches it.
++    const uint i0 = gl_WorkGroupID.x * BLOCK_SIZE + tid;
++    if (i0 >= n_embd) {
++        return;
++    }
++
++    const float xv = data_x[x_offset + i0 * nbx0 + it * nbx1];
++
++    const uint rb = r_offset + i0 * nbr0 + it * nbr2;
++
++    float r[hc];
++    [[unroll]]
++    for (uint isrc = 0; isrc < hc; ++isrc) {
++        r[isrc] = data_r[rb + isrc * nbr1];
++    }
++
++    [[unroll]]
++    for (uint idst = 0; idst < hc; ++idst) {
++        float result = xv * post_s[idst];
++        [[unroll]]
++        for (uint isrc = 0; isrc < hc; ++isrc) {
++            result = fma(r[isrc], comb_s[idst + hc * isrc], result);
++        }
++        data_d[d_offset + i0 * nbd0 + idst * nbd1 + it * nbd2] = result;
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_pre.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_pre.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dsv4_hc_pre.comp
+@@ -0,0 +1,59 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : require
++
++// Collapse the hc residual streams of a token into one, weighted per stream:
++//
++//   dst[i0, it] = sum_ih x[i0, ih, it] * weights[ih, it]
++
++layout(constant_id = 0) const uint BLOCK_SIZE = 256;
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout(push_constant) uniform parameter
++{
++    uint n_embd;
++    uint n_tokens;
++
++    uint nbx0; uint nbx1; uint nbx2;   // x
++    uint nbw0; uint nbw1;              // weights
++    uint nbd0; uint nbd1;              // dst
++
++    uint x_offset;
++    uint w_offset;
++    uint d_offset;
++};
++
++layout(binding = 0, std430) readonly buffer X { float data_x[]; };
++layout(binding = 1, std430) readonly buffer W { float data_w[]; };
++layout(binding = 2, std430) writeonly buffer D { float data_d[]; };
++
++const uint hc = 4;
++
++shared float w[hc];
++
++void main() {
++    const uint tid = gl_LocalInvocationID.x;
++    const uint it  = gl_WorkGroupID.y;
++
++    if (tid < hc) {
++        w[tid] = data_w[w_offset + tid * nbw0 + it * nbw1];
++    }
++    barrier();
++
++    // After the barrier, so every invocation reaches it.
++    const uint i0 = gl_WorkGroupID.x * BLOCK_SIZE + tid;
++    if (i0 >= n_embd) {
++        return;
++    }
++
++    const uint xb = x_offset + i0 * nbx0 + it * nbx2;
++
++    float result = 0.0f;
++    [[unroll]]
++    for (uint ih = 0; ih < hc; ++ih) {
++        result = fma(data_x[xb + ih * nbx1], w[ih], result);
++    }
++
++    data_d[d_offset + i0 * nbd0 + it * nbd1] = result;
++}

@@ -1,0 +1,14 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
+@@ -20,6 +20,10 @@ void main() {
+     const uint row = gl_WorkGroupID.z * 262144 + gl_WorkGroupID.y * 512 + gl_WorkGroupID.x;
+     const uint tid = gl_LocalInvocationID.x;
+ 
++    if (row >= p.KY) {
++        return;
++    }
++
+     FLOAT_TYPE scale = p.param1;
+ 
+     // partial sums for thread in warp

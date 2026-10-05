@@ -1,0 +1,40 @@
+repo: ggml-org/llama.cpp
+pr: 10254
+url: https://github.com/ggml-org/llama.cpp/pull/10254
+merge_sha: 80dd7ff22fd050fed58b552cc8001aaf968b7ebf
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/10254/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/vulkan-shaders/clamp.comp
+  status: modified
+  sha256: 6f9127058112a08e93929ec576777869b46a78ff82eae2cc14ccc0ea32bef4b0
+- path: ggml/src/vulkan-shaders/contig_copy.comp
+  status: added
+  sha256: a879ee8d1f65485819aa2907dd3b223df620321e3d533ec0ee32ce8d98dba600
+- path: ggml/src/vulkan-shaders/copy.comp
+  status: modified
+  sha256: 6f9127058112a08e93929ec576777869b46a78ff82eae2cc14ccc0ea32bef4b0
+- path: ggml/src/vulkan-shaders/cos.comp
+  status: modified
+  sha256: 6f9127058112a08e93929ec576777869b46a78ff82eae2cc14ccc0ea32bef4b0
+- path: ggml/src/vulkan-shaders/generic_unary_head.comp
+  status: modified
+  sha256: f23fad7f96c57443621b5531cd760af1ff4818e2cc3dca011907bf7617f26a72
+- path: ggml/src/vulkan-shaders/pad.comp
+  status: modified
+  sha256: 48789631370250cc7aaa82eabd10c29ea8af9da46b32832c28a6b039c9448969
+- path: ggml/src/vulkan-shaders/repeat.comp
+  status: modified
+  sha256: 9f49d509cd5d22eb109349309b48a821fb7be901d1faf8b2c975469de898d7d3
+- path: ggml/src/vulkan-shaders/scale.comp
+  status: modified
+  sha256: a99d5f8b25e7fb34abd9333831239e1cae5d20f108b2148a1cc2ae5a099e2dd2
+- path: ggml/src/vulkan-shaders/sin.comp
+  status: modified
+  sha256: 6f9127058112a08e93929ec576777869b46a78ff82eae2cc14ccc0ea32bef4b0
+- path: ggml/src/vulkan-shaders/square.comp
+  status: modified
+  sha256: 6f9127058112a08e93929ec576777869b46a78ff82eae2cc14ccc0ea32bef4b0

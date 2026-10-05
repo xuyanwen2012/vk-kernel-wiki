@@ -1,0 +1,216 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+@@ -25,92 +25,94 @@ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+ 
+ #if defined(DATA_A_Q4_0)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+-    return (vec2(vui & 0xF, vui >> 4) - 8.0f) * d;
++    return (vec2(vui & 0xF, vui >> 4) - 8.0f);
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+     const uint vui = uint(data_a_packed16[a_offset + ib].qs[iqs/2]);
+-    return (vec4(vui & 0xF, (vui >> 4) & 0xF, (vui >> 8) & 0xF, (vui >> 12) & 0xF) - 8.0f) * d;
++    return (vec4(vui & 0xF, (vui >> 4) & 0xF, (vui >> 8) & 0xF, vui >> 12) - 8.0f);
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q4_1)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+-    const float m = float(data_a[a_offset + ib].m);
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+-    return vec2(vui & 0xF, vui >> 4) * d + m;
++    return vec2(vui & 0xF, vui >> 4);
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+-    const float m = float(data_a_packed16[a_offset + ib].m);
+     const uint vui = uint(data_a_packed16[a_offset + ib].qs[iqs/2]);
+-    return vec4(vui & 0xF, (vui >> 4) & 0xF, (vui >> 8) & 0xF, (vui >> 12) & 0xF) * d + m;
++    return vec4(vui & 0xF, (vui >> 4) & 0xF, (vui >> 8) & 0xF, vui >> 12);
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q5_0)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+     const uint uint_qh = uint(data_a[a_offset + ib].qh[1]) << 16 | data_a[a_offset + ib].qh[0];
+     const ivec2 qh = ivec2(((uint_qh >> iqs) << 4) & 0x10, (uint_qh >> (iqs + 12)) & 0x10);
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+-    return (vec2((vui & 0xF) | qh.x, (vui >> 4) | qh.y) - 16.0f) * d;
++    return (vec2((vui & 0xF) | qh.x, (vui >> 4) | qh.y) - 16.0f);
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+     const uint uint_qh = uint(data_a_packed16[a_offset + ib].qh[1]) << 16 | data_a_packed16[a_offset + ib].qh[0];
+     const ivec2 qh0 = ivec2(((uint_qh >> iqs) << 4) & 0x10, (uint_qh >> (iqs + 12)) & 0x10);
+     const ivec2 qh1 = ivec2(((uint_qh >> (iqs + 1)) << 4) & 0x10, (uint_qh >> (iqs + 13)) & 0x10);
+     const uint vui = uint(data_a_packed16[a_offset + ib].qs[iqs/2]);
+-    return (vec4(((vui >> 0) & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, ((vui >> 12) & 0xF) | qh1.y) - 16.0f) * d;
++    return (vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, (vui >> 12) | qh1.y) - 16.0f);
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q5_1)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+-    const float m = float(data_a[a_offset + ib].m);
+     const uint uint_qh = data_a[a_offset + ib].qh;
+     const ivec2 qh = ivec2(((uint_qh >> iqs) << 4) & 0x10, (uint_qh >> (iqs + 12)) & 0x10);
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+-    return vec2((vui & 0xF) | qh.x, (vui >> 4) | qh.y) * d + m;
++    return vec2((vui & 0xF) | qh.x, (vui >> 4) | qh.y);
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+-    const float m = float(data_a_packed16[a_offset + ib].m);
+     const uint uint_qh = data_a_packed16[a_offset + ib].qh;
+     const ivec2 qh0 = ivec2(((uint_qh >> iqs) << 4) & 0x10, (uint_qh >> (iqs + 12)) & 0x10);
+     const ivec2 qh1 = ivec2(((uint_qh >> (iqs + 1)) << 4) & 0x10, (uint_qh >> (iqs + 13)) & 0x10);
+     const uint vui = uint(data_a_packed16[a_offset + ib].qs[iqs/2]);
+-    return vec4(((vui >> 0) & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, ((vui >> 12) & 0xF) | qh1.y) * d + m;
++    return vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, (vui >> 12) | qh1.y);
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q8_0)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+-    return vec2(int(data_a[a_offset + ib].qs[iqs]), int(data_a[a_offset + ib].qs[iqs + 1])) * d;
++    return vec2(int(data_a[a_offset + ib].qs[iqs]), int(data_a[a_offset + ib].qs[iqs + 1]));
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+     uint32_t v0 = data_a_packed16[a_offset + ib].qs[iqs/2];
+     uint32_t v1 = data_a_packed16[a_offset + ib].qs[iqs/2 + 1];
+-    return vec4(int8_t(v0 & 0xFF), int8_t((v0 >> 8) & 0xFF), int8_t(v1 & 0xFF), int8_t((v1 >> 8) & 0xFF)) * d;
++    return vec4(int8_t(v0 & 0xFF), int8_t(v0 >> 8), int8_t(v1 & 0xFF), int8_t(v1 >> 8));
+ }
+ #endif
+ 
+ #if defined(DATA_A_IQ4_NL)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a[a_offset + ib].d);
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+-    return vec2(kvalues_iq4nl[vui & 0xF], kvalues_iq4nl[vui >> 4]) * d;
++    return vec2(kvalues_iq4nl[vui & 0xF], kvalues_iq4nl[vui >> 4]);
+ }
+ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+-    const float d = float(data_a_packed16[a_offset + ib].d);
+     const uint vui = uint(data_a_packed16[a_offset + ib].qs[iqs/2]);
+-    return vec4(kvalues_iq4nl[vui & 0xF], kvalues_iq4nl[(vui >> 4) & 0xF], kvalues_iq4nl[(vui >> 8) & 0xF], kvalues_iq4nl[(vui >> 12) & 0xF]) * d;
++    return vec4(kvalues_iq4nl[vui & 0xF], kvalues_iq4nl[(vui >> 4) & 0xF], kvalues_iq4nl[(vui >> 8) & 0xF], kvalues_iq4nl[vui >> 12]);
++}
++#endif
++
++#if defined(DATA_A_F32) || defined(DATA_A_F16)
++vec2 get_dm(uint ib, uint a_offset) {
++    return vec2(0, 0);
++}
++#endif
++
++#if defined(DATA_A_Q4_0) || defined(DATA_A_Q5_0) || defined(DATA_A_Q8_0) || defined(DATA_A_IQ4_NL)
++vec2 get_dm(uint ib, uint a_offset) {
++    return vec2(float(data_a[a_offset + ib].d), 0);
++}
++#endif
++
++#if defined(DATA_A_Q4_1) || defined(DATA_A_Q5_1)
++vec2 get_dm(uint ib, uint a_offset) {
++    return vec2(float(data_a[a_offset + ib].d), float(data_a[a_offset + ib].m));
+ }
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+@@ -31,6 +31,8 @@ void main() {
+     const uint y_offset = QUANT_R == 1 ? 1 : QUANT_K/2;
+ 
+     vec2 v = dequantize(ib, iqs, 0);
++    const vec2 dm = get_dm(ib, 0);
++    v = v * dm.x + dm.y;
+ 
+     data_d[d_offset + iybs + iqs           ] = D_TYPE(v.x);
+     data_d[d_offset + iybs + iqs + y_offset] = D_TYPE(v.y);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -31,27 +31,13 @@ void iter(inout FLOAT_TYPE temp[NUM_ROWS], const uint first_row, const uint num_
+ 
+ #if K_PER_ITER == 8
+ #if QUANT_R == 2
+-    B_TYPE_VEC4 bv02 = data_b_v4[(b_offset + iybs + iqs) / 4];
+-    B_TYPE_VEC4 bv13 = data_b_v4[(b_offset + iybs + iqs + y_offset) / 4];
+-    FLOAT_TYPE b0 = FLOAT_TYPE(bv02.x);
+-    FLOAT_TYPE b1 = FLOAT_TYPE(bv13.x);
+-    FLOAT_TYPE b2 = FLOAT_TYPE(bv02.y);
+-    FLOAT_TYPE b3 = FLOAT_TYPE(bv13.y);
+-    FLOAT_TYPE b4 = FLOAT_TYPE(bv02.z);
+-    FLOAT_TYPE b5 = FLOAT_TYPE(bv13.z);
+-    FLOAT_TYPE b6 = FLOAT_TYPE(bv02.w);
+-    FLOAT_TYPE b7 = FLOAT_TYPE(bv13.w);
++    const B_TYPE_VEC4 bv02 = data_b_v4[(b_offset + iybs + iqs) / 4];
++    const B_TYPE_VEC4 bv13 = data_b_v4[(b_offset + iybs + iqs + y_offset) / 4];
++    const vec4 bv0 = vec4(bv02.x, bv13.x, bv02.y, bv13.y);
++    const vec4 bv1 = vec4(bv02.z, bv13.z, bv02.w, bv13.w);
+ #else
+-    B_TYPE_VEC4 bv0 = data_b_v4[(b_offset + iybs + iqs) / 4];
+-    B_TYPE_VEC4 bv1 = data_b_v4[(b_offset + iybs + iqs) / 4 + 1];
+-    FLOAT_TYPE b0 = FLOAT_TYPE(bv0.x);
+-    FLOAT_TYPE b1 = FLOAT_TYPE(bv0.y);
+-    FLOAT_TYPE b2 = FLOAT_TYPE(bv0.z);
+-    FLOAT_TYPE b3 = FLOAT_TYPE(bv0.w);
+-    FLOAT_TYPE b4 = FLOAT_TYPE(bv1.x);
+-    FLOAT_TYPE b5 = FLOAT_TYPE(bv1.y);
+-    FLOAT_TYPE b6 = FLOAT_TYPE(bv1.z);
+-    FLOAT_TYPE b7 = FLOAT_TYPE(bv1.w);
++    const vec4 bv0 = vec4(data_b_v4[(b_offset + iybs + iqs) / 4]);
++    const vec4 bv1 = vec4(data_b_v4[(b_offset + iybs + iqs) / 4 + 1]);
+ #endif
+ #else
+     // Check if the second of the pair of elements is OOB, and don't fetch B or
+@@ -67,22 +53,29 @@ void iter(inout FLOAT_TYPE temp[NUM_ROWS], const uint first_row, const uint num_
+         b1 = FLOAT_TYPE(data_b[b_offset + iybs + iqs + y_offset]);
+     }
+ #endif
++    uint ibi = first_row*p.ncols;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib = ((first_row + n)*p.ncols + col)/QUANT_K; // block index
++        const uint ib = (ibi + col)/QUANT_K; // block index
++        ibi += p.ncols;
+ 
+ #if K_PER_ITER == 8
+-        const vec4 v = dequantize4(ib, iqs, a_offset);
+-        const vec4 v2 = dequantize4(ib, iqs+(4/QUANT_R), a_offset);
++        vec4 v = dequantize4(ib, iqs, a_offset);
++        vec4 v2 = dequantize4(ib, iqs+(4/QUANT_R), a_offset);
++
++        const vec2 dm = get_dm(ib, a_offset);
++        if (dm.y != 0) { // quant has min component
++            v = v * dm.x + dm.y;
++            v2 = v2 * dm.x + dm.y;
++        }
+ 
+         // matrix multiplication
+-        temp[n] = fma(FLOAT_TYPE(v.x), b0, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v.y), b1, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v.z), b2, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v.w), b3, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v2.x), b4, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v2.y), b5, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v2.z), b6, temp[n]);
+-        temp[n] = fma(FLOAT_TYPE(v2.w), b7, temp[n]);
++        FLOAT_TYPE rowtmp = dot(bv0, v);
++        rowtmp += dot(bv1, v2);
++
++        if (dm.y == 0)
++            rowtmp *= dm.x;
++
++        temp[n] += rowtmp;
+ #else
+         const vec2 v = dequantize(ib, iqs, a_offset);
+ 

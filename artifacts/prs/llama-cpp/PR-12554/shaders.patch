@@ -1,0 +1,342 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp b/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
+@@ -18,7 +18,11 @@ void main() {
+     // fast path for when all four iterations are in-bounds
+     if (idx + (num_iter-1)*num_threads < p.ne) {
+         [[unroll]] for (uint i = 0; i < num_iter; ++i) {
+-#ifndef OPTIMIZATION_ERROR_WORKAROUND
++
++#if defined(DATA_D_BF16)
++            float f = float(data_a[get_aoffset() + idx]);
++            data_d[get_doffset() + idx] = D_TYPE(fp32_to_bf16(f));
++#elif !defined(OPTIMIZATION_ERROR_WORKAROUND)
+             data_d[get_doffset() + idx] = D_TYPE(data_a[get_aoffset() + idx]);
+ #else
+             data_d[get_doffset() + idx] = data_a[get_aoffset() + idx];
+@@ -31,7 +35,10 @@ void main() {
+                 continue;
+             }
+ 
+-#ifndef OPTIMIZATION_ERROR_WORKAROUND
++#if defined(DATA_D_BF16)
++            float f = float(data_a[get_aoffset() + idx]);
++            data_d[get_doffset() + idx] = D_TYPE(fp32_to_bf16(f));
++#elif !defined(OPTIMIZATION_ERROR_WORKAROUND)
+             data_d[get_doffset() + idx] = D_TYPE(data_a[get_aoffset() + idx]);
+ #else
+             data_d[get_doffset() + idx] = data_a[get_aoffset() + idx];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
+@@ -12,7 +12,10 @@ void main() {
+         return;
+     }
+ 
+-#ifndef OPTIMIZATION_ERROR_WORKAROUND
++#if defined(DATA_D_BF16)
++    float f = float(data_a[get_aoffset() + src0_idx(idx)]);
++    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(fp32_to_bf16(f));
++#elif !defined(OPTIMIZATION_ERROR_WORKAROUND)
+     data_d[get_doffset() + dst_idx(idx)] = D_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+ #else
+     data_d[get_doffset() + dst_idx(idx)] = data_a[get_aoffset() + src0_idx(idx)];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+@@ -23,6 +23,12 @@ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+ }
+ #endif
+ 
++#if defined(DATA_A_BF16)
++vec2 dequantize(uint ib, uint iqs, uint a_offset) {
++    return vec2(bf16_to_fp32(data_a[a_offset + ib]), bf16_to_fp32(data_a[a_offset + ib + 1]));
++}
++#endif
++
+ #if defined(DATA_A_Q4_0)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+@@ -428,7 +434,7 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+ }
+ #endif
+ 
+-#if defined(DATA_A_F32) || defined(DATA_A_F16)
++#if defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)
+ vec2 get_dm(uint ib, uint a_offset) {
+     return vec2(0, 0);
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
+@@ -20,9 +20,14 @@ void main() {
+     const uint a_offset = get_aoffset() + i01*p.nb01 + i11*p.nb02 + i12*p.nb03;
+     const uint d_offset = get_doffset() + i10*p.nb21 + i11*p.nb22 + i12*p.nb23;
+ 
++#if defined(DATA_A_BF16)
++    FLOAT_TYPE v = FLOAT_TYPE(bf16_to_fp32(data_a[a_offset + i00]));
++#else
++    FLOAT_TYPE v = FLOAT_TYPE(data_a[a_offset + i00]);
++#endif
+ #ifndef OPTIMIZATION_ERROR_WORKAROUND
+-    data_d[d_offset + i00] = D_TYPE(data_a[a_offset + i00]);
++    data_d[d_offset + i00] = D_TYPE(v);
+ #else
+-    data_d[d_offset + i00] = data_a[a_offset + i00];
++    data_d[d_offset + i00] = D_TYPE(v);
+ #endif
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -6,7 +6,7 @@
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+-#if !defined(DATA_A_F32) && !defined(DATA_A_F16)
++#if !defined(DATA_A_F32) && !defined(DATA_A_F16) && !defined(DATA_A_BF16)
+ #define K_PER_ITER 8
+ #else
+ #define K_PER_ITER 2
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -10,6 +10,10 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+ #endif
+ 
++#if defined(DATA_A_BF16) && defined(COOPMAT)
++#extension GL_EXT_bfloat16 : enable
++#endif
++
+ #ifdef COOPMAT
+ #extension GL_KHR_cooperative_matrix : enable
+ #extension GL_KHR_memory_scope_semantics : enable
+@@ -29,6 +33,10 @@
+ #define LOAD_VEC_B 1
+ #endif
+ 
++#if !defined(TO_FLOAT_TYPE)
++#define TO_FLOAT_TYPE FLOAT_TYPE
++#endif
++
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+@@ -202,8 +210,8 @@ void main() {
+ #endif
+ 
+ #ifdef COOPMAT
+-    coopmat<float16_t, gl_ScopeSubgroup, TM, TK, gl_MatrixUseA> cache_a;
+-    coopmat<float16_t, gl_ScopeSubgroup, TK, TN, gl_MatrixUseB> cache_b;
++    coopmat<FLOAT_TYPE, gl_ScopeSubgroup, TM, TK, gl_MatrixUseA> cache_a;
++    coopmat<FLOAT_TYPE, gl_ScopeSubgroup, TK, TN, gl_MatrixUseB> cache_b;
+     coopmat<ACC_TYPE, gl_ScopeSubgroup, TM, TN, gl_MatrixUseAccumulator> sums[cms_per_row * cms_per_col];
+ 
+     [[unroll]] for (uint i = 0; i < cms_per_row * cms_per_col; i++) {
+@@ -248,6 +256,21 @@ void main() {
+                 buf_a[(loadc_a + l) * SHMEM_STRIDE + loadr_a] = FLOAT_TYPE(0.0f);
+             }
+ #endif
++#elif defined(DATA_A_BF16)
++#if LOAD_VEC_A == 4
++            const uint idx = pos_a + (loadc_a + l) * p.stride_a / LOAD_VEC_A + loadr_a;
++            const uint buf_idx = (loadc_a + l) * SHMEM_STRIDE + loadr_a * LOAD_VEC_A;
++            buf_a[buf_idx    ] = TO_FLOAT_TYPE(data_a[idx].x);
++            buf_a[buf_idx + 1] = TO_FLOAT_TYPE(data_a[idx].y);
++            buf_a[buf_idx + 2] = TO_FLOAT_TYPE(data_a[idx].z);
++            buf_a[buf_idx + 3] = TO_FLOAT_TYPE(data_a[idx].w);
++#else
++            if (ir * BM + loadc_a + l < p.M && block + loadr_a < end_k) {
++                buf_a[(loadc_a + l) * SHMEM_STRIDE + loadr_a] = TO_FLOAT_TYPE(data_a[pos_a + (loadc_a + l) * p.stride_a + loadr_a]);
++            } else {
++                buf_a[(loadc_a + l) * SHMEM_STRIDE + loadr_a] = TO_FLOAT_TYPE(uint16_t(0));
++            }
++#endif
+ #elif defined(DATA_A_Q4_0)
+             const uint idx = pos_a + (loadc_a + l) * p.stride_a / LOAD_VEC_A + loadr_a;
+             const uint buf_idx = (loadc_a + l) * SHMEM_STRIDE + 4 * loadr_a;
+@@ -695,21 +718,21 @@ void main() {
+             const uint idx = pos_b + (loadc_b + l) * p.stride_b / LOAD_VEC_B + loadr_b;
+ #endif
+             const uint buf_idx = (loadc_b + l) * SHMEM_STRIDE + loadr_b * LOAD_VEC_B;
+-            buf_b[buf_idx + 0] = FLOAT_TYPE(data_b[idx].x);
+-            buf_b[buf_idx + 1] = FLOAT_TYPE(data_b[idx].y);
+-            buf_b[buf_idx + 2] = FLOAT_TYPE(data_b[idx].z);
+-            buf_b[buf_idx + 3] = FLOAT_TYPE(data_b[idx].w);
++            buf_b[buf_idx + 0] = TO_FLOAT_TYPE(data_b[idx].x);
++            buf_b[buf_idx + 1] = TO_FLOAT_TYPE(data_b[idx].y);
++            buf_b[buf_idx + 2] = TO_FLOAT_TYPE(data_b[idx].z);
++            buf_b[buf_idx + 3] = TO_FLOAT_TYPE(data_b[idx].w);
+ #elif !MUL_MAT_ID
+             if (ic * BN + loadc_b + l < p.N && block + loadr_b < end_k) {
+-                buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = FLOAT_TYPE(data_b[pos_b + (loadc_b + l) * p.stride_b + loadr_b]);
++                buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = TO_FLOAT_TYPE(data_b[pos_b + (loadc_b + l) * p.stride_b + loadr_b]);
+             } else {
+                 buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = FLOAT_TYPE(0.0f);
+             }
+ #else
+             const uint row_i = ic * BN + loadc_b + l;
+             if (row_i < _ne1) {
+                 const u16vec2 row_idx = row_ids[row_i];
+-                buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = FLOAT_TYPE(data_b[pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + loadr_b]);
++                buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = TO_FLOAT_TYPE(data_b[pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + loadr_b]);
+             } else {
+                 buf_b[(loadc_b + l) * SHMEM_STRIDE + loadr_b] = FLOAT_TYPE(0.0f);
+             }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -14,6 +14,9 @@
+ #extension GL_EXT_buffer_reference : enable
+ #extension GL_KHR_shader_subgroup_ballot : enable
+ #extension GL_KHR_shader_subgroup_vote : enable
++#ifdef DATA_A_BF16
++#extension GL_EXT_bfloat16 : enable
++#endif
+ 
+ #include "types.comp"
+ 
+@@ -80,6 +83,12 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ #define store_scales(a)
+ #endif
+ 
++#if defined(DATA_A_BF16)
++#define MAT_TYPE bfloat16_t
++#else
++#define MAT_TYPE FLOAT_TYPE
++#endif
++
+ #ifdef MUL_MAT_ID
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
+ 
+@@ -271,8 +280,8 @@ void main() {
+ 
+                 // Manually partial unroll
+                 [[unroll]] for (uint j = 0; j < unroll_count; ++j) {
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BNover4, gl_MatrixUseB> mat_b;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BNover4, gl_MatrixUseB> mat_b;
+ 
+                     coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                     coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BNover4, block_k, BK), tensorViewTranspose);
+@@ -286,8 +295,8 @@ void main() {
+                 store_scales(tid);
+             }
+             while (block_k < end_k) {
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BNover4, gl_MatrixUseB> mat_b;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BNover4, gl_MatrixUseB> mat_b;
+ 
+                 coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                 coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BNover4, block_k, BK), tensorViewTranspose);
+@@ -310,8 +319,8 @@ void main() {
+ 
+                 // Manually partial unroll
+                 [[unroll]] for (uint j = 0; j < unroll_count; ++j) {
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BNover2, gl_MatrixUseB> mat_b;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BNover2, gl_MatrixUseB> mat_b;
+ 
+                     coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                     coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BNover2, block_k, BK), tensorViewTranspose);
+@@ -325,8 +334,8 @@ void main() {
+                 store_scales(tid);
+             }
+             while (block_k < end_k) {
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BNover2, gl_MatrixUseB> mat_b;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BNover2, gl_MatrixUseB> mat_b;
+ 
+                 coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                 coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BNover2, block_k, BK), tensorViewTranspose);
+@@ -350,8 +359,8 @@ void main() {
+ 
+                 // Manually partial unroll
+                 [[unroll]] for (uint j = 0; j < unroll_count; ++j) {
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                    coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                    coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
+ 
+                     coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                     coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BN, block_k, BK), tensorViewTranspose);
+@@ -365,8 +374,8 @@ void main() {
+                 store_scales(tid);
+             }
+             while (block_k < end_k) {
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-                coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++                coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
+ 
+                 coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutA, ir * BM, BM, block_k, BK) DECODEFUNCA);
+                 coopMatLoadTensorNV(mat_b, data_b, pos_b, sliceTensorLayoutNV(tensorLayoutB, ic * BN, BN, block_k, BK), tensorViewTranspose);
+@@ -405,8 +414,8 @@ void main() {
+                 fetch_scales(ir * BM, pos_a, stride_a, block_k + BK, tid, false);
+             }
+ 
+-            coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
+-            coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
++            coopmat<MAT_TYPE, gl_ScopeWorkgroup, BM, BK, gl_MatrixUseA> mat_a;
++            coopmat<MAT_TYPE, gl_ScopeWorkgroup, BK, BN, gl_MatrixUseB> mat_b;
+ 
+             coopMatLoadTensorNV(mat_a, data_a, pos_a, sliceTensorLayoutNV(tensorLayoutAClamp, ir * BM, BM, block_k, BK) DECODEFUNCA);
+ #ifdef MUL_MAT_ID
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/test_bfloat16_support.comp b/ggml/src/ggml-vulkan/vulkan-shaders/test_bfloat16_support.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/test_bfloat16_support.comp
+@@ -0,0 +1,7 @@
++#version 460
++
++#extension GL_EXT_bfloat16 : require
++
++void main()
++{
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+@@ -33,6 +33,19 @@
+ #endif
+ #endif
+ 
++#if defined(DATA_A_BF16)
++#define QUANT_K 1
++#define QUANT_R 1
++
++#if !defined(LOAD_VEC_A) || LOAD_VEC_A == 1
++#define A_TYPE uint16_t
++#elif LOAD_VEC_A == 4
++#define A_TYPE u16vec4
++#elif LOAD_VEC_A == 8
++#error unsupported
++#endif
++#endif
++
+ #define QUANT_K_Q4_0 32
+ #define QUANT_R_Q4_0 2
+ 
+@@ -1343,4 +1356,18 @@ void init_iq_shmem(uvec3 wgsize)
+ }
+ #endif
+ 
++// returns the bfloat value in the low 16b.
++// See ggml_compute_fp32_to_bf16
++uint32_t fp32_to_bf16(float f)
++{
++    uint32_t u = floatBitsToUint(f);
++    u = (u + (0x7fff + ((u >> 16) & 1))) >> 16;
++    return u;
++}
++
++float bf16_to_fp32(uint32_t u)
++{
++    return uintBitsToFloat(u << 16);
++}
++
+ #endif // !defined(GGML_TYPES_COMP)

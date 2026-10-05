@@ -1,0 +1,11 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp b/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+@@ -16,6 +16,5 @@ void main() {
+     if (i >= p.KX) {
+         return;
+     }
+-
+-    data_d[i] = D_TYPE(tanh(data_a[i]));
++    data_d[i] = D_TYPE(1. - 2. / (exp(2.*data_a[i]) + 1.));
+ }

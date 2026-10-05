@@ -1,0 +1,283 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+@@ -608,6 +608,20 @@ vec2 get_dm(uint ib, uint a_offset) {
+ }
+ #endif
+ 
++#if defined(DATA_A_TQ2_0)
++vec2 dequantize(uint ib, uint iqs, uint a_offset) {
++    // elem e -> byte qs[(e/128)*32 + e%32], bits 2*((e%128)/32); w = q - 1 (d applied via get_dm)
++    const uint qsi   = (iqs / 128) * 32 + (iqs % 32);  // iqs even -> qsi, qsi+1 in same group/level
++    const uint shift = 2 * ((iqs % 128) / 32);
++
++    const uvec2 qs = uvec2(data_a[a_offset + ib].qs[qsi], data_a[a_offset + ib].qs[qsi + 1]);
++    return vec2((qs >> shift) & 3) - 1.0;
++}
++vec2 get_dm(uint ib, uint a_offset) {
++    return vec2(float(data_a[a_offset + ib].d), 0);
++}
++#endif
++
+ #if defined(DATA_A_Q3_K)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+     iqs /= 2;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+@@ -247,6 +247,44 @@ f16vec4 dequantFuncQ8_0_v(const in decodeBufQ8_0 bl, const in uint blockCoords[2
+     return f16vec4(vec4(qi) * vec4(float(d)));
+ }
+ 
++layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufTQ2_0 {
++   block_tq2_0 block;
++};
++
++layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufTQ2_0_packed16 {
++   block_tq2_0_packed16 block;
++};
++
++float16_t dequantFuncTQ2_0(const in decodeBufTQ2_0 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
++{
++    decodeBufTQ2_0_packed16 bl16 = decodeBufTQ2_0_packed16(bl);
++    const uint idx = coordInBlock[1];
++
++    const uint qsshift = (idx & 0x60) >> 4;             // 0,2,4,6
++
++    uint qs = uint32_t(bl16.block.qs[((idx & 0x80) >> 3) + ((idx & 0x1E) >> 1)]);
++    qs = (qs >> qsshift) & 0x0303;
++    qs = unpack8(qs)[idx & 1];
++
++    return bl.block.d * (float16_t(int(qs)) - float16_t(1.0));
++}
++
++f16vec4 dequantFuncTQ2_0_v(const in decodeBufTQ2_0 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
++{
++    const uint idx = coordInBlock[1];
++
++    const uint qsshift = (idx & 0x60) >> 4;             // 0,2,4,6
++    const uint qsi = ((idx & 0x80) >> 2) + (idx & 0x1C); // byte index of 4-aligned group
++
++    const uint qsw = (uint(bl.block.qs[qsi]))
++                   | (uint(bl.block.qs[qsi + 1]) << 8)
++                   | (uint(bl.block.qs[qsi + 2]) << 16)
++                   | (uint(bl.block.qs[qsi + 3]) << 24);
++    const u8vec4 q = unpack8((qsw >> qsshift) & 0x03030303);
++
++    return bl.block.d * (f16vec4(q) - f16vec4(1.0));
++}
++
+ layout(buffer_reference, std430, buffer_reference_align = 4) buffer decodeBufQ2_K {
+    block_q2_K block;
+ };
+@@ -1368,6 +1406,9 @@ f16vec4 dequantFuncNVFP4_v(const in decodeBufNVFP4 bl, const in uint blockCoords
+ #elif defined(DATA_A_Q8_0)
+ #define dequantFuncA dequantFuncQ8_0
+ #define dequantFuncA_v dequantFuncQ8_0_v
++#elif defined(DATA_A_TQ2_0)
++#define dequantFuncA dequantFuncTQ2_0
++#define dequantFuncA_v dequantFuncTQ2_0_v
+ #elif defined(DATA_A_Q2_K)
+ #define dequantFuncA dequantFuncQ2_K
+ #define dequantFuncA_v dequantFuncQ2_K_v
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_tq2_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_tq2_0.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_tq2_0.comp
+@@ -0,0 +1,31 @@
++#version 450
++
++#include "dequant_head.glsl"
++
++layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
++layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
++
++void main() {
++    [[unroll]] for (uint wgy = 0; wgy < 256; wgy++) {
++        const uint i = gl_WorkGroupID.x * 256 + wgy;
++        if (i >= p.nel / QUANT_K) {
++            return;
++        }
++
++        const uint tid = gl_LocalInvocationID.x;
++        const uint ip = tid / 32;         // group 0,1 (128 elems each)
++        const uint il = tid - 32 * ip;    // byte in group 0..31
++
++        const uint y_idx = i * QUANT_K + 128 * ip + il;
++
++        const uint8_t qs = data_a[i].qs[32 * ip + il];
++
++        const FLOAT_TYPE d = FLOAT_TYPE(data_a[i].d);
++        data_b[y_idx +  0] = D_TYPE(d * FLOAT_TYPE(int((qs >> 0) & 3) - 1));
++        data_b[y_idx + 32] = D_TYPE(d * FLOAT_TYPE(int((qs >> 2) & 3) - 1));
++        data_b[y_idx + 64] = D_TYPE(d * FLOAT_TYPE(int((qs >> 4) & 3) - 1));
++        data_b[y_idx + 96] = D_TYPE(d * FLOAT_TYPE(int((qs >> 6) & 3) - 1));
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_tq2_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_tq2_0.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_tq2_0.comp
+@@ -0,0 +1,102 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.glsl"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++// ternary TQ2_0: w = (q - 1) * d. Same qs group/level layout as q2_K, but a
++// single f16 scale per 256-block and no mins:
++//   sum_e b_e * (q_e - 1) * d  =  d * (sum_e b_e * q_e  -  sum_e b_e)
++void calc_superblock(const uint a_offset, const uint b_offset, const uint v_im, const uint q_offset, const uint y_offset, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + y_offset;
++
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
++        if (i >= num_blocks_per_row) {
++            continue;
++        }
++
++        const uint32_t qs_u32 = uint32_t(data_a_packed16[ib0 + i].qs[q_offset / 2]) | (uint32_t(data_a_packed16[ib0 + i].qs[q_offset / 2 + 8]) << 16);
++        const vec4 qs_u32_0 = vec4(unpack8(qs_u32 & 0x03030303));
++        const vec4 qs_u32_2 = vec4(unpack8((qs_u32 >> 2) & 0x03030303));
++        const vec4 qs_u32_4 = vec4(unpack8((qs_u32 >> 4) & 0x03030303));
++        const vec4 qs_u32_6 = vec4(unpack8((qs_u32 >> 6) & 0x03030303));
++
++        const FLOAT_TYPE d = FLOAT_TYPE(data_a[ib0 + i].d);
++
++        [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++            vec2 b0 =   vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 +  0]);
++            vec2 b16 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 +  8]);
++            vec2 b32 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 16]);
++            vec2 b48 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 24]);
++            vec2 b64 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 32]);
++            vec2 b80 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 40]);
++            vec2 b96 =  vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 48]);
++            vec2 b112 = vec2(data_b_v2[(j*p.batch_stride_b + b_offset + y_idx) / 2 + 56]);
++
++            FLOAT_TYPE sumq = FLOAT_TYPE(0.0);
++            FLOAT_TYPE sumb = FLOAT_TYPE(0.0);
++            [[unroll]] for (int l = 0; l < 2; ++l) {
++                sumq = fma(FLOAT_TYPE(b0[l]),   FLOAT_TYPE(qs_u32_0[l  ]),
++                       fma(FLOAT_TYPE(b16[l]),  FLOAT_TYPE(qs_u32_0[l+2]),
++                       fma(FLOAT_TYPE(b32[l]),  FLOAT_TYPE(qs_u32_2[l  ]),
++                       fma(FLOAT_TYPE(b48[l]),  FLOAT_TYPE(qs_u32_2[l+2]),
++                       fma(FLOAT_TYPE(b64[l]),  FLOAT_TYPE(qs_u32_4[l  ]),
++                       fma(FLOAT_TYPE(b80[l]),  FLOAT_TYPE(qs_u32_4[l+2]),
++                       fma(FLOAT_TYPE(b96[l]),  FLOAT_TYPE(qs_u32_6[l  ]),
++                       fma(FLOAT_TYPE(b112[l]), FLOAT_TYPE(qs_u32_6[l+2]), sumq))))))));
++                sumb += FLOAT_TYPE(b0[l]) + FLOAT_TYPE(b16[l]) + FLOAT_TYPE(b32[l]) + FLOAT_TYPE(b48[l])
++                      + FLOAT_TYPE(b64[l]) + FLOAT_TYPE(b80[l]) + FLOAT_TYPE(b96[l]) + FLOAT_TYPE(b112[l]);
++            }
++            temp[j][n] = fma(d, sumq - sumb, temp[j][n]);
++        }
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 16 threads are used to process each block
++    const uint it_size = gl_WorkGroupSize.x/16;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid%16;  // 0...15
++    const uint ix = tid/16;
++
++    const uint v_im = itid/8;                                // 0 or 1. 0 computes 0..., 1 computes 128...
++    const uint v_in = itid - 8*v_im;                         // 0...7
++
++    const uint l0 = 2*v_in;                                  // 0...15
++    const uint q_offset = 32*v_im + l0;
++    const uint y_offset = 128*v_im + l0;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    for (uint i0 = 0; i0 < num_blocks_per_row; i0 += it_size)
++        calc_superblock(a_offset, b_offset, v_im, q_offset, y_offset, i0 + ix, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+@@ -182,6 +182,22 @@ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uin
+ 
+             buf_a[buf_idx    ] = FLOAT_TYPEV2(v.xy);
+             buf_a[buf_idx + 1] = FLOAT_TYPEV2(v.zw);
++#elif defined(DATA_A_TQ2_0)
++            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++            const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
++
++            const uint ib = idx / 128;                         // 2 values per idx
++            const uint iqs = (idx % 128) * 2;                  // elem 0,2,4..254
++
++            const uint qsi   = (iqs / 128) * 32 + (iqs % 32);  // byte pair start
++            const uint shift = 2 * ((iqs % 128) / 32);         // 0,2,4,6
++
++            const uvec2 qs = uvec2(data_a[ib].qs[qsi], data_a[ib].qs[qsi + 1]);
++            const float d = float(data_a[ib].d);
++
++            const vec2 v = d * (vec2((qs >> shift) & 3) - 1.0);
++
++            buf_a[buf_idx] = FLOAT_TYPEV2(v.xy);
+ #elif defined(DATA_A_Q3_K)
+             const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+             const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_A / 2;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+@@ -303,6 +303,30 @@ struct block_q2_K_packed32
+ #define DATA_A_QUANT_K
+ #endif
+ 
++#define QUANT_K_TQ2_0 256
++
++// ternary (BitNet): 2-bit codes, w = (q - 1) * d; qs layout matches q2_K's
++// two 32-byte groups with four bit-levels per byte
++struct block_tq2_0
++{
++    uint8_t qs[QUANT_K_TQ2_0/4];
++    float16_t d;
++};
++
++struct block_tq2_0_packed16
++{
++    uint16_t qs[QUANT_K_TQ2_0/4/2];
++    float16_t d;
++};
++
++#if defined(DATA_A_TQ2_0)
++#define QUANT_K QUANT_K_TQ2_0
++#define QUANT_R 1
++#define A_TYPE block_tq2_0
++#define A_TYPE_PACKED16 block_tq2_0_packed16
++#define DATA_A_QUANT_K
++#endif
++
+ #define QUANT_K_Q3_K 256
+ 
+ struct block_q3_K

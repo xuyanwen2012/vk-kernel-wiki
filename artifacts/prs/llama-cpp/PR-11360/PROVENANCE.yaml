@@ -1,0 +1,58 @@
+repo: ggml-org/llama.cpp
+pr: 11360
+url: https://github.com/ggml-org/llama.cpp/pull/11360
+merge_sha: 66ee4f297cff3c7ce98b31dbc0ce909d41b9e408
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/11360/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+  status: modified
+  sha256: 4f8ae76037aea1c54e1a838d88e62c8140070f5701ac5f56f787859d7368fe6c
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+  status: modified
+  sha256: e1ae2a63d36e2fbdc1f3ea4ef191737ad7faa261396dea5c602cd4cb359de664
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+  status: modified
+  sha256: cc38646956f9c157ace1723f63030878329e8b3d2ce1306a8b0235a1a53f0721
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp
+  status: modified
+  sha256: 16512b190fa5b33df70c7f9bbe753bbc969ba174d9d30a9191f75127d067abfc
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_s.comp
+  status: added
+  sha256: 8a271f221820efd7a135982ddc6fffdd35220cc52a53a8e564c9934a59d185a8
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xs.comp
+  status: added
+  sha256: 8d0856d3a37bec03b59f892d34e3d5ef2f73c87fe36a4133aa9d4fdcdc68c0d7
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xxs.comp
+  status: added
+  sha256: 1b7cd792bfcee7e4e2b71d18b8d81067af225c1710a5cae5f9558d9b65345552
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_s.comp
+  status: added
+  sha256: 803dbdc06cdb618f364996984d8900bace393d93b08fe5d730cbd73d23981225
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_xxs.comp
+  status: added
+  sha256: 0914100f11e63f228bb7244693b91839840656ed66c1c243a21f0dd032217e28
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
+  status: modified
+  sha256: a4322e58641a65c82e583e7ac4daa8c1cc3dd75f99e4d43a1230664c8f1a52ba
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+  status: modified
+  sha256: b67e118e9d8a5054330bf66783862f5746456fdc7e3d72ef52473b8ab7642b44
+- path: ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+  status: modified
+  sha256: 608cf3491c1c381e3fecc95aacd30c12b5b9d16c0f90af08b6d8c8d5db1cbfd0
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+  status: modified
+  sha256: eee90f0ed219e53680d50a9305c9a9e05406be60066f9939decae67b4091b626
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+  status: modified
+  sha256: 6e898597cd5c7687992d7990340e5eda65a45fb78889e0083aa9156f512189fe
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+  status: modified
+  sha256: 2efad206945d6203b54bcf54f6e3158db334d4e6a83ec74f5a615f37712ffc7e
+- path: ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+  status: modified
+  sha256: 881e8e1fd10309ccf9607b5a29a2f6590e23264d31b924de0631435b32b13b26

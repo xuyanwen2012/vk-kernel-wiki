@@ -1,0 +1,13 @@
+repo: ggml-org/llama.cpp
+pr: 16656
+url: https://github.com/ggml-org/llama.cpp/pull/16656
+merge_sha: 10fcc41290e233788f5a4215314156e8e023eb92
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/16656/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/topk_moe.comp
+  status: modified
+  sha256: c7f175976ecce39053264280a2941f67d171cfce6fcccd2ced948a504acd1d2d

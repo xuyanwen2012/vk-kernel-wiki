@@ -1,0 +1,113 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -127,7 +127,7 @@ void main() {
+             continue;
+         }
+         // Only load if the block is not all zeros
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0 && mask_opt_bits != MASK_OPT_ALL_ZERO) {
++        if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+@@ -181,15 +181,15 @@ void main() {
+             }
+         }
+ 
+-        if (p.logit_softcap != 0.0f) {
++        if (LOGIT_SOFTCAP) {
+             [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+                 [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+                     Sf[r][c] = p.logit_softcap * tanh(Sf[r][c]);
+                 }
+             }
+         }
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0 && mask_opt_bits != MASK_OPT_ALL_ZERO) {
++        if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+                 [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+                     float mvf = masksh[c * cols_per_iter + col_tid][r];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -10,7 +10,11 @@ layout (constant_id = 5) const uint32_t Clamp = 0;
+ layout (constant_id = 6) const uint32_t D_split = 16;
+ layout (constant_id = 7) const uint32_t SubGroupSize = 32;
+ layout (constant_id = 8) const uint32_t K_LOAD_SHMEM = 0;
+-layout (constant_id = 9) const bool     USE_MASK_OPT = false;
++layout (constant_id = 9) const uint32_t Flags = 0;
++
++const bool USE_MASK_OPT  = (Flags & 1) != 0;
++const bool MASK_ENABLE   = (Flags & 2) != 0;
++const bool LOGIT_SOFTCAP = (Flags & 4) != 0;
+ 
+ // Round up head sizes to a multiple of 16, for coopmat1/coopmat2 paths
+ const uint32_t HSK_pad = (HSK + 15) & ~15;
+@@ -60,7 +64,6 @@ layout (push_constant) uniform parameter {
+ } p;
+ 
+ #define SINK_ENABLE_BIT (1<<24)
+-#define MASK_ENABLE_BIT (1<<16)
+ #define N_LOG2_MASK 0xFFFF
+ 
+ layout (binding = 4) readonly buffer S {float data_s[];};
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -160,7 +160,7 @@ void main() {
+             mask_cache[idx] = f16vec4(0);
+         }
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if (MASK_ENABLE) {
+ 
+             if (USE_MASK_OPT && mask_opt_idx != j / 16) {
+                 mask_opt_idx = j / 16;
+@@ -303,7 +303,7 @@ void main() {
+         coopMatStore(SfMat, sfsh, coord, sfshstride, gl_CooperativeMatrixLayoutRowMajor);
+         barrier();
+ 
+-        if (p.logit_softcap != 0.0f) {
++        if (LOGIT_SOFTCAP) {
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br / 4; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) / (Br / 4);
+                 uint32_t r = (idx + tid) % (Br / 4);
+@@ -314,7 +314,7 @@ void main() {
+             barrier();
+         }
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if (MASK_ENABLE) {
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br / 4; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) / (Br / 4);
+                 uint32_t r = (idx + tid) % (Br / 4);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -155,7 +155,7 @@ void main() {
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+         coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv = coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(0);
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if (MASK_ENABLE) {
+ 
+             if (USE_MASK_OPT && mask_opt_idx != j / 16) {
+                 mask_opt_idx = j / 16;
+@@ -197,14 +197,14 @@ void main() {
+         coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose DECODEFUNC);
+         S = coopMatMulAdd(Qf16, K_T, S);
+ 
+-        if (p.logit_softcap != 0.0f) {
++        if (LOGIT_SOFTCAP) {
+             [[unroll]]
+             for (int k = 0; k < S.length(); ++k) {
+                 S[k] = ACC_TYPE(p.logit_softcap)*tanh(S[k]);
+             }
+         }
+ 
+-        if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++        if (MASK_ENABLE) {
+             S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
+         }
+ 

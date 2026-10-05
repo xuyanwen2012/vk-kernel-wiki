@@ -1,0 +1,55 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+@@ -16,8 +16,9 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+                 data_a[a_offset + ib + 2], data_a[a_offset + ib + 3]);
+ }
+ vec4 dequantize4_2aligned(uint ib, uint iqs, uint a_offset) {
+-    return vec4(data_a[a_offset + ib    ], data_a[a_offset + ib + 1],
+-                data_a[a_offset + ib + 2], data_a[a_offset + ib + 3]);
++    const vec2 a = data_a_packed64[(a_offset + ib)/2];
++    const vec2 b = data_a_packed64[(a_offset + ib)/2 + 1];
++    return vec4(a, b);
+ }
+ 
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -143,9 +143,9 @@ void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
+ 
+     get_offsets(a_offset, b_offset, d_offset);
+     const bool is_aligned_nonquant =
+-        p.batch_stride_b % 4 == 0 && b_offset % 4 == 0 &&
+-        p.ncols % 4 == 0 && BLOCK_SIZE % 4 == 0 &&
+-        K_PER_ITER == 4;
++        p.batch_stride_b % 4 == 0 && p.ncols % 4 == 0 &&
++        a_offset % 4 == 0 && b_offset % 4 == 0 &&
++        BLOCK_SIZE % 4 == 0 && K_PER_ITER == 4;
+ 
+     y_offset = QUANT_R == 1 ? 1 : QUANT_K/2;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl
+@@ -15,6 +15,9 @@ layout (binding = 0) readonly buffer A_PACKED16 {A_TYPE_PACKED16 data_a_packed16
+ #if defined(A_TYPE_PACKED32)
+ layout (binding = 0) readonly buffer A_PACKED32 {A_TYPE_PACKED32 data_a_packed32[];};
+ #endif
++#if defined(A_TYPE_PACKED64)
++layout (binding = 0) readonly buffer A_PACKED64 {A_TYPE_PACKED64 data_a_packed64[];};
++#endif
+ 
+ layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+ #ifdef B_TYPEV2
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+@@ -23,6 +23,7 @@
+ #else
+ #define A_TYPE float
+ #endif
++#define A_TYPE_PACKED64 vec2
+ #endif
+ 
+ #if defined(DATA_A_F16)

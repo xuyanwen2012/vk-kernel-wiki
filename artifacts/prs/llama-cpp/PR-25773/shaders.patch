@@ -1,0 +1,2487 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+@@ -260,6 +260,20 @@ float16_t dequantFuncTQ1_0(const in decodeBufTQ1_0 bl, const in uint blockCoords
+     return bl.block.d * (float16_t(int(xi)) - float16_t(1.0));
+ }
+ 
++f16vec4 dequantFuncTQ1_0_v(const in decodeBufTQ1_0 bl, const in uint blockCoords[2], const in uint coordInBlock[2])
++{
++    const uint e = coordInBlock[1];
++    f16vec4 v;
++    [[unroll]] for (uint k = 0u; k < 4u; ++k) {
++        const uint ee = e + k;
++        const uint bidx = tq1_0_byte_of(ee);
++        const uint qbyte = uint(bidx < 48u ? bl.block.qs[bidx] : bl.block.qh[bidx - 48u]);
++        const uint xi = tq1_0_trit(qbyte, tq1_0_digit_of(ee));
++        v[k] = bl.block.d * (float16_t(int(xi)) - float16_t(1.0));
++    }
++    return v;
++}
++
+ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufTQ2_0 {
+    block_tq2_0 block;
+ };
+@@ -1054,7 +1068,7 @@ float16_t dequantFuncIQ2_S(const in decodeBufIQ2_S bl, const in uint blockCoords
+     const uint scale = (bl.block.scales[ib32] >> ((idx & 0x10) >> 2)) & 0xf;
+     const uint qs = bl.block.qs[ib8];
+     const uint qh = bl.block.qh[ib32];
+-    const uint sign = bl.block.qs[QUANT_K / 8 + ib8] >> (idx & 0x6);
++    const uint sign = bl.block.qs[QUANT_K_IQ2_S / 8 + ib8] >> (idx & 0x6);
+ 
+     const float d = float(bl.block.d);
+     const float db = d * 0.25 * (0.5 + scale);
+@@ -1076,7 +1090,7 @@ f16vec4 dequantFuncIQ2_S_v(const in decodeBufIQ2_S bl, const in uint blockCoords
+     const uint scale = (bl.block.scales[ib32] >> ((idx & 0x10) >> 2)) & 0xf;
+     const uint qs    = bl.block.qs[ib8];
+     const uint qh    = bl.block.qh[ib32];
+-    const uint sb    = uint(bl.block.qs[QUANT_K / 8 + ib8]) >> (idx & 0x6u);
++    const uint sb    = uint(bl.block.qs[QUANT_K_IQ2_S / 8 + ib8]) >> (idx & 0x6u);
+ 
+     const float d  = float(bl.block.d);
+     const float db = d * 0.25 * (0.5 + scale);
+@@ -1107,7 +1121,7 @@ float16_t dequantFuncIQ3_XXS(const in decodeBufIQ3_XXS bl, const in uint blockCo
+     uint idx = coordInBlock[1];
+ 
+     const uint iqs = (idx & 0xFC) >> 2;             // 0..63
+-    const uint is = QUANT_K / 4 + ((idx & 0xE0) >> 3);// 8 values
++    const uint is = QUANT_K_IQ3_XXS / 4 + ((idx & 0xE0) >> 3);// 8 values
+ 
+     const float d = float(bl.block.d);
+     const uint qs = bl.block.qs[iqs];
+@@ -1130,7 +1144,7 @@ f16vec4 dequantFuncIQ3_XXS_v(const in decodeBufIQ3_XXS bl, const in uint blockCo
+     const uint idx = coordInBlock[1];
+ 
+     const uint iqs = idx >> 2;
+-    const uint is  = QUANT_K / 4 + ((idx & 0xE0) >> 3);
++    const uint is  = QUANT_K_IQ3_XXS / 4 + ((idx & 0xE0) >> 3);
+ 
+     const float d     = float(bl.block.d);
+     const uint  qs    = bl.block.qs[iqs];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/fa_types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/fa_types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/fa_types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/fa_types.glsl
+@@ -1,32 +1,22 @@
+ #if !defined(GGML_FA_TYPES_COMP)
+ #define GGML_FA_TYPES_COMP
+ 
+-// FaTypeK / FaTypeV spec constant values. These mirror enum ggml_type so the
+-// host can pass the type directly. Keep in sync with ggml.h.
+-#define FA_TYPE_F32   0u
+-#define FA_TYPE_F16   1u
+-#define FA_TYPE_Q4_0  2u
+-#define FA_TYPE_Q4_1  3u
+-#define FA_TYPE_Q5_0  6u
+-#define FA_TYPE_Q5_1  7u
+-#define FA_TYPE_Q8_0  8u
+-#define FA_TYPE_IQ4_NL 20u
+-#define FA_TYPE_BF16 30u
++#include "ggml_type_ids.glsl"
+ 
+ // Number of matrix elements per buffer block, derived from the K/V type spec
+ // constant. F32 is treated as a vec4 "block" of 4 floats. F16 uses block size 1
+ // and bypasses the dequant path entirely. Quants follow their ggml block sizes.
+ uint fa_block_elems(uint ty) {
+     switch (ty) {
+-        case FA_TYPE_F32:  return 4u;
+-        case FA_TYPE_F16:  return 1u;
+-        case FA_TYPE_Q4_0: return uint(QUANT_K_Q4_0);
+-        case FA_TYPE_Q4_1: return uint(QUANT_K_Q4_1);
+-        case FA_TYPE_Q5_0: return uint(QUANT_K_Q5_0);
+-        case FA_TYPE_Q5_1: return uint(QUANT_K_Q5_1);
+-        case FA_TYPE_Q8_0: return uint(QUANT_K_Q8_0);
+-        case FA_TYPE_IQ4_NL: return uint(QUANT_K_IQ4_NL);
+-        case FA_TYPE_BF16: return 1u;
++        case GGML_TYPE_F32:  return 4u;
++        case GGML_TYPE_F16:  return 1u;
++        case GGML_TYPE_Q4_0: return uint(QUANT_K_Q4_0);
++        case GGML_TYPE_Q4_1: return uint(QUANT_K_Q4_1);
++        case GGML_TYPE_Q5_0: return uint(QUANT_K_Q5_0);
++        case GGML_TYPE_Q5_1: return uint(QUANT_K_Q5_1);
++        case GGML_TYPE_Q8_0: return uint(QUANT_K_Q8_0);
++        case GGML_TYPE_IQ4_NL: return uint(QUANT_K_IQ4_NL);
++        case GGML_TYPE_BF16: return 1u;
+         default:           return 1u;
+     }
+ }
+@@ -36,18 +26,18 @@ uint fa_block_elems(uint ty) {
+ // of int32s per 32-element block on the MMQ K path: ints_per_block == 8 / R.
+ uint fa_quant_r_mmq(uint ty) {
+     switch (ty) {
+-        case FA_TYPE_Q4_0: return uint(QUANT_R_Q4_0);
+-        case FA_TYPE_Q4_1: return uint(QUANT_R_Q4_1);
+-        case FA_TYPE_Q5_0: return uint(QUANT_R_Q5_0);
+-        case FA_TYPE_Q5_1: return uint(QUANT_R_Q5_1);
+-        case FA_TYPE_Q8_0: return uint(QUANT_R_Q8_0);
++        case GGML_TYPE_Q4_0: return uint(QUANT_R_Q4_0);
++        case GGML_TYPE_Q4_1: return uint(QUANT_R_Q4_1);
++        case GGML_TYPE_Q5_0: return uint(QUANT_R_Q5_0);
++        case GGML_TYPE_Q5_1: return uint(QUANT_R_Q5_1);
++        case GGML_TYPE_Q8_0: return uint(QUANT_R_Q8_0);
+         default:           return 1u;
+     }
+ }
+ 
+ bool fa_type_needs_shmem(uint ty) {
+     switch (ty) {
+-        case FA_TYPE_IQ4_NL: return true;
++        case GGML_TYPE_IQ4_NL: return true;
+         default:             return false;
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -134,7 +134,7 @@ void main() {
+ 
+         // Q8_0 K only needs (qd, _); the asymmetric Q4_*/Q5_* family also stores
+         // the row-sum scaled by qd, used in k_dot_correction.
+-        if (FaTypeK == FA_TYPE_Q8_0) {
++        if (FaTypeK == GGML_TYPE_Q8_0) {
+             if (buf_iqs == 0) {
+                 Qf[buf_ib].ds = FLOAT_TYPEV2(qd, 0.0f);
+             }
+@@ -367,15 +367,15 @@ void main() {
+                 // Q4_*/Q5_* take the block-8 fast path when one step covers a full
+                 // block; Q8_0 always goes through the per-int get_k_qs* helpers
+                 // (its qs is byte-packed, not nibble-packed).
+-                const bool block8_fast = (d_per_step == 8) && (FaTypeK != FA_TYPE_Q8_0);
++                const bool block8_fast = (d_per_step == 8) && (FaTypeK != GGML_TYPE_Q8_0);
+ 
+                 if (SHMEM_STAGING != 0) {
+                     const uint k_block_idx = (d_tid * (HSK_per_thread / 4) + d_block) / 8;
+                     const uint buf_ib = (c * cols_per_iter + col_tid) * qf_stride + k_block_idx;
+                     k_dm = ACC_TYPEV2(kblocksh[buf_ib].dm);
+ 
+                     if (block8_fast) {
+-                        const bool has_qh = (FaTypeK == FA_TYPE_Q5_0) || (FaTypeK == FA_TYPE_Q5_1);
++                        const bool has_qh = (FaTypeK == GGML_TYPE_Q5_0) || (FaTypeK == GGML_TYPE_Q5_1);
+                         [[unroll]] for (uint32_t d = 0; d < 4; d++) {
+                             uint vui = kblocksh[buf_ib].qs[d];
+                             k_quants[d    ] = int32_t( vui       & 0x0F0F0F0F);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -105,8 +105,8 @@ layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
+ #define BLOCK_SIZE_V fa_block_elems(FaTypeV)
+ // F16 reads f16 elements directly from the binding; everything else routes
+ // through dequantize4 / the MMQ helpers to unpack from the packed block layout.
+-#define USE_DECODE_K (FaTypeK != FA_TYPE_F16)
+-#define USE_DECODE_V (FaTypeV != FA_TYPE_F16)
++#define USE_DECODE_K (FaTypeK != GGML_TYPE_F16)
++#define USE_DECODE_V (FaTypeV != GGML_TYPE_F16)
+ 
+ #define CEIL_DIV(a, b) (((a) + (b) - 1) / (b))
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -40,53 +40,55 @@ layout(buffer_reference, std430, buffer_reference_align = 1) buffer decodeBufFA_
+ #if !defined(BFLOAT16)
+ float16_t faDecodeK(const decodeBufFA_K bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeK) {
+-        case FA_TYPE_F32:  return dequantFuncF32 (decodeBufF32 (bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_0: return dequantFuncQ4_0(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_1: return dequantFuncQ4_1(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_F32:  return dequantFuncF32 (decodeBufF32 (bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_0: return dequantFuncQ4_0(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_1: return dequantFuncQ4_1(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q1_0: return dequantFuncQ1_0(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
+         default: return float16_t(0);
+     }
+ }
+ 
+ float16_t faDecodeV(const decodeBufFA_V bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeV) {
+-        case FA_TYPE_F32:  return dequantFuncF32 (decodeBufF32 (bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_0: return dequantFuncQ4_0(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_1: return dequantFuncQ4_1(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_F32:  return dequantFuncF32 (decodeBufF32 (bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_0: return dequantFuncQ4_0(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_1: return dequantFuncQ4_1(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q1_0: return dequantFuncQ1_0(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
+         default: return float16_t(0);
+     }
+ }
+ 
+ // V=4 vector decode for K/V; dispatches to per-format _v decoders.
+ f16vec4 faDecodeKVector(const decodeBufFA_K bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeK) {
+-        case FA_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
+-        case FA_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
++        case GGML_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return f16vec4(0);
+     }
+ }
+ 
+ f16vec4 faDecodeVVector(const decodeBufFA_V bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeV) {
+-        case FA_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
+-        case FA_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
++        case GGML_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case GGML_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return f16vec4(0);
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+@@ -121,25 +121,25 @@ layout (binding = 1) readonly buffer K_PACKED_Q5_1_P32 { block_q5_1_packed32 dat
+ FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+     if (binding_idx == BINDING_IDX_K) {
+         switch (FaTypeK) {
+-            case FA_TYPE_F32:  FA_DEQUANT4_F32 (k_packed_f32)
+-            case FA_TYPE_Q4_0: FA_DEQUANT4_Q4_0(k_packed_q4_0)
+-            case FA_TYPE_Q4_1: FA_DEQUANT4_Q4_1(k_packed_q4_1)
+-            case FA_TYPE_Q5_0: FA_DEQUANT4_Q5_0(k_packed_q5_0)
+-            case FA_TYPE_Q5_1: FA_DEQUANT4_Q5_1(k_packed_q5_1)
+-            case FA_TYPE_Q8_0: FA_DEQUANT4_Q8_0(k_packed_q8_0)
+-            case FA_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(k_packed_iq4_nl)
+-            case FA_TYPE_BF16: FA_DEQUANT4_BF16(k_packed_bf16)
++            case GGML_TYPE_F32:  FA_DEQUANT4_F32 (k_packed_f32)
++            case GGML_TYPE_Q4_0: FA_DEQUANT4_Q4_0(k_packed_q4_0)
++            case GGML_TYPE_Q4_1: FA_DEQUANT4_Q4_1(k_packed_q4_1)
++            case GGML_TYPE_Q5_0: FA_DEQUANT4_Q5_0(k_packed_q5_0)
++            case GGML_TYPE_Q5_1: FA_DEQUANT4_Q5_1(k_packed_q5_1)
++            case GGML_TYPE_Q8_0: FA_DEQUANT4_Q8_0(k_packed_q8_0)
++            case GGML_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(k_packed_iq4_nl)
++            case GGML_TYPE_BF16: FA_DEQUANT4_BF16(k_packed_bf16)
+         }
+     } else {
+         switch (FaTypeV) {
+-            case FA_TYPE_F32:  FA_DEQUANT4_F32 (v_packed_f32)
+-            case FA_TYPE_Q4_0: FA_DEQUANT4_Q4_0(v_packed_q4_0)
+-            case FA_TYPE_Q4_1: FA_DEQUANT4_Q4_1(v_packed_q4_1)
+-            case FA_TYPE_Q5_0: FA_DEQUANT4_Q5_0(v_packed_q5_0)
+-            case FA_TYPE_Q5_1: FA_DEQUANT4_Q5_1(v_packed_q5_1)
+-            case FA_TYPE_Q8_0: FA_DEQUANT4_Q8_0(v_packed_q8_0)
+-            case FA_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(v_packed_iq4_nl)
+-            case FA_TYPE_BF16: FA_DEQUANT4_BF16(v_packed_bf16)
++            case GGML_TYPE_F32:  FA_DEQUANT4_F32 (v_packed_f32)
++            case GGML_TYPE_Q4_0: FA_DEQUANT4_Q4_0(v_packed_q4_0)
++            case GGML_TYPE_Q4_1: FA_DEQUANT4_Q4_1(v_packed_q4_1)
++            case GGML_TYPE_Q5_0: FA_DEQUANT4_Q5_0(v_packed_q5_0)
++            case GGML_TYPE_Q5_1: FA_DEQUANT4_Q5_1(v_packed_q5_1)
++            case GGML_TYPE_Q8_0: FA_DEQUANT4_Q8_0(v_packed_q8_0)
++            case GGML_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(v_packed_iq4_nl)
++            case GGML_TYPE_BF16: FA_DEQUANT4_BF16(v_packed_bf16)
+         }
+     }
+     return FLOAT_TYPEV4(0);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl
+@@ -4,20 +4,20 @@
+ 
+ int32_t get_k_qs(uint ib, uint iqs, uint a_offset) {
+     switch (FaTypeK) {
+-        case FA_TYPE_Q4_0: {
++        case GGML_TYPE_Q4_0: {
+             uint vui = pack32(u16vec2(k_packed_q4_0.data[a_offset + ib].qs[(iqs & 0xF) / 2 + 0],
+                                       k_packed_q4_0.data[a_offset + ib].qs[(iqs & 0xF) / 2 + 1]));
+             uint shift = (iqs & 0x10) >> 2;
+             vui >>= shift;
+             return int32_t(vui & 0x0F0F0F0F);
+         }
+-        case FA_TYPE_Q4_1: { // uses packed32 alias
++        case GGML_TYPE_Q4_1: { // uses packed32 alias
+             uint vui = k_packed_q4_1_p32.data[a_offset + ib].qs[(iqs & 0xF) / 4];
+             uint shift = (iqs & 0x10) >> 2;
+             vui >>= shift;
+             return int32_t(vui & 0x0F0F0F0F);
+         }
+-        case FA_TYPE_Q5_0: {
++        case GGML_TYPE_Q5_0: {
+             uint vui = pack32(u16vec2(k_packed_q5_0.data[a_offset + ib].qs[(iqs & 0xF) / 2 + 0],
+                                       k_packed_q5_0.data[a_offset + ib].qs[(iqs & 0xF) / 2 + 1]));
+             uint qh = pack32(u16vec2(k_packed_q5_0.data[a_offset + ib].qh[0],
+@@ -27,15 +27,15 @@ int32_t get_k_qs(uint ib, uint iqs, uint a_offset) {
+             uint qh_bits = (qh >> iqs) & 0xF;
+             return int32_t(vui & 0x0F0F0F0F) | int32_t((qh_bits * 0x02040810u) & 0x10101010u);
+         }
+-        case FA_TYPE_Q5_1: { // qs via packed32, qh via packed16
++        case GGML_TYPE_Q5_1: { // qs via packed32, qh via packed16
+             uint vui = k_packed_q5_1_p32.data[a_offset + ib].qs[(iqs & 0xF) / 4];
+             uint qh  = k_packed_q5_1.data[a_offset + ib].qh;
+             uint shift = (iqs & 0x10) >> 2;
+             vui >>= shift;
+             uint qh_bits = (qh >> iqs) & 0xF;
+             return int32_t(vui & 0x0F0F0F0F) | int32_t((qh_bits * 0x02040810u) & 0x10101010u);
+         }
+-        case FA_TYPE_Q8_0: {
++        case GGML_TYPE_Q8_0: {
+             return pack32(i16vec2(k_packed_q8_0.data[a_offset + ib].qs[iqs / 2],
+                                   k_packed_q8_0.data[a_offset + ib].qs[iqs / 2 + 1]));
+         }
+@@ -47,11 +47,11 @@ int32_t get_k_qs(uint ib, uint iqs, uint a_offset) {
+ // return (d, 0) so call sites always see the same shape.
+ FLOAT_TYPEV2 get_k_scale(uint ib, uint a_offset) {
+     switch (FaTypeK) {
+-        case FA_TYPE_Q4_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q4_0.data[a_offset + ib].d), 0.0);
+-        case FA_TYPE_Q4_1: return FLOAT_TYPEV2(k_packed_q4_1_p32.data[a_offset + ib].dm);
+-        case FA_TYPE_Q5_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q5_0.data[a_offset + ib].d), 0.0);
+-        case FA_TYPE_Q5_1: return FLOAT_TYPEV2(k_packed_q5_1_p32.data[a_offset + ib].dm);
+-        case FA_TYPE_Q8_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q8_0.data[a_offset + ib].d), 0.0);
++        case GGML_TYPE_Q4_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q4_0.data[a_offset + ib].d), 0.0);
++        case GGML_TYPE_Q4_1: return FLOAT_TYPEV2(k_packed_q4_1_p32.data[a_offset + ib].dm);
++        case GGML_TYPE_Q5_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q5_0.data[a_offset + ib].d), 0.0);
++        case GGML_TYPE_Q5_1: return FLOAT_TYPEV2(k_packed_q5_1_p32.data[a_offset + ib].dm);
++        case GGML_TYPE_Q8_0: return FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q8_0.data[a_offset + ib].d), 0.0);
+         default: return FLOAT_TYPEV2(0);
+     }
+ }
+@@ -61,16 +61,16 @@ void k_block_to_shmem(const uint buf_ib, const uint global_ib, const uint iqs, c
+     // explicit casts. The bit pattern is what we care about here -- the actual
+     // signed/unsigned interpretation happens downstream in the dot product.
+     switch (FaTypeK) {
+-        case FA_TYPE_Q4_0: {
++        case GGML_TYPE_Q4_0: {
+             kblocksh[buf_ib].qs[iqs] = int32_t(pack32(u16vec2(k_packed_q4_0.data[a_offset + global_ib].qs[iqs * 2],
+                                                               k_packed_q4_0.data[a_offset + global_ib].qs[iqs * 2 + 1])));
+             break;
+         }
+-        case FA_TYPE_Q4_1: {
++        case GGML_TYPE_Q4_1: {
+             kblocksh[buf_ib].qs[iqs] = int32_t(k_packed_q4_1_p32.data[a_offset + global_ib].qs[iqs]);
+             break;
+         }
+-        case FA_TYPE_Q5_0: {
++        case GGML_TYPE_Q5_0: {
+             kblocksh[buf_ib].qs[iqs] = int32_t(pack32(u16vec2(k_packed_q5_0.data[a_offset + global_ib].qs[iqs * 2],
+                                                               k_packed_q5_0.data[a_offset + global_ib].qs[iqs * 2 + 1])));
+             if (iqs == 0) {
+@@ -79,14 +79,14 @@ void k_block_to_shmem(const uint buf_ib, const uint global_ib, const uint iqs, c
+             }
+             break;
+         }
+-        case FA_TYPE_Q5_1: {
++        case GGML_TYPE_Q5_1: {
+             kblocksh[buf_ib].qs[iqs] = int32_t(k_packed_q5_1_p32.data[a_offset + global_ib].qs[iqs]);
+             if (iqs == 0) {
+                 kblocksh[buf_ib].qh = k_packed_q5_1.data[a_offset + global_ib].qh;
+             }
+             break;
+         }
+-        case FA_TYPE_Q8_0: {
++        case GGML_TYPE_Q8_0: {
+             kblocksh[buf_ib].qs[iqs] = pack32(i16vec2(k_packed_q8_0.data[a_offset + global_ib].qs[iqs * 2],
+                                                       k_packed_q8_0.data[a_offset + global_ib].qs[iqs * 2 + 1]));
+             break;
+@@ -96,11 +96,11 @@ void k_block_to_shmem(const uint buf_ib, const uint global_ib, const uint iqs, c
+     if (iqs == 0) {
+         // Q4_0/Q5_0/Q8_0 store dm.x = d; Q4_1/Q5_1 store dm = (d, m) pair.
+         switch (FaTypeK) {
+-            case FA_TYPE_Q4_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q4_0.data[a_offset + global_ib].d), 0.0); break;
+-            case FA_TYPE_Q4_1: kblocksh[buf_ib].dm = FLOAT_TYPEV2(k_packed_q4_1_p32.data[a_offset + global_ib].dm); break;
+-            case FA_TYPE_Q5_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q5_0.data[a_offset + global_ib].d), 0.0); break;
+-            case FA_TYPE_Q5_1: kblocksh[buf_ib].dm = FLOAT_TYPEV2(k_packed_q5_1_p32.data[a_offset + global_ib].dm); break;
+-            case FA_TYPE_Q8_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q8_0.data[a_offset + global_ib].d), 0.0); break;
++            case GGML_TYPE_Q4_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q4_0.data[a_offset + global_ib].d), 0.0); break;
++            case GGML_TYPE_Q4_1: kblocksh[buf_ib].dm = FLOAT_TYPEV2(k_packed_q4_1_p32.data[a_offset + global_ib].dm); break;
++            case GGML_TYPE_Q5_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q5_0.data[a_offset + global_ib].d), 0.0); break;
++            case GGML_TYPE_Q5_1: kblocksh[buf_ib].dm = FLOAT_TYPEV2(k_packed_q5_1_p32.data[a_offset + global_ib].dm); break;
++            case GGML_TYPE_Q8_0: kblocksh[buf_ib].dm = FLOAT_TYPEV2(FLOAT_TYPE(k_packed_q8_0.data[a_offset + global_ib].d), 0.0); break;
+         }
+     }
+ }
+@@ -121,31 +121,31 @@ struct fa_k_qs_block8 {
+ fa_k_qs_block8 get_k_qs_block8(uint ib, uint a_offset) {
+     fa_k_qs_block8 r;
+     uint qh = 0;
+-    if (FaTypeK == FA_TYPE_Q5_0) {
++    if (FaTypeK == GGML_TYPE_Q5_0) {
+         qh = pack32(u16vec2(k_packed_q5_0.data[a_offset + ib].qh[0],
+                             k_packed_q5_0.data[a_offset + ib].qh[1]));
+-    } else if (FaTypeK == FA_TYPE_Q5_1) {
++    } else if (FaTypeK == GGML_TYPE_Q5_1) {
+         qh = k_packed_q5_1.data[a_offset + ib].qh;
+     }
+-    const bool has_qh = (FaTypeK == FA_TYPE_Q5_0) || (FaTypeK == FA_TYPE_Q5_1);
++    const bool has_qh = (FaTypeK == GGML_TYPE_Q5_0) || (FaTypeK == GGML_TYPE_Q5_1);
+     [[unroll]] for (uint32_t d = 0; d < 4; d++) {
+         uint vui = 0;
+         switch (FaTypeK) {
+-            case FA_TYPE_Q4_0: { // packed16
++            case GGML_TYPE_Q4_0: { // packed16
+                 vui = pack32(u16vec2(k_packed_q4_0.data[a_offset + ib].qs[d * 2 + 0],
+                                      k_packed_q4_0.data[a_offset + ib].qs[d * 2 + 1]));
+                 break;
+             }
+-            case FA_TYPE_Q4_1: { // packed32 alias
++            case GGML_TYPE_Q4_1: { // packed32 alias
+                 vui = k_packed_q4_1_p32.data[a_offset + ib].qs[d];
+                 break;
+             }
+-            case FA_TYPE_Q5_0: { // packed16
++            case GGML_TYPE_Q5_0: { // packed16
+                 vui = pack32(u16vec2(k_packed_q5_0.data[a_offset + ib].qs[d * 2 + 0],
+                                      k_packed_q5_0.data[a_offset + ib].qs[d * 2 + 1]));
+                 break;
+             }
+-            case FA_TYPE_Q5_1: { // packed32 alias
++            case GGML_TYPE_Q5_1: { // packed32 alias
+                 vui = k_packed_q5_1_p32.data[a_offset + ib].qs[d];
+                 break;
+             }
+@@ -164,21 +164,21 @@ fa_k_qs_block8 get_k_qs_block8(uint ib, uint a_offset) {
+ 
+ int32_t get_k_qs_shmem(const uint buf_ib, const uint pos) {
+     switch (FaTypeK) {
+-        case FA_TYPE_Q4_0:
+-        case FA_TYPE_Q4_1: {
++        case GGML_TYPE_Q4_0:
++        case GGML_TYPE_Q4_1: {
+             uint sub = pos % 4;
+             uint shift = ((pos % 8) >= 4) ? 4u : 0u;
+             return int32_t((uint(kblocksh[buf_ib].qs[sub]) >> shift) & 0x0F0F0F0Fu);
+         }
+-        case FA_TYPE_Q5_0:
+-        case FA_TYPE_Q5_1: {
++        case GGML_TYPE_Q5_0:
++        case GGML_TYPE_Q5_1: {
+             uint sub = pos % 4;
+             uint shift = ((pos % 8) >= 4) ? 4u : 0u;
+             int32_t result = int32_t((uint(kblocksh[buf_ib].qs[sub]) >> shift) & 0x0F0F0F0Fu);
+             uint qh_bits = (kblocksh[buf_ib].qh >> (pos * 4u)) & 0xFu;
+             return result | int32_t((qh_bits * 0x02040810u) & 0x10101010u);
+         }
+-        case FA_TYPE_Q8_0: {
++        case GGML_TYPE_Q8_0: {
+             return kblocksh[buf_ib].qs[pos];
+         }
+         default: return 0;
+@@ -187,10 +187,10 @@ int32_t get_k_qs_shmem(const uint buf_ib, const uint pos) {
+ 
+ ACC_TYPE k_dot_correction(const uint qib, const ACC_TYPEV2 k_dm) {
+     switch (FaTypeK) {
+-        case FA_TYPE_Q4_0: return -ACC_TYPE(8.0)  * ACC_TYPE(Qf[qib].ds.y) * k_dm.x;
+-        case FA_TYPE_Q5_0: return -ACC_TYPE(16.0) * ACC_TYPE(Qf[qib].ds.y) * k_dm.x;
+-        case FA_TYPE_Q4_1:
+-        case FA_TYPE_Q5_1: return ACC_TYPE(Qf[qib].ds.y) * k_dm.y;
++        case GGML_TYPE_Q4_0: return -ACC_TYPE(8.0)  * ACC_TYPE(Qf[qib].ds.y) * k_dm.x;
++        case GGML_TYPE_Q5_0: return -ACC_TYPE(16.0) * ACC_TYPE(Qf[qib].ds.y) * k_dm.x;
++        case GGML_TYPE_Q4_1:
++        case GGML_TYPE_Q5_1: return ACC_TYPE(Qf[qib].ds.y) * k_dm.y;
+         default: return ACC_TYPE(0.0);
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/ggml_type_ids.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/ggml_type_ids.glsl
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/ggml_type_ids.glsl
+@@ -0,0 +1,34 @@
++#if !defined(GGML_TYPE_IDS_COMP)
++#define GGML_TYPE_IDS_COMP
++
++// ggml_type enum values — must match ggml.h
++#define GGML_TYPE_F32      0u
++#define GGML_TYPE_F16      1u
++#define GGML_TYPE_Q4_0     2u
++#define GGML_TYPE_Q4_1     3u
++#define GGML_TYPE_Q5_0     6u
++#define GGML_TYPE_Q5_1     7u
++#define GGML_TYPE_Q8_0     8u
++#define GGML_TYPE_Q2_K    10u
++#define GGML_TYPE_Q3_K    11u
++#define GGML_TYPE_Q4_K    12u
++#define GGML_TYPE_Q5_K    13u
++#define GGML_TYPE_Q6_K    14u
++#define GGML_TYPE_IQ2_XXS 16u
++#define GGML_TYPE_IQ2_XS  17u
++#define GGML_TYPE_IQ3_XXS 18u
++#define GGML_TYPE_IQ1_S   19u
++#define GGML_TYPE_IQ4_NL  20u
++#define GGML_TYPE_IQ3_S   21u
++#define GGML_TYPE_IQ2_S   22u
++#define GGML_TYPE_IQ4_XS  23u
++#define GGML_TYPE_IQ1_M   29u
++#define GGML_TYPE_BF16    30u
++#define GGML_TYPE_TQ1_0   34u
++#define GGML_TYPE_TQ2_0   35u
++#define GGML_TYPE_MXFP4   39u
++#define GGML_TYPE_NVFP4   40u
++#define GGML_TYPE_Q1_0    41u
++#define GGML_TYPE_Q2_0    42u
++
++#endif // !defined(GGML_TYPE_IDS_COMP)
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/iq_shmem_init.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/iq_shmem_init.glsl
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/iq_shmem_init.glsl
+@@ -0,0 +1,2 @@
++void init_iq_shmem(uvec3 wgsize) {
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/lightning_indexer.comp b/ggml/src/ggml-vulkan/vulkan-shaders/lightning_indexer.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/lightning_indexer.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/lightning_indexer.comp
+@@ -12,9 +12,9 @@
+ 
+ #include "types.glsl"
+ #include "fa_types.glsl"
+-#define FaTypeV FA_TYPE_F32
++#define FaTypeV GGML_TYPE_F32
+ 
+-layout(constant_id = 0) const uint FaTypeK = FA_TYPE_F32;
++layout(constant_id = 0) const uint FaTypeK = GGML_TYPE_F32;
+ layout(constant_id = 1) const uint FaBlockBytesK = 4;
+ layout(constant_id = 2) const uint SUBGROUP_SIZE = 32;
+ 
+@@ -84,11 +84,11 @@ void main() {
+     const uint k_block_elems = fa_block_elems(FaTypeK);
+     const uint k_elem_bytes = FaBlockBytesK / k_block_elems;
+ 
+-    if (FaTypeK == FA_TYPE_F16) {
++    if (FaTypeK == GGML_TYPE_F16) {
+         k_row[tid] = float(k_f16[k_offset / k_elem_bytes + tid]);
+-    } else if (FaTypeK == FA_TYPE_F32) {
++    } else if (FaTypeK == GGML_TYPE_F32) {
+         k_row[tid] = k_f32[k_offset / k_elem_bytes + tid];
+-    } else if (FaTypeK == FA_TYPE_BF16) {
++    } else if (FaTypeK == GGML_TYPE_BF16) {
+         k_row[tid] = bf16_to_fp32(uint(k_bf16[k_offset / k_elem_bytes + tid]));
+     } else if (4 * tid < HEAD_SIZE) {
+         const uint coord = 4 * tid;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -9,6 +9,9 @@
+ #if defined(DATA_A_IQ1_M)
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #endif
++#if !defined(DATA_A_F32) && !defined(DATA_A_F16) && !defined(DATA_A_BF16)
++#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
++#endif
+ 
+ #if defined(DATA_A_BF16) && defined(COOPMAT)
+ #extension GL_EXT_bfloat16 : enable
+@@ -28,24 +31,54 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #endif
+ 
++#ifdef MULMAT_QUANT
++#include "ggml_type_ids.glsl"
++layout (constant_id = 12) const uint MmTypeA = 0;
++#endif
++
+ #include "types.glsl"
+ #include "dot_product_funcs.glsl"
+ 
++#ifndef MULMAT_QUANT
+ #ifndef LOAD_VEC_A
+ #define LOAD_VEC_A 1
+ #endif
++#endif
+ #ifndef LOAD_VEC_B
+ #define LOAD_VEC_B 1
+ #endif
+ 
+ layout (constant_id = 11) const uint ALIGNED = 0;
+ 
++#ifdef MULMAT_QUANT
++
++uint mm_load_vec_a() {
++    switch (MmTypeA) {
++    case GGML_TYPE_Q1_0:
++    case GGML_TYPE_Q4_0:
++    case GGML_TYPE_Q4_1:
++    case GGML_TYPE_Q5_1:
++        return 8u;
++    case GGML_TYPE_Q2_0:
++    case GGML_TYPE_Q5_0:
++    case GGML_TYPE_Q8_0:
++    case GGML_TYPE_Q2_K:
++    case GGML_TYPE_Q4_K:
++    case GGML_TYPE_Q5_K:
++        return 4u;
++    default:
++        return 2u;
++    }
++}
++#endif
++
+ #if !defined(TO_FLOAT_TYPE)
+ #define TO_FLOAT_TYPE FLOAT_TYPE
+ #endif
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
++#ifndef MULMAT_QUANT
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+ #if defined(DATA_A_F32)
+ layout (binding = 0) readonly buffer A_SCALAR {float data_a_scalar[];};
+@@ -60,6 +93,30 @@ layout (binding = 0) readonly buffer A_PACKED16 {A_TYPE_PACKED16 data_a_packed16
+ #if defined(A_TYPE_PACKED32)
+ layout (binding = 0) readonly buffer A_PACKED32 {A_TYPE_PACKED32 data_a_packed32[];};
+ #endif
++#else
++// Unpacked struct aliases
++layout (binding = 0) readonly buffer BUF_Q1_0     { block_q1_0 data[];     } a_q1_0;
++layout (binding = 0) readonly buffer BUF_Q2_0     { block_q2_0 data[];     } a_q2_0;
++layout (binding = 0) readonly buffer BUF_Q2_K     { block_q2_K data[];     } a_q2_k;
++layout (binding = 0) readonly buffer BUF_Q3_K     { block_q3_K data[];     } a_q3_k;
++layout (binding = 0) readonly buffer BUF_Q4_K     { block_q4_K data[];     } a_q4_k;
++layout (binding = 0) readonly buffer BUF_Q5_K     { block_q5_K data[];     } a_q5_k;
++layout (binding = 0) readonly buffer BUF_Q6_K     { block_q6_K data[];     } a_q6_k;
++layout (binding = 0) readonly buffer BUF_TQ1_0    { block_tq1_0 data[];    } a_tq1_0;
++layout (binding = 0) readonly buffer BUF_TQ2_0    { block_tq2_0 data[];    } a_tq2_0;
++// Packed16 aliases
++layout (binding = 0) readonly buffer BUF_Q4_0_P16   { block_q4_0_packed16 data[];   } a_q4_0_p16;
++layout (binding = 0) readonly buffer BUF_Q5_0_P16   { block_q5_0_packed16 data[];   } a_q5_0_p16;
++layout (binding = 0) readonly buffer BUF_Q8_0_P16   { block_q8_0_packed16 data[];   } a_q8_0_p16;
++layout (binding = 0) readonly buffer BUF_Q3_K_P16   { block_q3_K_packed16 data[];   } a_q3_k_p16;
++layout (binding = 0) readonly buffer BUF_Q6_K_P16   { block_q6_K_packed16 data[];   } a_q6_k_p16;
++// Packed32 aliases
++layout (binding = 0) readonly buffer BUF_Q4_1_P32   { block_q4_1_packed32 data[];   } a_q4_1_p32;
++layout (binding = 0) readonly buffer BUF_Q5_1_P32   { block_q5_1_packed32 data[];   } a_q5_1_p32;
++layout (binding = 0) readonly buffer BUF_Q2_K_P32   { block_q2_K_packed32 data[];   } a_q2_k_p32;
++layout (binding = 0) readonly buffer BUF_Q4_K_P32   { block_q4_K_packed32 data[];   } a_q4_k_p32;
++layout (binding = 0) readonly buffer BUF_Q5_K_P32   { block_q5_K_packed32 data[];   } a_q5_k_p32;
++#endif
+ 
+ layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+ layout (binding = 1) readonly buffer B_SCALAR {B_TYPE_SCALAR data_b_scalar[];};
+@@ -121,8 +178,13 @@ layout (constant_id = 3) const uint BK = 16;  // Assumed to be 32 if working wit
+ #endif
+ 
+ #ifdef COOPMAT
++#ifdef MULMAT_QUANT
++layout(constant_id = 13) const uint SHMEM_STRIDE_PAD = 4;
++layout(constant_id = 14) const bool APPLY_SLM_A_RESHAPE = false;
++#else
+ layout(constant_id = 12) const uint SHMEM_STRIDE_PAD = 4;
+ layout(constant_id = 13) const bool APPLY_SLM_A_RESHAPE = false;
++#endif
+ #else
+ const uint SHMEM_STRIDE_PAD = 1;
+ const bool APPLY_SLM_A_RESHAPE = false;
+@@ -141,6 +203,10 @@ shared ACC_TYPE coopmat_stage[TM * TN * NUM_WARPS];
+ #include "mul_mm_id_funcs.glsl"
+ #include "mul_mm_funcs.glsl"
+ 
++#ifdef MULMAT_QUANT
++#include "iq_shmem_init.glsl"
++#endif
++
+ void main() {
+     const uint ic = gl_WorkGroupID.y;
+ 
+@@ -150,7 +216,7 @@ void main() {
+         return;
+     }
+ #endif
+-#ifdef NEEDS_INIT_IQ_SHMEM
++#if defined(NEEDS_INIT_IQ_SHMEM) || defined(MULMAT_QUANT)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+@@ -200,9 +266,12 @@ void main() {
+ #if defined(DATA_A_F32) || defined(DATA_A_F16) || defined(DATA_A_BF16)
+     const uint LOAD_VEC_A_EFF = (ALIGNED != 0) ? LOAD_VEC_A : 1;
+     const uint LOAD_VEC_BATCH_A = (ALIGNED != 0) ? 1 : 2;
+-#else
++#elif !defined(MULMAT_QUANT)
+     const uint LOAD_VEC_A_EFF = LOAD_VEC_A;
+     const uint LOAD_VEC_BATCH_A = 1;
++#else
++    const uint LOAD_VEC_A_EFF = mm_load_vec_a();
++    const uint LOAD_VEC_BATCH_A = 1;
+ #endif
+     const uint LOAD_VEC_B_EFF = (ALIGNED != 0) ? LOAD_VEC_B : 1;
+     const uint LOAD_VEC_BATCH_B = (ALIGNED != 0) ? 1 : 2;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -21,6 +21,13 @@
+ #extension GL_EXT_bfloat16 : enable
+ #endif
+ 
++#include "ggml_type_ids.glsl"
++
++#ifdef MULMAT_QUANT
++layout (constant_id = 7) const uint MmTypeA = 0;
++layout (constant_id = 8) const uint MmABlockBytes = 2;
++#endif
++
+ #include "types.glsl"
+ #include "utils.glsl"
+ 
+@@ -37,6 +44,24 @@ layout (constant_id = 4) const bool enable_smaller_matrices = false;
+ const uint BNover2 = enable_smaller_matrices ? (BN / 2) : BN;
+ const uint BNover4 = enable_smaller_matrices ? (BN / 4) : BN;
+ layout (constant_id = 5) const uint ALIGNED = 0;
++layout (constant_id = 6) const uint subgroup_size = 32;
++
++#ifdef MULMAT_QUANT
++
++uint mm_quant_k() {
++    switch (MmTypeA) {
++    case GGML_TYPE_Q4_0: case GGML_TYPE_Q4_1: case GGML_TYPE_Q5_0: case GGML_TYPE_Q5_1:
++    case GGML_TYPE_Q8_0:
++        return 32u;
++    case GGML_TYPE_Q1_0:
++        return 128u;
++    case GGML_TYPE_Q2_0:
++        return 64u;
++    default:
++        return 256u;
++    }
++}
++#endif
+ 
+ layout (push_constant) uniform parameter
+ {
+@@ -72,21 +97,73 @@ layout (push_constant) uniform parameter
+ } p;
+ 
+ 
++#ifndef MULMAT_QUANT
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
++#else
++layout (binding = 0) readonly buffer A {uint8_t data_a[];};
++#endif
+ layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ #if defined(MUL_MAT_ID) && defined(GGML_VULKAN_COOPMAT2_DECODE_VECTOR)
+ layout (binding = 1) readonly buffer B4 {B_TYPEV4 data_b_v4[];};
+ #endif
+ 
+-#if QUANT_K > 1
++#if defined(MULMAT_QUANT) || QUANT_K > 1
+ #include "dequant_funcs_cm2.glsl"
++#ifndef MULMAT_QUANT
++// Per-type path: use the alias set by dequant_funcs_cm2.glsl
+ #if defined(dequantFuncA_v) && defined(GGML_VULKAN_COOPMAT2_DECODE_VECTOR)
+ #define DECODEFUNCA , dequantFuncA, dequantFuncA_v
+ #else
+ #define DECODEFUNCA , dequantFuncA
+ #endif
+ #else
++layout(buffer_reference, std430, buffer_reference_align = 1) buffer decodeBufA {
++    uint8_t raw[MmABlockBytes];
++};
++
++float16_t mmDecodeA(const in decodeBufA bl_in, const in uint blockCoords[2], const in uint coordInBlock[2]) {
++    switch (MmTypeA) {
++    case GGML_TYPE_Q1_0:  return dequantFuncQ1_0 (decodeBufQ1_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q2_0:  return dequantFuncQ2_0 (decodeBufQ2_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q4_0:  return dequantFuncQ4_0 (decodeBufQ4_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q4_1:  return dequantFuncQ4_1 (decodeBufQ4_1 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q5_0:  return dequantFuncQ5_0 (decodeBufQ5_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q5_1:  return dequantFuncQ5_1 (decodeBufQ5_1 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q8_0:  return dequantFuncQ8_0 (decodeBufQ8_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q2_K:  return dequantFuncQ2_K (decodeBufQ2_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q3_K:  return dequantFuncQ3_K (decodeBufQ3_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q6_K:  return dequantFuncQ6_K (decodeBufQ6_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_TQ1_0: return dequantFuncTQ1_0(decodeBufTQ1_0(bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_TQ2_0: return dequantFuncTQ2_0(decodeBufTQ2_0(bl_in), blockCoords, coordInBlock);
++    default:              return float16_t(0);
++    }
++}
++
++#ifdef GGML_VULKAN_COOPMAT2_DECODE_VECTOR
++f16vec4 mmDecodeA_v(const in decodeBufA bl_in, const in uint blockCoords[2], const in uint coordInBlock[2]) {
++    switch (MmTypeA) {
++    case GGML_TYPE_Q1_0:  return dequantFuncQ1_0_v (decodeBufQ1_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q2_0:  return dequantFuncQ2_0_v (decodeBufQ2_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q4_0:  return dequantFuncQ4_0_v (decodeBufQ4_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q4_1:  return dequantFuncQ4_1_v (decodeBufQ4_1 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q5_0:  return dequantFuncQ5_0_v (decodeBufQ5_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q5_1:  return dequantFuncQ5_1_v (decodeBufQ5_1 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q8_0:  return dequantFuncQ8_0_v (decodeBufQ8_0 (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q2_K:  return dequantFuncQ2_K_v (decodeBufQ2_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q3_K:  return dequantFuncQ3_K_v (decodeBufQ3_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_Q6_K:  return dequantFuncQ6_K_v (decodeBufQ6_K (bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_TQ1_0: return dequantFuncTQ1_0_v(decodeBufTQ1_0(bl_in), blockCoords, coordInBlock);
++    case GGML_TYPE_TQ2_0: return dequantFuncTQ2_0_v(decodeBufTQ2_0(bl_in), blockCoords, coordInBlock);
++    default:              return f16vec4(0);
++    }
++}
++#define DECODEFUNCA , mmDecodeA, mmDecodeA_v
++#else
++#define DECODEFUNCA , mmDecodeA
++#endif
++#endif
++#else
+ #define DECODEFUNCA
+ #endif
+ 
+@@ -114,7 +191,6 @@ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufB {
+ };
+ 
+ uint _ne1;
+-layout (constant_id = 6) const uint subgroup_size = 32;
+ shared uvec4 ballots_sh[BLOCK_SIZE / subgroup_size];
+ 
+ B_TYPE decodeFuncB(const in decodeBufB bl, const in uint blockCoords[2], const in uint coordInBlock[2])
+@@ -246,6 +322,10 @@ void load_row_ids_hoisted(uint expert_idx, uint ic) {
+ }
+ #endif
+ 
++#ifdef MULMAT_QUANT
++#include "iq_shmem_init.glsl"
++#endif
++
+ void main() {
+     const uint tid = gl_LocalInvocationIndex;
+     const uint ic = gl_WorkGroupID.y;
+@@ -264,7 +344,7 @@ void main() {
+ #endif
+ #endif
+ 
+-#ifdef NEEDS_INIT_IQ_SHMEM
++#if defined(NEEDS_INIT_IQ_SHMEM) || defined(MULMAT_QUANT)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+@@ -305,22 +385,33 @@ void main() {
+     const uint end_k = min(p.K, (ik + 1) * p.k_split);
+ #endif
+ 
++#ifdef MULMAT_QUANT
++    const uint qk = mm_quant_k();
++#else
++    const uint qk = QUANT_K;
++#endif
++
+ #ifdef MUL_MAT_ID
+-    uint pos_a = expert_idx * (p.batch_stride_a / QUANT_K);
++    uint pos_a = expert_idx * (p.batch_stride_a / qk);
+     uint pos_b = 0;
+ #else
+-    uint pos_a = batch_idx_a * (p.batch_stride_a / QUANT_K);
++    uint pos_a = batch_idx_a * (p.batch_stride_a / qk);
+     uint pos_b = batch_idx * p.batch_stride_b;
+     uint pos_d = batch_idx * p.batch_stride_d + ik * p.batch_stride_d * p.num_batches;
+ #endif
+ 
+-    uint stride_a = p.stride_a / QUANT_K;
++#ifdef MULMAT_QUANT
++    // pos_a is a byte offset into the raw buffer; strides stay in block units
++    pos_a *= MmABlockBytes;
++#endif
++
++    uint stride_a = p.stride_a / qk;
+     uint stride_b = p.stride_b;
+ 
+     // Hint to the compiler that values are aligned (want 16B alignment).
+     // Quants are always block-aligned, no alignment needed.
+     if (ALIGNED != 0) {
+-#if QUANT_K == 1
++#if !defined(MULMAT_QUANT) && QUANT_K == 1
+         stride_a &= ~7;
+ #endif
+         stride_b &= ~7;
+@@ -335,10 +426,8 @@ void main() {
+ #endif
+     tensorLayoutNV<2, gl_CooperativeMatrixClampModeConstantNV> tensorLayoutD = createTensorLayoutNV(2, gl_CooperativeMatrixClampModeConstantNV);
+ 
+-#if QUANT_K > 1
+-    tensorLayoutA = setTensorLayoutBlockSizeNV(tensorLayoutA, 1, QUANT_K);
+-    tensorLayoutAClamp = setTensorLayoutBlockSizeNV(tensorLayoutAClamp, 1, QUANT_K);
+-#endif
++    tensorLayoutA = setTensorLayoutBlockSizeNV(tensorLayoutA, 1, qk);
++    tensorLayoutAClamp = setTensorLayoutBlockSizeNV(tensorLayoutAClamp, 1, qk);
+ #if defined(MUL_MAT_ID) && defined(GGML_VULKAN_COOPMAT2_DECODE_VECTOR)
+     tensorLayoutB = setTensorLayoutBlockSizeNV(tensorLayoutB, 1, BK);
+ #endif
+@@ -368,19 +457,19 @@ void main() {
+     const uint START_ALIGN_K = 256;
+     // For Qi_K (block size 256), unroll whole 256 element tiles.
+     // For legacy quants (block size 32), unroll 8x.
+-    const uint UNROLL_K = (QUANT_K == 256) ? 256 : (BK * 8);
++    const uint UNROLL_K = (qk == 256) ? 256 : (BK * 8);
+     const uint unroll_count = UNROLL_K / BK;
+ 
+     // Detect a fast path where all loads are entirely in bounds and no clamping is required
+     if ((ir + 1) * BM <= p.M && (ic + 1) * BN <= p.padded_N && (start_k % START_ALIGN_K) == 0 && (end_k % BK) == 0 &&
+-#if QUANT_K == 1
++#if !defined(MULMAT_QUANT) && QUANT_K == 1
+         (stride_a % 8) == 0 &&
+ #endif
+         (stride_b % 8) == 0) {
+         // Hint to the compiler that values are aligned (want 16B alignment)
+         start_k &= ~(START_ALIGN_K-1);
+         stride_b &= ~7;
+-#if QUANT_K == 1
++#if !defined(MULMAT_QUANT) && QUANT_K == 1
+         stride_a &= ~7;
+ #endif
+ 
+@@ -551,10 +640,10 @@ void main() {
+             [[dont_unroll]]
+             for (uint block_k = start_k, i = 0; i < k_iters; block_k += BK, ++i) {
+ 
+-                if ((block_k % QUANT_K) == 0) {
++                if ((block_k % qk) == 0) {
+                     store_scales(tid);
+                 }
+-                if (block_k + BK < end_k && ((block_k + BK) % QUANT_K) == 0) {
++                if (block_k + BK < end_k && ((block_k + BK) % qk) == 0) {
+                     fetch_scales(ir * BM, pos_a, stride_a, block_k + BK, tid, false);
+                 }
+ 
+@@ -595,10 +684,10 @@ void main() {
+             [[dont_unroll]]
+             for (uint block_k = start_k, i = 0; i < k_iters; block_k += BK, ++i) {
+ 
+-                if ((block_k % QUANT_K) == 0) {
++                if ((block_k % qk) == 0) {
+                     store_scales(tid);
+                 }
+-                if (block_k + BK < end_k && ((block_k + BK) % QUANT_K) == 0) {
++                if (block_k + BK < end_k && ((block_k + BK) % qk) == 0) {
+                     fetch_scales(ir * BM, pos_a, stride_a, block_k + BK, tid, false);
+                 }
+ 
+@@ -639,10 +728,10 @@ void main() {
+         [[dont_unroll]]
+         for (uint block_k = start_k, i = 0; i < k_iters; block_k += BK, ++i) {
+ 
+-            if ((block_k % QUANT_K) == 0) {
++            if ((block_k % qk) == 0) {
+                 store_scales(tid);
+             }
+-            if (block_k + BK < end_k && ((block_k + BK) % QUANT_K) == 0) {
++            if (block_k + BK < end_k && ((block_k + BK) % qk) == 0) {
+                 fetch_scales(ir * BM, pos_a, stride_a, block_k + BK, tid, false);
+             }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+@@ -20,669 +20,698 @@ void store_a(uint m, uint k_pair, FLOAT_TYPEV2 value) {
+ void load_a_to_shmem(const uint pos_a, const uint row, const uint col, const uint idx_m, const uint block, const uint end_k) {
+ #if defined(DATA_A_F32) || defined(DATA_A_F16)
+ #if LOAD_VEC_A == 8
+-            if (ALIGNED != 0) {
+-                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-                const uint k_pair = row * LOAD_VEC_A / 2;
+-                FLOAT_TYPEV8 aa = FLOAT_TYPEV8(data_a[idx]);
+-                store_a(col, k_pair,     aa[0].xy);
+-                store_a(col, k_pair + 1, aa[0].zw);
+-                store_a(col, k_pair + 2, aa[1].xy);
+-                store_a(col, k_pair + 3, aa[1].zw);
+-                return;
+-            }
++    if (ALIGNED != 0) {
++        const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++        const uint k_pair = row * LOAD_VEC_A / 2;
++        FLOAT_TYPEV8 aa = FLOAT_TYPEV8(data_a[idx]);
++        store_a(col, k_pair,     aa[0].xy);
++        store_a(col, k_pair + 1, aa[0].zw);
++        store_a(col, k_pair + 2, aa[1].xy);
++        store_a(col, k_pair + 3, aa[1].zw);
++        return;
++    }
+ #elif LOAD_VEC_A == 4
+-            if (ALIGNED != 0) {
+-                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-                const uint k_pair = row * LOAD_VEC_A / 2;
+-                FLOAT_TYPEV4 aa = FLOAT_TYPEV4(data_a[idx]);
+-                store_a(col, k_pair,     aa.xy);
+-                store_a(col, k_pair + 1, aa.zw);
+-                return;
+-            }
++    if (ALIGNED != 0) {
++        const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++        const uint k_pair = row * LOAD_VEC_A / 2;
++        FLOAT_TYPEV4 aa = FLOAT_TYPEV4(data_a[idx]);
++        store_a(col, k_pair,     aa.xy);
++        store_a(col, k_pair + 1, aa.zw);
++        return;
++    }
+ #endif
+-            const uint idx = pos_a + col * p.stride_a + row * 2;
+-            if (idx_m < p.M && block + row * 2 + 1 < end_k) {
+-                store_a(col, row, FLOAT_TYPEV2(data_a_scalar[idx],
+-                                               data_a_scalar[idx + 1]));
+-            } else if (idx_m < p.M && block + row * 2 < end_k) {
+-                store_a(col, row, FLOAT_TYPEV2(data_a_scalar[idx], 0.0f));
+-            } else {
+-                store_a(col, row, FLOAT_TYPEV2(0.0f));
+-            }
++    const uint idx = pos_a + col * p.stride_a + row * 2;
++    if (idx_m < p.M && block + row * 2 + 1 < end_k) {
++        store_a(col, row, FLOAT_TYPEV2(data_a_scalar[idx],
++                                       data_a_scalar[idx + 1]));
++    } else if (idx_m < p.M && block + row * 2 < end_k) {
++        store_a(col, row, FLOAT_TYPEV2(data_a_scalar[idx], 0.0f));
++    } else {
++        store_a(col, row, FLOAT_TYPEV2(0.0f));
++    }
+ #elif defined(DATA_A_BF16)
+ #if LOAD_VEC_A == 4
+-            if (ALIGNED != 0) {
+-                const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-                const uint k_pair = row * LOAD_VEC_A / 2;
+-                FLOAT_TYPEV4 aa = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_a[idx]));
+-                store_a(col, k_pair,     aa.xy);
+-                store_a(col, k_pair + 1, aa.zw);
+-                return;
+-            }
++    if (ALIGNED != 0) {
++        const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++        const uint k_pair = row * LOAD_VEC_A / 2;
++        FLOAT_TYPEV4 aa = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_a[idx]));
++        store_a(col, k_pair,     aa.xy);
++        store_a(col, k_pair + 1, aa.zw);
++        return;
++    }
+ #endif
+-            const uint idx = pos_a + col * p.stride_a + row * 2;
+-            if (idx_m < p.M && block + row * 2 + 1 < end_k) {
+-                store_a(col, row, FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]),
+-                                               TO_FLOAT_TYPE(data_a_scalar[idx + 1])));
+-            } else if (idx_m < p.M && block + row * 2 < end_k) {
+-                store_a(col, row, FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]), 0.0f));
+-            } else {
+-                store_a(col, row, FLOAT_TYPEV2(0.0f));
+-            }
+-#elif defined(DATA_A_Q4_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 4;
+-            const uint iqs = idx & 0x03;
+-
+-            const float d = float(data_a_packed16[ib].d);
+-            const uint vui = uint(data_a_packed16[ib].qs[2*iqs]) | (uint(data_a_packed16[ib].qs[2*iqs + 1]) << 16);
+-            const vec4 v0 = (vec4(unpack8(vui & 0x0F0F0F0F)) - 8.0f) * d;
+-            const vec4 v1 = (vec4(unpack8((vui >> 4) & 0x0F0F0F0F)) - 8.0f) * d;
+-
+-            const uint k_pair = row * LOAD_VEC_A / 4;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v0.xy));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v0.zw));
+-            store_a(col, k_pair + 8, FLOAT_TYPEV2(v1.xy));
+-            store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.zw));
+-#elif defined(DATA_A_Q4_1)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 4;
+-            const uint iqs = idx & 0x03;
+-
+-            const vec2 dm = vec2(data_a_packed32[ib].dm);
+-            const uint vui = data_a_packed32[ib].qs[iqs];
+-            const vec4 v0 = vec4(unpack8(vui & 0x0F0F0F0F)) * dm.x + dm.y;
+-            const vec4 v1 = vec4(unpack8((vui >> 4) & 0x0F0F0F0F)) * dm.x + dm.y;
+-
+-            const uint k_pair = row * LOAD_VEC_A / 4;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v0.xy));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v0.zw));
+-            store_a(col, k_pair + 8, FLOAT_TYPEV2(v1.xy));
+-            store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.zw));
+-#elif defined(DATA_A_Q5_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 8;
+-            const uint iqs = idx & 0x07;
+-
+-            const float d = float(data_a_packed16[ib].d);
+-            const uint uint_qh = uint(data_a_packed16[ib].qh[1]) << 16 | uint(data_a_packed16[ib].qh[0]);
+-            const ivec2 qh0 = ivec2(((uint_qh >> 2*iqs) << 4) & 0x10, (uint_qh >> (2*iqs + 12)) & 0x10);
+-            const ivec2 qh1 = ivec2(((uint_qh >> (2*iqs + 1)) << 4) & 0x10, (uint_qh >> (2*iqs + 13)) & 0x10);
+-
+-            const uint vui = uint(data_a_packed16[ib].qs[iqs]);
+-            const vec4 v = (vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, (vui >> 12) | qh1.y) - 16.0f) * d;
+-            store_a(col, row,     FLOAT_TYPEV2(v.xz));
+-            store_a(col, row + 8, FLOAT_TYPEV2(v.yw));
+-#elif defined(DATA_A_Q5_1)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 4;
+-            const uint iqs = idx & 0x03;
+-
+-            const vec2 dm = vec2(data_a_packed32[ib].dm);
+-            const uint uint_qh = data_a_packed32[ib].qh;
+-            const uvec2 qh0 = uvec2(((uint_qh >> 4*iqs) << 4) & 0x10, (uint_qh >> (4*iqs + 12)) & 0x10);
+-            const uvec2 qh1 = uvec2(((uint_qh >> (4*iqs + 1)) << 4) & 0x10, (uint_qh >> (4*iqs + 13)) & 0x10);
+-            const uvec2 qh2 = uvec2(((uint_qh >> (4*iqs + 2)) << 4) & 0x10, (uint_qh >> (4*iqs + 14)) & 0x10);
+-            const uvec2 qh3 = uvec2(((uint_qh >> (4*iqs + 3)) << 4) & 0x10, (uint_qh >> (4*iqs + 15)) & 0x10);
+-
+-            const uint vui = data_a_packed32[ib].qs[iqs];
+-            const vec4 v0 = vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, ((vui >> 12) & 0xF) | qh1.y) * dm.x + dm.y;
+-            const vec4 v1 = vec4(((vui >> 16) & 0xF) | qh2.x, ((vui >> 20) & 0xF) | qh2.y, ((vui >> 24) & 0xF) | qh3.x, ((vui >> 28) & 0xF) | qh3.y) * dm.x + dm.y;
+-
+-            const uint k_pair = row * LOAD_VEC_A / 4;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v0.xz));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v1.xz));
+-            store_a(col, k_pair + 8, FLOAT_TYPEV2(v0.yw));
+-            store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.yw));
+-#elif defined(DATA_A_Q8_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 8;
+-            const uint iqs = idx & 0x07;
+-
+-            const float d = float(data_a_packed16[ib].d);
+-            const i8vec2 v0 = unpack8(int32_t(data_a_packed16[ib].qs[2*iqs])).xy; // vec4 used due to #12147
+-            const i8vec2 v1 = unpack8(int32_t(data_a_packed16[ib].qs[2*iqs + 1])).xy;
+-            const vec4 v = vec4(v0.x, v0.y, v1.x, v1.y) * d;
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v.xy));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
+-#elif defined(DATA_A_Q1_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 16;
+-            const uint iqs = idx & 0xfu;
+-
+-            const float d = float(data_a[ib].d);
+-            const uint bits = uint(data_a[ib].qs[iqs]);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2((bits & 0x01u) != 0u ? d : -d, (bits & 0x02u) != 0u ? d : -d));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2((bits & 0x04u) != 0u ? d : -d, (bits & 0x08u) != 0u ? d : -d));
+-            store_a(col, k_pair + 2, FLOAT_TYPEV2((bits & 0x10u) != 0u ? d : -d, (bits & 0x20u) != 0u ? d : -d));
+-            store_a(col, k_pair + 3, FLOAT_TYPEV2((bits & 0x40u) != 0u ? d : -d, (bits & 0x80u) != 0u ? d : -d));
+-#elif defined(DATA_A_Q2_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 16;
+-            const uint iqs = idx & 0xfu;
+-
+-            const FLOAT_TYPE d = FLOAT_TYPE(data_a[ib].d);
+-            const uint bits = uint(data_a[ib].qs[iqs]);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     d * (FLOAT_TYPEV2(bits & 3u, (bits >> 2u) & 3u) - FLOAT_TYPEV2(1.0f)));
+-            store_a(col, k_pair + 1, d * (FLOAT_TYPEV2((bits >> 4u) & 3u, bits >> 6u) - FLOAT_TYPEV2(1.0f)));
+-#elif defined(DATA_A_Q2_K)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 64;                          // 4 values per idx
+-            const uint iqs = (idx % 64) * 2;                   // 0,2,4..126
+-
+-            const uint qsi = (iqs / 64) * 16 + (iqs % 16);     // 0..15
+-            const uint scalesi = iqs / 8;                      // 0..15
+-            const uint qsshift = ((iqs % 64) / 16) * 2;        // 0,2,4,6
+-
+-            const vec4 qs = vec4(unpack8((data_a_packed32[ib].qs[qsi / 2] >> qsshift) & 0x03030303));
+-            const uint scales = data_a[ib].scales[scalesi];
+-            const vec2 dm = vec2(data_a[ib].dm);
+-
+-            const vec4 v = dm.x * float(scales & 0xF) * qs - dm.y * float(scales >> 4);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v.xy));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
+-#elif defined(DATA_A_TQ1_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib  = idx / 128;               // 2 values per idx
+-            const uint iqs = (idx % 128) * 2;         // element 0,2,4..254
+-
+-            const float d = float(data_a[ib].d);
+-            vec2 v;
+-            for (uint kk = 0u; kk < 2u; ++kk) {
+-                const uint e = iqs + kk;
+-                const uint bidx = tq1_0_byte_of(e);
+-                const uint qbyte = uint(bidx < 48u ? data_a[ib].qs[bidx]
+-                                                   : data_a[ib].qh[bidx - 48u]);
+-                v[kk] = d * (float(tq1_0_trit(qbyte, tq1_0_digit_of(e))) - 1.0);
+-            }
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
+-#elif defined(DATA_A_TQ2_0)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 128;                         // 2 values per idx
+-            const uint iqs = (idx % 128) * 2;                  // elem 0,2,4..254
+-
+-            const uint qsi   = (iqs / 128) * 32 + (iqs % 32);  // byte pair start
+-            const uint shift = 2 * ((iqs % 128) / 32);         // 0,2,4,6
+-
+-            const uvec2 qs = uvec2(data_a[ib].qs[qsi], data_a[ib].qs[qsi + 1]);
+-            const float d = float(data_a[ib].d);
+-
+-            const vec2 v = d * (vec2((qs >> shift) & 3) - 1.0);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
+-#elif defined(DATA_A_Q3_K)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 128;                   // 2 values per idx
+-            const uint iqs = idx % 128;                  // 0..127
+-
+-            const uint n = iqs / 64;                     // 0,1
+-            const uint qsi = n * 32 + (iqs % 16) * 2;    // 0,2,4..62
+-            const uint hmi =          (iqs % 16) * 2;    // 0,2,4..30
+-            const uint j = (iqs % 64) / 4;               // 0..3
+-            const uint is = iqs / 8;                     // 0..15
+-            const uint halfsplit = ((iqs % 64) / 16);    // 0,1,2,3
+-            const uint qsshift = halfsplit * 2;          // 0,2,4,6
+-
+-            const int8_t us = int8_t(((data_a[ib].scales[is % 8] >> (4 * int(is / 8))) & 0xF)
+-                                  | (((data_a[ib].scales[8 + (is % 4)] >> (2 * int(is / 4))) & 3) << 4));
+-            const float dl = float(data_a[ib].d) * float(us - 32);
+-
+-            const vec2 qs = vec2(unpack8((uint(data_a_packed16[ib].qs[qsi / 2]) >> qsshift) & 0x0303).xy);
+-            const vec2 hm = vec2(unpack8(((uint(data_a_packed16[ib].hmask[hmi / 2]) >> (4 * n + halfsplit)) & 0x0101 ^ 0x0101) << 2).xy);
+-
+-            store_a(col, row * LOAD_VEC_A / 2, FLOAT_TYPEV2(dl * (qs.x - hm.x),
+-                                                              dl * (qs.y - hm.y)));
+-#elif defined(DATA_A_Q4_K)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 64;                  // 4 values per idx
+-            const uint iqs = (idx % 64) * 2;           // 0,2,4..126
+-
+-            const uint n = iqs / 32;                   // 0,1,2,3
+-            const uint b = (iqs % 32) / 16;            // 0,1
+-            const uint is = 2 * n + b;                 // 0..7
+-            const uint qsi = n * 32 + (iqs % 16) * 2;  // 0,2,4..126
+-
+-            const vec2 loadd = vec2(data_a[ib].dm);
+-
+-            const uvec3 scales = uvec3(data_a_packed32[ib].scales[0],
+-                                       data_a_packed32[ib].scales[1],
+-                                       data_a_packed32[ib].scales[2]);
+-            const uint scalesoffs = (is & 3) * 8;
+-
+-            const uint scidx0 = (is < 4) ? 0 : 2;
+-            const uint scidxshift0 = scalesoffs;
+-            const uint scidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
+-            const uint mbidx0 = (is < 4) ? 1 : 2;
+-            const uint mbidxshift0 = (is < 4) ? scalesoffs : scalesoffs + 4;
+-            const uint mbidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
+-
+-            const uint8_t sc    = uint8_t(((scales[scidx0] >> scidxshift0) & 0xF) | ((scales[0] >> scidxshift1) & 0x30));
+-            const uint8_t mbyte = uint8_t(((scales[mbidx0] >> mbidxshift0) & 0xF) | ((scales[1] >> mbidxshift1) & 0x30));
+-
+-            const float d = loadd.x * sc;
+-            const float m = -loadd.y * mbyte;
+-
+-            const vec4 q = vec4(unpack8((data_a_packed32[ib].qs[qsi / 4] >> (b * 4)) & 0x0F0F0F0F));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(fma(d, q.x, m), fma(d, q.y, m)));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(fma(d, q.z, m), fma(d, q.w, m)));
+-#elif defined(DATA_A_Q5_K)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 64;                  // 4 values per idx
+-            const uint iqs = (idx % 64) * 2;           // 0,2,4..126
+-
+-            const uint n = iqs / 32;                   // 0,1,2,3
+-            const uint b = (iqs % 32) / 16;            // 0,1
+-            const uint is = 2 * n + b;                 // 0..7
+-            const uint qsi = n * 32 + (iqs % 16) * 2;  // 0,2,4..126
+-            const uint qhi = (iqs % 16) * 2;           // 0,2,4..30
+-
+-            const vec2 loadd = vec2(data_a[ib].dm);
+-
+-            const uvec3 scales = uvec3(data_a_packed32[ib].scales[0],
+-                                       data_a_packed32[ib].scales[1],
+-                                       data_a_packed32[ib].scales[2]);
+-            const uint scalesoffs = (is & 3) * 8;
+-
+-            const uint scidx0 = (is < 4) ? 0 : 2;
+-            const uint scidxshift0 = scalesoffs;
+-            const uint scidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
+-            const uint mbidx0 = (is < 4) ? 1 : 2;
+-            const uint mbidxshift0 = (is < 4) ? scalesoffs : scalesoffs + 4;
+-            const uint mbidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
++    const uint idx = pos_a + col * p.stride_a + row * 2;
++    if (idx_m < p.M && block + row * 2 + 1 < end_k) {
++        store_a(col, row, FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]),
++                                       TO_FLOAT_TYPE(data_a_scalar[idx + 1])));
++    } else if (idx_m < p.M && block + row * 2 < end_k) {
++        store_a(col, row, FLOAT_TYPEV2(TO_FLOAT_TYPE(data_a_scalar[idx]), 0.0f));
++    } else {
++        store_a(col, row, FLOAT_TYPEV2(0.0f));
++    }
++#elif defined(DATA_A_IQ1_S)
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
+ 
+-            const uint8_t sc    = uint8_t(((scales[scidx0] >> scidxshift0) & 0xF) | ((scales[0] >> scidxshift1) & 0x30));
+-            const uint8_t mbyte = uint8_t(((scales[mbidx0] >> mbidxshift0) & 0xF) | ((scales[1] >> mbidxshift1) & 0x30));
+-
+-            const float d = loadd.x * sc;
+-            const float m = -loadd.y * mbyte;
+-
+-            const uint qs = (data_a_packed32[ib].qs[qsi / 4] >> (b * 4)) & 0x0F0F0F0F;
+-            const uint qh = ((data_a_packed32[ib].qh[qhi / 4] >> (iqs / 16)) & 0x01010101) << 4;
+-            const vec4 q = vec4(unpack8(qs | qh));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(fma(d, q.x, m), fma(d, q.y, m)));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(fma(d, q.z, m), fma(d, q.w, m)));
+-#elif defined(DATA_A_Q6_K)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 128;                  // 2 values per idx
+-            const uint iqs = idx % 128;                 // 0..127
+-
+-            const uint n = iqs / 64;                    // 0,1
+-            const uint b = ((iqs % 64) / 32) * 4;       // 0,4
+-            const uint is_b = (iqs % 16) / 8;           // 0,1
+-            const uint qhshift = ((iqs % 64) / 16) * 2; // 0,2,4,6
+-            const uint is = 8 * n + qhshift + is_b;     // 0..15
+-            const uint qsi = n * 32 + (iqs % 32);       // 0..63
+-            const uint qhi = n * 16 + (iqs % 16);       // 0..31
+-
+-            const float dscale = float(data_a[ib].d) * float(data_a[ib].scales[is]);
++    const uint ib = idx / 32;
++    const uint ib32 = (idx % 32) / 4;
++    const uint ib8 = idx % 32;
+ 
+-            const uint ql = (uint(data_a_packed16[ib].ql[qsi]) >> b) & 0x0F0F;
+-            const uint qh = (uint(data_a_packed16[ib].qh[qhi]) >> qhshift) & 0x0303;
+-            const vec2 q = (vec2(unpack8(ql | (qh << 4)).xy) - 32) * dscale;
++    const float d = float(data_a[ib].d);
++    const uint qh = data_a[ib].qh[ib32];
++    const uint qs = data_a[ib].qs[ib8];
++    const float dl = d * (2 * bitfieldExtract(qh, 12, 3) + 1);
++    const float delta = ((qh & 0x8000) != 0) ? -IQ1S_DELTA : IQ1S_DELTA;
++    const int16_t grid = int16_t(iq1s_grid[qs | (bitfieldExtract(qh, 3 * int(ib8 & 3), 3) << 8)]);
+ 
+-            store_a(col, row * LOAD_VEC_A / 2, FLOAT_TYPEV2(q.x, q.y));
+-#elif defined(DATA_A_IQ1_S)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 32;                  // 8 values per idx
+-            const uint ib32 = (idx % 32) / 4;         // 0..7
+-            const uint ib8 = idx % 32;
+-
+-            const float d = float(data_a[ib].d);
+-            const uint qh = data_a[ib].qh[ib32];
+-            const uint qs = data_a[ib].qs[ib8];
+-            const float dl = d * (2 * bitfieldExtract(qh, 12, 3) + 1);
+-            const float delta = ((qh & 0x8000) != 0) ? -IQ1S_DELTA : IQ1S_DELTA;
+-            const int16_t grid = int16_t(iq1s_grid[qs | (bitfieldExtract(qh, 3 * int(ib8 & 3), 3) << 8)]);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            [[unroll]] for (int k = 0; k < 4; ++k) {
+-                store_a(col, k_pair + k, FLOAT_TYPEV2(dl * (bitfieldExtract(grid, 4 * k    , 2) + delta),
+-                                                       dl * (bitfieldExtract(grid, 4 * k + 2, 2) + delta)));
+-            }
++    [[unroll]] for (int k = 0; k < 4; ++k) {
++        store_a(col, k_pair + k, FLOAT_TYPEV2(dl * (bitfieldExtract(grid, 4 * k    , 2) + delta),
++                                            dl * (bitfieldExtract(grid, 4 * k + 2, 2) + delta)));
++
++    }
+ #elif defined(DATA_A_IQ1_M)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 32;  // 8 values per idx
+-            const uint ib8 = idx % 32;
+-            const uint ib16 = ib8 / 2;
+-
+-            const uint16_t[4] scales = data_a[ib].scales;
+-            const u16vec4 s = u16vec4(scales[0], scales[1], scales[2], scales[3]) >> 12;
+-            const float d = float(unpackHalf2x16(s.x | (s.y << 4) | (s.z << 8) | (s.w << 12)).x);
+-            const uint sc = scales[ib8 / 8];
+-            const uint qs = data_a[ib].qs[ib8];
+-            const uint qh = data_a[ib].qh[ib16] >> (4 * (ib8 & 1));
+-            const float dl = d * (2 * bitfieldExtract(sc, 3 * int(ib16 & 3), 3) + 1);
+-            const float delta = ((qh & 8) != 0) ? -IQ1M_DELTA : IQ1M_DELTA;
+-            const int16_t grid = int16_t(iq1s_grid[qs | ((qh & 7) << 8)]);
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            [[unroll]] for (int k = 0; k < 4; ++k) {
+-                store_a(col, k_pair + k, FLOAT_TYPEV2(dl * (bitfieldExtract(grid, 4 * k    , 2) + delta),
+-                                                       dl * (bitfieldExtract(grid, 4 * k + 2, 2) + delta)));
+-            }
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 32;
++    const uint ib8 = idx % 32;
++    const uint ib16 = ib8 / 2;
++
++    const uint16_t[4] scales = data_a[ib].scales;
++    const u16vec4 s = u16vec4(scales[0], scales[1], scales[2], scales[3]) >> 12;
++    const float d = float(unpackHalf2x16(s.x | (s.y << 4) | (s.z << 8) | (s.w << 12)).x);
++    const uint sc = scales[ib8 / 8];
++    const uint qs = data_a[ib].qs[ib8];
++    const uint qh = data_a[ib].qh[ib16] >> (4 * (ib8 & 1));
++    const float dl = d * (2 * bitfieldExtract(sc, 3 * int(ib16 & 3), 3) + 1);
++    const float delta = ((qh & 8) != 0) ? -IQ1M_DELTA : IQ1M_DELTA;
++    const int16_t grid = int16_t(iq1s_grid[qs | ((qh & 7) << 8)]);
++
++    [[unroll]] for (int k = 0; k < 4; ++k) {
++        store_a(col, k_pair + k, FLOAT_TYPEV2(dl * (bitfieldExtract(grid, 4 * k    , 2) + delta),
++                                            dl * (bitfieldExtract(grid, 4 * k + 2, 2) + delta)));
++
++    }
+ #elif defined(DATA_A_IQ2_XXS)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 32;                 // 8 values per idx
+-            const uint ib32 = (idx % 32) / 4;         // 0..7
+-            const uint ib8 = idx % 4;
+-
+-            const float d = float(data_a[ib].d);
+-            const uint qs = data_a[ib].qs[8 * ib32 + ib8];
+-            const uint signs = pack32(u8vec4(
+-                data_a[ib].qs[8*ib32 + 4],
+-                data_a[ib].qs[8*ib32 + 5],
+-                data_a[ib].qs[8*ib32 + 6],
+-                data_a[ib].qs[8*ib32 + 7]
+-            ));
+-            const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + (signs >> 28)));
+-            const uint32_t sign7 = bitfieldExtract(signs, 7 * int(ib8), 7);
+-            const uint sign = sign7 | (bitCount(sign7) << 7);
+-            const uvec2 grid = iq2xxs_grid[qs];
+-            const vec4 grid0 = vec4(unpack8(grid.x));
+-            const vec4 grid1 = vec4(unpack8(grid.y));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
+-                                                        (sign &   2) != 0 ? -grid0.y : grid0.y));
+-            store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
+-                                                        (sign &   8) != 0 ? -grid0.w : grid0.w));
+-            store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
+-                                                        (sign &  32) != 0 ? -grid1.y : grid1.y));
+-            store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
+-                                                        (sign & 128) != 0 ? -grid1.w : grid1.w));
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 32;
++    const uint ib32 = (idx % 32) / 4;
++    const uint ib8 = idx % 4;
++
++    const float d = float(data_a[ib].d);
++    const uint qs = data_a[ib].qs[8 * ib32 + ib8];
++    const uint signs = pack32(u8vec4(
++        data_a[ib].qs[8*ib32 + 4],
++        data_a[ib].qs[8*ib32 + 5],
++        data_a[ib].qs[8*ib32 + 6],
++        data_a[ib].qs[8*ib32 + 7]
++    ));
++    const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + (signs >> 28)));
++    const uint32_t sign7 = bitfieldExtract(signs, 7 * int(ib8), 7);
++    const uint sign = sign7 | (bitCount(sign7) << 7);
++    const uvec2 grid = iq2xxs_grid[qs];
++    const vec4 grid0 = vec4(unpack8(grid.x));
++    const vec4 grid1 = vec4(unpack8(grid.y));
++
++    store_a(col, k_pair, db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
++                                            (sign &   2) != 0 ? -grid0.y : grid0.y));
++
++    store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
++                                            (sign &   8) != 0 ? -grid0.w : grid0.w));
++
++    store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
++                                            (sign &  32) != 0 ? -grid1.y : grid1.y));
++
++    store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
++                                            (sign & 128) != 0 ? -grid1.w : grid1.w));
++
+ #elif defined(DATA_A_IQ2_XS)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 32;            // 8 values per idx
+-            const uint ib32 = (idx % 32) / 4;    // 0..7
+-            const uint ib8 = idx % 4;            // 0..3
+-
+-            const float d = float(data_a[ib].d);
+-            const uint scale = (data_a[ib].scales[ib32] >> (2 * (ib8 & 2))) & 0xf;
+-            const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + scale));
+-            const uint qs = data_a[ib].qs[4 * ib32 + ib8];
+-            const uint sign7 = qs >> 9;
+-            const uint sign = sign7 | (bitCount(sign7) << 7);
+-            const uvec2 grid = iq2xs_grid[qs & 511];
+-            const vec4 grid0 = vec4(unpack8(grid.x));
+-            const vec4 grid1 = vec4(unpack8(grid.y));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
+-                                                        (sign &   2) != 0 ? -grid0.y : grid0.y));
+-            store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
+-                                                        (sign &   8) != 0 ? -grid0.w : grid0.w));
+-            store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
+-                                                        (sign &  32) != 0 ? -grid1.y : grid1.y));
+-            store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
+-                                                        (sign & 128) != 0 ? -grid1.w : grid1.w));
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 32;
++    const uint ib32 = (idx % 32) / 4;
++    const uint ib8 = idx % 4;
++
++    const float d = float(data_a[ib].d);
++    const uint scale = (data_a[ib].scales[ib32] >> (2 * (ib8 & 2))) & 0xf;
++    const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + scale));
++    const uint qs = data_a[ib].qs[4 * ib32 + ib8];
++    const uint sign7 = qs >> 9;
++    const uint sign = sign7 | (bitCount(sign7) << 7);
++    const uvec2 grid = iq2xs_grid[qs & 511];
++    const vec4 grid0 = vec4(unpack8(grid.x));
++    const vec4 grid1 = vec4(unpack8(grid.y));
++
++    store_a(col, k_pair, db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
++                                            (sign &   2) != 0 ? -grid0.y : grid0.y));
++
++    store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
++                                            (sign &   8) != 0 ? -grid0.w : grid0.w));
++
++    store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
++                                            (sign &  32) != 0 ? -grid1.y : grid1.y));
++
++    store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
++                                            (sign & 128) != 0 ? -grid1.w : grid1.w));
++
+ #elif defined(DATA_A_IQ2_S)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 32;  // 8 values per idx
+-            const uint ib8 = idx % 32; // 0..31
+-            const uint ib32 = ib8 / 4; // 0..7
+-
+-            const uint scale = (data_a[ib].scales[ib32] >> (2 * (ib8 & 2))) & 0xf;
+-            const uint qs = data_a[ib].qs[ib8];
+-            const uint qh = data_a[ib].qh[ib32];
+-            const uint qhshift = 2 * (ib8 % 4);
+-            const uint sign = data_a[ib].qs[QUANT_K / 8 + ib8];
+-
+-            const float d = float(data_a[ib].d);
+-            const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + scale));
+-            const uvec2 grid = iq2s_grid[qs | ((qh << (8 - qhshift)) & 0x300)];
+-            const vec4 grid0 = vec4(unpack8(grid.x));
+-            const vec4 grid1 = vec4(unpack8(grid.y));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
+-                                                        (sign &   2) != 0 ? -grid0.y : grid0.y));
+-            store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
+-                                                        (sign &   8) != 0 ? -grid0.w : grid0.w));
+-            store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
+-                                                        (sign &  32) != 0 ? -grid1.y : grid1.y));
+-            store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
+-                                                        (sign & 128) != 0 ? -grid1.w : grid1.w));
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 32;
++    const uint ib8 = idx % 32;
++    const uint ib32 = ib8 / 4;
++
++    const uint scale = (data_a[ib].scales[ib32] >> (2 * (ib8 & 2))) & 0xf;
++    const uint qs = data_a[ib].qs[ib8];
++    const uint qh = data_a[ib].qh[ib32];
++    const uint qhshift = 2 * (ib8 % 4);
++    const uint sign = data_a[ib].qs[QUANT_K_IQ2_S / 8 + ib8];
++
++    const float d = float(data_a[ib].d);
++    const FLOAT_TYPE db = FLOAT_TYPE(d * 0.25 * (0.5 + scale));
++    const uvec2 grid = iq2s_grid[qs | ((qh << (8 - qhshift)) & 0x300)];
++    const vec4 grid0 = vec4(unpack8(grid.x));
++    const vec4 grid1 = vec4(unpack8(grid.y));
++
++    store_a(col, k_pair, db * FLOAT_TYPEV2((sign &   1) != 0 ? -grid0.x : grid0.x,
++                                            (sign &   2) != 0 ? -grid0.y : grid0.y));
++
++    store_a(col, k_pair + 1, db * FLOAT_TYPEV2((sign &   4) != 0 ? -grid0.z : grid0.z,
++                                            (sign &   8) != 0 ? -grid0.w : grid0.w));
++
++    store_a(col, k_pair + 2, db * FLOAT_TYPEV2((sign &  16) != 0 ? -grid1.x : grid1.x,
++                                            (sign &  32) != 0 ? -grid1.y : grid1.y));
++
++    store_a(col, k_pair + 3, db * FLOAT_TYPEV2((sign &  64) != 0 ? -grid1.z : grid1.z,
++                                            (sign & 128) != 0 ? -grid1.w : grid1.w));
++
+ #elif defined(DATA_A_IQ3_XXS)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 64;            // 4 values per idx
+-            const uint iqs = idx % 64;           // 0..63
+-            const uint is = QUANT_K / 4 + 4 * (iqs / 8); // 8 values
+-
+-            const float d = float(data_a[ib].d);
+-            const uint qs = data_a[ib].qs[iqs];
+-            const uint signs = pack32(u16vec2(
+-                data_a_packed16[ib].qs[is/2],
+-                data_a_packed16[ib].qs[is/2+1]
+-            ));
+-            const float db = d * 0.5 * (0.5 + (signs >> 28));
+-            const uint32_t sign7 = bitfieldExtract(signs, 7 * (int(iqs / 2) % 4), 7);
+-            const uint sign = (sign7 | (bitCount(sign7) << 7)) >> (4 * (idx % 2));
+-            const uint grid = iq3xxs_grid[qs];
+-            const vec4 v = db * vec4(unpack8(grid));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2((sign &   1) != 0 ? -v.x : v.x,
+-                                                   (sign &   2) != 0 ? -v.y : v.y));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2((sign &   4) != 0 ? -v.z : v.z,
+-                                                   (sign &   8) != 0 ? -v.w : v.w));
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 64;
++    const uint iqs = idx % 64;
++    const uint is = QUANT_K_IQ3_XXS / 4 + 4 * (iqs / 8);
++
++    const float d = float(data_a[ib].d);
++    const uint qs = data_a[ib].qs[iqs];
++    const uint signs = pack32(u16vec2(
++        data_a_packed16[ib].qs[is/2],
++        data_a_packed16[ib].qs[is/2+1]
++    ));
++    const float db = d * 0.5 * (0.5 + (signs >> 28));
++    const uint32_t sign7 = bitfieldExtract(signs, 7 * (int(iqs / 2) % 4), 7);
++    const uint sign = (sign7 | (bitCount(sign7) << 7)) >> (4 * (idx % 2));
++    const uint grid = iq3xxs_grid[qs];
++    const vec4 v = db * vec4(unpack8(grid));
++
++    store_a(col, k_pair, FLOAT_TYPEV2((sign &   1) != 0 ? -v.x : v.x,
++                                        (sign &   2) != 0 ? -v.y : v.y));
++
++    store_a(col, k_pair + 1, FLOAT_TYPEV2((sign &   4) != 0 ? -v.z : v.z,
++                                        (sign &   8) != 0 ? -v.w : v.w));
++
+ #elif defined(DATA_A_IQ3_S)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-
+-            const uint ib = idx / 64;            // 4 values per idx
+-            const uint iqs = idx % 64;           // 0..63
+-            const uint iqh = iqs / 8;
+-
+-            const float d = float(data_a[ib].d);
+-            const uint qs = data_a[ib].qs[iqs];
+-            const uint qh = data_a[ib].qh[iqh];
+-            const int8_t sign = int8_t(data_a[ib].signs[iqs / 2] >> (4 * (idx % 2)));
+-            const uint scale = data_a[ib].scales[iqs / 16];
+-            const i8vec2 sign01 = i8vec2(1 - (2 & i8vec2(sign << 1, sign)));
+-            const float db = d * (1 + 2 * ((scale >> (4 * (iqh & 1))) & 0xf));
+-            const uint32_t grid = iq3s_grid[qs | ((qh << (8 - (iqs % 8))) & 256)];
+-            const vec4 v = db * vec4(unpack8(grid));
+-
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2((sign &   1) != 0 ? -v.x : v.x,
+-                                                   (sign &   2) != 0 ? -v.y : v.y));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2((sign &   4) != 0 ? -v.z : v.z,
+-                                                   (sign &   8) != 0 ? -v.w : v.w));
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
++
++    const uint ib = idx / 64;
++    const uint iqs = idx % 64;
++    const uint iqh = iqs / 8;
++
++    const float d = float(data_a[ib].d);
++    const uint qs = data_a[ib].qs[iqs];
++    const uint qh = data_a[ib].qh[iqh];
++    const int8_t sign = int8_t(data_a[ib].signs[iqs / 2] >> (4 * (idx % 2)));
++    const uint scale = data_a[ib].scales[iqs / 16];
++    const i8vec2 sign01 = i8vec2(1 - (2 & i8vec2(sign << 1, sign)));
++    const float db = d * (1 + 2 * ((scale >> (4 * (iqh & 1))) & 0xf));
++    const uint32_t grid = iq3s_grid[qs | ((qh << (8 - (iqs % 8))) & 256)];
++    const vec4 v = db * vec4(unpack8(grid));
++
++    store_a(col, k_pair, FLOAT_TYPEV2((sign &   1) != 0 ? -v.x : v.x,
++                                        (sign &   2) != 0 ? -v.y : v.y));
++
++    store_a(col, k_pair + 1, FLOAT_TYPEV2((sign &   4) != 0 ? -v.z : v.z,
++                                        (sign &   8) != 0 ? -v.w : v.w));
++
+ #elif defined(DATA_A_IQ4_XS)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 2;
+ 
+-            const uint ib = idx / 64;            // 4 values per idx
+-            const uint ib32 = (idx % 64) / 8;    // 0..7
+-            const uint iq = 4 * ib32 + (idx % 4);
++    const uint ib = idx / 64;
++    const uint ib32 = (idx % 64) / 8;
++    const uint iq = 4 * ib32 + (idx % 4);
+ 
+-            const uint sl = (data_a[ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
+-            const uint sh = ((data_a[ib].scales_h) >> (2 * ib32)) & 3;
+-            const uint qshift = idx & 4;
+-            u8vec4 qs = unpack8((uint(data_a_packed32[ib].qs[iq]) >> qshift) & 0x0F0F0F0F);
++    const uint sl = (data_a[ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++    const uint sh = ((data_a[ib].scales_h) >> (2 * ib32)) & 3;
++    const uint qshift = idx & 4;
++    u8vec4 qs = unpack8((uint(data_a_packed32[ib].qs[iq]) >> qshift) & 0x0F0F0F0F);
+ 
+-            const float d = float(data_a[ib].d);
+-            const vec4 v = d * float(int(sl | (sh << 4)) - 32) * vec4(kvalues_iq4nl[qs.x], kvalues_iq4nl[qs.y], kvalues_iq4nl[qs.z], kvalues_iq4nl[qs.w]);
++    const float d = float(data_a[ib].d);
++    const vec4 v = d * float(int(sl | (sh << 4)) - 32) * vec4(kvalues_iq4nl[qs.x], kvalues_iq4nl[qs.y], kvalues_iq4nl[qs.z], kvalues_iq4nl[qs.w]);
+ 
+-            const uint k_pair = row * LOAD_VEC_A / 2;
+-            store_a(col, k_pair,     FLOAT_TYPEV2(v.xy));
+-            store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
++    store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
++    store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
+ #elif defined(DATA_A_IQ4_NL)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 4;
++
++    const uint ib = idx / 8;
++    const uint iqs = idx & 0x07;
+ 
+-            const uint ib = idx / 8;
+-            const uint iqs = idx & 0x07;
++    const FLOAT_TYPE d = FLOAT_TYPE(data_a_packed16[ib].d);
++    const uint vui = uint(data_a_packed16[ib].qs[iqs]);
+ 
+-            const FLOAT_TYPE d = FLOAT_TYPE(data_a_packed16[ib].d);
+-            const uint vui = uint(data_a_packed16[ib].qs[iqs]);
++    store_a(col, k_pair, d * FLOAT_TYPEV2(kvalues_iq4nl[vui & 0xF],
++                                            kvalues_iq4nl[bitfieldExtract(vui, 8, 4)]));
++
++    store_a(col, k_pair + 8, d * FLOAT_TYPEV2(kvalues_iq4nl[bitfieldExtract(vui, 4, 4)],
++                                            kvalues_iq4nl[vui >> 12]));
+ 
+-            const uint k_pair = row * LOAD_VEC_A / 4;
+-            store_a(col, k_pair,     d * FLOAT_TYPEV2(kvalues_iq4nl[vui & 0xF],
+-                                                       kvalues_iq4nl[bitfieldExtract(vui, 8, 4)]));
+-            store_a(col, k_pair + 8, d * FLOAT_TYPEV2(kvalues_iq4nl[bitfieldExtract(vui, 4, 4)],
+-                                                       kvalues_iq4nl[vui >> 12]));
+ #elif defined(DATA_A_MXFP4)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint k_pair = row * LOAD_VEC_A / 4;
+ 
+-            const uint ib = idx / 8;
+-            const uint iqs = (idx & 0x07) * 2;
++    const uint ib = idx / 8;
++    const uint iqs = (idx & 0x07) * 2;
+ 
+-            const uint vui = uint(data_a[ib].qs[iqs]);
+-            const uint vui2 = uint(data_a[ib].qs[iqs+1]);
++    const uint vui = uint(data_a[ib].qs[iqs]);
++    const uint vui2 = uint(data_a[ib].qs[iqs+1]);
+ 
+ #ifdef USE_OCP_FP4
+-            const float d = e8m0_to_fp32(data_a[ib].e);
+-            const u8vec2 packed = u8vec2(vui, vui2);
+-            store_a(col, row,     FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 0u)) * FLOAT_TYPE(d));
+-            store_a(col, row + 8, FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 4u)) * FLOAT_TYPE(d));
++    const float d = e8m0_to_fp32(data_a[ib].e);
++    const u8vec2 packed = u8vec2(vui, vui2);
++    store_a(col, k_pair, FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 0u)) * FLOAT_TYPE(d));
++    store_a(col, k_pair + 8, FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 4u)) * FLOAT_TYPE(d));
+ #else
+-            const float d = e8m0_to_fp32(data_a[ib].e) * 0.5;
+-            store_a(col, row,     FLOAT_TYPEV2(kvalues_mxfp4[vui  & 0xF] * d,
+-                                              kvalues_mxfp4[vui2 & 0xF] * d));
+-            store_a(col, row + 8, FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
+-                                              kvalues_mxfp4[vui2 >>  4] * d));
++    const float d = e8m0_to_fp32(data_a[ib].e) * 0.5;
++    store_a(col, k_pair, FLOAT_TYPEV2(kvalues_mxfp4[vui  & 0xF] * d,
++                                        kvalues_mxfp4[vui2 & 0xF] * d));
++
++    store_a(col, k_pair + 8, FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
++                                        kvalues_mxfp4[vui2 >>  4] * d));
++
+ #endif
+ #elif defined(DATA_A_NVFP4)
+-            const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
+-            const uint ib = idx / 16u;
+-            const uint sub = (idx & 0xC) >> 2;
+-            const uint iqs = (idx & 0xF) * 2;
+-            const uint vui = uint(data_a[ib].qs[iqs]);
+-            const uint vui2 = uint(data_a[ib].qs[iqs+1]);
+-
+-            // lo and hi nibbles are 8 elements apart, which doesn't quite line up with
+-            // how the thread mapping and buf_idx calculation works for other types.
+-            const uint eff_row = (row & 3) + (row & ~3) * 2;
++    const uint idx = pos_a + col * p.stride_a / LOAD_VEC_A + row;
++    const uint eff_row = (row & 3) + (row & ~3) * 2;
++
++    const uint ib = idx / 16u;
++    const uint sub = (idx & 0xC) >> 2;
++    const uint iqs = (idx & 0xF) * 2;
++    const uint vui = uint(data_a[ib].qs[iqs]);
++    const uint vui2 = uint(data_a[ib].qs[iqs+1]);
++
+ #ifdef USE_OCP_FP4
+-            const FLOAT_TYPE d = FLOAT_TYPE(ue4m3_from_bits(data_a[ib].d[sub]));
+-            const u8vec2 packed = u8vec2(vui, vui2);
+-            store_a(col, eff_row,     FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 0u)) * d);
+-            store_a(col, eff_row + 4, FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 4u)) * d);
++    const FLOAT_TYPE d = FLOAT_TYPE(ue4m3_from_bits(data_a[ib].d[sub]));
++    const u8vec2 packed = u8vec2(vui, vui2);
++    store_a(col, eff_row,     FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 0u)) * d);
++    store_a(col, eff_row + 4, FLOAT_TYPEV2(bitcastExtractfe2m1EXT(packed, 4u)) * d);
+ #else
+-            const float d = ue4m3_to_fp32(data_a[ib].d[sub]) * 0.5;
+-            store_a(col, eff_row,     FLOAT_TYPEV2(kvalues_mxfp4[vui  & 0xF] * d,
+-                                                    kvalues_mxfp4[vui2 & 0xF] * d));
+-            store_a(col, eff_row + 4, FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
+-                                                    kvalues_mxfp4[vui2 >>  4] * d));
++    const float d = ue4m3_to_fp32(data_a[ib].d[sub]) * 0.5;
++    store_a(col, eff_row,     FLOAT_TYPEV2(kvalues_mxfp4[vui  & 0xF] * d,
++                                            kvalues_mxfp4[vui2 & 0xF] * d));
++    store_a(col, eff_row + 4, FLOAT_TYPEV2(kvalues_mxfp4[vui  >>  4] * d,
++                                            kvalues_mxfp4[vui2 >>  4] * d));
+ #endif
++#else
++    if (MmTypeA == GGML_TYPE_Q4_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 4;
++
++        const uint ib = idx / 4;
++        const uint iqs = idx & 0x03;
++
++        const float d = float(a_q4_0_p16.data[ib].d);
++        const uint vui = uint(a_q4_0_p16.data[ib].qs[2*iqs]) | (uint(a_q4_0_p16.data[ib].qs[2*iqs + 1]) << 16);
++        const vec4 v0 = (vec4(unpack8(vui & 0x0F0F0F0F)) - 8.0f) * d;
++        const vec4 v1 = (vec4(unpack8((vui >> 4) & 0x0F0F0F0F)) - 8.0f) * d;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v0.xy));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(v0.zw));
++        store_a(col, k_pair + 8, FLOAT_TYPEV2(v1.xy));
++        store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.zw));
++    } else if (MmTypeA == GGML_TYPE_Q4_1) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 4;
++
++        const uint ib = idx / 4;
++        const uint iqs = idx & 0x03;
++
++        const vec2 dm = vec2(a_q4_1_p32.data[ib].dm);
++        const uint vui = a_q4_1_p32.data[ib].qs[iqs];
++        const vec4 v0 = vec4(unpack8(vui & 0x0F0F0F0F)) * dm.x + dm.y;
++        const vec4 v1 = vec4(unpack8((vui >> 4) & 0x0F0F0F0F)) * dm.x + dm.y;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v0.xy));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(v0.zw));
++        store_a(col, k_pair + 8, FLOAT_TYPEV2(v1.xy));
++        store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.zw));
++    } else if (MmTypeA == GGML_TYPE_Q5_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 4;
++
++        const uint ib = idx / 8;
++        const uint iqs = idx & 0x07;
++
++        const float d = float(a_q5_0_p16.data[ib].d);
++        const uint uint_qh = uint(a_q5_0_p16.data[ib].qh[1]) << 16 | uint(a_q5_0_p16.data[ib].qh[0]);
++        const ivec2 qh0 = ivec2(((uint_qh >> 2*iqs) << 4) & 0x10, (uint_qh >> (2*iqs + 12)) & 0x10);
++        const ivec2 qh1 = ivec2(((uint_qh >> (2*iqs + 1)) << 4) & 0x10, (uint_qh >> (2*iqs + 13)) & 0x10);
++
++        const uint vui = uint(a_q5_0_p16.data[ib].qs[iqs]);
++        const vec4 v = (vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, (vui >> 12) | qh1.y) - 16.0f) * d;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v.xz));
++        store_a(col, k_pair + 8, FLOAT_TYPEV2(v.yw));
++    } else if (MmTypeA == GGML_TYPE_Q5_1) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 4;
++
++        const uint ib = idx / 4;
++        const uint iqs = idx & 0x03;
++
++        const vec2 dm = vec2(a_q5_1_p32.data[ib].dm);
++        const uint uint_qh = a_q5_1_p32.data[ib].qh;
++        const uvec2 qh0 = uvec2(((uint_qh >> 4*iqs) << 4) & 0x10, (uint_qh >> (4*iqs + 12)) & 0x10);
++        const uvec2 qh1 = uvec2(((uint_qh >> (4*iqs + 1)) << 4) & 0x10, (uint_qh >> (4*iqs + 13)) & 0x10);
++        const uvec2 qh2 = uvec2(((uint_qh >> (4*iqs + 2)) << 4) & 0x10, (uint_qh >> (4*iqs + 14)) & 0x10);
++        const uvec2 qh3 = uvec2(((uint_qh >> (4*iqs + 3)) << 4) & 0x10, (uint_qh >> (4*iqs + 15)) & 0x10);
++
++        const uint vui = a_q5_1_p32.data[ib].qs[iqs];
++        const vec4 v0 = vec4((vui & 0xF) | qh0.x, ((vui >> 4) & 0xF) | qh0.y, ((vui >> 8) & 0xF) | qh1.x, ((vui >> 12) & 0xF) | qh1.y) * dm.x + dm.y;
++        const vec4 v1 = vec4(((vui >> 16) & 0xF) | qh2.x, ((vui >> 20) & 0xF) | qh2.y, ((vui >> 24) & 0xF) | qh3.x, ((vui >> 28) & 0xF) | qh3.y) * dm.x + dm.y;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v0.xz));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(v1.xz));
++        store_a(col, k_pair + 8, FLOAT_TYPEV2(v0.yw));
++        store_a(col, k_pair + 9, FLOAT_TYPEV2(v1.yw));
++    } else if (MmTypeA == GGML_TYPE_Q8_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 8;
++        const uint iqs = idx & 0x07;
++
++        const float d = float(a_q8_0_p16.data[ib].d);
++        const i8vec2 v0 = unpack8(int32_t(a_q8_0_p16.data[ib].qs[2*iqs])).xy; // vec4 used due to #12147
++        const i8vec2 v1 = unpack8(int32_t(a_q8_0_p16.data[ib].qs[2*iqs + 1])).xy;
++        const vec4 v = vec4(v0.x, v0.y, v1.x, v1.y) * d;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
++    } else if (MmTypeA == GGML_TYPE_Q1_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 16;
++        const uint iqs = idx & 0xfu;
++
++        const float d = float(a_q1_0.data[ib].d);
++        const uint bits = uint(a_q1_0.data[ib].qs[iqs]);
++
++        store_a(col, k_pair, FLOAT_TYPEV2((bits & 0x01u) != 0u ? d : -d, (bits & 0x02u) != 0u ? d : -d));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2((bits & 0x04u) != 0u ? d : -d, (bits & 0x08u) != 0u ? d : -d));
++        store_a(col, k_pair + 2, FLOAT_TYPEV2((bits & 0x10u) != 0u ? d : -d, (bits & 0x20u) != 0u ? d : -d));
++        store_a(col, k_pair + 3, FLOAT_TYPEV2((bits & 0x40u) != 0u ? d : -d, (bits & 0x80u) != 0u ? d : -d));
++    } else if (MmTypeA == GGML_TYPE_Q2_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 16;
++        const uint iqs = idx & 0xfu;
++
++        const FLOAT_TYPE d = FLOAT_TYPE(a_q2_0.data[ib].d);
++        const uint bits = uint(a_q2_0.data[ib].qs[iqs]);
++
++        store_a(col, k_pair, d * (FLOAT_TYPEV2(bits & 3u, (bits >> 2u) & 3u) - FLOAT_TYPEV2(1.0f)));
++        store_a(col, k_pair + 1, d * (FLOAT_TYPEV2((bits >> 4u) & 3u, bits >> 6u) - FLOAT_TYPEV2(1.0f)));
++    } else if (MmTypeA == GGML_TYPE_Q2_K) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 64;                          // 4 values per idx
++        const uint iqs = (idx % 64) * 2;                   // 0,2,4..126
++
++        const uint qsi = (iqs / 64) * 16 + (iqs % 16);     // 0..15
++        const uint scalesi = iqs / 8;                      // 0..15
++        const uint qsshift = ((iqs % 64) / 16) * 2;        // 0,2,4,6
++
++        const vec4 qs = vec4(unpack8((a_q2_k_p32.data[ib].qs[qsi / 2] >> qsshift) & 0x03030303));
++        const uint scales = a_q2_k.data[ib].scales[scalesi];
++        const vec2 dm = vec2(a_q2_k.data[ib].dm);
++
++        const vec4 v = dm.x * float(scales & 0xF) * qs - dm.y * float(scales >> 4);
++
++        store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(v.zw));
++    } else if (MmTypeA == GGML_TYPE_Q3_K) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 128;                   // 2 values per idx
++        const uint iqs = idx % 128;                  // 0..127
++
++        const uint n = iqs / 64;                     // 0,1
++        const uint qsi = n * 32 + (iqs % 16) * 2;    // 0,2,4..62
++        const uint hmi =          (iqs % 16) * 2;    // 0,2,4..30
++        const uint j = (iqs % 64) / 4;               // 0..3
++        const uint is = iqs / 8;                     // 0..15
++        const uint halfsplit = ((iqs % 64) / 16);    // 0,1,2,3
++        const uint qsshift = halfsplit * 2;          // 0,2,4,6
++
++        const int8_t us = int8_t(((a_q3_k.data[ib].scales[is % 8] >> (4 * int(is / 8))) & 0xF)
++                                | (((a_q3_k.data[ib].scales[8 + (is % 4)] >> (2 * int(is / 4))) & 3) << 4));
++        const float dl = float(a_q3_k.data[ib].d) * float(us - 32);
++
++        const vec2 qs = vec2(unpack8((uint(a_q3_k_p16.data[ib].qs[qsi / 2]) >> qsshift) & 0x0303).xy);
++        const vec2 hm = vec2(unpack8(((uint(a_q3_k_p16.data[ib].hmask[hmi / 2]) >> (4 * n + halfsplit)) & 0x0101 ^ 0x0101) << 2).xy);
++
++        store_a(col, k_pair, FLOAT_TYPEV2(dl * (qs.x - hm.x),
++                                        dl * (qs.y - hm.y)));
++
++    } else if (MmTypeA == GGML_TYPE_Q4_K) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 64;                  // 4 values per idx
++        const uint iqs = (idx % 64) * 2;           // 0,2,4..126
++
++        const uint n = iqs / 32;                   // 0,1,2,3
++        const uint b = (iqs % 32) / 16;            // 0,1
++        const uint is = 2 * n + b;                 // 0..7
++        const uint qsi = n * 32 + (iqs % 16) * 2;  // 0,2,4..126
++
++        const vec2 loadd = vec2(a_q4_k.data[ib].dm);
++
++        const uvec3 scales = uvec3(a_q4_k_p32.data[ib].scales[0],
++                                    a_q4_k_p32.data[ib].scales[1],
++                                    a_q4_k_p32.data[ib].scales[2]);
++        const uint scalesoffs = (is & 3) * 8;
++
++        const uint scidx0 = (is < 4) ? 0 : 2;
++        const uint scidxshift0 = scalesoffs;
++        const uint scidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
++        const uint mbidx0 = (is < 4) ? 1 : 2;
++        const uint mbidxshift0 = (is < 4) ? scalesoffs : scalesoffs + 4;
++        const uint mbidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
++
++        const uint8_t sc    = uint8_t(((scales[scidx0] >> scidxshift0) & 0xF) | ((scales[0] >> scidxshift1) & 0x30));
++        const uint8_t mbyte = uint8_t(((scales[mbidx0] >> mbidxshift0) & 0xF) | ((scales[1] >> mbidxshift1) & 0x30));
++
++        const float d = loadd.x * sc;
++        const float m = -loadd.y * mbyte;
++
++        const vec4 q = vec4(unpack8((a_q4_k_p32.data[ib].qs[qsi / 4] >> (b * 4)) & 0x0F0F0F0F));
++
++        store_a(col, k_pair, FLOAT_TYPEV2(fma(d, q.x, m), fma(d, q.y, m)));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(fma(d, q.z, m), fma(d, q.w, m)));
++    } else if (MmTypeA == GGML_TYPE_Q5_K) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 64;                  // 4 values per idx
++        const uint iqs = (idx % 64) * 2;           // 0,2,4..126
++
++        const uint n = iqs / 32;                   // 0,1,2,3
++        const uint b = (iqs % 32) / 16;            // 0,1
++        const uint is = 2 * n + b;                 // 0..7
++        const uint qsi = n * 32 + (iqs % 16) * 2;  // 0,2,4..126
++        const uint qhi = (iqs % 16) * 2;           // 0,2,4..30
++
++        const vec2 loadd = vec2(a_q5_k.data[ib].dm);
++
++        const uvec3 scales = uvec3(a_q5_k_p32.data[ib].scales[0],
++                                    a_q5_k_p32.data[ib].scales[1],
++                                    a_q5_k_p32.data[ib].scales[2]);
++        const uint scalesoffs = (is & 3) * 8;
++
++        const uint scidx0 = (is < 4) ? 0 : 2;
++        const uint scidxshift0 = scalesoffs;
++        const uint scidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
++        const uint mbidx0 = (is < 4) ? 1 : 2;
++        const uint mbidxshift0 = (is < 4) ? scalesoffs : scalesoffs + 4;
++        const uint mbidxshift1 = (is < 4) ? scalesoffs : scalesoffs + 2;
++
++        const uint8_t sc    = uint8_t(((scales[scidx0] >> scidxshift0) & 0xF) | ((scales[0] >> scidxshift1) & 0x30));
++        const uint8_t mbyte = uint8_t(((scales[mbidx0] >> mbidxshift0) & 0xF) | ((scales[1] >> mbidxshift1) & 0x30));
++
++        const float d = loadd.x * sc;
++        const float m = -loadd.y * mbyte;
++
++        const uint qs = (a_q5_k_p32.data[ib].qs[qsi / 4] >> (b * 4)) & 0x0F0F0F0F;
++        const uint qh = ((a_q5_k_p32.data[ib].qh[qhi / 4] >> (iqs / 16)) & 0x01010101) << 4;
++        const vec4 q = vec4(unpack8(qs | qh));
++
++        store_a(col, k_pair, FLOAT_TYPEV2(fma(d, q.x, m), fma(d, q.y, m)));
++        store_a(col, k_pair + 1, FLOAT_TYPEV2(fma(d, q.z, m), fma(d, q.w, m)));
++    } else if (MmTypeA == GGML_TYPE_Q6_K) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++        const uint k_pair = row * mm_load_vec_a() / 2;
++
++        const uint ib = idx / 128;                  // 2 values per idx
++        const uint iqs = idx % 128;                 // 0..127
++
++        const uint n = iqs / 64;                    // 0,1
++        const uint b = ((iqs % 64) / 32) * 4;       // 0,4
++        const uint is_b = (iqs % 16) / 8;           // 0,1
++        const uint qhshift = ((iqs % 64) / 16) * 2; // 0,2,4,6
++        const uint is = 8 * n + qhshift + is_b;     // 0..15
++        const uint qsi = n * 32 + (iqs % 32);       // 0..63
++        const uint qhi = n * 16 + (iqs % 16);       // 0..31
++
++        const float dscale = float(a_q6_k.data[ib].d) * float(a_q6_k.data[ib].scales[is]);
++
++        const uint ql = (uint(a_q6_k_p16.data[ib].ql[qsi]) >> b) & 0x0F0F;
++        const uint qh = (uint(a_q6_k_p16.data[ib].qh[qhi]) >> qhshift) & 0x0303;
++        const vec2 q = (vec2(unpack8(ql | (qh << 4)).xy) - 32) * dscale;
++
++        store_a(col, k_pair, FLOAT_TYPEV2(q.x, q.y));
++    } else if (MmTypeA == GGML_TYPE_TQ1_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++
++        const uint ib  = idx / 128;                        // 2 values per idx
++        const uint iqs = (idx % 128) * 2;                  // elem 0,2,4..254
++
++        const float d = float(a_tq1_0.data[ib].d);
++        vec2 v;
++        for (uint kk = 0u; kk < 2u; ++kk) {
++            const uint e = iqs + kk;
++            const uint bidx = tq1_0_byte_of(e);
++            const uint qbyte = uint(bidx < 48u ? a_tq1_0.data[ib].qs[bidx]
++                                               : a_tq1_0.data[ib].qh[bidx - 48u]);
++            v[kk] = d * (float(tq1_0_trit(qbyte, tq1_0_digit_of(e))) - 1.0);
++        }
++
++        const uint k_pair = row * mm_load_vec_a() / 2;
++        store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
++    } else if (MmTypeA == GGML_TYPE_TQ2_0) {
++        const uint idx = pos_a + col * p.stride_a / mm_load_vec_a() + row;
++
++        const uint ib = idx / 128;                         // 2 values per idx
++        const uint iqs = (idx % 128) * 2;                  // elem 0,2,4..254
++
++        const uint qsi   = (iqs / 128) * 32 + (iqs % 32);  // byte pair start
++        const uint shift = 2 * ((iqs % 128) / 32);         // 0,2,4,6
++
++        const uvec2 qs = uvec2(a_tq2_0.data[ib].qs[qsi], a_tq2_0.data[ib].qs[qsi + 1]);
++        const float d = float(a_tq2_0.data[ib].d);
++
++        const vec2 v = d * (vec2((qs >> shift) & 3) - 1.0);
++
++        const uint k_pair = row * mm_load_vec_a() / 2;
++        store_a(col, k_pair, FLOAT_TYPEV2(v.xy));
++    }
+ #endif
+ }
+ 
+ #if !defined(MUL_MAT_ID)
+ void load_b_to_shmem(const uint pos_b, const uint row, const uint col, const uint idx_n, const uint block, const uint end_k) {
+ #if LOAD_VEC_B == 8
+-            if (ALIGNED != 0) {
+-                // Not supported for b_type bf16 because bf16mat2x4 does not exist
+-                const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
+-                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+-                FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
+-                buf_b[buf_idx + 0] = bb[0].xy;
+-                buf_b[buf_idx + 1] = bb[0].zw;
+-                buf_b[buf_idx + 2] = bb[1].xy;
+-                buf_b[buf_idx + 3] = bb[1].zw;
+-                return;
+-            }
++    if (ALIGNED != 0) {
++        // Not supported for b_type bf16 because bf16mat2x4 does not exist
++        const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
++        const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++        FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
++        buf_b[buf_idx + 0] = bb[0].xy;
++        buf_b[buf_idx + 1] = bb[0].zw;
++        buf_b[buf_idx + 2] = bb[1].xy;
++        buf_b[buf_idx + 3] = bb[1].zw;
++        return;
++    }
+ #elif LOAD_VEC_B == 4
+-            if (ALIGNED != 0) {
+-                const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
+-                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++    if (ALIGNED != 0) {
++        const uint idx = pos_b + col * p.stride_b / LOAD_VEC_B + row;
++        const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+ #if defined(DATA_B_BF16)
+-                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
++        FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
+ #else
+-                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++        FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
+ #endif
+-                buf_b[buf_idx + 0] = bb.xy;
+-                buf_b[buf_idx + 1] = bb.zw;
+-                return;
+-            }
++        buf_b[buf_idx + 0] = bb.xy;
++        buf_b[buf_idx + 1] = bb.zw;
++        return;
++    }
+ #endif
+-            const uint idx = pos_b + col * p.stride_b + row * 2;
+-            const uint buf_idx = col * SHMEM_STRIDE + row;
+-            if (idx_n < p.N && block + row * 2 + 1 < end_k) {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
+-                                              TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
+-            } else if (idx_n < p.N && block + row * 2 < end_k) {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
+-            } else {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
+-            }
++    const uint idx = pos_b + col * p.stride_b + row * 2;
++    const uint buf_idx = col * SHMEM_STRIDE + row;
++    if (idx_n < p.N && block + row * 2 + 1 < end_k) {
++        buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
++                                        TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
++    } else if (idx_n < p.N && block + row * 2 < end_k) {
++        buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
++    } else {
++        buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
++    }
+ }
+ #else
+ void load_b_to_shmem(const uint pos_b, const uint row, const uint col, const uint ic, const uint _ne1, const uint block, const uint end_k) {
+ #if LOAD_VEC_B == 8
+-            if (ALIGNED != 0) {
+-                // Not supported for b_type bf16 because bf16mat2x4 does not exist
+-                const u16vec2 row_idx = row_ids[col];
+-                const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
+-                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+-                FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
+-                buf_b[buf_idx + 0] = bb[0].xy;
+-                buf_b[buf_idx + 1] = bb[0].zw;
+-                buf_b[buf_idx + 2] = bb[1].xy;
+-                buf_b[buf_idx + 3] = bb[1].zw;
+-                return;
+-            }
++    if (ALIGNED != 0) {
++        // Not supported for b_type bf16 because bf16mat2x4 does not exist
++        const u16vec2 row_idx = row_ids[col];
++        const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
++        const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++        FLOAT_TYPEV8 bb = FLOAT_TYPEV8(data_b[idx]);
++        buf_b[buf_idx + 0] = bb[0].xy;
++        buf_b[buf_idx + 1] = bb[0].zw;
++        buf_b[buf_idx + 2] = bb[1].xy;
++        buf_b[buf_idx + 3] = bb[1].zw;
++        return;
++    }
+ #elif LOAD_VEC_B == 4
+-            if (ALIGNED != 0) {
+-                const u16vec2 row_idx = row_ids[col];
+-                const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
+-                const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
++    if (ALIGNED != 0) {
++        const u16vec2 row_idx = row_ids[col];
++        const uint idx = pos_b + row_idx.y * p.batch_stride_b / LOAD_VEC_B + (row_idx.x % p.ne11) * p.stride_b / LOAD_VEC_B + row;
++        const uint buf_idx = col * SHMEM_STRIDE + row * LOAD_VEC_B / 2;
+ #if defined(DATA_B_BF16)
+-                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
++        FLOAT_TYPEV4 bb = FLOAT_TYPEV4(TO_FLOAT_TYPE(data_b[idx]));
+ #else
+-                FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
++        FLOAT_TYPEV4 bb = FLOAT_TYPEV4(data_b[idx]);
+ #endif
+-                buf_b[buf_idx + 0] = bb.xy;
+-                buf_b[buf_idx + 1] = bb.zw;
+-                return;
+-            }
++        buf_b[buf_idx + 0] = bb.xy;
++        buf_b[buf_idx + 1] = bb.zw;
++        return;
++    }
+ #endif
+-            const uint row_i = ic * BN + col;
+-            const uint buf_idx = col * SHMEM_STRIDE + row;
+-            if (row_i < _ne1 && block + row * 2 + 1 < end_k) {
+-                const u16vec2 row_idx = row_ids[col];
+-                const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
+-                                              TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
+-            } else if (row_i < _ne1 && block + row * 2 < end_k) {
+-                const u16vec2 row_idx = row_ids[col];
+-                const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
+-                buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
+-            } else {
+-                buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
+-            }
++    const uint row_i = ic * BN + col;
++    const uint buf_idx = col * SHMEM_STRIDE + row;
++    if (row_i < _ne1 && block + row * 2 + 1 < end_k) {
++        const u16vec2 row_idx = row_ids[col];
++        const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
++        buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]),
++                                        TO_FLOAT_TYPE(data_b_scalar[idx + 1]));
++    } else if (row_i < _ne1 && block + row * 2 < end_k) {
++        const u16vec2 row_idx = row_ids[col];
++        const uint idx = pos_b + row_idx.y * p.batch_stride_b + (row_idx.x % p.ne11) * p.stride_b + row * 2;
++        buf_b[buf_idx] = FLOAT_TYPEV2(TO_FLOAT_TYPE(data_b_scalar[idx]), 0.0f);
++    } else {
++        buf_b[buf_idx] = FLOAT_TYPEV2(0.0f);
++    }
+ }
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+@@ -955,6 +955,7 @@ shared uint16_t iq1s_grid[2048];
+ shared uint32_t iq1s_grid_gpu[2048];
+ #endif
+ 
++#if defined(DATA_A_IQ1_S) || defined(DATA_A_IQ1_M)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -978,6 +979,17 @@ void init_iq_shmem(uvec3 wgsize)
+     barrier();
+ }
+ #endif
++#endif
++
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S)
++#if defined(DATA_A_IQ2_S)
++shared uvec2 iq2s_grid[1024];
++#elif defined(DATA_A_IQ2_XS)
++shared uvec2 iq2xs_grid[512];
++#else
++shared uvec2 iq2xxs_grid[256];
++#endif
++#endif
+ 
+ #define QUANT_K_IQ2_XXS 256
+ #define QUANT_R_IQ2_XXS 1
+@@ -1063,8 +1075,7 @@ const uvec2[256] iq2xxs_grid_const = {
+     uvec2(0x08080808, 0x2b2b082b), uvec2(0x08192b08, 0x2b2b1908), uvec2(0x19190808, 0x2b2b2b08), uvec2(0x08081908, 0x2b2b2b19)
+ };
+ 
+-shared uvec2 iq2xxs_grid[256];
+-
++#if defined(DATA_A_IQ2_XXS)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1076,12 +1087,15 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
++#endif
+ 
++#if defined(DATA_A_IQ2_XXS)
+ #define QUANT_K QUANT_K_IQ2_XXS
+ #define QUANT_R QUANT_R_IQ2_XXS
+ #define A_TYPE block_iq2_xxs
+ #define A_TYPE_PACKED16 block_iq2_xxs_packed16
+ #endif
++#endif
+ 
+ #define QUANT_K_IQ2_XS 256
+ #define QUANT_R_IQ2_XS 1
+@@ -1233,8 +1247,7 @@ const uvec2 iq2xs_grid_const[512] = {
+     uvec2(0x082b2b08, 0x2b2b2b2b), uvec2(0x082b2b2b, 0x2b2b2b2b), uvec2(0x2b190819, 0x2b2b2b2b), uvec2(0x2b2b2b2b, 0x2b2b2b2b),
+ };
+ 
+-shared uvec2 iq2xs_grid[512];
+-
++#if defined(DATA_A_IQ2_XS)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1246,12 +1259,15 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
++#endif
+ 
++#if defined(DATA_A_IQ2_XS)
+ #define QUANT_K QUANT_K_IQ2_XS
+ #define QUANT_R QUANT_R_IQ2_XS
+ #define A_TYPE block_iq2_xs
+ #define A_TYPE_PACKED16 block_iq2_xs_packed16
+ #endif
++#endif
+ 
+ #define QUANT_K_IQ2_S 256
+ #define QUANT_R_IQ2_S 1
+@@ -1533,8 +1549,7 @@ const uvec2 iq2s_grid_const[1024] = {
+     uvec2(0x082b082b, 0x2b2b2b2b), uvec2(0x082b2b08, 0x2b2b2b2b), uvec2(0x2b082b08, 0x2b2b2b2b), uvec2(0x2b2b2b2b, 0x2b2b2b2b)
+ };
+ 
+-shared uvec2 iq2s_grid[1024];
+-
++#if defined(DATA_A_IQ2_S)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1546,12 +1561,23 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
++#endif
+ 
++#if defined(DATA_A_IQ2_S)
+ #define QUANT_K QUANT_K_IQ2_S
+ #define QUANT_R QUANT_R_IQ2_S
+ #define A_TYPE block_iq2_s
+ #define A_TYPE_PACKED16 block_iq2_s_packed16
+ #endif
++#endif
++
++#if defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S)
++#if defined(DATA_A_IQ3_S)
++shared uint32_t iq3s_grid[512];
++#else
++shared uint32_t iq3xxs_grid[256];
++#endif
++#endif
+ 
+ #define QUANT_K_IQ3_XXS 256
+ #define QUANT_R_IQ3_XXS 1
+@@ -1605,8 +1631,7 @@ const uint32_t iq3xxs_grid_const[256] = {
+     0x3e1c1c1c, 0x3e1c3404, 0x3e24140c, 0x3e24240c, 0x3e2c0404, 0x3e2c0414, 0x3e2c1424, 0x3e341c04,
+ };
+ 
+-shared uint32_t iq3xxs_grid[256];
+-
++#if defined(DATA_A_IQ3_XXS)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1618,12 +1643,15 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
++#endif
+ 
++#if defined(DATA_A_IQ3_XXS)
+ #define QUANT_K QUANT_K_IQ3_XXS
+ #define QUANT_R QUANT_R_IQ3_XXS
+ #define A_TYPE block_iq3_xxs
+ #define A_TYPE_PACKED16 block_iq3_xxs_packed16
+ #endif
++#endif
+ 
+ #define QUANT_K_IQ3_S 256
+ #define QUANT_R_IQ3_S 1
+@@ -1715,8 +1743,7 @@ const uint32_t iq3s_grid_const[512] = {
+     0x0f090307, 0x0f090501, 0x0f090b01, 0x0f0b0505, 0x0f0b0905, 0x0f0d0105, 0x0f0d0703, 0x0f0f0101,
+ };
+ 
+-shared uint32_t iq3s_grid[512];
+-
++#if defined(DATA_A_IQ3_S)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1728,12 +1755,15 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
++#endif
+ 
++#if defined(DATA_A_IQ3_S)
+ #define QUANT_K QUANT_K_IQ3_S
+ #define QUANT_R QUANT_R_IQ3_S
+ #define A_TYPE block_iq3_s
+ #define A_TYPE_PACKED16 block_iq3_s_packed16
+ #endif
++#endif
+ 
+ #define QUANT_K_IQ4_XS 256
+ #define QUANT_R_IQ4_XS 1
+@@ -1847,6 +1877,7 @@ const int8_t kvalues_iq4nl_const[16] = {
+ 
+ shared FLOAT_TYPE kvalues_iq4nl[16];
+ 
++#if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {
+@@ -1857,6 +1888,7 @@ void init_iq_shmem(uvec3 wgsize)
+     barrier();
+ }
+ #endif
++#endif
+ 
+ #if defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)
+ #if !defined(USE_OCP_FP4)
+@@ -1886,7 +1918,7 @@ float ue4m3_to_fp32_build(uint u) {
+ }
+ #endif
+ 
+-#if !defined(USE_OCP_FP4)
++#if (defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)) && !defined(USE_OCP_FP4)
+ #define NEEDS_INIT_IQ_SHMEM
+ void init_iq_shmem(uvec3 wgsize)
+ {

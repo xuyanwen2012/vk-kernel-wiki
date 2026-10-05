@@ -1,0 +1,582 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+@@ -1,5 +1,7 @@
+ #version 450
+ 
++#extension GL_EXT_control_flow_attributes : enable
++
+ #include "types.comp"
+ #include "generic_binary_head.comp"
+ #include "dequant_funcs.comp"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+@@ -0,0 +1,90 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++void calc_superblock(const uint a_offset, const uint b_offset, const uint itid, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + 16 * itid;
++    const uint nibble_shift = 4 * (itid & 1);
++    const uint ib32 = itid / 2; // 0..7
++
++    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const float d = float(data_a[ibi].d);
++        const uint scale = (data_a[ibi].scales[ib32] >> nibble_shift) & 0xF;
++        const float db = d * (0.5 + scale) * 0.25;
++
++        const uint qh = data_a[ibi].qh[ib32];
++        const u8vec2 qs16 = unpack8(data_a_packed16[ibi].qs[itid]);
++        const u8vec2 sign16 = unpack8(data_a_packed16[ibi].qs[QUANT_K / 16 + itid]);
++        [[unroll]] for (uint l = 0; l < 2; ++l) {
++            const uint8_t sign = sign16[l];
++            const uint qs = qs16[l] | ((qh << (8 - nibble_shift - 2 * l)) & 0x300);
++            const uvec2 grid = iq2s_grid[qs];
++            const vec4 grid0 = vec4(unpack8(grid.x));
++            const vec4 grid1 = vec4(unpack8(grid.y));
++
++            [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++                vec4 b0 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 0]);
++                vec4 b4 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 1]);
++
++                FLOAT_TYPE sum =
++                      fma(FLOAT_TYPE(b0.x), FLOAT_TYPE((sign &   1) != 0 ? -grid0.x : grid0.x),
++                      fma(FLOAT_TYPE(b0.y), FLOAT_TYPE((sign &   2) != 0 ? -grid0.y : grid0.y),
++                      fma(FLOAT_TYPE(b0.z), FLOAT_TYPE((sign &   4) != 0 ? -grid0.z : grid0.z),
++                      fma(FLOAT_TYPE(b0.w), FLOAT_TYPE((sign &   8) != 0 ? -grid0.w : grid0.w),
++                      fma(FLOAT_TYPE(b4.x), FLOAT_TYPE((sign &  16) != 0 ? -grid1.x : grid1.x),
++                      fma(FLOAT_TYPE(b4.y), FLOAT_TYPE((sign &  32) != 0 ? -grid1.y : grid1.y),
++                      fma(FLOAT_TYPE(b4.z), FLOAT_TYPE((sign &  64) != 0 ? -grid1.z : grid1.z),
++                      fma(FLOAT_TYPE(b4.w), FLOAT_TYPE((sign & 128) != 0 ? -grid1.w : grid1.w),
++                      FLOAT_TYPE(0.0)))))))));
++                temp[j][n] = fma(db, sum, temp[j][n]);
++            }
++        }
++        ibi += num_blocks_per_row;
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 16 threads are used to process each block
++    const uint blocks_per_wg = gl_WorkGroupSize.x/16;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid % 16;  // 0...15
++    const uint ix = tid / 16;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    [[unroll]] for (uint i = ix; i < num_blocks_per_row; i += blocks_per_wg)
++        calc_superblock(a_offset, b_offset, itid, i, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+@@ -0,0 +1,87 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++void calc_superblock(const uint a_offset, const uint b_offset, const uint itid, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + 16 * itid;
++    const uint nibble_shift = 4 * (itid & 1);
++    const uint ib32 = itid / 2; // 0..7
++
++    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const float d = float(data_a[ibi].d);
++        const uint scale = (data_a[ibi].scales[ib32] >> nibble_shift) & 0xF;
++        const float db = d * (0.5 + scale) * 0.25;
++
++        [[unroll]] for (uint l = 0; l < 2; ++l) {
++            const uint qs = data_a[ibi].qs[2 * itid + l];
++            const uint sign = qs >> 9;
++            const uint sign7 = bitCount(sign);
++            const vec4 grid0 = vec4(unpack8(iq2xs_grid[qs & 511].x));
++            const vec4 grid1 = vec4(unpack8(iq2xs_grid[qs & 511].y));
++
++            [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++                vec4 b0 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 0]);
++                vec4 b4 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 1]);
++
++                FLOAT_TYPE sum =
++                      fma(FLOAT_TYPE(b0.x), FLOAT_TYPE((sign &   1) != 0 ? -grid0.x : grid0.x),
++                      fma(FLOAT_TYPE(b0.y), FLOAT_TYPE((sign &   2) != 0 ? -grid0.y : grid0.y),
++                      fma(FLOAT_TYPE(b0.z), FLOAT_TYPE((sign &   4) != 0 ? -grid0.z : grid0.z),
++                      fma(FLOAT_TYPE(b0.w), FLOAT_TYPE((sign &   8) != 0 ? -grid0.w : grid0.w),
++                      fma(FLOAT_TYPE(b4.x), FLOAT_TYPE((sign &  16) != 0 ? -grid1.x : grid1.x),
++                      fma(FLOAT_TYPE(b4.y), FLOAT_TYPE((sign &  32) != 0 ? -grid1.y : grid1.y),
++                      fma(FLOAT_TYPE(b4.z), FLOAT_TYPE((sign &  64) != 0 ? -grid1.z : grid1.z),
++                      fma(FLOAT_TYPE(b4.w), FLOAT_TYPE((sign7 &  1) != 0 ? -grid1.w : grid1.w),
++                      FLOAT_TYPE(0.0)))))))));
++                temp[j][n] = fma(db, sum, temp[j][n]);
++            }
++        }
++        ibi += num_blocks_per_row;
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 16 threads are used to process each block
++    const uint blocks_per_wg = gl_WorkGroupSize.x/16;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid % 16;  // 0...15
++    const uint ix = tid / 16;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    [[unroll]] for (uint i = ix; i < num_blocks_per_row; i += blocks_per_wg)
++        calc_superblock(a_offset, b_offset, itid, i, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+@@ -0,0 +1,87 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++void calc_superblock(const uint a_offset, const uint b_offset, const uint itid, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + 16 * itid;
++    const uint ib32 = itid / 2; // 0..7
++
++    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const float d = float(data_a[ibi].d);
++        const uint signscale = pack32(u16vec2(
++            data_a_packed16[ibi].qs[4 * ib32 + 2],
++            data_a_packed16[ibi].qs[4 * ib32 + 3]));
++        const float db = d * 0.25 * (0.5 + (signscale >> 28));
++        [[unroll]] for (uint l = 0; l < 2; ++l) {
++            const uint qs = data_a[ibi].qs[8 * ib32 + 2 * (itid & 1) + l];
++            const uint sign = bitfieldExtract(signscale, 7 * int(2 * (itid & 1) + l), 7);
++            const uint sign7 = bitCount(sign);
++            const vec4 grid0 = vec4(unpack8(iq2xxs_grid[qs].x));
++            const vec4 grid1 = vec4(unpack8(iq2xxs_grid[qs].y));
++
++            [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++                const vec4 b0 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 0]);
++                const vec4 b4 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 1]);
++
++                FLOAT_TYPE sum =
++                      fma(FLOAT_TYPE(b0.x), FLOAT_TYPE((sign &   1) != 0 ? -grid0.x : grid0.x),
++                      fma(FLOAT_TYPE(b0.y), FLOAT_TYPE((sign &   2) != 0 ? -grid0.y : grid0.y),
++                      fma(FLOAT_TYPE(b0.z), FLOAT_TYPE((sign &   4) != 0 ? -grid0.z : grid0.z),
++                      fma(FLOAT_TYPE(b0.w), FLOAT_TYPE((sign &   8) != 0 ? -grid0.w : grid0.w),
++                      fma(FLOAT_TYPE(b4.x), FLOAT_TYPE((sign &  16) != 0 ? -grid1.x : grid1.x),
++                      fma(FLOAT_TYPE(b4.y), FLOAT_TYPE((sign &  32) != 0 ? -grid1.y : grid1.y),
++                      fma(FLOAT_TYPE(b4.z), FLOAT_TYPE((sign &  64) != 0 ? -grid1.z : grid1.z),
++                      fma(FLOAT_TYPE(b4.w), FLOAT_TYPE((sign7 &  1) != 0 ? -grid1.w : grid1.w),
++                      FLOAT_TYPE(0.0)))))))));
++                temp[j][n] = fma(db, sum, temp[j][n]);
++            }
++        }
++        ibi += num_blocks_per_row;
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 16 threads are used to process each block
++    const uint blocks_per_wg = gl_WorkGroupSize.x/16;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid % 16;  // 0...15
++    const uint ix = tid / 16;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    [[unroll]] for (uint i = ix; i < num_blocks_per_row; i += blocks_per_wg)
++        calc_superblock(a_offset, b_offset, itid, i, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+@@ -0,0 +1,90 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++void calc_superblock(const uint a_offset, const uint b_offset, const uint ib32, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + 32 * ib32;
++
++    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const float d = float(data_a[ibi].d);
++        const uint scale = (data_a[ibi].scales[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++        const float dscale = d * (1 + 2 * scale);
++        const uint qh = data_a[ibi].qh[ib32];
++        FLOAT_TYPE sum[NUM_COLS];
++        [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++            sum[j] = 0.0;
++        }
++        [[unroll]] for (uint l = 0; l < 4; ++l) {
++            const u8vec2 qs = unpack8(data_a_packed16[ibi].qs[4 * ib32 + l]);
++            const uint sign = data_a[ibi].signs[4 * ib32 + l];
++            const vec4 grid0 = vec4(unpack8(iq3s_grid[qs.x | ((qh << (8 - 2*l)) & 0x100)]));
++            const vec4 grid1 = vec4(unpack8(iq3s_grid[qs.y | ((qh << (7 - 2*l)) & 0x100)]));
++
++            [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++                const vec4 b0 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 0]);
++                const vec4 b4 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 1]);
++
++                sum[j] =
++                      fma(FLOAT_TYPE(b0.x), FLOAT_TYPE((sign &   1) != 0 ? -grid0.x : grid0.x),
++                      fma(FLOAT_TYPE(b0.y), FLOAT_TYPE((sign &   2) != 0 ? -grid0.y : grid0.y),
++                      fma(FLOAT_TYPE(b0.z), FLOAT_TYPE((sign &   4) != 0 ? -grid0.z : grid0.z),
++                      fma(FLOAT_TYPE(b0.w), FLOAT_TYPE((sign &   8) != 0 ? -grid0.w : grid0.w),
++                      fma(FLOAT_TYPE(b4.x), FLOAT_TYPE((sign &  16) != 0 ? -grid1.x : grid1.x),
++                      fma(FLOAT_TYPE(b4.y), FLOAT_TYPE((sign &  32) != 0 ? -grid1.y : grid1.y),
++                      fma(FLOAT_TYPE(b4.z), FLOAT_TYPE((sign &  64) != 0 ? -grid1.z : grid1.z),
++                      fma(FLOAT_TYPE(b4.w), FLOAT_TYPE((sign & 128) != 0 ? -grid1.w : grid1.w),
++                      sum[j]))))))));
++            }
++        }
++        [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++            temp[j][n] = fma(dscale, sum[j], temp[j][n]);
++        }
++        ibi += num_blocks_per_row;
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 8 threads are used to process each block
++    const uint blocks_per_wg = gl_WorkGroupSize.x/8;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid % 8;  // 0...7
++    const uint ix = tid / 8;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    [[unroll]] for (uint i = ix; i < num_blocks_per_row; i += blocks_per_wg)
++        calc_superblock(a_offset, b_offset, itid, i, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+@@ -0,0 +1,88 @@
++#version 450
++#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
++
++#include "mul_mat_vec_base.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
++
++void calc_superblock(const uint a_offset, const uint b_offset, const uint itid, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
++    const uint y_idx = i * QUANT_K + 16 * itid;
++    const uint ib32 = itid / 2; // 0..7
++
++    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    [[unroll]] for (uint n = 0; n < num_rows; ++n) {
++        const float d = float(data_a[ibi].d);
++        const uint signscale = pack32(u16vec2(
++            data_a_packed16[ibi].qs[QUANT_K / 8 + 2 * ib32],
++            data_a_packed16[ibi].qs[QUANT_K / 8 + 2 * ib32 + 1]));
++        const float db = d * 0.5 * (0.5 + (signscale >> 28));
++        [[unroll]] for (uint l = 0; l < 2; ++l) {
++            const uint qs0 = data_a[ibi].qs[8 * ib32 + 4 * (itid & 1) + 2 * l];
++            const uint qs1 = data_a[ibi].qs[8 * ib32 + 4 * (itid & 1) + 2 * l + 1];
++            const uint sign = bitfieldExtract(signscale, 7 * int(2 * (itid & 1) + l), 7);
++            const uint sign7 = bitCount(sign);
++            const vec4 grid0 = vec4(unpack8(iq3xxs_grid[qs0]));
++            const vec4 grid1 = vec4(unpack8(iq3xxs_grid[qs1]));
++
++            [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++                const vec4 b0 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 0]);
++                const vec4 b4 = vec4(data_b_v4[(j*p.batch_stride_b + b_offset + y_idx) / 4 + 2*l + 1]);
++
++                FLOAT_TYPE sum =
++                      fma(FLOAT_TYPE(b0.x), FLOAT_TYPE((sign &   1) != 0 ? -grid0.x : grid0.x),
++                      fma(FLOAT_TYPE(b0.y), FLOAT_TYPE((sign &   2) != 0 ? -grid0.y : grid0.y),
++                      fma(FLOAT_TYPE(b0.z), FLOAT_TYPE((sign &   4) != 0 ? -grid0.z : grid0.z),
++                      fma(FLOAT_TYPE(b0.w), FLOAT_TYPE((sign &   8) != 0 ? -grid0.w : grid0.w),
++                      fma(FLOAT_TYPE(b4.x), FLOAT_TYPE((sign &  16) != 0 ? -grid1.x : grid1.x),
++                      fma(FLOAT_TYPE(b4.y), FLOAT_TYPE((sign &  32) != 0 ? -grid1.y : grid1.y),
++                      fma(FLOAT_TYPE(b4.z), FLOAT_TYPE((sign &  64) != 0 ? -grid1.z : grid1.z),
++                      fma(FLOAT_TYPE(b4.w), FLOAT_TYPE((sign7 &  1) != 0 ? -grid1.w : grid1.w),
++                      FLOAT_TYPE(0.0)))))))));
++                temp[j][n] = fma(db, sum, temp[j][n]);
++            }
++        }
++        ibi += num_blocks_per_row;
++    }
++}
++
++void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
++    uint a_offset, b_offset, d_offset;
++    get_offsets(a_offset, b_offset, d_offset);
++
++    const uint num_blocks_per_row = p.ncols / QUANT_K;
++
++    // 16 threads are used to process each block
++    const uint blocks_per_wg = gl_WorkGroupSize.x/16;
++    const uint tid = gl_LocalInvocationID.x;
++    const uint itid = tid % 16;  // 0...15
++    const uint ix = tid / 16;
++
++    [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
++        [[unroll]] for (uint i = 0; i < NUM_ROWS; ++i) {
++            temp[j][i] = FLOAT_TYPE(0);
++        }
++    }
++
++    [[unroll]] for (uint i = ix; i < num_blocks_per_row; i += blocks_per_wg)
++        calc_superblock(a_offset, b_offset, itid, i, num_blocks_per_row, first_row, num_rows);
++
++    reduce_result(temp, d_offset, first_row, num_rows, tid);
++}
++
++void main() {
++    const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    // do NUM_ROWS at a time, unless there aren't enough remaining rows
++    if (first_row + NUM_ROWS <= p.stride_d) {
++        compute_outputs(first_row, NUM_ROWS);
++    } else {
++        if (first_row >= p.stride_d) {
++            return;
++        }
++        compute_outputs(first_row, p.stride_d - first_row);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+@@ -466,10 +466,13 @@ shared uint16_t iq1s_grid[2048];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq1s_grid_const.length(); i += wgsize.x) {
+-        u16vec2 g = unpack16(iq1s_grid_const[i]);
+-        iq1s_grid[2*i+0] = g.x;
+-        iq1s_grid[2*i+1] = g.y;
++    [[unroll]] for (uint i = 0; i < iq1s_grid_const.length(); i += wgsize.x) {
++        uint idx = i + gl_LocalInvocationIndex.x;
++        if (iq1s_grid_const.length() % wgsize.x == 0 || idx < iq1s_grid_const.length()) {
++            u16vec2 g = unpack16(iq1s_grid_const[idx]);
++            iq1s_grid[2*idx+0] = g.x;
++            iq1s_grid[2*idx+1] = g.y;
++        }
+     }
+     barrier();
+ }
+@@ -565,8 +568,10 @@ shared uvec2 iq2xxs_grid[256];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq2xxs_grid.length(); i += wgsize.x) {
+-        iq2xxs_grid[i] = iq2xxs_grid_const[i];
++    [[unroll]] for (uint i = 0; i < iq2xxs_grid.length(); i += wgsize.x) {
++        if (iq2xxs_grid_const.length() % wgsize.x == 0 || i + gl_LocalInvocationIndex.x < iq2xxs_grid_const.length()) {
++            iq2xxs_grid[i + gl_LocalInvocationIndex.x] = iq2xxs_grid_const[i + gl_LocalInvocationIndex.x];
++        }
+     }
+     barrier();
+ }
+@@ -733,8 +738,10 @@ shared uvec2 iq2xs_grid[512];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq2xs_grid.length(); i += wgsize.x) {
+-        iq2xs_grid[i] = iq2xs_grid_const[i];
++    [[unroll]] for (uint i = 0; i < iq2xs_grid.length(); i += wgsize.x) {
++        if (iq2xs_grid.length() % wgsize.x == 0 || i + gl_LocalInvocationIndex.x < iq2xs_grid_const.length()) {
++            iq2xs_grid[i + gl_LocalInvocationIndex.x] = iq2xs_grid_const[i + gl_LocalInvocationIndex.x];
++        }
+     }
+     barrier();
+ }
+@@ -756,6 +763,14 @@ struct block_iq2_s
+     uint8_t scales[QUANT_K_IQ2_S/32];
+ };
+ 
++struct block_iq2_s_packed16
++{
++    float16_t d;
++    uint16_t qs[QUANT_K_IQ2_S/8];
++    uint16_t qh[QUANT_K_IQ2_S/64];
++    uint16_t scales[QUANT_K_IQ2_S/64];
++};
++
+ #if defined(DATA_A_IQ2_S)
+ 
+ const uvec2 iq2s_grid_const[1024] = {
+@@ -1023,15 +1038,18 @@ shared uvec2 iq2s_grid[1024];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq2s_grid.length(); i += wgsize.x) {
+-        iq2s_grid[i] = iq2s_grid_const[i];
++    [[unroll]] for (uint i = 0; i < iq2s_grid.length(); i += wgsize.x) {
++        if (iq2s_grid.length() % wgsize.x == 0 || i + gl_LocalInvocationIndex.x < iq2s_grid_const.length()) {
++            iq2s_grid[i + gl_LocalInvocationIndex.x] = iq2s_grid_const[i + gl_LocalInvocationIndex.x];
++        }
+     }
+     barrier();
+ }
+ 
+ #define QUANT_K QUANT_K_IQ2_S
+ #define QUANT_R QUANT_R_IQ2_S
+ #define A_TYPE block_iq2_s
++#define A_TYPE_PACKED16 block_iq2_s_packed16
+ #endif
+ 
+ #define QUANT_K_IQ3_XXS 256
+@@ -1092,8 +1110,10 @@ shared uint32_t iq3xxs_grid[256];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq3xxs_grid.length(); i += wgsize.x) {
+-        iq3xxs_grid[i] = iq3xxs_grid_const[i];
++    [[unroll]] for (uint i = 0; i < iq3xxs_grid.length(); i += wgsize.x) {
++        if (iq3xxs_grid.length() % wgsize.x == 0 || i + gl_LocalInvocationIndex.x < iq3xxs_grid.length()) {
++            iq3xxs_grid[i + gl_LocalInvocationIndex.x] = iq3xxs_grid_const[i + gl_LocalInvocationIndex.x];
++        }
+     }
+     barrier();
+ }
+@@ -1200,8 +1220,10 @@ shared uint32_t iq3s_grid[512];
+ void init_iq_shmem(uvec3 wgsize)
+ {
+     // copy the table into shared memory and sync
+-    for (uint i = gl_LocalInvocationIndex.x; i < iq3s_grid.length(); i += wgsize.x) {
+-        iq3s_grid[i] = iq3s_grid_const[i];
++    [[unroll]] for (uint i = 0; i < iq3s_grid.length(); i += wgsize.x) {
++        if (iq3s_grid.length() % wgsize.x == 0 || i + gl_LocalInvocationIndex.x < iq3s_grid.length()) {
++            iq3s_grid[i + gl_LocalInvocationIndex.x] = iq3s_grid_const[i + gl_LocalInvocationIndex.x];
++        }
+     }
+     barrier();
+ }

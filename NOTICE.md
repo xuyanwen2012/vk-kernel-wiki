@@ -13,6 +13,16 @@ The directory structure, page schema layout, and the scripts under `scripts/` ar
 
 The derived files have been modified for this repository: the subject matter, controlled vocabulary, architecture model, page types and validation rules differ from upstream. No knowledge pages were copied from KernelWiki.
 
+## Upstream pull-request material
+
+`sources/prs/<slug>/` holds short verbatim excerpts of upstream pull-request descriptions, each with a link to the pull request. `artifacts/prs/<slug>/` holds verbatim shader patches from those pull requests. Both remain the work of their upstream authors and are distributed under the upstream licence, not under this repository's own terms.
+
+| Directory | Upstream | Licence | Licence text |
+|---|---|---|---|
+| `sources/prs/llama-cpp/`, `artifacts/prs/llama-cpp/` | https://github.com/ggml-org/llama.cpp | MIT, Copyright (c) 2023-2026 The ggml authors | `artifacts/prs/llama-cpp/LICENSE` |
+
+Each `artifacts/prs/<slug>/PR-<number>/PROVENANCE.yaml` records the pull request, its merge commit, the retrieval date and a sha256 per file.
+
 ## PyYAML
 
 `scripts/_vendor/yaml/` is a bundled copy of the pure-Python portion of PyYAML, taken over from KernelWiki and used as a fallback when the host Python has no PyYAML installed. It is distributed under the MIT license.

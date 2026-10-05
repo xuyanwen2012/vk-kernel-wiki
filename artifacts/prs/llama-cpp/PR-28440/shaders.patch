@@ -1,0 +1,84 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp
+@@ -110,11 +110,11 @@ shared float buf_b_d[BN * BK_STEP];
+ shared float buf_b_s[BN * BK_STEP];
+ #endif
+ 
+-#if defined(DATA_A_IQ4_NL) || defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)
++#if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS) || defined(DATA_A_MXFP4) || defined(DATA_A_NVFP4)
+ shared int8_t cm1_kvalues[16];
+ #endif
+ 
+-#if defined(DATA_A_QUANT_K) || defined(DATA_A_NVFP4)
++#if defined(DATA_A_QUANT_K) || defined(DATA_A_IQ4_XS) || defined(DATA_A_NVFP4)
+ #define LOAD_VEC_A 8
+ #else
+ #define LOAD_VEC_A (4 * QUANT_R)
+@@ -149,7 +149,7 @@ ACC_TYPE cm1_accumulate(ACC_TYPE prev, int acc_e, float scale_a, float nbias_a,
+ #include "mul_mmq_cm1_funcs.glsl"
+ 
+ void main() {
+-#if defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)
+     if (gl_LocalInvocationIndex < 16u) {
+         cm1_kvalues[gl_LocalInvocationIndex] = kvalues_iq4nl_const[gl_LocalInvocationIndex];
+     }
+@@ -184,7 +184,11 @@ void main() {
+ #else
+     // L2-friendly workgroup scheduling
+     const uint blocks_n = (p.N + BN - 1) / BN;
++#if defined(DATA_A_IQ4_XS)
++    const uint a_panel_bytes = (BM * p.K) / 2 + (BM * p.K) / 32;
++#else
+     const uint a_panel_bytes = BM * p.K + (BM * p.K) / 16;
++#endif
+     const uint group_m = clamp(GROUP_A_BUDGET / max(a_panel_bytes, 1u), 1u, min(blocks_m, 32u));
+     const uint tiles_per_group = group_m * blocks_n;
+     const uint lin = gl_WorkGroupID.y * blocks_m + (gl_WorkGroupID.x % blocks_m);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl
+@@ -173,6 +173,42 @@ void block_a_to_shmem(block_a_prefetch blk, uint buf_ib, uint ks, uint loadr) {
+     }
+ }
+ 
++#elif defined(DATA_A_IQ4_XS)
++
++struct block_a_prefetch {
++    uint32_t qs;
++    float d;
++};
++
++block_a_prefetch block_a_load(uint ib, uint loadr) {
++    block_a_prefetch blk;
++    const uint ib_k = ib / 8;
++    const uint ib32 = ib % 8;
++    blk.qs = data_a_packed32[ib_k].qs[4 * ib32 + loadr];
++    blk.d = 0.0;
++    if (loadr == 0) {
++        const uint sl = (data_a_packed32[ib_k].scales_l >> (4 * ib32)) & 0xF;
++        const uint sh = (data_a_packed32[ib_k].scales_h >> (2 * ib32)) & 3;
++        blk.d = float(data_a_packed32[ib_k].d) * float(int(sl | (sh << 4)) - 32);
++    }
++    return blk;
++}
++
++void block_a_to_shmem(block_a_prefetch blk, uint buf_ib, uint ks, uint loadr) {
++    const u8vec4 lo_idx = unpack8(blk.qs & 0x0F0F0F0F);
++    const u8vec4 hi_idx = unpack8((blk.qs >> 4) & 0x0F0F0F0F);
++    buf_a_qs[buf_ib * QPITCH + ks * (BK / 4) + loadr    ] =
++        pack32(i8vec4(cm1_kvalues[lo_idx.x], cm1_kvalues[lo_idx.y],
++                      cm1_kvalues[lo_idx.z], cm1_kvalues[lo_idx.w]));
++    buf_a_qs[buf_ib * QPITCH + ks * (BK / 4) + loadr + 4] =
++        pack32(i8vec4(cm1_kvalues[hi_idx.x], cm1_kvalues[hi_idx.y],
++                      cm1_kvalues[hi_idx.z], cm1_kvalues[hi_idx.w]));
++
++    if (loadr == 0) {
++        buf_a_d[ks * BM + buf_ib] = blk.d;
++    }
++}
++
+ #elif defined(DATA_A_MXFP4)
+ 
+ struct block_a_prefetch {

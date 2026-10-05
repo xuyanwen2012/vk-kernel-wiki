@@ -1,0 +1,25 @@
+repo: ggml-org/llama.cpp
+pr: 19281
+url: https://github.com/ggml-org/llama.cpp/pull/19281
+merge_sha: 449ec2ab0751fc713fe338da2ced153125b5c674
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/19281/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+  status: modified
+  sha256: 3fc2e408349dc016b87329fc6459b19ff8d87847a4944bd7618ff134394d7ae2
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+  status: modified
+  sha256: 7e16f55891947fb97053e968a58868a13f8b91c1e9fb8cfe9562d2a1b1bcf6d5
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+  status: modified
+  sha256: 7e006bb5bca5a36514cf9b5aa6513018224e964639a84c52db4f727a65bf6a27
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+  status: modified
+  sha256: a13dd5a00723207086703ad694166125ae015bc5d130afc4693e96f832e729d7
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp
+  status: added
+  sha256: 715829f2069b8590fe94899744d644d0488bcc47dc907b91461275ac8c011541

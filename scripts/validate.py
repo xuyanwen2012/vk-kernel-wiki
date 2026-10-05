@@ -535,6 +535,17 @@ def source_pr_errors(fm, body, constraints):
                 errors.append("body excerpt end marker appears before the start marker")
             elif not excerpt_text(body[s + len(start):e]):
                 errors.append("body excerpt between the upstream-excerpt markers is empty")
+
+    artifact_dir = fm.get("artifact_dir")
+    if artifact_dir is not None:
+        prefix = constraints.get("artifact_dir_prefix", "artifacts/prs/")
+        required = constraints.get("artifact_dir_required_file", "PROVENANCE.yaml")
+        parts = str(artifact_dir).split("/")
+        if (not isinstance(artifact_dir, str) or not artifact_dir.startswith(prefix)
+                or ".." in parts or "" in parts):
+            errors.append(f"artifact_dir '{artifact_dir}' must be a repository path under '{prefix}'")
+        elif not (REPO_ROOT / artifact_dir / required).is_file():
+            errors.append(f"artifact_dir '{artifact_dir}' has no {required}")
     return errors
 
 

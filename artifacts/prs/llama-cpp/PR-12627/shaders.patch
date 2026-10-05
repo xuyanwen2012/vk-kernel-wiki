@@ -1,0 +1,143 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -63,6 +63,8 @@ layout (push_constant) uniform parameter {
+     float m1;
+ 
+     uint32_t gqa_ratio;
++    uint32_t split_kv;
++    uint32_t k_num;
+ } p;
+ 
+ layout (binding = 0) readonly buffer Q {uint8_t data_q[];};
+@@ -116,6 +118,16 @@ D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TY
+     return elem;
+ }
+ 
++// Store column zero. This is used to save per-row m and L values for split_k.
++ACC_TYPE perElemOpStoreCol0(const in uint32_t r, const in uint32_t c, const in ACC_TYPE elem, const in uint32_t o_offset, const in uint32_t iq2, const in uint32_t N)
++{
++    if (r < N && c == 0) {
++        uint32_t offset = iq2 + r;
++        data_o[o_offset + offset] = D_TYPE(elem);
++    }
++    return elem;
++}
++
+ // Load the slope matrix, indexed by Q's dimension 2.
+ ACC_TYPE perElemOpComputeSlope(const in uint32_t r, const in uint32_t c, const in ACC_TYPE elem, const in uint32_t iq2)
+ {
+@@ -135,10 +147,18 @@ void main() {
+     const uint32_t N = p.N;
+     const uint32_t KV = p.KV;
+ 
++    uint32_t i = gl_WorkGroupID.x;
++    uint32_t split_k_index = 0;
++
++    if (p.k_num > 1) {
++        i = 0;
++        split_k_index = gl_WorkGroupID.x;
++    }
++
+     const uint32_t Tr = CEIL_DIV(N, Br);
+-    const uint32_t Tc = CEIL_DIV(KV, Bc);
+ 
+-    const uint32_t i = gl_WorkGroupID.x;
++    const uint32_t start_j = split_k_index * p.split_kv / Bc;
++    const uint32_t end_j = CEIL_DIV(min(KV, (split_k_index + 1) * p.split_kv), Bc);
+ 
+     // When not using grouped query attention, all rows share the same iq2, equal to gl_WorkGroupID.y.
+     // When using grouped query attention, each workgroup does gqa_ratio consecutive values of iq2.
+@@ -218,7 +238,7 @@ void main() {
+     }
+ 
+     [[dont_unroll]]
+-    for (uint32_t j = 0; j < Tc; ++j) {
++    for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+         coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> S = coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(0);
+ 
+@@ -312,6 +332,20 @@ void main() {
+         O = coopMatMulAdd(P_A, V, O);
+     }
+ 
++    // If there is split_k, then the split_k resolve shader does the final
++    // division by L. Store the intermediate O value and per-row m and L values.
++    if (p.k_num > 1) {
++        coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator>(O);
++
++        uint32_t o_offset = D * p.ne1 * split_k_index;
++        coopMatPerElementNV(O_D, O_D, perElemOpGqaStore, o_offset, iq2, N);
++
++        o_offset = D * p.ne1 * p.k_num + p.ne1 * split_k_index * 2;
++        coopMatPerElementNV(L, L, perElemOpStoreCol0, o_offset, iq2, N);
++        coopMatPerElementNV(M, M, perElemOpStoreCol0, o_offset + p.ne1, iq2, N);
++        return;
++    }
++
+     coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, D, gl_MatrixUseAccumulator> Ldiag;
+ 
+     // resize L by using smear/reduce
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+@@ -0,0 +1,59 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : enable
++
++#define BLOCK_SIZE 32
++
++layout(local_size_x = BLOCK_SIZE, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {float data_a[];};
++layout (binding = 1) writeonly buffer D {float data_d[];};
++
++layout (push_constant) uniform parameter {
++    uint D;
++    uint N;
++    uint k_num;
++} p;
++
++void main() {
++    // Each workgroup handles a row
++    const uint n = gl_WorkGroupID.x;
++    const uint tid = gl_LocalInvocationID.x;
++
++    uint D = p.D;
++    uint N = p.N;
++    uint k_num = p.k_num;
++
++    uint l_offset = D * N * k_num + n;
++    uint m_offset = D * N * k_num + N + n;
++    uint lm_stride = N * 2;
++
++    // Compute the max m value for the row
++    float m_max = -1.0/0.0;
++    [[unroll]] for (uint k = 0; k < k_num; ++k) {
++        float m = data_a[m_offset + k * lm_stride];
++        m_max = max(m_max, m);
++    }
++
++    // Compute L based on m_max
++    float L = 0;
++    [[unroll]] for (uint k = 0; k < k_num; ++k) {
++        float l = data_a[l_offset + k * lm_stride];
++        float m = data_a[m_offset + k * lm_stride];
++        L += exp(m - m_max) * l;
++    }
++
++    L = 1.0 / L;
++
++    // Scale and sum the O contributions based on m_max and store the result to memory
++    for (uint d = tid; d < D; d += BLOCK_SIZE) {
++        float O = 0.0;
++        [[unroll]] for (uint k = 0; k < k_num; ++k) {
++            uint o_offset = D * N * k + D * n + d;
++            float m = data_a[m_offset + k * lm_stride];
++            O += exp(m - m_max) * data_a[o_offset];
++        }
++        O *= L;
++        data_d[D * n + d] = O;
++    }
++}

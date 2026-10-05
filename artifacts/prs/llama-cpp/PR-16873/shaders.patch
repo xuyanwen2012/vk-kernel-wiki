@@ -1,0 +1,29 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -82,9 +82,13 @@ layout (constant_id = 10) const uint WARP = 32;
+ 
+ #include "mul_mmq_shmem_types.glsl"
+ 
++#ifdef MUL_MAT_ID
++#define BK_STEP 1
++#else
+ #ifndef BK_STEP
+ #define BK_STEP 4
+ #endif
++#endif
+ 
+ // Shared memory cache
+ shared block_a_cache buf_a[BM * BK_STEP];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl
+@@ -27,7 +27,7 @@ struct block_a_cache {
+ #elif defined(DATA_A_Q8_0)
+ #define QUANT_R_MMQ 1
+ // AMD likes 4, Intel likes 1 and Nvidia likes 2
+-#define BK_STEP 1
++// #define BK_STEP 1
+ struct block_a_cache {
+     int32_t qs[32/4];
+     FLOAT_TYPE dm;

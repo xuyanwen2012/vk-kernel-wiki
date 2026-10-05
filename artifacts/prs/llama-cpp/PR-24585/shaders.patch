@@ -1,0 +1,195 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -80,7 +80,9 @@ shared vec4 occupancy_limiter[LIMIT_OCCUPANCY_SHMEM > 0 ? LIMIT_OCCUPANCY_SHMEM
+ 
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+-    init_iq_shmem(gl_WorkGroupSize);
++    if (fa_type_needs_shmem(FaTypeK) || fa_type_needs_shmem(FaTypeV)) {
++        init_iq_shmem(gl_WorkGroupSize);
++    }
+ #endif
+ 
+     init_indices();
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -97,8 +97,8 @@ layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
+ #define FA_TYPE_Q5_0  6u
+ #define FA_TYPE_Q5_1  7u
+ #define FA_TYPE_Q8_0  8u
++#define FA_TYPE_IQ4_NL 20u
+ #define FA_TYPE_BF16 30u
+-#define FA_TYPE_Q1_0 41u
+ 
+ #if defined(BFLOAT16)
+ #define O_TYPE float
+@@ -120,8 +120,8 @@ uint fa_block_elems(uint ty) {
+         case FA_TYPE_Q5_0: return uint(QUANT_K_Q5_0);
+         case FA_TYPE_Q5_1: return uint(QUANT_K_Q5_1);
+         case FA_TYPE_Q8_0: return uint(QUANT_K_Q8_0);
++        case FA_TYPE_IQ4_NL: return uint(QUANT_K_IQ4_NL);
+         case FA_TYPE_BF16: return 1u;
+-        case FA_TYPE_Q1_0: return uint(QUANT_K_Q1_0); // cm2-only, harmless elsewhere
+         default:           return 1u;
+     }
+ }
+@@ -140,6 +140,13 @@ uint fa_quant_r_mmq(uint ty) {
+     }
+ }
+ 
++bool fa_type_needs_shmem(uint ty) {
++    switch (ty) {
++        case FA_TYPE_IQ4_NL: return true;
++        default:             return false;
++    }
++}
++
+ // These can't be `const` globals because GLSL forbids function calls in global
+ // const initializers, even when the spec constants would let the driver fold
+ // them. Macros expand at the use site and fold after specialization.
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -64,7 +64,9 @@ shared ACC_TYPE slope[Br];
+ 
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+-    init_iq_shmem(gl_WorkGroupSize);
++    if (fa_type_needs_shmem(FaTypeK) || fa_type_needs_shmem(FaTypeV)) {
++        init_iq_shmem(gl_WorkGroupSize);
++    }
+ #endif
+ 
+     init_indices();
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -46,7 +46,7 @@ float16_t faDecodeK(const decodeBufFA_K bl_in, const uint blockCoords[2], const
+         case FA_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+         case FA_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+         case FA_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q1_0: return dequantFuncQ1_0(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return float16_t(0);
+     }
+ }
+@@ -59,34 +59,34 @@ float16_t faDecodeV(const decodeBufFA_V bl_in, const uint blockCoords[2], const
+         case FA_TYPE_Q5_0: return dequantFuncQ5_0(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+         case FA_TYPE_Q5_1: return dequantFuncQ5_1(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+         case FA_TYPE_Q8_0: return dequantFuncQ8_0(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case FA_TYPE_Q1_0: return dequantFuncQ1_0(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return float16_t(0);
+     }
+ }
+ 
+ // V=4 vector decode for K/V; dispatches to per-format _v decoders.
+ f16vec4 faDecodeKVector(const decodeBufFA_K bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeK) {
+-        case 0u: return f16vec4(decodeBufF32(bl_in).block);
+-        case 2u: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case 3u: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case 6u: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case 7u: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case 8u: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case 41u: return dequantFuncQ1_0_v(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
++        case FA_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return f16vec4(0);
+     }
+ }
+ 
+ f16vec4 faDecodeVVector(const decodeBufFA_V bl_in, const uint blockCoords[2], const uint coordInBlock[2]) {
+     switch (FaTypeV) {
+-        case 0u: return f16vec4(decodeBufF32(bl_in).block);
+-        case 2u: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
+-        case 3u: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
+-        case 6u: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
+-        case 7u: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
+-        case 8u: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
+-        case 41u: return dequantFuncQ1_0_v(decodeBufQ1_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_F32: return f16vec4(decodeBufF32(bl_in).block);
++        case FA_TYPE_Q4_0: return dequantFuncQ4_0_v(decodeBufQ4_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q4_1: return dequantFuncQ4_1_v(decodeBufQ4_1(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q5_0: return dequantFuncQ5_0_v(decodeBufQ5_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q5_1: return dequantFuncQ5_1_v(decodeBufQ5_1(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_Q8_0: return dequantFuncQ8_0_v(decodeBufQ8_0(bl_in), blockCoords, coordInBlock);
++        case FA_TYPE_IQ4_NL: return dequantFuncIQ4_NL_v(decodeBufIQ4_NL(bl_in), blockCoords, coordInBlock);
+         default: return f16vec4(0);
+     }
+ }
+@@ -169,6 +169,12 @@ ACC_TYPE perElemOpNonGqaSplitKStoreCol0(const in uint32_t r, const in uint32_t c
+ }
+ 
+ void main() {
++#ifdef NEEDS_INIT_IQ_SHMEM
++    if (fa_type_needs_shmem(FaTypeK) || fa_type_needs_shmem(FaTypeV)) {
++        init_iq_shmem(gl_WorkGroupSize);
++    }
++#endif
++
+     init_indices();
+ 
+     tensorLayoutNV<2, gl_CooperativeMatrixClampModeConstantNV> tensorLayoutQ = createTensorLayoutNV(2, gl_CooperativeMatrixClampModeConstantNV);
+@@ -302,7 +308,7 @@ void main() {
+         coopmat<FLOAT_TYPE, gl_ScopeWorkgroup, HSK_pad, Bc, gl_MatrixUseB> K_T;
+ 
+         uint32_t k_offset = ik2*p.nb12 + ik3*p.nb13;
+-        // F16: bs_k==1 (direct load). F32: bs_k==4 (vec4 / dequantFuncF32). Q4/Q8 family: bs_k==32. Q1_0: bs_k==128.
++        // F16: bs_k==1 (direct load). F32: bs_k==4 (vec4 / dequantFuncF32). Quantized types: bs_k==32.
+ #if defined(BFLOAT16)
+         coopMatLoadTensorNV(K_T, data_k, k_offset, sliceTensorLayoutNV(tensorLayoutK, j * Bc, Bc, 0, HSK_pad), tensorViewTranspose);
+ #else
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+@@ -27,6 +27,8 @@ layout (binding = 1) readonly buffer K_PACKED_Q5_1 { block_q5_1_packed16 data[];
+ layout (binding = 2) readonly buffer V_PACKED_Q5_1 { block_q5_1_packed16 data[]; } v_packed_q5_1;
+ layout (binding = 1) readonly buffer K_PACKED_Q8_0 { block_q8_0_packed16 data[]; } k_packed_q8_0;
+ layout (binding = 2) readonly buffer V_PACKED_Q8_0 { block_q8_0_packed16 data[]; } v_packed_q8_0;
++layout (binding = 1) readonly buffer K_PACKED_IQ4_NL { block_iq4_nl_packed16 data[]; } k_packed_iq4_nl;
++layout (binding = 2) readonly buffer V_PACKED_IQ4_NL { block_iq4_nl_packed16 data[]; } v_packed_iq4_nl;
+ 
+ layout (binding = 1) readonly buffer K_PACKED_BF16 { u16vec4 data[]; } k_packed_bf16;
+ layout (binding = 2) readonly buffer V_PACKED_BF16 { u16vec4 data[]; } v_packed_bf16;
+@@ -102,6 +104,17 @@ layout (binding = 1) readonly buffer K_PACKED_Q5_1_P32 { block_q5_1_packed32 dat
+     return FLOAT_TYPE(BUF.data[a_offset + ib].d) * FLOAT_TYPEV4(v0.x, v0.y, v1.x, v1.y);          \
+ }
+ 
++#define FA_DEQUANT4_IQ4_NL(BUF) {                                                                 \
++    const uint shift = (iqs & 0x10) >> 2;                                                         \
++    const uint qs_i = (iqs & 0xC) >> 1;                                                           \
++    const uint qsw = uint(BUF.data[a_offset + ib].qs[qs_i])                                       \
++                   | (uint(BUF.data[a_offset + ib].qs[qs_i + 1u]) << 16);                         \
++    const FLOAT_TYPE d = FLOAT_TYPE(BUF.data[a_offset + ib].d);                                   \
++    const u8vec4 q = unpack8((qsw >> shift) & 0x0F0F0F0Fu);                                       \
++    return d * FLOAT_TYPEV4(kvalues_iq4nl[q.x], kvalues_iq4nl[q.y],                               \
++                            kvalues_iq4nl[q.z], kvalues_iq4nl[q.w]);                              \
++}
++
+ #define FA_DEQUANT4_BF16(BUF) \
+     return FLOAT_TYPEV4(bf16_to_fp32(uvec4(BUF.data[(a_offset + ib) / 4])));
+ 
+@@ -114,6 +127,7 @@ FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+             case FA_TYPE_Q5_0: FA_DEQUANT4_Q5_0(k_packed_q5_0)
+             case FA_TYPE_Q5_1: FA_DEQUANT4_Q5_1(k_packed_q5_1)
+             case FA_TYPE_Q8_0: FA_DEQUANT4_Q8_0(k_packed_q8_0)
++            case FA_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(k_packed_iq4_nl)
+             case FA_TYPE_BF16: FA_DEQUANT4_BF16(k_packed_bf16)
+         }
+     } else {
+@@ -124,6 +138,7 @@ FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+             case FA_TYPE_Q5_0: FA_DEQUANT4_Q5_0(v_packed_q5_0)
+             case FA_TYPE_Q5_1: FA_DEQUANT4_Q5_1(v_packed_q5_1)
+             case FA_TYPE_Q8_0: FA_DEQUANT4_Q8_0(v_packed_q8_0)
++            case FA_TYPE_IQ4_NL: FA_DEQUANT4_IQ4_NL(v_packed_iq4_nl)
+             case FA_TYPE_BF16: FA_DEQUANT4_BF16(v_packed_bf16)
+         }
+     }

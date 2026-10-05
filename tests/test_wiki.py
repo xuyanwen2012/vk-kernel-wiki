@@ -1367,5 +1367,270 @@ class ArchitectureQueryTest(unittest.TestCase):
                 self.assertEqual(info["kinds"][node], "device")
 
 
+# ---------------------------------------------------------------------------
+# 5. Pull-request intake: policy, ledger refresh and page generation (offline)
+# ---------------------------------------------------------------------------
+
+FIXTURE_REPO = "example-org/example-repo"
+FIXTURE_LEDGER = (
+    f"repo: {FIXTURE_REPO}\n"
+    "keywords_used:\n- fixture in:title\n"
+    "license: MIT\n"
+    "shader_path_markers:\n- fixture-shaders/\n"
+    "host_path_markers:\n- fixture-backend\n"
+    "prs: []\n"
+)
+
+
+def fixture_evidence(number, title, filenames, body="FIXTURE synthetic description.", removed=()):
+    return {
+        "repo": FIXTURE_REPO,
+        "fetched_at": "2000-01-02",
+        "pr": {
+            "number": number, "title": title, "body": body, "author": "fixture-author",
+            "html_url": f"https://example.invalid/{FIXTURE_REPO}/pull/{number}",
+            "state": "closed", "merged": True, "merged_at": "2000-01-01T00:00:00Z",
+            "created_at": "2000-01-01T00:00:00Z", "closed_at": "2000-01-01T00:00:00Z",
+            "merge_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+            "changed_files": len(filenames),
+        },
+        "files": [
+            {"filename": name, "status": "removed" if name in removed else "modified", "patch": "+x"}
+            for name in filenames
+        ],
+    }
+
+
+class PrPolicyTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import pr_policy
+        cls.policy = pr_policy
+        cls.vocab = yaml.safe_load((REAL_DATA / "tags.yaml").read_text(encoding="utf-8"))
+        cls.config = pr_policy.PathConfig(("fixture-shaders/",), ("fixture_embedded.py",), ("fixture-backend",))
+
+    def scope(self, *names, removed=()):
+        files = [{"filename": n, "status": "removed" if n in removed else "modified"} for n in names]
+        return self.policy.classify_scope(files, self.config)
+
+    def test_shader_source_is_included(self):
+        decision = self.scope("src/fixture-shaders/a.comp", "src/fixture-backend.cpp")
+        self.assertEqual((decision.decision, decision.rule), ("include", "glsl-shader-source"))
+        self.assertEqual(decision.evidence_paths, ("src/fixture-shaders/a.comp",))
+
+    def test_embedded_shader_source_is_included(self):
+        decision = self.scope("tools/fixture_embedded.py", "src/fixture-backend.cpp")
+        self.assertEqual(decision.decision, "include")
+        self.assertEqual(decision.evidence_paths, ("tools/fixture_embedded.py",))
+
+    def test_kernel_type_patterns(self):
+        for name, expected in (
+            ("ssm_conv.comp", []), ("conv2d_mm.comp", ["convolution"]), ("rope_norm.comp", ["rope"]),
+            ("rms_norm.comp", ["normalization"]), ("topk_moe.comp", ["moe", "topk-sort"]),
+            ("dequant_q4_k.comp", ["dequantize"]), ("add.comp", ["elementwise"]), ("copy.comp", ["tensor-copy"]),
+        ):
+            with self.subTest(name=name):
+                files = [{"filename": f"src/fixture-shaders/{name}"}]
+                meta = self.policy.derive_metadata("FIXTURE", files, self.vocab, self.config)
+                self.assertEqual(meta["kernel_types"], expected)
+
+    def test_host_source_only_is_deferred(self):
+        decision = self.scope("src/fixture-backend.cpp", "docs/readme.md")
+        self.assertEqual((decision.decision, decision.rule), ("defer", "backend-host-source-only"))
+
+    def test_everything_else_is_excluded(self):
+        for names, removed in (
+            (("docs/readme.md",), ()),
+            (("other/dir/a.comp",), ()),                         # shader outside the marked path
+            (("src/fixture-backend/CMakeLists.txt",), ()),       # build file, not host source
+            (("src/fixture-shaders/a.comp",), ("src/fixture-shaders/a.comp",)),  # removal only
+        ):
+            with self.subTest(names=names):
+                self.assertEqual(self.scope(*names, removed=removed).decision, "exclude")
+
+    def test_architectures_come_from_the_title(self):
+        nodes, evidence = self.policy.derive_architectures("FIXTURE kernel for AMD RDNA3 and Intel")
+        self.assertEqual(nodes, ["rdna3", "intel"])  # tree order; 'amd' dropped for its descendant
+        self.assertEqual([row["locator"] for row in evidence], ["title", "title"])
+        self.assertEqual(self.policy.derive_architectures("FIXTURE alarm64 charm")[0], [])
+
+    def test_architectures_from_code_markers(self):
+        markers = {"FIXTURE_ID_AMD": "amd", "FIXTURE_ARCH_RDNA3": "rdna3", "FIXTURE_ID_NONE": "fixture-unknown-node"}
+        added = [{"filename": "src/a.cpp", "patch": "@@ -1 +1,2 @@\n ctx\n+if (id == FIXTURE_ID_AMD) {}"}]
+        self.assertEqual(
+            self.policy.derive_architectures("FIXTURE change", added, markers),
+            (["amd"], [{"node": "amd", "locator": "added-patch:src/a.cpp", "matched": "FIXTURE_ID_AMD"}]),
+        )
+        # Code that is only moved adds and removes the marker equally often.
+        moved = [
+            {"filename": "src/a.cpp", "patch": "@@\n-if (id == FIXTURE_ID_AMD) {}"},
+            {"filename": "src/b.cpp", "patch": "@@\n+if (id == FIXTURE_ID_AMD) {}"},
+        ]
+        self.assertEqual(self.policy.derive_architectures("FIXTURE change", moved, markers)[0], [])
+        # A marker inside a longer identifier, or mapped to a name that is not a node, never counts.
+        other = [{"filename": "src/a.cpp", "patch": "@@\n+X_FIXTURE_ID_AMD_2 FIXTURE_ID_NONE"}]
+        self.assertEqual(self.policy.derive_architectures("FIXTURE change", other, markers)[0], [])
+        # The title and the code agree on a descendant: the ancestor is dropped.
+        both = [{"filename": "src/a.cpp", "patch": "@@\n+FIXTURE_ID_AMD FIXTURE_ARCH_RDNA3"}]
+        self.assertEqual(self.policy.derive_architectures("FIXTURE for AMD", both, markers)[0], ["rdna3"])
+
+    def test_reserved_vendor_is_never_emitted(self):
+        import arch_policy
+        reserved = [
+            n for n in arch_policy.all_nodes()
+            if arch_policy.node_kind(n) == "vendor" and not arch_policy.children(n)
+        ]
+        self.assertTrue(reserved)
+        self.assertEqual(self.policy.derive_architectures(f"FIXTURE {reserved[0]} tile")[0], [])
+
+    def test_metadata_only_uses_the_vocabulary(self):
+        files = [{"filename": "src/fixture-shaders/mul_mm_cm2.comp"}, {"filename": "src/fixture-backend.cpp"}]
+        meta = self.policy.derive_metadata("FIXTURE change", files, self.vocab, self.config)
+        self.assertEqual(meta["hardware_features"], ["cooperative-matrix", "cooperative-matrix2"])
+        self.assertEqual(meta["kernel_types"], ["gemm"])
+        self.assertEqual(meta["languages"], ["glsl", "cpp"])
+        self.assertEqual(meta["techniques"], [])
+        self.assertEqual(meta["tags"], ["cooperative-matrix", "cooperative-matrix2", "gemm", "glsl", "cpp"])
+        bare = self.policy.derive_metadata("FIXTURE change", files, {"languages": ["glsl"]}, self.config)
+        self.assertEqual(bare["tags"], ["glsl"])
+
+    def test_excerpt_is_a_bounded_verbatim_prefix(self):
+        body = "line one\r\n" + "x" * 2000
+        excerpt, total = self.policy.upstream_excerpt(body)
+        self.assertEqual(total, len("line one\n") + 2000)
+        self.assertEqual(len(excerpt), self.policy.UPSTREAM_EXCERPT_LIMIT)
+        self.assertTrue(body.replace("\r\n", "\n").startswith(excerpt))
+        forged, _ = self.policy.upstream_excerpt("a <!-- upstream-excerpt-end --> b")
+        self.assertNotIn(self.policy.EXCERPT_END, forged)
+        self.assertTrue(self.policy.excerpt_is_empty("<!-- template -->\n```\n```"))
+
+
+class PrPipelineTest(TempRoots):
+    """refresh_candidate_ledger.py --offline and generate-pr-pages.py --offline
+    against a temporary root with a synthetic ledger and evidence cache."""
+
+    def make_root(self):
+        root = self.assemble_root(TESTS_DIR / "no-such-pages", {"pr-page-skipped.yaml": None})
+        (root / "candidates").mkdir()
+        (root / "candidates" / "fixture-repo.yaml").write_text(
+            FIXTURE_LEDGER.replace("prs: []\n", "prs:\n" + "".join(f"- number: {n}\n" for n in (1, 2, 3, 4))),
+            encoding="utf-8",
+        )
+        cache = root / ".cache" / "pr-evidence" / "fixture-repo"
+        cache.mkdir(parents=True)
+        for evidence in (
+            fixture_evidence(1, "FIXTURE coopmat kernel for RDNA3", ["src/fixture-shaders/mul_mm_cm2.comp"]),
+            fixture_evidence(2, "FIXTURE host change", ["src/fixture-backend.cpp"]),
+            fixture_evidence(3, "FIXTURE docs", ["docs/readme.md"]),
+            fixture_evidence(4, "FIXTURE shader without description", ["src/fixture-shaders/b.comp"], body=""),
+        ):
+            (cache / f"{evidence['pr']['number']}.json").write_text(json.dumps(evidence), encoding="utf-8")
+        return root
+
+    def test_offline_refresh_and_generation(self):
+        root = self.make_root()
+        proc = run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline",
+                          "--reclassify", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        ledger = yaml.safe_load((root / "candidates" / "fixture-repo.yaml").read_text(encoding="utf-8"))
+        self.assertEqual([row["decision"] for row in ledger["prs"]], ["include", "defer", "exclude", "include"])
+        self.assertEqual((ledger["included"], ledger["deferred"], ledger["excluded"]), (2, 1, 1))
+        self.assertEqual(list(ledger)[-1], "prs")
+
+        (root / "artifacts" / "prs" / "fixture-repo").mkdir(parents=True)
+        (root / "artifacts" / "prs" / "fixture-repo" / "LICENSE").write_text("FIXTURE licence text\n", encoding="utf-8")
+        proc = run_script("fetch_pr_diff.py", "--offline", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        proc = run_script("generate-pr-pages.py", "--offline", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        pages = sorted(p.name for p in (root / "sources" / "prs" / "fixture-repo").glob("*.md"))
+        self.assertEqual(pages, ["PR-1.md", "PR-4.md"])
+        # An empty description is replaced by the title, and the locator says so.
+        untitled = (root / "sources" / "prs" / "fixture-repo" / "PR-4.md").read_text(encoding="utf-8")
+        self.assertIn("(pull request title, complete; the pull request description is empty)", untitled)
+        self.assertIn("<!-- upstream-excerpt-start -->\nFIXTURE shader without description\n", untitled)
+        fm = load_frontmatter(root / "sources" / "prs" / "fixture-repo" / "PR-1.md")
+        self.assertEqual(fm["id"], "pr-fixture-repo-1")
+        self.assertEqual(fm["architectures"], ["rdna3"])
+        self.assertEqual(fm["architecture_evidence"], [{"node": "rdna3", "locator": "title", "matched": "RDNA3"}])
+        self.assertEqual(fm["captured_at"], "2000-01-02")
+        self.assertEqual(fm["artifact_dir"], "artifacts/prs/fixture-repo/PR-1")
+        bundle = root / "artifacts" / "prs" / "fixture-repo"
+        self.assertEqual(sorted(p.name for p in bundle.iterdir()), ["LICENSE", "PR-1", "PR-4"])
+        patch = (bundle / "PR-1" / "shaders.patch").read_text(encoding="utf-8")
+        self.assertEqual(patch.splitlines()[-1], "+x")
+        proc = run_script("verify_verbatim.py", "--against-cache", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(summary_line(proc.stdout),
+                         "Verified 2 artifact bundle(s), 0 without cached evidence: 0 error(s)")
+        proc = run_script("grep_wiki.py", "^\\+x$", "--only", "artifacts", "--files-only", root=root)
+        self.assertIn("PR-1/shaders.patch", proc.stdout)
+        self.assertFalse((root / "data" / "pr-page-skipped.yaml").exists())
+
+        proc = run_script("validate.py", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(summary_line(proc.stdout), "Validated 2 pages (2 source, 0 wiki): 0 error(s)")
+
+        # A second run changes nothing; a manual decision survives --reclassify.
+        before = (root / "sources" / "prs" / "fixture-repo" / "PR-1.md").read_bytes()
+        proc = run_script("generate-pr-pages.py", "--offline", "--force", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual((root / "sources" / "prs" / "fixture-repo" / "PR-1.md").read_bytes(), before)
+        ledger["prs"][1].update(decision="include", decision_source="manual")
+        (root / "candidates" / "fixture-repo.yaml").write_text(yaml.safe_dump(ledger, sort_keys=False),
+                                                              encoding="utf-8")
+        run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline", "--reclassify", root=root)
+        ledger = yaml.safe_load((root / "candidates" / "fixture-repo.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(ledger["prs"][1]["decision"], "include")
+
+    def test_tampered_or_missing_artifact_is_reported(self):
+        root = self.make_root()
+        (root / "artifacts" / "prs" / "fixture-repo").mkdir(parents=True)
+        (root / "artifacts" / "prs" / "fixture-repo" / "LICENSE").write_text("FIXTURE\n", encoding="utf-8")
+        for script in ("refresh_candidate_ledger.py --cutoff 2000-01-31 --reclassify", "fetch_pr_diff.py",
+                       "generate-pr-pages.py"):
+            name, *args = script.split()
+            self.assertEqual(run_script(name, *args, "--offline", root=root).returncode, 0, script)
+        patch = root / "artifacts" / "prs" / "fixture-repo" / "PR-1" / "shaders.patch"
+        patch.write_text(patch.read_text(encoding="utf-8").replace("+x", "+y"), encoding="utf-8")
+        proc = run_script("verify_verbatim.py", root=root)
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("does not match its recorded sha256", proc.stdout)
+        shutil.rmtree(patch.parent)
+        proc = run_script("validate.py", root=root)
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("artifact_dir 'artifacts/prs/fixture-repo/PR-1' has no PROVENANCE.yaml", proc.stdout)
+
+    def test_real_artifacts_are_intact(self):
+        proc = run_script("verify_verbatim.py")
+        self.assertEqual(proc.returncode, 0, proc.stdout[-2000:] + proc.stderr)
+
+    def test_missing_evidence_is_not_a_page(self):
+        root = self.make_root()
+        shutil.rmtree(root / ".cache")
+        run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline", "--reclassify", root=root)
+        ledger = yaml.safe_load((root / "candidates" / "fixture-repo.yaml").read_text(encoding="utf-8"))
+        self.assertEqual({row["rule"] for row in ledger["prs"]}, {"evidence-unavailable"})
+        self.assertEqual({row["decision"] for row in ledger["prs"]}, {"defer"})
+
+    def test_real_ledgers_and_pages_agree(self):
+        skipped_file = REAL_DATA / "pr-page-skipped.yaml"
+        skipped = set()
+        if skipped_file.is_file():
+            rows = (yaml.safe_load(skipped_file.read_text(encoding="utf-8")) or {}).get("rows") or []
+            skipped = {(row["repo"], row["pr"]) for row in rows}
+        for path in sorted((REPO_ROOT / "candidates").glob("*.yaml")):
+            ledger = yaml.safe_load(path.read_text(encoding="utf-8"))
+            included = {row["number"] for row in ledger["prs"] if row["decision"] == "include"}
+            pages = {
+                int(p.stem.split("-")[1]) for p in (REPO_ROOT / "sources" / "prs" / path.stem).glob("PR-*.md")
+            }
+            without_page = {n for n in included if (ledger["repo"], n) in skipped}
+            with self.subTest(ledger=path.name):
+                self.assertEqual(pages, included - without_page)
+                self.assertEqual(ledger["included"], len(included))
+                self.assertEqual(ledger["total_candidates"], len(ledger["prs"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

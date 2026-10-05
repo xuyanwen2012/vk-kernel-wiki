@@ -1,0 +1,1390 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -3,9 +3,13 @@
+ #extension GL_EXT_control_flow_attributes : enable
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
++#ifdef FLOAT16
++#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
++#extension GL_EXT_shader_subgroup_extended_types_float16 : require
++#endif
++
+ #extension GL_KHR_shader_subgroup_shuffle : enable
+ #extension GL_KHR_shader_subgroup_vote : enable
+ 
+@@ -15,8 +19,10 @@
+ const uint32_t HSK_per_thread = HSK / D_split;
+ const uint32_t HSV_per_thread = HSV / D_split;
+ 
+-const uint32_t cols_per_iter = WorkGroupSize / D_split;
++const uint32_t rows_per_thread = Br / row_split;
++const uint32_t cols_per_iter = WorkGroupSize / D_split / row_split;
+ const uint32_t cols_per_thread = Bc / cols_per_iter;
++const uint32_t num_subgroups = SubGroupSize == 0 ? 0 : WorkGroupSize / SubGroupSize;
+ 
+ 
+ layout (binding = 0) readonly buffer Q {float data_q[];};
+@@ -27,20 +33,22 @@ layout (binding = 2) readonly buffer V {float16_t data_v[];};
+ layout (binding = 2) readonly buffer VV4 {f16vec4 data_vv4[];};
+ layout (binding = 3) readonly buffer M {float16_t data_m[];};
+ 
+-// Store the output when doing grouped query attention.
+-// Rows index by Q's dimension 2, and the first N rows are valid.
+-D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TYPE elem, const in uint32_t o_offset, const in uint32_t iq2, const in uint32_t N)
+-{
+-    uint32_t offset = (iq2 + r) * HSV + c;
+-    data_o[o_offset + offset] = D_TYPE(elem);
+-    return elem;
+-}
++// If SubGroupSize is set to 0 then only use shmem reductions
++const uint32_t tmpsh_size = (SubGroupSize > 0) ? (row_split == 1 ? num_subgroups * D_split : num_subgroups) : WorkGroupSize;
++shared float tmpsh[tmpsh_size];
++shared FLOAT_TYPEV4 tmpshv4[tmpsh_size];
+ 
+-shared FLOAT_TYPE tmpsh[WorkGroupSize];
+-shared vec4 tmpshv4[WorkGroupSize];
++const uint32_t masksh_stride = Br + 1;
++shared FLOAT_TYPE masksh[Bc * masksh_stride];
+ 
+-shared float masksh[Bc][Br];
+-shared vec4 Qf[Br][HSK / 4];
++const uint32_t qf_stride = HSK / 4 + 1;
++shared FLOAT_TYPEV4 Qf[Br * qf_stride];
++
++const uint32_t D = HSK > HSV ? HSK : HSV;
++const uint32_t kvsh_stride = D / 4 + 1;
++shared FLOAT_TYPEV4 kvsh[SHMEM_STAGING != 0 ? Bc * kvsh_stride : 1];
++
++shared vec4 occupancy_limiter[LIMIT_OCCUPANCY_SHMEM > 0 ? LIMIT_OCCUPANCY_SHMEM : 1];
+ 
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+@@ -50,8 +58,24 @@ void main() {
+     init_indices();
+ 
+     const uint32_t tid = gl_LocalInvocationIndex;
++    const uint32_t threads_per_rowgroup = gl_WorkGroupSize.x / row_split;
++    const uint32_t row_tid = gl_LocalInvocationIndex / threads_per_rowgroup;
++    const uint32_t rowgroup_tid = gl_LocalInvocationIndex % threads_per_rowgroup;
+     const uint32_t d_tid = gl_LocalInvocationIndex % D_split;
+-    const uint32_t col_tid = gl_LocalInvocationIndex / D_split;
++    const uint32_t col_tid = (gl_LocalInvocationIndex % threads_per_rowgroup) / D_split;
++
++    if (LIMIT_OCCUPANCY_SHMEM > 0) {
++        // This just exists to avoid the occupancy_limiter array getting optimized out
++        occupancy_limiter[tid] = vec4(tid);
++
++        barrier();
++
++        if (occupancy_limiter[tid] == vec4(99999.0)) {
++            data_ov4[0] = D_TYPEV4(occupancy_limiter[tid]);
++        }
++    }
++
++#define tile_row(r) (row_tid * rows_per_thread + (r))
+ 
+     uint32_t q_offset = gqa_iq1*p.nb01 + (iq2*p.nb02 + iq3*p.nb03) / 4;
+ 
+@@ -60,37 +84,37 @@ void main() {
+         uint32_t r = (idx + tid) / (HSK / 4);
+         if (r < Br && d < HSK / 4 &&
+             i * Br + r < N) {
+-            Qf[r][d] = vec4(data_qv4[q_offset / 4 + (i * Br + r) * q_stride / 4 + d]) * p.scale;
++            Qf[r * qf_stride + d] = FLOAT_TYPEV4(data_qv4[q_offset / 4 + (i * Br + r) * q_stride / 4 + d] * p.scale);
+         }
+     }
+     barrier();
+ 
+-    vec4 Of[Br][HSV_per_thread / 4];
++    FLOAT_TYPEV4 Of[rows_per_thread][HSV_per_thread / 4];
+     [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            Of[r][d] = vec4(0.0);
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            Of[r][d] = FLOAT_TYPEV4(0.0);
+         }
+     }
+ 
+-    float Lf[Br], Mf[Br];
++    float Lf[rows_per_thread], Mf[rows_per_thread];
+ 
+     // Use -FLT_MAX/2 rather than -inf to reduce the possibility of NaNs, e.g. when computing Mold-M.
+     const float NEG_FLT_MAX_OVER_2 = uintBitsToFloat(0xFEFFFFFF);
+ 
+-    [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
++    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+         Lf[r] = 0;
+         Mf[r] = NEG_FLT_MAX_OVER_2;
+     }
+ 
+-    float slope[Br];
+-    [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-        slope[r] = 1.0;
++    ACC_TYPE slope[rows_per_thread];
++    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++        slope[r] = ACC_TYPE(1.0);
+     }
+ 
+     // ALiBi
+     if (p.max_bias > 0.0f) {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            slope[r] = perElemOpComputeSlope(r, col_tid, ACC_TYPE(0), iq2);
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            slope[r] = perElemOpComputeSlope(tile_row(r), col_tid, ACC_TYPE(0), iq2);
+         }
+     }
+ 
+@@ -113,258 +137,414 @@ void main() {
+ 
+     uint32_t mask_opt = 0;
+     uint32_t mask_opt_idx = ~0;
++    uint32_t mask_opt_bits = 0;
+ 
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
++        if (MASK_ENABLE) {
++            if (USE_MASK_OPT && mask_opt_idx != j / 16) {
++                mask_opt_idx = j / 16;
++                mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
++            }
++            mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
++            if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
++                // skip this block
++                continue;
++            }
++            // Only load if the block is not all zeros
++            if (mask_opt_bits != MASK_OPT_ALL_ZERO) {
++                bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+-        if (USE_MASK_OPT && mask_opt_idx != j / 16) {
+-            mask_opt_idx = j / 16;
+-            mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
+-        }
+-        uint32_t mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
+-        if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
+-            // skip this block
+-            continue;
+-        }
+-        // Only load if the block is not all zeros
+-        if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+-            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+-
+-            float max_mask = NEG_FLT_MAX_OVER_2;
+-            [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+-                uint32_t c = (idx + tid) % Bc;
+-                uint32_t r = (idx + tid) / Bc;
+-                if (idx + tid < Bc * Br) {
+-                    if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+-                        float m = float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
+-                        masksh[c][r] = m;
+-                        max_mask = max(max_mask, m);
+-                    } else {
+-                        masksh[c][r] = float(0);
++                float max_mask = NEG_FLT_MAX_OVER_2;
++                barrier();
++                [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
++                    uint32_t c = (idx + tid) % Bc;
++                    uint32_t r = (idx + tid) / Bc;
++                    if (idx + tid < Bc * Br) {
++                        if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
++                            FLOAT_TYPE m = FLOAT_TYPE(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
++                            masksh[c * masksh_stride + r] = m;
++                            max_mask = max(max_mask, float(m));
++                        } else {
++                            masksh[c * masksh_stride + r] = FLOAT_TYPE(0);
++                        }
+                     }
+                 }
+-            }
+-            // skip the block if the mask is entirely -inf
+-            bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
+-            barrier();
+-            if (gl_SubgroupInvocationID == 0) {
+-                tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
+-            }
+-            barrier();
+-            [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
+-                max_mask = max(max_mask, tmpsh[s]);
+-            }
+-            if (max_mask <= NEG_FLT_MAX_OVER_2) {
+-                continue;
++                // skip the block if the mask is entirely -inf
++                bool all_less = subgroupAll(max_mask <= NEG_FLT_MAX_OVER_2);
++                barrier();
++                if (gl_SubgroupInvocationID == 0) {
++                    tmpsh[gl_SubgroupID] = all_less ? NEG_FLT_MAX_OVER_2 : 0.0f;
++                }
++                barrier();
++                [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
++                    max_mask = max(max_mask, tmpsh[s]);
++                }
++                if (max_mask <= NEG_FLT_MAX_OVER_2) {
++                    continue;
++                }
+             }
+         }
+ 
+-        float Sf[Br][cols_per_thread];
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
++        ACC_TYPE Sf[rows_per_thread][cols_per_thread];
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                Sf[r][c] = 0.0;
++                Sf[r][c] = ACC_TYPE(0.0);
+             }
+         }
+ 
++        if (SHMEM_STAGING != 0) {
++            barrier();
++            [[unroll]] for (uint32_t idx = 0; idx < Bc * HSK / 4; idx += gl_WorkGroupSize.x) {
++                uint32_t d = (idx + tid) % (HSK / 4);
++                uint32_t c = (idx + tid) / (HSK / 4);
++                if (idx + gl_WorkGroupSize.x <= Bc * HSK / 4 || c < Bc) {
++                    FLOAT_TYPEV4 K_Tf = FLOAT_TYPEV4(0);
++                    if (!KV_bounds_check || j * Bc + c < KV) {
++#if BLOCK_SIZE > 1
++                        uint coord = (j * Bc + c) * k_stride * BLOCK_SIZE + 4 * d;
++                        uint ib = coord / BLOCK_SIZE;
++                        uint iqs = (coord % BLOCK_SIZE);
++                        K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
++#else
++                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c) * k_stride / 4 + d]);
++#endif
++                    }
+ 
+-        [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-            if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
+-                continue;
++                    kvsh[c * kvsh_stride + d] = K_Tf;
++                }
+             }
++            barrier();
++        }
++
++        // More d iterations means Q register caching becomes relevant
++        // Few iterations means the additional registers needed are worse than the speed-up from caching
++        if (HSK_per_thread / 4 > 4) {
+             [[unroll]] for (uint32_t d = 0; d < HSK_per_thread / 4; ++d) {
++                FLOAT_TYPEV4 Q_cache[rows_per_thread];
++                [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                    Q_cache[r] = Qf[tile_row(r) * qf_stride + d * D_split + d_tid];
++                }
++
++                [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
++                    if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
++                        continue;
++                    }
++
++                    FLOAT_TYPEV4 K_Tf;
++                    if (SHMEM_STAGING != 0) {
++                        K_Tf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
++                    } else {
+ #if BLOCK_SIZE > 1
+-                uint coord = (j * Bc + c * cols_per_iter + col_tid) * k_stride * BLOCK_SIZE + 4 * (d * D_split + d_tid);
+-                uint ib = coord / BLOCK_SIZE;
+-                uint iqs = (coord % BLOCK_SIZE);
+-                vec4 K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
++                        uint coord = (j * Bc + c * cols_per_iter + col_tid) * k_stride * BLOCK_SIZE + 4 * (d * D_split + d_tid);
++                        uint ib = coord / BLOCK_SIZE;
++                        uint iqs = (coord % BLOCK_SIZE);
++                        K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+ #else
+-                vec4 K_Tf = vec4(data_kv4[k_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * k_stride / 4 + d * D_split + d_tid]);
++                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * k_stride / 4 + d * D_split + d_tid]);
+ #endif
+-                [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-                    Sf[r][c] += dot(Qf[r][d * D_split + d_tid], K_Tf);
++                    }
++                    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                        Sf[r][c] += ACC_TYPE(dot(Q_cache[r], K_Tf));
++                    }
++                }
++            }
++        } else {
++            [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
++                if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
++                    continue;
++                }
++
++                [[unroll]] for (uint32_t d = 0; d < HSK_per_thread / 4; ++d) {
++                    FLOAT_TYPEV4 K_Tf;
++                    if (SHMEM_STAGING != 0) {
++                        K_Tf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
++                    } else {
++#if BLOCK_SIZE > 1
++                        uint coord = (j * Bc + c * cols_per_iter + col_tid) * k_stride * BLOCK_SIZE + 4 * (d * D_split + d_tid);
++                        uint ib = coord / BLOCK_SIZE;
++                        uint iqs = (coord % BLOCK_SIZE);
++                        K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
++#else
++                        K_Tf = FLOAT_TYPEV4(data_kv4[k_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * k_stride / 4 + d * D_split + d_tid]);
++#endif
++                    }
++                    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                        Sf[r][c] += ACC_TYPE(dot(Qf[tile_row(r) * qf_stride + d * D_split + d_tid], K_Tf));
++                    }
+                 }
+             }
+         }
+ 
+         [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+             // Compute sum across the D_split
+             [[unroll]] for (uint s = D_split / 2; s > 0; s >>= 1) {
+-                [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
++                [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+                     Sf[r][c] += subgroupShuffleXor(Sf[r][c], s);
+                 }
+             }
+         }
+ 
+         if (LOGIT_SOFTCAP) {
+-            [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+                 [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                    Sf[r][c] = p.logit_softcap * tanh(Sf[r][c]);
++                    Sf[r][c] = ACC_TYPE(p.logit_softcap * tanh(Sf[r][c]));
+                 }
+             }
+         }
+ 
+         if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-                    float mvf = masksh[c * cols_per_iter + col_tid][r];
++                [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                    FLOAT_TYPE mvf = masksh[(c * cols_per_iter + col_tid) * masksh_stride + tile_row(r)];
+ 
+                     Sf[r][c] += slope[r]*mvf;
+                 }
+             }
+-            barrier();
+         }
+ 
+-        float rowmaxf[Br], Pf[Br][cols_per_thread], rowsumf[Br], eMf[Br], Moldf[Br];
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            rowmaxf[r] = NEG_FLT_MAX_OVER_2;
++        float eMf[rows_per_thread];
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            float rowmaxf = NEG_FLT_MAX_OVER_2;
+             [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+                 if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
+                     continue;
+                 }
+-                rowmaxf[r] = max(rowmaxf[r], Sf[r][c]);
++                rowmaxf = max(rowmaxf, float(Sf[r][c]));
+             }
+-            Moldf[r] = Mf[r];
++            float Moldf = Mf[r];
+ 
+             // M = max(rowmax, Mold)
+             // P = e^(S - M)
+             // eM = e^(Mold - M)
+-            Mf[r] = max(rowmaxf[r], Moldf[r]);
+-            [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                Pf[r][c] = exp(Sf[r][c] - Mf[r]);
+-            }
+-            eMf[r] = exp(Moldf[r] - Mf[r]);
++            Mf[r] = max(rowmaxf, Moldf);
++            eMf[r] = exp(Moldf - Mf[r]);
++            Lf[r] = eMf[r]*Lf[r];
++        }
+ 
+-            // Compute sum across row of P
+-            rowsumf[r] = 0.0;
+-            [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+-                if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
+-                    continue;
+-                }
+-                rowsumf[r] += Pf[r][c];
++        [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                Of[r][d] = FLOAT_TYPE(eMf[r]) * Of[r][d];
+             }
+-
+-            Lf[r] = eMf[r]*Lf[r] + rowsumf[r];
+         }
+ 
+-        [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-            [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-                Of[r][d] = eMf[r] * Of[r][d];
++        if (SHMEM_STAGING != 0) {
++            barrier();
++            [[unroll]] for (uint32_t idx = 0; idx < Bc * HSV / 4; idx += gl_WorkGroupSize.x) {
++                uint32_t d = (idx + tid) % (HSV / 4);
++                uint32_t c = (idx + tid) / (HSV / 4);
++                if (idx + gl_WorkGroupSize.x <= Bc * HSV / 4 || c < Bc) {
++                    FLOAT_TYPEV4 V_Tf = FLOAT_TYPEV4(0);
++                    if (!KV_bounds_check || j * Bc + c < KV) {
++#if BLOCK_SIZE > 1
++                        uint coord = (j * Bc + c) * v_stride * BLOCK_SIZE + 4 * d;
++                        uint ib = coord / BLOCK_SIZE;
++                        uint iqs = (coord % BLOCK_SIZE);
++                        V_Tf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
++#else
++                        V_Tf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + (j * Bc + c) * v_stride / 4 + d]);
++#endif
++                    }
++
++                    kvsh[c * kvsh_stride + d] = V_Tf;
++                }
+             }
++            barrier();
+         }
+ 
+         [[unroll]] for (uint32_t c = 0; c < cols_per_thread; ++c) {
+             if (KV_bounds_check && j * Bc + c * cols_per_iter + col_tid >= KV) {
+                 continue;
+             }
++
++            FLOAT_TYPE Pf[rows_per_thread];
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                Pf[r] = FLOAT_TYPE(exp(float(Sf[r][c]) - Mf[r]));
++                Lf[r] += Pf[r];
++            }
++
+             [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
++                FLOAT_TYPEV4 Vf;
++                if (SHMEM_STAGING != 0) {
++                    Vf = kvsh[(c * cols_per_iter + col_tid) * kvsh_stride + (d * D_split + d_tid)];
++                } else {
+ #if BLOCK_SIZE > 1
+-                uint coord = (j * Bc + c * cols_per_iter + col_tid) * v_stride * BLOCK_SIZE + 4 * (d * D_split + d_tid);
+-                uint ib = coord / BLOCK_SIZE;
+-                uint iqs = (coord % BLOCK_SIZE);
+-                vec4 Vf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
++                    uint coord = (j * Bc + c * cols_per_iter + col_tid) * v_stride * BLOCK_SIZE + 4 * (d * D_split + d_tid);
++                    uint ib = coord / BLOCK_SIZE;
++                    uint iqs = (coord % BLOCK_SIZE);
++                    Vf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+ #else
+-                vec4 Vf = vec4(data_vv4[v_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * v_stride / 4 + d * D_split + d_tid]);
++                    Vf = FLOAT_TYPEV4(data_vv4[v_offset / 4 + (j * Bc + c * cols_per_iter + col_tid) * v_stride / 4 + d * D_split + d_tid]);
+ #endif
+-                [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-                    Of[r][d] += Pf[r][c] * Vf;
++                }
++                [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                    Of[r][d] += FLOAT_TYPEV4(Pf[r] * Vf);
+                 }
+             }
+         }
+-
+-        barrier();
+     }
+ 
+     // prevent race on tmpsh
+     barrier();
+ 
+     // reduce across threads
+ 
+-    [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-        float rowmaxf, eMf;
++    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++        float rowmaxf = Mf[r];
+ 
+-        tmpsh[tid] = Mf[r];
+         // Compute max across the row
+-        barrier();
+-        [[unroll]] for (int s = int(gl_WorkGroupSize.x) / 2; s >= D_split; s >>= 1) {
+-            if (tid < s) {
+-                tmpsh[tid] = max(tmpsh[tid], tmpsh[tid + s]);
++        if (SubGroupSize > 0) {
++            [[unroll]] for (uint s = D_split; s < SubGroupSize; s *= 2) {
++                rowmaxf = max(rowmaxf, subgroupShuffleXor(rowmaxf, s));
+             }
++            if (row_split == 1) {
++                // Reduce inside workgroup with shmem
++                barrier();
++                if (gl_SubgroupInvocationID == d_tid) {
++                    tmpsh[gl_SubgroupID * D_split + d_tid] = rowmaxf;
++                }
++                barrier();
++                rowmaxf = tmpsh[d_tid];
++                [[unroll]] for (uint32_t s = 1; s < num_subgroups; ++s) {
++                    rowmaxf = max(rowmaxf, tmpsh[s * D_split + d_tid]);
++                }
++            }
++        } else {
++            barrier();
++            tmpsh[tid] = rowmaxf;
+             barrier();
++            [[unroll]] for (int s = int(threads_per_rowgroup) / 2; s >= D_split; s >>= 1) {
++                if (rowgroup_tid < s) {
++                    tmpsh[tid] = max(tmpsh[tid], tmpsh[tid ^ s]);
++                }
++                barrier();
++            }
++            rowmaxf = tmpsh[row_tid * threads_per_rowgroup + d_tid];
+         }
+-        rowmaxf = tmpsh[d_tid];
+-        barrier();
+ 
+         float Moldf = Mf[r];
+ 
+         // M = max(rowmax, Mold)
+         // eM = e^(Mold - M)
+         Mf[r] = max(rowmaxf, Moldf);
+-        eMf = exp(Moldf - Mf[r]);
++        float eMf = exp(Moldf - Mf[r]);
+ 
+         Lf[r] = eMf*Lf[r];
+ 
+-        tmpsh[tid] = Lf[r];
+-
+         // Compute sum across the row
+-        barrier();
+-        [[unroll]] for (int s = int(gl_WorkGroupSize.x) / 2; s >= D_split; s >>= 1) {
+-            if (tid < s) {
+-                tmpsh[tid] = tmpsh[tid] + tmpsh[tid + s];
++        if (SubGroupSize > 0) {
++            [[unroll]] for (uint s = D_split; s < SubGroupSize; s *= 2) {
++                Lf[r] += subgroupShuffleXor(Lf[r], s);
+             }
++            if (row_split == 1) {
++                barrier();
++                if (gl_SubgroupInvocationID == d_tid) {
++                    tmpsh[gl_SubgroupID * D_split + d_tid] = Lf[r];
++                }
++                barrier();
++                Lf[r] = tmpsh[d_tid];
++                [[unroll]] for (uint32_t s = 1; s < num_subgroups; ++s) {
++                    Lf[r] += tmpsh[s * D_split + d_tid];
++                }
++            }
++        } else {
+             barrier();
++            tmpsh[tid] = Lf[r];
++            barrier();
++            [[unroll]] for (int s = int(threads_per_rowgroup) / 2; s >= D_split; s >>= 1) {
++                if (rowgroup_tid < s) {
++                    tmpsh[tid] = tmpsh[tid] + tmpsh[tid ^ s];
++                }
++                barrier();
++            }
++            Lf[r] = tmpsh[row_tid * threads_per_rowgroup + d_tid];
+         }
+-        Lf[r] = tmpsh[d_tid];
+-        barrier();
+ 
+         [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
++            Of[r][d] = FLOAT_TYPE(eMf) * Of[r][d];
+ 
+-            Of[r][d] = eMf * Of[r][d];
+-            tmpshv4[tid] = Of[r][d];
+-
+-            barrier();
+-            [[unroll]] for (int s = int(gl_WorkGroupSize.x) / 2; s >= D_split; s >>= 1) {
+-                if (tid < s) {
+-                    Of[r][d] += tmpshv4[tid + s];
+-                    tmpshv4[tid] = Of[r][d];
++            if (SubGroupSize > 0) {
++                [[unroll]] for (uint s = D_split; s < SubGroupSize; s *= 2) {
++                    Of[r][d] += subgroupShuffleXor(Of[r][d], s);
++                }
++                if (row_split == 1) {
++                    barrier();
++                    if (gl_SubgroupInvocationID == d_tid) {
++                        tmpshv4[gl_SubgroupID * D_split + d_tid] = Of[r][d];
++                    }
++                    barrier();
++                    Of[r][d] = tmpshv4[d_tid];
++                    [[unroll]] for (uint32_t s = 1; s < num_subgroups; ++s) {
++                        Of[r][d] += tmpshv4[s * D_split + d_tid];
++                    }
+                 }
++            } else {
++                barrier();
++                tmpshv4[tid] = Of[r][d];
+                 barrier();
++                [[unroll]] for (int s = int(threads_per_rowgroup) / 2; s >= D_split; s >>= 1) {
++                    if (rowgroup_tid < s) {
++                        Of[r][d] += tmpshv4[tid ^ s];
++                        tmpshv4[tid] = Of[r][d];
++                    }
++                    barrier();
++                }
++                Of[r][d] = tmpshv4[row_tid * threads_per_rowgroup + d_tid];
+             }
+-            Of[r][d] = tmpshv4[d_tid];
+-            barrier();
+         }
+     }
+ 
+ 
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        // note: O and Q have swapped coord 1,2.
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+-
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            if (r < N) {
+-                [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        perElemOpGqaStore(r, 4*(d * D_split + d_tid) + comp, Of[r][d][comp], o_offset, iq2, N);
++        if (p.gqa_ratio > 1) {
++            // note: O and Q have swapped coord 1,2.
++            uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3)) / 4;
++
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                const uint row = tile_row(r);
++                if (row < N) {
++                    [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
++                        gqaStore(row, d * D_split + d_tid, Of[r][d], o_offset, iq2, N);
+                     }
+                 }
+             }
+-        }
+ 
+-        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            if (r < N) {
+-                perElemOpStoreCol0(r, 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+-                perElemOpStoreCol0(r, 0u, ACC_TYPE(Mf[r]), o_offset + p.ne1, iq2, N);
++            o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                const uint row = tile_row(r);
++                if (row < N) {
++                    perElemOpStoreCol0(row, 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
++                    perElemOpStoreCol0(row, 0u, ACC_TYPE(Mf[r]), o_offset + p.ne1, iq2, N);
++                }
+             }
+-        }
++        } else {
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                const uint row = tile_row(r);
++                const uint global_row = i * Br + row;
++
++                if (global_row < N) {
++                    uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (global_row + p.ne2 * iq3)) / 4;
+ 
++                    [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
++                        data_ov4[o_offset + iq2 * HSV/4 + d * D_split + d_tid] = D_TYPEV4(Of[r][d]);
++                    }
++                }
++
++                if (global_row < N && d_tid == 0 && col_tid == 0) {
++                    uint32_t lm_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (global_row + p.ne2 * iq3));
++                    data_o[lm_offset + iq2] = D_TYPE(Lf[r]);
++                    data_o[lm_offset + p.ne1 + iq2] = D_TYPE(Mf[r]);
++                }
++            }
++        }
+         return;
+     }
+ 
+     if ((p.mask_n_head_log2 & SINK_ENABLE_BIT) != 0) {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            float sink = perElemOpGetSink(r, 0u, ACC_TYPE(0), iq2);
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            float sink = perElemOpGetSink(tile_row(r), 0u, ACC_TYPE(0), iq2);
+ 
+             float ms = 1.0f;
+             float vs = 1.0f;
+@@ -373,7 +553,7 @@ void main() {
+                 ms = exp(Mf[r] - sink);
+ 
+                 [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-                    Of[r][d] *= ms;
++                    Of[r][d] *= FLOAT_TYPE(ms);
+                 }
+             } else {
+                 vs = exp(sink - Mf[r]);
+@@ -383,39 +563,37 @@ void main() {
+         }
+     }
+ 
+-    float Lfrcp[Br];
+-    [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
++    float Lfrcp[rows_per_thread];
++    [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+         Lfrcp[r] = (Lf[r] == 0.0) ? 0.0 : (1.0 / Lf[r]);
+     }
+ 
+     [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            Of[r][d] *= Lfrcp[r];
+-#if defined(ACC_TYPE_MAX)
+-            Of[r][d] = clamp(Of[r][d], -vec4(ACC_TYPE_MAX), vec4(ACC_TYPE_MAX));
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            Of[r][d] *= FLOAT_TYPE(Lfrcp[r]);
++#if defined(FLOAT_TYPE_MAX)
++            Of[r][d] = clamp(Of[r][d], -FLOAT_TYPE_MAX, FLOAT_TYPE_MAX);
+ #endif
+         }
+     }
+ 
+-    uint32_t o_offset = gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV;
++    uint32_t o_offset = (gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV) / 4;
+ 
+     if (p.gqa_ratio > 1) {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            if (r < N) {
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            const uint row = tile_row(r);
++            if (row < N) {
+                 [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        perElemOpGqaStore(r, 4*(d * D_split + d_tid) + comp, Of[r][d][comp], o_offset, iq2, N);
+-                    }
++                    gqaStore(row, d * D_split + d_tid, Of[r][d], o_offset, iq2, N);
+                 }
+             }
+         }
+     } else {
+-        [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+-            if (i * Br + r < N) {
++        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++            const uint row = tile_row(r);
++            if (i * Br + row < N) {
+                 [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        data_o[o_offset + iq2 * HSV + (i * Br + r) * p.ne1 * HSV + 4*(d * D_split + d_tid) + comp] = D_TYPE(Of[r][d][comp]);
+-                    }
++                    data_ov4[o_offset + (iq2 * HSV + (i * Br + row) * p.ne1 * HSV) / 4 + d * D_split + d_tid] = D_TYPEV4(Of[r][d]);
+                 }
+             }
+         }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+@@ -1,16 +1,18 @@
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+-layout (constant_id = 0) const uint32_t WorkGroupSize = 128;
+-layout (constant_id = 1) const uint32_t Br = 1;
+-layout (constant_id = 2) const uint32_t Bc = 32;
+-layout (constant_id = 3) const uint32_t HSK = 32;
+-layout (constant_id = 4) const uint32_t HSV = 32;
+-layout (constant_id = 5) const uint32_t Clamp = 0;
+-layout (constant_id = 6) const uint32_t D_split = 16;
+-layout (constant_id = 7) const uint32_t SubGroupSize = 32;
+-layout (constant_id = 8) const uint32_t K_LOAD_SHMEM = 0;
+-layout (constant_id = 9) const uint32_t Flags = 0;
++layout (constant_id =  0) const uint32_t WorkGroupSize = 128;
++layout (constant_id =  1) const uint32_t Br = 1;
++layout (constant_id =  2) const uint32_t Bc = 32;
++layout (constant_id =  3) const uint32_t HSK = 32;
++layout (constant_id =  4) const uint32_t HSV = 32;
++layout (constant_id =  5) const uint32_t Clamp = 0;
++layout (constant_id =  6) const uint32_t D_split = 16;
++layout (constant_id =  7) const uint32_t row_split = 1;
++layout (constant_id =  8) const uint32_t SubGroupSize = 32;
++layout (constant_id =  9) const uint32_t SHMEM_STAGING = 0;
++layout (constant_id = 10) const uint32_t Flags = 0;
++layout (constant_id = 11) const uint32_t LIMIT_OCCUPANCY_SHMEM = 0;
+ 
+ const bool USE_MASK_OPT  = (Flags & 1) != 0;
+ const bool MASK_ENABLE   = (Flags & 2) != 0;
+@@ -69,6 +71,7 @@ layout (push_constant) uniform parameter {
+ layout (binding = 4) readonly buffer S {float data_s[];};
+ 
+ layout (binding = 5) writeonly buffer O {D_TYPE data_o[];};
++layout (binding = 5) writeonly buffer OV4 {D_TYPEV4 data_ov4[];};
+ 
+ layout (binding = 6) readonly buffer MO {uint32_t data_mask_opt[];};
+ 
+@@ -94,53 +97,53 @@ layout (binding = 2) readonly buffer V_PACKED16 {A_TYPE_PACKED16 v_data_packed16
+ #define BLOCK_SIZE 4
+ #define BLOCK_BYTE_SIZE 16
+ 
+-vec4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
++FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+     // iqs is currently always zero in the flash attention shaders
+     if (binding_idx == BINDING_IDX_K) {
+-        return k_packed.k_data_packed[a_offset + ib];
++        return FLOAT_TYPEV4(k_packed.k_data_packed[a_offset + ib]);
+     } else {
+-        return v_packed.v_data_packed[a_offset + ib];
++        return FLOAT_TYPEV4(v_packed.v_data_packed[a_offset + ib]);
+     }
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q4_0)
+ #define BLOCK_BYTE_SIZE 18
+ 
+-vec4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
++FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+     if (binding_idx == BINDING_IDX_K) {
+         uint vui_lo = uint(k_packed.k_data_packed16[a_offset + ib].qs[(iqs & 0xF) / 2 + 0]);
+         uint vui_hi = uint(k_packed.k_data_packed16[a_offset + ib].qs[(iqs & 0xF) / 2 + 1]);
+         uint shift = (iqs & 0x10) >> 2;
+         vui_lo >>= shift;
+         vui_hi >>= shift;
+ 
+-        return float(k_packed.k_data_packed16[a_offset + ib].d) * (vec4(vui_lo & 0xF, (vui_lo >> 8) & 0xF, vui_hi & 0xF, (vui_hi >> 8) & 0xF) - 8.0f);
++        return FLOAT_TYPE(k_packed.k_data_packed16[a_offset + ib].d) * (FLOAT_TYPEV4(vui_lo & 0xF, (vui_lo >> 8) & 0xF, vui_hi & 0xF, (vui_hi >> 8) & 0xF) - FLOAT_TYPE(8.0f));
+     } else {
+         uint vui_lo = uint(v_packed.v_data_packed16[a_offset + ib].qs[(iqs & 0xF) / 2 + 0]);
+         uint vui_hi = uint(v_packed.v_data_packed16[a_offset + ib].qs[(iqs & 0xF) / 2 + 1]);
+         uint shift = (iqs & 0x10) >> 2;
+         vui_lo >>= shift;
+         vui_hi >>= shift;
+ 
+-        return float(v_packed.v_data_packed16[a_offset + ib].d) * (vec4(vui_lo & 0xF, (vui_lo >> 8) & 0xF, vui_hi & 0xF, (vui_hi >> 8) & 0xF) - 8.0f);
++        return FLOAT_TYPE(v_packed.v_data_packed16[a_offset + ib].d) * (FLOAT_TYPEV4(vui_lo & 0xF, (vui_lo >> 8) & 0xF, vui_hi & 0xF, (vui_hi >> 8) & 0xF) - FLOAT_TYPE(8.0f));
+     }
+ }
+ #endif
+ 
+ #if defined(DATA_A_Q8_0)
+ #define BLOCK_BYTE_SIZE 34
+-vec4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
++FLOAT_TYPEV4 dequantize4(uint ib, uint iqs, uint a_offset, uint binding_idx) {
+     if (binding_idx == BINDING_IDX_K) {
+         const i8vec2 v0 = unpack8(int32_t(k_packed.k_data_packed16[a_offset + ib].qs[iqs / 2])).xy; // vec4 used due to #12147
+         const i8vec2 v1 = unpack8(int32_t(k_packed.k_data_packed16[a_offset + ib].qs[iqs / 2 + 1])).xy;
+ 
+-        return float(k_packed.k_data_packed16[a_offset + ib].d) * vec4(v0.x, v0.y, v1.x, v1.y);
++        return FLOAT_TYPE(k_packed.k_data_packed16[a_offset + ib].d) * FLOAT_TYPEV4(v0.x, v0.y, v1.x, v1.y);
+     } else {
+         const i8vec2 v0 = unpack8(int32_t(v_packed.v_data_packed16[a_offset + ib].qs[iqs / 2])).xy; // vec4 used due to #12147
+         const i8vec2 v1 = unpack8(int32_t(v_packed.v_data_packed16[a_offset + ib].qs[iqs / 2 + 1])).xy;
+ 
+-        return float(v_packed.v_data_packed16[a_offset + ib].d) * vec4(v0.x, v0.y, v1.x, v1.y);
++        return FLOAT_TYPE(v_packed.v_data_packed16[a_offset + ib].d) * FLOAT_TYPEV4(v0.x, v0.y, v1.x, v1.y);
+     }
+ }
+ #endif
+@@ -189,10 +192,16 @@ void init_indices()
+     KV = p.KV;
+ 
+     if (p.k_num > 1) {
+-        i = 0;
+-        // batch and split_k share gl_WorkGroupID.x
+-        gqa_iq1 = gl_WorkGroupID.x / p.k_num;
+-        split_k_index = gl_WorkGroupID.x % p.k_num;
++        if (p.gqa_ratio > 1) {
++            i = 0;
++            // batch and split_k share gl_WorkGroupID.x
++            gqa_iq1 = gl_WorkGroupID.x / p.k_num;
++            split_k_index = gl_WorkGroupID.x % p.k_num;
++        } else {
++            gqa_iq1 = 0;
++            split_k_index = gl_WorkGroupID.x % p.k_num;
++            i = gl_WorkGroupID.x / p.k_num;
++        }
+     } else if (p.gqa_ratio > 1) {
+         i = 0;
+         gqa_iq1 = gl_WorkGroupID.x;
+@@ -244,3 +253,11 @@ void init_indices()
+ // Bias applied to softmax to stay in fp16 range.
+ // Based on ggml-cuda issue https://github.com/ggml-org/llama.cpp/issues/18606
+ const float FATTN_KQ_MAX_OFFSET = 3.0f*0.6931f;
++
++// Store the output when doing grouped query attention.
++// Rows index by Q's dimension 2, and the first N rows are valid.
++void gqaStore(const in uint32_t r, const in uint32_t c, const in FLOAT_TYPEV4 elems, const in uint32_t o_offset, const in uint32_t iq2, const in uint32_t N)
++{
++    uint32_t offset = (iq2 + r) * HSV / 4 + c;
++    data_ov4[o_offset + offset] = D_TYPEV4(elems);
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -19,7 +19,6 @@
+ const uint32_t MatBr = 16;
+ const uint32_t MatBc = 16;
+ 
+-const uint32_t row_split = Bc / MatBc;
+ const uint32_t rows_per_thread = Br / row_split;
+ const uint32_t cols_per_iter = gl_WorkGroupSize.x / row_split;
+ const uint32_t cols_per_thread = Bc / cols_per_iter;
+@@ -33,15 +32,6 @@ layout (binding = 2) readonly buffer V {float16_t data_v[];};
+ layout (binding = 2) readonly buffer VV4 {f16vec4 data_vv4[];};
+ layout (binding = 3) readonly buffer M {float16_t data_m[];};
+ 
+-// Store the output when doing grouped query attention.
+-// Rows index by Q's dimension 2, and the first N rows are valid.
+-D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TYPE elem, const in uint32_t o_offset, const in uint32_t iq2, const in uint32_t N)
+-{
+-    uint32_t offset = (iq2 + r) * HSV + c;
+-    data_o[o_offset + offset] = D_TYPE(elem);
+-    return elem;
+-}
+-
+ shared float tmpsh[row_split];
+ 
+ const uint32_t qstride = HSK_pad / 4 + 2; // in units of f16vec4
+@@ -54,10 +44,14 @@ shared f16vec4 Psh[Bc * psh_stride];
+ const uint32_t sfshstride = (HSK <= 128) ? (Br / 4 + 2) : Br / 4;
+ shared ACC_TYPEV4 sfsh[Bc * sfshstride];
+ 
+-const uint32_t kshstride = (K_LOAD_SHMEM != 0 ? HSK_pad : MatBr) / 4 + 2; // in units of f16vec4
++const uint32_t D_pad = HSK_pad > HSV_pad ? HSK_pad : HSV_pad;
++const uint32_t kvsh_stride = (SHMEM_STAGING != 0 ? D_pad : MatBr) / 4 + 2; // in units of f16vec4
+ const uint v_cols = MatBc / 4 * row_split; // total cols, 4 vec4s per MatBc * number of subgroups
+ const uint vsh_stride = v_cols;
+-shared f16vec4 ksh[(kshstride >= vsh_stride) ? (Bc * kshstride) : (Bc * vsh_stride)];
++shared f16vec4 kvsh[(kvsh_stride >= vsh_stride) ? (Bc * kvsh_stride) : (Bc * vsh_stride)];
++
++const uint32_t osh_stride = row_split * MatBr / 4;
++shared f16vec4 pvsh[MatBc * osh_stride];
+ 
+ shared ACC_TYPE slope[Br];
+ 
+@@ -84,11 +78,6 @@ void main() {
+                 Qf[i + tid] = f16vec4(0);
+             }
+         }
+-        [[unroll]] for (uint i = 0; i < Bc * kshstride; i += gl_WorkGroupSize.x) {
+-            if (i + tid < Bc * kshstride) {
+-                ksh[i + tid] = f16vec4(0);
+-            }
+-        }
+         barrier();
+     }
+ 
+@@ -104,10 +93,10 @@ void main() {
+     }
+     barrier();
+ 
+-    ACC_TYPEV4 Of[rows_per_thread][d_per_thread];
++    f16vec4 Of[rows_per_thread][d_per_thread];
+     [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+         [[unroll]] for (uint32_t d = 0; d < d_per_thread; ++d) {
+-            Of[r][d] = ACC_TYPEV4(0.0);
++            Of[r][d] = f16vec4(0.0);
+         }
+     }
+ 
+@@ -153,22 +142,22 @@ void main() {
+ 
+     uint32_t mask_opt = 0;
+     uint32_t mask_opt_idx = ~0;
++    uint32_t mask_opt_bits = 0;
++    f16vec4 mask_cache[Bc * Br / 4 / WorkGroupSize];
+ 
+     [[dont_unroll]]
+     for (uint32_t j = start_j; j < end_j; ++j) {
+ 
+-        f16vec4 mask_cache[Bc * Br / 4 / WorkGroupSize];
+         [[unroll]] for (uint32_t idx = 0; idx < mask_cache.length(); ++idx) {
+             mask_cache[idx] = f16vec4(0);
+         }
+ 
+         if (MASK_ENABLE) {
+-
+             if (USE_MASK_OPT && mask_opt_idx != j / 16) {
+                 mask_opt_idx = j / 16;
+                 mask_opt = data_mask_opt[mo_offset + mask_opt_idx];
+             }
+-            uint32_t mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
++            mask_opt_bits = (mask_opt >> ((j % 16) * 2)) & 0x3;
+             if (mask_opt_bits == MASK_OPT_ALL_NEG_INF) {
+                 // skip this block
+                 continue;
+@@ -231,24 +220,24 @@ void main() {
+             }
+         }
+ 
+-        if (K_LOAD_SHMEM != 0) {
+-            [[unroll]] for (uint32_t idx = 0; idx < Bc * HSK / 4; idx += gl_WorkGroupSize.x) {
+-                uint32_t d = (idx + tid) % (HSK / 4);
+-                uint32_t c = (idx + tid) / (HSK / 4);
+-                if (c < Bc && d < HSK / 4) {
++        if (SHMEM_STAGING != 0) {
++            [[unroll]] for (uint32_t idx = 0; idx < Bc * HSK_pad / 4; idx += gl_WorkGroupSize.x) {
++                uint32_t d = (idx + tid) % (HSK_pad / 4);
++                uint32_t c = (idx + tid) / (HSK_pad / 4);
++                if (idx + gl_WorkGroupSize.x <= Bc * HSK_pad / 4 || c < Bc) {
+                     f16vec4 K_Tf = f16vec4(0);
+-                    if (!KV_bounds_check || j * Bc + c < KV) {
++                    if ((!KV_bounds_check || j * Bc + c < KV) && (HSK == HSK_pad || d < HSK / 4)) {
+ #if BLOCK_SIZE > 1
+                         uint coord = (j * Bc + c) * k_stride * BLOCK_SIZE + 4 * d;
+                         uint ib = coord / BLOCK_SIZE;
+                         uint iqs = (coord % BLOCK_SIZE);
+-                        K_Tf = f16vec4(dequantize4(ib, iqs, k_offset, BINDING_IDX_K));
++                        K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+ #else
+                         K_Tf = f16vec4(data_kv4[k_offset / 4 + (j * Bc + c) * k_stride / 4 + d]);
+ #endif
+                     }
+ 
+-                    ksh[c * kshstride + d] = K_Tf;
++                    kvsh[c * kvsh_stride + d] = K_Tf;
+                 }
+             }
+             barrier();
+@@ -262,7 +251,11 @@ void main() {
+         coopmat<float16_t, gl_ScopeSubgroup, 16, MatBr, gl_MatrixUseB> QMat;
+ 
+         [[unroll]] for (uint32_t d = 0; d < HSK_pad / 16; ++d) {
+-            if (K_LOAD_SHMEM == 0) {
++            // If SHMEM_STAGING is set, a Bc * HSK_pad size tile of K is loaded to shmem
++            // If not, f16 K is loaded directly from global memory if aligned, otherwise
++            // staged through a Bc * MatBr size staging buffer.
++            // If K is not type f16, then it is always staged for dequantization.
++            if (SHMEM_STAGING == 0) {
+ #if BLOCK_SIZE == 1
+             if (KV_bounds_check || d * 16 + 16 > HSK) {
+ #endif
+@@ -277,13 +270,13 @@ void main() {
+                         uint coord = (j * Bc + row) * k_stride * BLOCK_SIZE + d * 16 + col_vec * 4;
+                         uint ib = coord / BLOCK_SIZE;
+                         uint iqs = (coord % BLOCK_SIZE);
+-                        K_Tf = f16vec4(dequantize4(ib, iqs, k_offset, BINDING_IDX_K));
++                        K_Tf = dequantize4(ib, iqs, k_offset, BINDING_IDX_K);
+ #else
+                         K_Tf = f16vec4(data_kv4[k_offset / 4 + (j * Bc + row) * k_stride / 4 + d * 16 / 4 + col_vec]);
+ #endif
+                     }
+ 
+-                    ksh[row * kshstride + col_vec] = K_Tf;
++                    kvsh[row * kvsh_stride + col_vec] = K_Tf;
+                 }
+             }
+             barrier();
+@@ -295,8 +288,8 @@ void main() {
+             if (KV_bounds_check || d * 16 + 16 > HSK)
+ #endif
+             {
+-                uint coord = (gl_SubgroupID * MatBc) * kshstride;
+-                coopMatLoad(KMat, ksh, coord, kshstride, gl_CooperativeMatrixLayoutRowMajor);
++                uint coord = (gl_SubgroupID * MatBc) * kvsh_stride;
++                coopMatLoad(KMat, kvsh, coord, kvsh_stride, gl_CooperativeMatrixLayoutRowMajor);
+             }
+ #if BLOCK_SIZE == 1
+             else {
+@@ -305,8 +298,8 @@ void main() {
+             }
+ #endif
+             } else {
+-                uint coord = (gl_SubgroupID * MatBc) * kshstride + d * 16 / 4;
+-                coopMatLoad(KMat, ksh, coord, kshstride, gl_CooperativeMatrixLayoutRowMajor);
++                uint coord = (gl_SubgroupID * MatBc) * kvsh_stride + d * 16 / 4;
++                coopMatLoad(KMat, kvsh, coord, kvsh_stride, gl_CooperativeMatrixLayoutRowMajor);
+             }
+ 
+             coopMatLoad(QMat, Qf, d * 16 / 4, qstride, gl_CooperativeMatrixLayoutColumnMajor);
+@@ -329,7 +322,7 @@ void main() {
+             barrier();
+         }
+ 
+-        if (MASK_ENABLE) {
++        if (MASK_ENABLE && mask_opt_bits != MASK_OPT_ALL_ZERO) {
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br / 4; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) / (Br / 4);
+                 uint32_t r = (idx + tid) % (Br / 4);
+@@ -374,7 +367,7 @@ void main() {
+         [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
+             const uint d_local = d0 / threads_per_rowgroup;
+             [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+-                Of[r][d_local] = ACC_TYPE(eMf[r]) * Of[r][d_local];
++                Of[r][d_local] = float16_t(eMf[r]) * Of[r][d_local];
+             }
+         }
+ 
+@@ -397,19 +390,47 @@ void main() {
+             }
+         }
+ 
++        if (SHMEM_STAGING != 0) {
++            [[unroll]] for (uint32_t idx = 0; idx < Bc * HSV_pad / 4; idx += gl_WorkGroupSize.x) {
++                uint32_t d = (idx + tid) % (HSV_pad / 4);
++                uint32_t c = (idx + tid) / (HSV_pad / 4);
++                if (idx + gl_WorkGroupSize.x <= Bc * HSV_pad / 4 || c < Bc) {
++                    f16vec4 V_Tf = f16vec4(0);
++                    if ((!KV_bounds_check || j * Bc + c < KV) && (HSV == HSV_pad || d < HSV / 4)) {
++#if BLOCK_SIZE > 1
++                        uint coord = (j * Bc + c) * v_stride * BLOCK_SIZE + 4 * d;
++                        uint ib = coord / BLOCK_SIZE;
++                        uint iqs = (coord % BLOCK_SIZE);
++                        V_Tf = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
++#else
++                        V_Tf = f16vec4(data_vv4[v_offset / 4 + (j * Bc + c) * v_stride / 4 + d]);
++#endif
++                    }
++
++                    kvsh[c * kvsh_stride + d] = V_Tf;
++                }
++            }
++        }
++        barrier();
++
+         const uint num_hsv_tiles = (HSV + MatBc * row_split - 1) / (MatBc * row_split); // round up
+ 
+         // Each subgroup handles HSV/4 columns
+         [[unroll]] for (uint32_t hsv_tile = 0; hsv_tile < num_hsv_tiles; ++hsv_tile) {
+             const uint hsv_offset = (hsv_tile * row_split + gl_SubgroupID) * 16;
+ 
+-            SfMat = coopmat<ACC_TYPE, gl_ScopeSubgroup, MatBc, MatBr, gl_MatrixUseAccumulator>(0);
++            coopmat<float16_t, gl_ScopeSubgroup, MatBc, MatBr, gl_MatrixUseAccumulator> PVMat = coopmat<float16_t, gl_ScopeSubgroup, MatBc, MatBr, gl_MatrixUseAccumulator>(0);
+ 
+             // Preload V tiles for [Bc, 16 * num subgroups]
+             const uint v_rows = Bc;
+             const uint v_total = v_rows * v_cols;
+             const uint v_loads_per_thread = v_total / gl_WorkGroupSize.x;
+ 
++            // If SHMEM_STAGING is set, a Bc * HSV_pad size tile of V is loaded to shmem.
++            // If not, f16 V is loaded directly from global memory if aligned, otherwise
++            // staged through a Bc * MatBr size staging buffer.
++            // If V is not type f16, then it is always staged for dequantization.
++            if (SHMEM_STAGING == 0) {
+ #if BLOCK_SIZE == 1
+             // For f16, only preload if not aligned
+             if (KV_bounds_check) {
+@@ -428,44 +449,52 @@ void main() {
+ 
+                 if (!KV_bounds_check || (v_row < KV && v_col < HSV)) {
+ #if BLOCK_SIZE > 1
+-                    ksh[row * vsh_stride + col] = f16vec4(dequantize4(ib, iqs, v_offset, BINDING_IDX_V));
++                    kvsh[row * vsh_stride + col] = dequantize4(ib, iqs, v_offset, BINDING_IDX_V);
+ #else
+-                    ksh[row * vsh_stride + col] = data_vv4[(v_offset + v_row * v_stride + v_col) / 4];
++                    kvsh[row * vsh_stride + col] = data_vv4[(v_offset + v_row * v_stride + v_col) / 4];
+ #endif
+                 } else {
+-                    ksh[row * vsh_stride + col] = f16vec4(0.0f);
++                    kvsh[row * vsh_stride + col] = f16vec4(0.0f);
+                 }
+             }
++
+ #if BLOCK_SIZE == 1
+             }
+ #endif
+-
++            }
+             barrier();
+ 
+-            [[unroll]] for (uint32_t bc_chunk = 0; bc_chunk < Bc / MatBc; ++bc_chunk) {
+-                coopMatLoad(KMat, Psh, bc_chunk * MatBc * psh_stride, psh_stride, gl_CooperativeMatrixLayoutColumnMajor);
++            const uint o_offset = gl_SubgroupID * MatBr / 4;
++
++            if (hsv_offset < HSV_pad) {
++                [[unroll]] for (uint32_t bc_chunk = 0; bc_chunk < Bc / MatBc; ++bc_chunk) {
++                    coopMatLoad(KMat, Psh, bc_chunk * MatBc * psh_stride, psh_stride, gl_CooperativeMatrixLayoutColumnMajor);
+ 
++                    if (SHMEM_STAGING == 0) {
+ #if BLOCK_SIZE == 1
+-                if (!KV_bounds_check) {
+-                    // F16 values can be loaded directly from global memory
+-                    const uint v_tile_row = j * Bc + bc_chunk * MatBc;
+-                    const uint v_tile_offset = v_offset / 4 + v_tile_row * v_stride / 4 + hsv_offset / 4;
+-                    coopMatLoad(QMat, data_vv4, v_tile_offset, v_stride / 4, gl_CooperativeMatrixLayoutRowMajor);
+-                } else
++                    if (!KV_bounds_check) {
++                        // F16 values can be loaded directly from global memory
++                        const uint v_tile_row = j * Bc + bc_chunk * MatBc;
++                        const uint v_tile_offset = v_offset / 4 + v_tile_row * v_stride / 4 + hsv_offset / 4;
++                        coopMatLoad(QMat, data_vv4, v_tile_offset, v_stride / 4, gl_CooperativeMatrixLayoutRowMajor);
++                    } else
+ #endif
+-                {
+-                    const uint v_tile_offset = bc_chunk * MatBr * v_cols + gl_SubgroupID * (MatBc / 4);
+-                    coopMatLoad(QMat, ksh, v_tile_offset, vsh_stride, gl_CooperativeMatrixLayoutRowMajor);
++                    {
++                        const uint v_tile_offset = bc_chunk * MatBr * v_cols + gl_SubgroupID * (MatBc / 4);
++                        coopMatLoad(QMat, kvsh, v_tile_offset, vsh_stride, gl_CooperativeMatrixLayoutRowMajor);
++                    }
++                    } else {
++                        const uint v_tile_offset = bc_chunk * MatBc * kvsh_stride + (hsv_tile * row_split + gl_SubgroupID) * (MatBc / 4);
++                        coopMatLoad(QMat, kvsh, v_tile_offset, kvsh_stride, gl_CooperativeMatrixLayoutRowMajor);
++                    }
++
++                    PVMat = coopMatMulAdd(KMat, QMat, PVMat);
+                 }
+ 
+-                SfMat = coopMatMulAdd(KMat, QMat, SfMat);
++                // Store PVMat to pvsh and load into Of
++                coopMatStore(PVMat, pvsh, o_offset, osh_stride, gl_CooperativeMatrixLayoutRowMajor);
+             }
+ 
+-            // Store SfMat to sfsh and load into Of
+-            const uint osh_stride = row_split * MatBc / 4;
+-            const uint o_offset = gl_SubgroupID * MatBc / 4;
+-            coopMatStore(SfMat, sfsh, o_offset, osh_stride, gl_CooperativeMatrixLayoutRowMajor);
+-
+             barrier();
+ 
+             const uint hsv_per_tile = row_split * MatBc;
+@@ -484,7 +513,7 @@ void main() {
+ 
+                     if (hsv_col >= hsv_base && hsv_col < hsv_base + hsv_per_tile && hsv_col < HSV) {
+                         const uint local_hsv = (hsv_col - hsv_base) / 4;
+-                        Of[r][d_local] += ACC_TYPEV4(sfsh[row * osh_stride + local_hsv]);
++                        Of[r][d_local] += pvsh[row * osh_stride + local_hsv];
+                     }
+                 }
+             }
+@@ -500,27 +529,48 @@ void main() {
+     // If there is split_k, then the split_k resolve shader does the final
+     // division by L. Store the intermediate O value and per-row m and L values.
+     if (p.k_num > 1) {
+-        // note: O and Q have swapped coord 1,2.
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
++        if (p.gqa_ratio > 1) {
++            // note: O and Q have swapped coord 1,2.
++            uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3)) / 4;
+ 
+-        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+-            if (tile_row(r) < N) {
+-                [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
+-                    const uint d = d0 + col_tid;
+-                    if (d >= HSV/4) break;
+-                    const uint d_local = d0 / threads_per_rowgroup;
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        perElemOpGqaStore(tile_row(r), 4 * d + comp, float(Of[r][d_local][comp]), o_offset, iq2, N);
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                if (tile_row(r) < N) {
++                    [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
++                        const uint d = d0 + col_tid;
++                        if (d >= HSV/4) break;
++                        const uint d_local = d0 / threads_per_rowgroup;
++                        gqaStore(tile_row(r), d, Of[r][d_local], o_offset, iq2, N);
+                     }
+                 }
+             }
+-        }
+ 
+-        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+-        [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+-            if (tile_row(r) < N) {
+-                perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
+-                perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Mf[r]), o_offset + p.ne1, iq2, N);
++            o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                if (tile_row(r) < N) {
++                    perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Lf[r]), o_offset, iq2, N);
++                    perElemOpStoreCol0(tile_row(r), 0u, ACC_TYPE(Mf[r]), o_offset + p.ne1, iq2, N);
++                }
++            }
++        } else {
++            [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
++                const uint row = tile_row(r);
++                const uint global_row = i * Br + row;
++
++                if (global_row < N) {
++                    uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (global_row + p.ne2 * iq3)) / 4;
++
++                    [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
++                        const uint d = d0 + col_tid;
++                        if (d >= HSV/4) break;
++                        data_ov4[o_offset + iq2 * HSV/4 + d] = D_TYPEV4(Of[r][d/threads_per_rowgroup]);
++                    }
++                }
++
++                if (global_row < N && col_tid == 0) {
++                    uint32_t lm_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (global_row + p.ne2 * iq3));
++                    data_o[lm_offset + iq2] = D_TYPE(Lf[r]);
++                    data_o[lm_offset + p.ne1 + iq2] = D_TYPE(Mf[r]);
++                }
+             }
+         }
+ 
+@@ -539,7 +589,7 @@ void main() {
+ 
+                 [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
+                     const uint d_local = d0 / threads_per_rowgroup;
+-                    Of[r][d_local] *= ACC_TYPE(ms);
++                    Of[r][d_local] *= float16_t(ms);
+                 }
+             } else {
+                 vs = exp(sink - Mf[r]);
+@@ -557,14 +607,14 @@ void main() {
+     [[unroll]] for (uint32_t d0 = 0; d0 < HSV / 4; d0 += threads_per_rowgroup) {
+         const uint d_local = d0 / threads_per_rowgroup;
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+-            Of[r][d_local] *= ACC_TYPE(Lfrcp[r]);
+-#if defined(ACC_TYPE_MAX)
+-            Of[r][d_local] = clamp(Of[r][d_local], -ACC_TYPE_MAX, ACC_TYPE_MAX);
++            Of[r][d_local] *= float16_t(Lfrcp[r]);
++#if defined(FLOAT_TYPE_MAX)
++            Of[r][d_local] = clamp(Of[r][d_local], -FLOAT_TYPE_MAX, FLOAT_TYPE_MAX);
+ #endif
+         }
+     }
+ 
+-    uint32_t o_offset = gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV;
++    uint32_t o_offset = (gqa_iq1*p.ne1*HSV + iq3*p.ne2*p.ne1*HSV) / 4;
+ 
+     if (p.gqa_ratio > 1) {
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+@@ -573,9 +623,7 @@ void main() {
+                     const uint d = d0 + col_tid;
+                     if (d >= HSV / 4) break;
+                     const uint d_local = d0 / threads_per_rowgroup;
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        perElemOpGqaStore(tile_row(r), 4 * d + comp, float(Of[r][d_local][comp]), o_offset, iq2, N);
+-                    }
++                    gqaStore(tile_row(r), d, Of[r][d_local], o_offset, iq2, N);
+                 }
+             }
+         }
+@@ -586,9 +634,7 @@ void main() {
+                     const uint d = d0 + col_tid;
+                     if (d >= HSV / 4) break;
+                     const uint d_local = d0 / threads_per_rowgroup;
+-                    [[unroll]] for (uint32_t comp = 0; comp < 4; ++comp) {
+-                        data_o[o_offset + iq2 * HSV + (i * Br + tile_row(r)) * p.ne1 * HSV + 4 * d + comp] = D_TYPE(Of[r][d_local][comp]);
+-                    }
++                    data_ov4[o_offset + (iq2 * HSV + (i * Br + tile_row(r)) * p.ne1 * HSV) / 4 + d] = D_TYPEV4(Of[r][d_local]);
+                 }
+             }
+         }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -72,6 +72,28 @@ D_TYPE perElemOpGqaStore(const in uint32_t r, const in uint32_t c, const in D_TY
+     return elem;
+ }
+ 
++// Store O values for non-GQA split_k. Rows are tokens, not heads.
++D_TYPE perElemOpNonGqaSplitKStore(const in uint32_t r, const in uint32_t c, const in D_TYPE elem, const in uint32_t unused, const in uint32_t iq2, const in uint32_t N) {
++    uint32_t global_row = i * Br + r;
++    if (global_row < N && c < HSV) {
++        uint32_t o_off = HSV * p.ne1
++            * (split_k_index + p.k_num * (global_row + p.ne2 * iq3));
++        data_o[o_off + iq2 * HSV + c] = D_TYPE(elem);
++    }
++    return elem;
++}
++
++// Store L/M values for non-GQA split_k.
++ACC_TYPE perElemOpNonGqaSplitKStoreCol0(const in uint32_t r, const in uint32_t c, const in ACC_TYPE elem, const in uint32_t lm_base, const in uint32_t iq2, const in uint32_t N) {
++    uint32_t global_row = i * Br + r;
++    if (global_row < N && c == 0) {
++        uint32_t lm_off = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3
++            + p.ne1 * 2 * (split_k_index + p.k_num * (global_row + p.ne2 * iq3));
++        data_o[lm_off + lm_base + iq2] = D_TYPE(elem);
++    }
++    return elem;
++}
++
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+     init_iq_shmem(gl_WorkGroupSize);
+@@ -290,13 +312,19 @@ void main() {
+     if (p.k_num > 1) {
+         coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator>(O);
+ 
+-        // note: O and Q have swapped coord 1,2.
+-        uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+-        coopMatPerElementNV(O_D, O_D, perElemOpGqaStore, o_offset, iq2, N);
+-
+-        o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
+-        coopMatPerElementNV(L, L, perElemOpStoreCol0, o_offset, iq2, N);
+-        coopMatPerElementNV(M, M, perElemOpStoreCol0, o_offset + p.ne1, iq2, N);
++        if (p.gqa_ratio > 1) {
++            // note: O and Q have swapped coord 1,2.
++            uint32_t o_offset = HSV * p.ne1 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
++            coopMatPerElementNV(O_D, O_D, perElemOpGqaStore, o_offset, iq2, N);
++
++            o_offset = HSV * p.ne1 * p.k_num * p.ne2 * p.ne3 + p.ne1 * 2 * (split_k_index + p.k_num * (gqa_iq1 + p.ne2 * iq3));
++            coopMatPerElementNV(L, L, perElemOpStoreCol0, o_offset, iq2, N);
++            coopMatPerElementNV(M, M, perElemOpStoreCol0, o_offset + p.ne1, iq2, N);
++        } else {
++            coopMatPerElementNV(O_D, O_D, perElemOpNonGqaSplitKStore, 0u, iq2, N);
++            coopMatPerElementNV(L, L, perElemOpNonGqaSplitKStoreCol0, 0u, iq2, N);
++            coopMatPerElementNV(M, M, perElemOpNonGqaSplitKStoreCol0, p.ne1, iq2, N);
++        }
+         return;
+     }
+ 

@@ -1,0 +1,210 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp b/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp
+@@ -0,0 +1,51 @@
++#version 450
++
++#include "generic_head.comp"
++#include "types.comp"
++
++#extension GL_EXT_control_flow_attributes : enable
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
++layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
++
++layout (constant_id = 0) const uint BLOCK_SIZE = 32;
++
++shared FLOAT_TYPE tmpmax[BLOCK_SIZE];
++shared uint tmp[BLOCK_SIZE];
++
++void main() {
++    const uint row = gl_WorkGroupID.z * 262144 + gl_WorkGroupID.y * 512 + gl_WorkGroupID.x;
++    const uint col = gl_LocalInvocationID.x;
++
++    if (col >= p.KX) {
++        return;
++    }
++    A_TYPE amax = data_a[row*p.KX + col];
++    tmp[col] = col;
++
++    for (uint i = col + BLOCK_SIZE; i < p.KX; i += BLOCK_SIZE) {
++        A_TYPE val = data_a[row*p.KX + i];
++        if (val > amax) {
++            amax = val;
++            tmp[col] = i;
++        }
++    }
++    tmpmax[col] = amax;
++
++    barrier();
++    [[unroll]] for (int s = int(BLOCK_SIZE) / 2; s > 0; s >>= 1) {
++        if (col < s && col + s < p.KX) {
++            if (tmpmax[col] < tmpmax[col + s]) {
++                tmpmax[col] = tmpmax[col + s];
++                tmp[col] = tmp[col + s];
++            }
++        }
++        barrier();
++    }
++
++    if (col == 0) {
++        data_d[row] = D_TYPE(tmp[0]);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp b/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp
+@@ -0,0 +1,31 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : enable
++
++#include "types.comp"
++#include "generic_head.comp"
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
++layout (binding = 1) readonly buffer Y {B_TYPE data_b[];};
++layout (binding = 2) buffer D {D_TYPE data_d[];};
++
++const uint CHUNK_SIZE = 512;
++
++void main() {
++    const uint base = gl_WorkGroupID.x * CHUNK_SIZE;
++    const uint col = gl_LocalInvocationID.x;
++
++    uint count = 0;
++    [[unroll]]
++    for (uint i = 0; i < CHUNK_SIZE; i += gl_WorkGroupSize.x) {
++        const uint idx = base + i + col;
++        if (idx >= p.KX) {
++            break;
++        }
++        count += uint(data_a[idx] == data_b[idx]);
++    }
++
++    atomicAdd(data_d[0], D_TYPE(count));
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp
+@@ -0,0 +1,42 @@
++#version 450
++
++#include "generic_head.comp"
++#include "types.comp"
++
++#extension GL_EXT_control_flow_attributes : enable
++
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) buffer X {A_TYPE x[];};
++layout (binding = 1) readonly buffer G {A_TYPE grad[];};
++layout (binding = 2) buffer GM {A_TYPE gradm[];};
++layout (binding = 3) buffer GV {A_TYPE gradv[];};
++layout (binding = 4) readonly buffer P {float params[7];};
++
++void main() {
++    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
++
++    if (i >= p.KX) {
++        return;
++    }
++
++    const float alpha  = params[0];
++    const float beta1  = params[1];
++    const float beta2  = params[2];
++    const float eps    = params[3];
++    const float wd     = params[4];
++    const float beta1h = params[5];
++    const float beta2h = params[6];
++
++    const float gi = grad[i];
++    const float gmi = gradm[i]*beta1 +    gi*(1.0f - beta1);
++    const float gvi = gradv[i]*beta2 + gi*gi*(1.0f - beta2);
++
++    gradm[i] = gmi;
++    gradv[i] = gvi;
++
++    const float mh =      gmi*beta1h;
++    const float vh = sqrt(gvi*beta2h) + eps;
++
++    x[i] = x[i]*(1.0f - alpha*wd) - alpha*mh/vh;
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+@@ -0,0 +1,37 @@
++#version 450
++
++#include "types.comp"
++#include "generic_unary_head.comp"
++
++layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    const uint idx = get_idx();
++
++    if (idx >= p.ne) {
++        return;
++    }
++
++    // Destination multi-index (inlined dst_idx)
++    const uint i13 = fastdiv(idx, p.ne1_012mp, p.ne1_012L);
++    const uint i13_offset = i13 * p.ne12*p.ne11*p.ne10;
++    const uint i12 = fastdiv(idx - i13_offset, p.ne1_01mp, p.ne1_01L);
++    const uint i12_offset = i12*p.ne11*p.ne10;
++    const uint i11 = fastdiv(idx - i13_offset - i12_offset, p.ne1_0mp, p.ne1_0L);
++    const uint i10 = idx - i13_offset - i12_offset - i11*p.ne10;
++    const uint d_idx = i13*p.nb13 + i12*p.nb12 + i11*p.nb11 + i10*p.nb10;
++
++    // Accumulate from sources
++    A_TYPE acc = A_TYPE(0);
++    for (uint i3 = i13; i3 < p.ne03; i3 += p.ne13) {
++        for (uint i2 = i12; i2 < p.ne02; i2 += p.ne12) {
++            for (uint i1 = i11; i1 < p.ne01; i1 += p.ne11) {
++                for (uint i0 = i10; i0 < p.ne00; i0 += p.ne10) {
++                    acc += data_a[i3*p.nb03 + i2*p.nb02 + i1*p.nb01 + i0*p.nb00];
++                }
++            }
++        }
++    }
++
++    data_d[get_doffset() + d_idx] = D_TYPE(acc);
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp
+@@ -0,0 +1,29 @@
++#version 450
++
++#extension GL_EXT_shader_16bit_storage : require
++
++#include "types.comp"
++#include "generic_binary_head.comp"
++
++const uint num_threads = 256;
++
++layout(local_size_x = num_threads, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    uint idx = get_idx();
++
++    // num_threads * num_iter must equal 512, to match the wg_denoms and get_idx calculation
++    const uint num_iter = 2;
++
++    [[unroll]] for (uint i = 0; i < num_iter; ++i) {
++        if (idx >= p.ne) {
++            continue;
++        }
++        uint i00, i01, i02, i03;
++        get_indices(idx, i00, i01, i02, i03);
++
++        data_d[get_doffset() + dst_idx(i00, i01, i02, i03)] = D_TYPE(FLOAT_TYPE(data_a[get_aoffset() + src0_idx(i00, i01, i02, i03)]) - FLOAT_TYPE(data_b[get_boffset() + src1_idx(i00, i01, i02, i03)]));
++
++        idx += num_threads;
++    }
++}

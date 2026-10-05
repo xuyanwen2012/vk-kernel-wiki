@@ -1,0 +1,77 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -153,12 +153,13 @@ void main() {
+         }
+ 
+         if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br) {
+-                    if (!KV_bounds_check || j * Bc + c < KV) {
++                    if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+                         masksh[c][r] = float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]);
+                     } else {
+                         masksh[c][r] = float(0);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -201,11 +201,13 @@ void main() {
+         }
+ 
+         if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
++            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
++
+             [[unroll]] for (uint32_t idx = 0; idx < Bc * Br; idx += gl_WorkGroupSize.x) {
+                 uint32_t c = (idx + tid) % Bc;
+                 uint32_t r = (idx + tid) / Bc;
+                 if (idx + tid < Bc * Br || idx + gl_WorkGroupSize.x <= Bc * Br) {
+-                    if (!KV_bounds_check || j * Bc + c < KV) {
++                    if ((!KV_bounds_check || j * Bc + c < KV) && (!nem1_bounds_check || i * Br + r < p.nem1)) {
+                         sfsh[c * sfshstride + r] += ACC_TYPE(slope[r] * float(data_m[m_offset + (i * Br + r) * m_stride + (j * Bc + c)]));
+                     }
+                 }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -154,15 +154,31 @@ void main() {
+         }
+ 
+         if ((p.mask_n_head_log2 & MASK_ENABLE_BIT) != 0) {
+-            tensorLayoutNV<2, Clamp> tensorLayoutM = createTensorLayoutNV(2, Clamp);
+-            tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, p.nem1, KV);
+-            tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
++            bool nem1_bounds_check = !(p.gqa_ratio > 1) && (p.nem1 % Br) != 0;
+ 
+-            coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv;
++            if (nem1_bounds_check) {
++                tensorLayoutNV<2, gl_CooperativeMatrixClampModeConstantNV> tensorLayoutM = createTensorLayoutNV(2, gl_CooperativeMatrixClampModeConstantNV);
++                tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, p.nem1, KV);
++                tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
+ 
+-            coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++                coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv;
+ 
+-            S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
++                coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++
++                S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
++            } else {
++                tensorLayoutNV<2, Clamp> tensorLayoutM = createTensorLayoutNV(2, Clamp);
++                // Don't clamp against nem1 when GQA is enabled
++                uint32_t m_height = p.gqa_ratio > 1 ? ~0 : p.nem1;
++                tensorLayoutM = setTensorLayoutDimensionNV(tensorLayoutM, m_height, KV);
++                tensorLayoutM = setTensorLayoutStrideNV(tensorLayoutM, m_stride, 1);
++
++                coopmat<float16_t, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator> mv;
++
++                coopMatLoadTensorNV(mv, data_m, m_offset, sliceTensorLayoutNV(tensorLayoutM, i * Br, Br, j * Bc, Bc));
++
++                S += slopeMat*coopmat<ACC_TYPE, gl_ScopeWorkgroup, Br, Bc, gl_MatrixUseAccumulator>(mv);
++            }
+         }
+ 
+         // Clear padding elements to -inf, so they don't contribute to rowmax

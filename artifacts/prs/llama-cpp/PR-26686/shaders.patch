@@ -1,0 +1,317 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+@@ -2,6 +2,11 @@
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
++#ifdef USE_SUBGROUPS
++#extension GL_KHR_shader_subgroup_basic : enable
++#extension GL_KHR_shader_subgroup_arithmetic : enable
++#endif
++
+ #include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+@@ -11,6 +16,10 @@ layout (push_constant) uniform parameter
+     uint32_t nb00;
+     uint32_t nb01;
+     uint32_t a_offset;
++    uint32_t n_experts;
++    uint32_t hoist_row_ids;
++    uint32_t ne00mp;
++    uint32_t ne00L;
+ } p;
+ 
+ #define BLOCK_SIZE 256
+@@ -21,16 +30,98 @@ layout (binding = 0) readonly buffer A {uint data_a[];};
+ layout (binding = 1) writeonly buffer D {uint data_d[];};
+ 
+ shared uint vals[BLOCK_SIZE];
++shared uint offsets[BLOCK_SIZE];
++shared uint cursors[BLOCK_SIZE];
++
++// see init_fastdiv_values in ggml-vulkan.cpp
++uint fastdiv(uint n, uint mp, uint L) {
++    uint msbs, lsbs;
++    // msbs = mulhi(n, mp)
++    umulExtended(n, mp, msbs, lsbs);
++    return (msbs + n) >> L;
++}
+ 
++// data_d layout when p.hoist_row_ids is set:
++//   [0,              n_experts)   per-expert row count
++//   [n_experts,    2*n_experts)   per-expert start offset into the row id region
++//   [2*n_experts]                 total row count
++//   [2*n_experts + 1,         )   row ids grouped by expert, packed as (i01 << 16) | (i00 & 0xffff)
++// Otherwise only data_d[expert_id] is written, holding that expert's row count.
+ void main() {
+     const uint expert_id = gl_WorkGroupID.x;
+     const uint num_elements = p.ne00 * p.ne01;
+     const uint tid = gl_LocalInvocationID.x;
+ 
++    if (p.hoist_row_ids != 0) {
++        if (tid < p.n_experts) {
++            vals[tid] = 0;
++        }
++        barrier();
++
++        for (uint idx = tid; idx < num_elements; idx += BLOCK_SIZE) {
++            const uint i01 = fastdiv(idx, p.ne00mp, p.ne00L);
++            const uint i00 = idx - i01 * p.ne00;
++            const uint expert = data_a[p.a_offset + i01 * p.nb01 + i00 * p.nb00];
++            if (expert < p.n_experts) {
++                atomicAdd(vals[expert], 1);
++            }
++        }
++        barrier();
++
++#ifdef USE_SUBGROUPS
++        if (gl_SubgroupID == 0) {
++            // pad the trip count so the subgroup ops stay in uniform control flow
++            const uint n_experts_padded = (p.n_experts + gl_SubgroupSize - 1) & ~(gl_SubgroupSize - 1);
++            uint base = 0;
++            for (uint expert = gl_SubgroupInvocationID; expert < n_experts_padded; expert += gl_SubgroupSize) {
++                const bool in_range = expert < p.n_experts;
++                const uint count = in_range ? vals[expert] : 0;
++                const uint offset = base + subgroupExclusiveAdd(count);
++                if (in_range) {
++                    data_d[expert] = count;
++                    data_d[p.n_experts + expert] = offset;
++                    offsets[expert] = offset;
++                    cursors[expert] = 0;
++                }
++                base += subgroupAdd(count);
++            }
++            if (subgroupElect()) {
++                data_d[2 * p.n_experts] = base;
++            }
++        }
++#else
++        if (tid == 0) {
++            uint offset = 0;
++            for (uint expert = 0; expert < p.n_experts; ++expert) {
++                const uint count = vals[expert];
++                data_d[expert] = count;
++                data_d[p.n_experts + expert] = offset;
++                offsets[expert] = offset;
++                cursors[expert] = 0;
++                offset += count;
++            }
++            data_d[2 * p.n_experts] = offset;
++        }
++#endif
++        barrier();
++
++        for (uint idx = tid; idx < num_elements; idx += BLOCK_SIZE) {
++            const uint i01 = fastdiv(idx, p.ne00mp, p.ne00L);
++            const uint i00 = idx - i01 * p.ne00;
++            const uint expert = data_a[p.a_offset + i01 * p.nb01 + i00 * p.nb00];
++            if (expert < p.n_experts) {
++                const uint row = atomicAdd(cursors[expert], 1);
++                const uint packed_row_id = (i01 << 16) | (i00 & 0xffffu);
++                data_d[2 * p.n_experts + 1 + offsets[expert] + row] = packed_row_id;
++            }
++        }
++        return;
++    }
++
+     uint count = 0;
+     for (uint idx = tid; idx < num_elements; idx += BLOCK_SIZE) {
+-        const uint i01 = idx / p.ne00;
+-        const uint i00 = idx % p.ne00;
++        const uint i01 = fastdiv(idx, p.ne00mp, p.ne00L);
++        const uint i00 = idx - i01 * p.ne00;
+         const uint a = data_a[p.a_offset + i01 * p.nb01 + i00 * p.nb00];
+ 
+         count += uint(a == expert_id);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -88,6 +88,9 @@ layout (push_constant) uniform parameter
+     uint nei1;
+     uint nbi1;
+     uint ne11;
++    uint padded_N;
++    uint n_experts;
++    uint hoist_row_ids;
+ #else
+     uint base_work_group_z;
+     uint num_batches;
+@@ -211,27 +214,31 @@ void main() {
+     const uint loadstride_b = gl_WorkGroupSize.x * LOAD_VEC_B_EFF * LOAD_VEC_BATCH_B / BK;
+ 
+ #ifdef MUL_MAT_ID
+-#ifdef MUL_MAT_ID_USE_SUBGROUPS
+-    if (bitCount(p.nei0) == 1) {
+-        load_row_ids(expert_idx, true, ic);
++    if (p.hoist_row_ids != 0) {
++        load_row_ids_hoisted(expert_idx, ic);
+     } else {
+-        load_row_ids(expert_idx, false, ic);
+-    }
++#ifdef MUL_MAT_ID_USE_SUBGROUPS
++        if (bitCount(p.nei0) == 1) {
++            load_row_ids(expert_idx, true, ic);
++        } else {
++            load_row_ids(expert_idx, false, ic);
++        }
+ #else
+-    _ne1 = 0;
+-    for (uint ii1 = 0; ii1 < p.nei1 && _ne1 < (ic + 1) * BN; ii1++) {
+-        for (uint ii0 = 0; ii0 < p.nei0 && _ne1 < (ic + 1) * BN; ii0++) {
+-            if (data_ids[ii1*p.nbi1 + ii0] == expert_idx) {
+-                if (_ne1 >= ic * BN) {
+-                    row_ids[_ne1 - ic * BN] = u16vec2(ii0, ii1);
++        _ne1 = 0;
++        for (uint ii1 = 0; ii1 < p.nei1 && _ne1 < (ic + 1) * BN; ii1++) {
++            for (uint ii0 = 0; ii0 < p.nei0 && _ne1 < (ic + 1) * BN; ii0++) {
++                if (data_ids[ii1*p.nbi1 + ii0] == expert_idx) {
++                    if (_ne1 >= ic * BN) {
++                        row_ids[_ne1 - ic * BN] = u16vec2(ii0, ii1);
++                    }
++                    _ne1++;
+                 }
+-                _ne1++;
+             }
+         }
+-    }
+ 
+-    barrier();
++        barrier();
+ #endif
++    }
+ 
+     // Workgroup has no work
+     if (ic * BN >= _ne1) return;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -67,6 +67,10 @@ layout (push_constant) uniform parameter
+ #endif
+     // N dimension for the B matrix can be >= p.N
+     uint padded_N;
++#ifdef MUL_MAT_ID
++    uint n_experts;
++    uint hoist_row_ids;
++#endif
+ } p;
+ 
+ 
+@@ -225,6 +229,23 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+     }
+     barrier();
+ }
++
++void load_row_ids_hoisted(uint expert_idx, uint ic) {
++    _ne1 = uint(data_expert_count[expert_idx]);
++
++    const uint tile_begin = ic * BN;
++    const uint tile_count = tile_begin < _ne1 ? min(BN, _ne1 - tile_begin) : 0;
++    const uint expert_offset = uint(data_expert_count[p.n_experts + expert_idx]);
++    const uint row_ids_offset = 2 * p.n_experts + 1 + expert_offset + tile_begin;
++
++    for (uint i = gl_LocalInvocationIndex; i < tile_count; i += BLOCK_SIZE) {
++        const uint packed_row_id = uint(data_expert_count[row_ids_offset + i]);
++        const uint ii0 = packed_row_id & 0xffffu;
++        const uint ii1 = packed_row_id >> 16;
++        row_ids[i] = u16vec4(fastmod(ii0, p.ne11), ii1, ii0, 0);
++    }
++    barrier();
++}
+ #endif
+ 
+ void main() {
+@@ -266,7 +287,9 @@ void main() {
+     const uint ik = gl_WorkGroupID.x / blocks_m;
+ 
+ #ifdef MUL_MAT_ID
+-    if (bitCount(p.nei0) == 1) {
++    if (p.hoist_row_ids != 0) {
++        load_row_ids_hoisted(expert_idx, ic);
++    } else if (bitCount(p.nei0) == 1) {
+         load_row_ids(expert_idx, true, ic);
+     } else {
+         load_row_ids(expert_idx, false, ic);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+@@ -71,4 +71,19 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+     barrier();
+ }
+ #endif // MUL_MAT_ID_USE_SUBGROUPS
++
++void load_row_ids_hoisted(uint expert_idx, uint ic) {
++    _ne1 = uint(data_expert_count[expert_idx]);
++
++    const uint tile_begin = ic * BN;
++    const uint tile_count = tile_begin < _ne1 ? min(BN, _ne1 - tile_begin) : 0;
++    const uint expert_offset = uint(data_expert_count[p.n_experts + expert_idx]);
++    const uint row_ids_offset = 2 * p.n_experts + 1 + expert_offset + tile_begin;
++
++    for (uint i = gl_LocalInvocationIndex; i < tile_count; i += BLOCK_SIZE) {
++        const uint packed_row_id = uint(data_expert_count[row_ids_offset + i]);
++        row_ids[i] = u16vec2(packed_row_id & 0xffffu, packed_row_id >> 16);
++    }
++    barrier();
++}
+ #endif // MUL_MAT_ID
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -56,6 +56,9 @@ layout (push_constant) uniform parameter
+     uint nei1;
+     uint nbi1;
+     uint ne11;
++    uint padded_N;
++    uint n_experts;
++    uint hoist_row_ids;
+ #else
+     uint base_work_group_z;
+     uint num_batches;
+@@ -157,27 +160,31 @@ void main() {
+     const uint loadstride_b = BLOCK_SIZE * LOAD_VEC_B / BK;
+ 
+ #ifdef MUL_MAT_ID
+-#ifdef MUL_MAT_ID_USE_SUBGROUPS
+-    if (bitCount(p.nei0) == 1) {
+-        load_row_ids(expert_idx, true, ic);
++    if (p.hoist_row_ids != 0) {
++        load_row_ids_hoisted(expert_idx, ic);
+     } else {
+-        load_row_ids(expert_idx, false, ic);
+-    }
++#ifdef MUL_MAT_ID_USE_SUBGROUPS
++        if (bitCount(p.nei0) == 1) {
++            load_row_ids(expert_idx, true, ic);
++        } else {
++            load_row_ids(expert_idx, false, ic);
++        }
+ #else
+-    _ne1 = 0;
+-    for (uint ii1 = 0; ii1 < p.nei1 && _ne1 < (ic + 1) * BN; ii1++) {
+-        for (uint ii0 = 0; ii0 < p.nei0 && _ne1 < (ic + 1) * BN; ii0++) {
+-            if (data_ids[ii1*p.nbi1 + ii0] == expert_idx) {
+-                if (_ne1 >= ic * BN) {
+-                    row_ids[_ne1 - ic * BN] = u16vec2(ii0, ii1);
++        _ne1 = 0;
++        for (uint ii1 = 0; ii1 < p.nei1 && _ne1 < (ic + 1) * BN; ii1++) {
++            for (uint ii0 = 0; ii0 < p.nei0 && _ne1 < (ic + 1) * BN; ii0++) {
++                if (data_ids[ii1*p.nbi1 + ii0] == expert_idx) {
++                    if (_ne1 >= ic * BN) {
++                        row_ids[_ne1 - ic * BN] = u16vec2(ii0, ii1);
++                    }
++                    _ne1++;
+                 }
+-                _ne1++;
+             }
+         }
+-    }
+ 
+-    barrier();
++        barrier();
+ #endif
++    }
+ 
+     // Workgroup has no work
+     if (ic * BN >= _ne1) return;

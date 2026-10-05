@@ -1,0 +1,222 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+@@ -0,0 +1,51 @@
++#version 450
++
++#extension GL_EXT_control_flow_attributes : enable
++
++#include "types.glsl"
++
++layout (push_constant) uniform parameter
++{
++    uint32_t ne00;
++    uint32_t ne01;
++    uint32_t nb00;
++    uint32_t nb01;
++    uint32_t a_offset;
++} p;
++
++#define BLOCK_SIZE 256
++
++layout(local_size_x = BLOCK_SIZE, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {uint data_a[];};
++layout (binding = 1) writeonly buffer D {uint data_d[];};
++
++shared uint vals[BLOCK_SIZE];
++
++void main() {
++    const uint expert_id = gl_WorkGroupID.x;
++    const uint num_elements = p.ne00 * p.ne01;
++    const uint tid = gl_LocalInvocationID.x;
++
++    uint count = 0;
++    for (uint idx = tid; idx < num_elements; idx += BLOCK_SIZE) {
++        const uint i01 = idx / p.ne00;
++        const uint i00 = idx % p.ne00;
++        const uint a = data_a[p.a_offset + i01 * p.nb01 + i00 * p.nb00];
++
++        count += uint(a == expert_id);
++    }
++
++    vals[tid] = count;
++    barrier();
++    [[unroll]] for (uint s = BLOCK_SIZE / 2; s > 0; s >>= 1) {
++        if (tid < s) {
++            vals[tid] += vals[tid + s];
++        }
++        barrier();
++    }
++
++    if (tid == 0) {
++        data_d[expert_id] = vals[0];
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -68,6 +68,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ 
+ #ifdef MUL_MAT_ID
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
++layout (binding = 4) readonly buffer Counts {int data_expert_count[];};
+ #endif
+ 
+ layout (push_constant) uniform parameter
+@@ -135,13 +136,19 @@ shared ACC_TYPE coopmat_stage[TM * TN * NUM_WARPS];
+ #include "mul_mm_funcs.glsl"
+ 
+ void main() {
++    const uint ic = gl_WorkGroupID.y;
++
++#ifdef MUL_MAT_ID
++    const uint expert_idx = gl_GlobalInvocationID.z;
++    if (ic * BN >= data_expert_count[expert_idx]) {
++        return;
++    }
++#endif
+ #ifdef NEEDS_INIT_IQ_SHMEM
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+-#ifdef MUL_MAT_ID
+-    const uint expert_idx = gl_GlobalInvocationID.z;
+-#else
++#ifndef MUL_MAT_ID
+     const uint batch_idx = gl_GlobalInvocationID.z;
+ 
+     const uint i13 = batch_idx / p.ne12;
+@@ -156,7 +163,6 @@ void main() {
+     const uint blocks_m = (p.M + BM - 1) / BM;
+     const uint ir = gl_WorkGroupID.x % blocks_m;
+     const uint ik = gl_WorkGroupID.x / blocks_m;
+-    const uint ic = gl_WorkGroupID.y;
+ 
+     const uint WNITER = (WM * WN) / (WARP * TM * TN * WMITER);
+     const uint WSUBM = WM / WMITER;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -92,6 +92,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ 
+ #ifdef MUL_MAT_ID
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
++layout (binding = 4) readonly buffer Counts {int data_expert_count[];};
+ 
+ shared u16vec4 row_ids[BN];
+ 
+@@ -134,6 +135,8 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+     uint ids[16];
+     uint iter = 0;
+ 
++    uint expert_count = data_expert_count[expert_idx];
++
+     for (uint j = 0; j < num_elements; j += BLOCK_SIZE) {
+         // prefetch up to 16 elements
+         if (iter == 0) {
+@@ -181,7 +184,7 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+         }
+         _ne1 += total;
+         iter &= 15;
+-        if (_ne1 >= (ic + 1) * BN) {
++        if (_ne1 >= (ic + 1) * BN || _ne1 == expert_count) {
+             break;
+         }
+     }
+@@ -191,7 +194,13 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+ 
+ void main() {
+     const uint tid = gl_LocalInvocationIndex;
++    const uint ic = gl_WorkGroupID.y;
++
+ #ifdef MUL_MAT_ID
++    const uint expert_idx = gl_GlobalInvocationID.z;
++    if (ic * BN >= data_expert_count[expert_idx]) {
++        return;
++    }
+     // initialize to row 0 so we don't need to bounds check
+     if (tid < BN) {
+         row_ids[tid] = u16vec4(0);
+@@ -205,9 +214,7 @@ void main() {
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+-#ifdef MUL_MAT_ID
+-    const uint expert_idx = gl_GlobalInvocationID.z;
+-#else
++#ifndef MUL_MAT_ID
+     const uint batch_idx = gl_GlobalInvocationID.z;
+ 
+     const uint i13 = batch_idx / p.ne12;
+@@ -222,7 +229,6 @@ void main() {
+     const uint blocks_m = (p.M + BM - 1) / BM;
+     const uint ir = gl_WorkGroupID.x % blocks_m;
+     const uint ik = gl_WorkGroupID.x / blocks_m;
+-    const uint ic = gl_WorkGroupID.y;
+ 
+ #ifdef MUL_MAT_ID
+     if (bitCount(p.nei0) == 1) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_id_funcs.glsl
+@@ -13,6 +13,8 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+     uint ids[16];
+     uint iter = 0;
+ 
++    uint expert_count = data_expert_count[expert_idx];
++
+     for (uint j = 0; j < num_elements; j += BLOCK_SIZE) {
+         // prefetch up to 16 elements
+         if (iter == 0) {
+@@ -60,7 +62,7 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+         }
+         _ne1 += total;
+         iter &= 15;
+-        if (_ne1 >= (ic + 1) * BN) {
++        if (_ne1 >= (ic + 1) * BN || _ne1 == expert_count) {
+             break;
+         }
+     }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -35,6 +35,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ 
+ #ifdef MUL_MAT_ID
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
++layout (binding = 4) readonly buffer Counts {int data_expert_count[];};
+ #endif
+ 
+ layout (push_constant) uniform parameter
+@@ -104,13 +105,19 @@ block_b_cache cache_b;
+ #include "mul_mmq_funcs.glsl"
+ 
+ void main() {
++    const uint ic = gl_WorkGroupID.y;
++
++#ifdef MUL_MAT_ID
++    const uint expert_idx = gl_GlobalInvocationID.z;
++    if (ic * BN >= data_expert_count[expert_idx]) {
++        return;
++    }
++#endif
+ #ifdef NEEDS_INIT_IQ_SHMEM
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+-#ifdef MUL_MAT_ID
+-    const uint expert_idx = gl_GlobalInvocationID.z;
+-#else
++#ifndef MUL_MAT_ID
+     const uint batch_idx = gl_GlobalInvocationID.z;
+ 
+     const uint i13 = batch_idx / p.ne12;
+@@ -125,7 +132,6 @@ void main() {
+     const uint blocks_m = (p.M + BM - 1) / BM;
+     const uint ir = gl_WorkGroupID.x % blocks_m;
+     const uint ik = gl_WorkGroupID.x / blocks_m;
+-    const uint ic = gl_WorkGroupID.y;
+ 
+     const uint WNITER = (WM * WN) / (WARP * TM * TN * WMITER);
+     const uint WSUBM = WM / WMITER;

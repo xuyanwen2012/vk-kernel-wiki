@@ -1,0 +1,17 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+@@ -17,8 +17,11 @@ layout (push_constant) uniform parameter2
+     uint nb[8][4];
+ } p;
+ 
+-layout (binding = 0) readonly buffer A {A_TYPE data_a[];} a[];
+-layout (binding = 0) writeonly buffer D {D_TYPE data_d[];} d[];
++// Workaround for MoltenVK Bug, see https://github.com/ggml-org/llama.cpp/issues/15498
++// layout (binding = 0) readonly buffer A {A_TYPE data_a[];} a[];
++// layout (binding = 0) writeonly buffer D {D_TYPE data_d[];} d[];
++layout (binding = 0) buffer A {A_TYPE data_a[];} a[];
++layout (binding = 0) buffer D {D_TYPE data_d[];} d[];
+ 
+ layout(constant_id = 0) const uint num_srcs = 2;
+ 

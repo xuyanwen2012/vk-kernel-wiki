@@ -7,6 +7,7 @@ Usage:
     grep_wiki.py "RADV" --only sources --files-only
     grep_wiki.py "coopmat int8" --any          # match if ANY word appears
     grep_wiki.py "latency" --ext json,csv      # also search raw-data files
+    grep_wiki.py "coopMatMulAdd" --only artifacts   # saved upstream shader patches
 
 Returns matching lines with file path, line number, and N context lines.
 """
@@ -32,9 +33,10 @@ def iter_files(scope, exts=None):
         "wiki": ["wiki"],
         "sources": ["sources"],
         "all": ["wiki", "sources"],
+        "artifacts": ["artifacts"],
     }
     sub_list = dirs.get(scope, ["wiki", "sources"])
-    search_exts = {".md"} | (exts or set())
+    search_exts = ({".patch"} if scope == "artifacts" else {".md"}) | (exts or set())
 
     for sub in sub_list:
         base = WIKI_ROOT / sub
@@ -74,8 +76,9 @@ def grep_file(path, compiled_patterns, context, any_match):
 def main():
     parser = argparse.ArgumentParser(description="Text search across the Vulkan compute-shader kernel wiki")
     parser.add_argument("patterns", nargs="+", help="Search pattern(s) — all must match a line unless --any is used")
-    parser.add_argument("--only", choices=["wiki", "sources", "all"], default="all",
-                        help="Restrict search scope (default: all)")
+    parser.add_argument("--only", choices=["wiki", "sources", "all", "artifacts"], default="all",
+                        help="Restrict search scope (default: all = wiki and sources; "
+                             "'artifacts' searches the saved upstream shader patches instead)")
     parser.add_argument("--context", type=int, default=1, help="Context lines around each match (default 1)")
     parser.add_argument("--any", action="store_true", help="Match if ANY pattern matches a line (default: all must match)")
     parser.add_argument("--limit", type=int, default=20, help="Max files reported (default 20)")

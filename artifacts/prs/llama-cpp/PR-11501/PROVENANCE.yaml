@@ -1,0 +1,43 @@
+repo: ggml-org/llama.cpp
+pr: 11501
+url: https://github.com/ggml-org/llama.cpp/pull/11501
+merge_sha: 8a7e3bf17aa5a8412854787746c92a28623a8925
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/11501/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+  status: modified
+  sha256: 5744999e2f5f133f0a10a6701ff1156603ea7ad1d8bcee08528d8dc95500d184
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+  status: modified
+  sha256: 278650fbbda37802aeb2cb47098cb375e6d0c58758ae199f2aba6860b1a3b1ed
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+  status: modified
+  sha256: 7c1dafe01ad2498116ecfd035ae7ca86bef383d584955882759428b9fc98a875
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp
+  status: modified
+  sha256: 85e58b20f743056e5019f30a6b399735e39b2d19435ea49c2e90e36cf78f5569
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
+  status: added
+  sha256: cefbb51a15d02b290b145c37f5540bbe3203f99afd02df82b80d7c35aed5ab90
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+  status: modified
+  sha256: 7f21d620ae1005a448168d4aeddc17831fa9929cc1f65c0f128e8387a5c72812
+- path: ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+  status: modified
+  sha256: 1979848f2c2b6acd17d5d17b2c4832739efc387e479080b374e5b152d468e473
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+  status: modified
+  sha256: def865ce939b7e461ba4a75296bd89bc578db29443c9d5e8e33d1e96200704b4
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+  status: modified
+  sha256: cd1a3d76fa87b9566158e54bfd2f4fdfc8fc96ba80912f20862cc9de2f391c61
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+  status: modified
+  sha256: d9e755d0f29c0924fbec50c78e9d8e8c0648b45f59b473f2a73254597147901c
+- path: ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+  status: modified
+  sha256: ac90e44c9e5102f344fb251882eb900f938ec64553b17994def0a7b71d14da1c

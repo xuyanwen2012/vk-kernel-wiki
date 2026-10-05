@@ -1,0 +1,1557 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/acc.comp b/ggml/src/ggml-vulkan/vulkan-shaders/acc.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/acc.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/acc.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/add.comp b/ggml/src/ggml-vulkan/vulkan-shaders/add.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/add.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/add.comp
+@@ -6,8 +6,8 @@
+ #extension GL_KHR_shader_subgroup_basic : enable
+ #endif
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ const uint num_threads = 256;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/add_id.comp b/ggml/src/ggml-vulkan/vulkan-shaders/add_id.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/add_id.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/add_id.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp b/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/argmax.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp b/ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/argsort.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(constant_id = 0) const int BLOCK_SIZE = 1024;
+ layout(constant_id = 1) const int BLOCK_SIZE_LOG2 = 10;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/concat.comp b/ggml/src/ggml-vulkan/vulkan-shaders/concat.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/concat.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/concat.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp b/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/contig_copy.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : require
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_dw.comp b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_dw.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_dw.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_dw.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
+@@ -11,7 +11,7 @@
+ #    extension GL_KHR_shader_subgroup_shuffle : enable
+ #endif
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ // shape notation: [dim(N), ..., dim(0)] -- stride(dim(j)) >= stride(dim(i)) if i > j
+ layout(binding = 0) readonly buffer A {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/conv_transpose_1d.comp b/ggml/src/ggml-vulkan/vulkan-shaders/conv_transpose_1d.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/conv_transpose_1d.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/conv_transpose_1d.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};   // src0 - kernel:    [K, Cout, Cin]
+ layout (binding = 1) readonly buffer B {B_TYPE data_b[];};   // src1 - input:     [L, Cin]
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+@@ -1,8 +1,8 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
+-#include "dequant_funcs.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
++#include "dequant_funcs.glsl"
+ 
+ #if defined(DATA_A_IQ4_NL) || defined(DATA_A_MXFP4)
+ // 16 invocations needed for init_iq_shmem
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "rte.comp"
+-#include "types.comp"
++#include "rte.glsl"
++#include "types.glsl"
+ 
+ #if defined(SET_ROWS) && QUANT_K == 1
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+@@ -14,7 +14,7 @@ const uint BLOCK_SIZE = 32;
+ layout (binding = 0) readonly buffer S {float data_s[];};
+ 
+ #if defined(SET_ROWS)
+-#include "generic_binary_head.comp"
++#include "generic_binary_head.glsl"
+ layout (binding = 1) readonly buffer C {B_TYPE data_i[];};
+ layout (binding = 2) writeonly buffer Q {A_TYPE data_q[];};
+ 
+@@ -25,7 +25,7 @@ layout (binding = 2) writeonly buffer Q {A_TYPE data_q[];};
+ #endif
+ 
+ #else
+-#include "generic_unary_head.comp"
++#include "generic_unary_head.glsl"
+ layout (binding = 1) writeonly buffer Q {A_TYPE data_q[];};
+ #endif
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp b/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp b/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/count_equal.comp
+@@ -2,8 +2,8 @@
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+-#include "types.comp"
+-#include "generic_head.comp"
++#include "types.glsl"
++#include "generic_head.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_f32.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_f32.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_f32.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_f32.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+@@ -2,7 +2,7 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+ #endif
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #if defined(A_TYPE_PACKED16)
+ layout (binding = 0) readonly buffer A_PACKED16 {A_TYPE_PACKED16 data_a_packed16[];};
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+@@ -1,5 +1,5 @@
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufQ4_0 {
+    block_q4_0_packed16 block;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_head.glsl
+@@ -10,4 +10,4 @@ layout (push_constant) uniform parameter
+     uint nel;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_m.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq1_s.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_s.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xs.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq2_xxs.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_s.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq3_xxs.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_nl.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_mxfp4.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_mxfp4.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_mxfp4.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_mxfp4.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q2_k.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q3_k.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_0.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_0.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_0.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_1.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q4_k.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_0.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_0.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_0.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_1.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q5_k.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q6_k.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q8_0.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q8_0.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q8_0.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_q8_0.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "dequant_head.comp"
++#include "dequant_head.glsl"
+ 
+ layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/diag_mask_inf.comp b/ggml/src/ggml-vulkan/vulkan-shaders/diag_mask_inf.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/diag_mask_inf.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/diag_mask_inf.comp
+@@ -10,7 +10,7 @@ layout (push_constant) uniform parameter
+     uint n_past;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(local_size_x = 1, local_size_y = 512, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/div.comp b/ggml/src/ggml-vulkan/vulkan-shaders/div.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/div.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/div.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ const uint num_threads = 256;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/exp.comp
+@@ -1,8 +1,8 @@
+ #version 450
+ 
+-#include "rte.comp"
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "rte.glsl"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -8,8 +8,8 @@
+ 
+ #extension GL_KHR_shader_subgroup_shuffle : enable
+ 
+-#include "types.comp"
+-#include "flash_attn_base.comp"
++#include "types.glsl"
++#include "flash_attn_base.glsl"
+ 
+ const uint32_t HSK_per_thread = HSK / D_split;
+ const uint32_t HSV_per_thread = HSV / D_split;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -10,8 +10,8 @@
+ #extension GL_KHR_memory_scope_semantics : enable
+ #extension GL_KHR_cooperative_matrix : enable
+ 
+-#include "types.comp"
+-#include "flash_attn_base.comp"
++#include "types.glsl"
++#include "flash_attn_base.glsl"
+ 
+ const uint32_t HSK_per_thread = HSK / D_split;
+ const uint32_t HSV_per_thread = HSV / D_split;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -16,9 +16,9 @@
+ #extension GL_KHR_shader_subgroup_vote : enable
+ #extension GL_EXT_null_initializer : enable
+ 
+-#include "types.comp"
+-#include "dequant_funcs_cm2.comp"
+-#include "flash_attn_base.comp"
++#include "types.glsl"
++#include "dequant_funcs_cm2.glsl"
++#include "flash_attn_base.glsl"
+ 
+ layout (binding = 0) readonly buffer Q {uint8_t data_q[];};
+ layout (binding = 1) readonly buffer K {uint8_t data_k[];};
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/geglu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/geglu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/geglu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/geglu.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ const float GELU_COEF_A    = 0.044715f;
+ const float SQRT_2_OVER_PI = 0.79788456080286535587989211986876f;
+@@ -10,4 +10,4 @@ float op(float a, float b) {
+     return 0.5f*a*(2.0f - 2.0f / (exp(2 * val) + 1)) * b;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/geglu_erf.comp b/ggml/src/ggml-vulkan/vulkan-shaders/geglu_erf.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/geglu_erf.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/geglu_erf.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ // based on Abramowitz and Stegun formula 7.1.26 or similar Hastings' approximation
+ // ref: https://www.johndcook.com/blog/python_erf/
+@@ -24,4 +24,4 @@ float op(float a, float b) {
+     return 0.5f * a * (1.0f + erf_approx) * b;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/geglu_quick.comp b/ggml/src/ggml-vulkan/vulkan-shaders/geglu_quick.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/geglu_quick.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/geglu_quick.comp
+@@ -1,11 +1,11 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ const float GELU_QUICK_COEF = -1.702f;
+ 
+ float op(float a, float b) {
+     return a * (1.0f / (1.0f + exp(GELU_QUICK_COEF * a))) * b;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/gelu.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_erf.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/gelu_quick.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.glsl
+@@ -1,8 +1,8 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#include "rte.comp"
+-#include "utils.comp"
++#include "rte.glsl"
++#include "utils.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+@@ -2,9 +2,9 @@
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
+-#include "dequant_funcs.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
++#include "dequant_funcs.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+@@ -1,6 +1,6 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#include "rte.comp"
++#include "rte.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/group_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/group_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/group_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/group_norm.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp b/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/hardsigmoid.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp b/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/hardswish.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+@@ -3,9 +3,8 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#include "rte.comp"
+-
+-#include "types.comp"
++#include "rte.glsl"
++#include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp b/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/im2col_3d.comp
+@@ -4,9 +4,8 @@
+ #extension GL_EXT_control_flow_attributes : require
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "rte.comp"
+-
+-#include "types.comp"
++#include "rte.glsl"
++#include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ const uint num_threads = 256;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+@@ -11,7 +11,7 @@
+ #define EXPERT_COUNT 8
+ #endif
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #ifndef MMQ
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+@@ -32,7 +32,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ layout (binding = 3) readonly buffer IDS {int data_ids[];};
+ #endif
+ 
+-#include "dequant_funcs.comp"
++#include "dequant_funcs.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
+@@ -2,7 +2,7 @@
+ 
+ #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+@@ -6,13 +6,13 @@
+ #define MMQ
+ #define B_TYPE block_q8_1_x4
+ 
+-#include "mul_mat_vec_base.comp"
++#include "mul_mat_vec_base.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+ #define K_PER_ITER 8
+ 
+-#include "mul_mmq_funcs.comp"
++#include "mul_mmq_funcs.glsl"
+ 
+ uint a_offset, b_offset, d_offset;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -28,7 +28,7 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #endif
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #ifndef LOAD_VEC_A
+ #define LOAD_VEC_A 1
+@@ -195,7 +195,7 @@ void load_row_ids(uint expert_idx, bool nei0_is_pow2, uint ic) {
+ shared ACC_TYPE coopmat_stage[TM * TN * NUM_WARPS];
+ #endif
+ 
+-#include "mul_mm_funcs.comp"
++#include "mul_mm_funcs.glsl"
+ 
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -18,8 +18,8 @@
+ #extension GL_EXT_bfloat16 : enable
+ #endif
+ 
+-#include "types.comp"
+-#include "utils.comp"
++#include "types.glsl"
++#include "utils.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+@@ -71,7 +71,7 @@ layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+ #if QUANT_K > 1
+ #define DECODEFUNCA , dequantFuncA
+ 
+-#include "dequant_funcs_cm2.comp"
++#include "dequant_funcs_cm2.glsl"
+ 
+ #else
+ #define DECODEFUNCA
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -20,7 +20,7 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #endif
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+@@ -110,7 +110,7 @@ shared u16vec2 row_ids[4096];
+ shared ACC_TYPE coopmat_stage[TM * TN * NUM_WARPS];
+ #endif
+ 
+-#include "mul_mmq_funcs.comp"
++#include "mul_mmq_funcs.glsl"
+ 
+ void main() {
+ #ifdef NEEDS_INIT_IQ_SHMEM
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+@@ -2,7 +2,7 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+ #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ // Each iqs value maps to a 32-bit integer
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/multi_add.comp
+@@ -8,9 +8,9 @@
+ #extension GL_KHR_shader_subgroup_basic : enable
+ #endif
+ 
+-#include "rte.comp"
+-#include "types.comp"
+-#include "utils.comp"
++#include "rte.glsl"
++#include "types.glsl"
++#include "utils.glsl"
+ 
+ layout (push_constant) uniform parameter2
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_adamw.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_sgd.comp b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_sgd.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_sgd.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/opt_step_sgd.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "generic_head.comp"
++#include "generic_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/pad.comp b/ggml/src/ggml-vulkan/vulkan-shaders/pad.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/pad.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/pad.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/pool2d.comp b/ggml/src/ggml-vulkan/vulkan-shaders/pool2d.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/pool2d.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/pool2d.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/quantize_q8_1.comp
+@@ -17,7 +17,7 @@ layout (push_constant) uniform parameter
+     uint ne;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(constant_id = 0) const uint GROUP_SIZE = 32;
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/reglu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/reglu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/reglu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/reglu.comp
+@@ -1,9 +1,9 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ float op(float a, float b) {
+     return max(a, 0.0f) * b;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/relu.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/repeat.comp b/ggml/src/ggml-vulkan/vulkan-shaders/repeat.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/repeat.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/repeat.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/repeat_back.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_binary_head.comp"
+-#include "types.comp"
++#include "generic_binary_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_back.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_partials.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_partials.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_partials.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rms_norm_partials.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_binary_head.comp"
+-#include "types.comp"
++#include "generic_binary_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #extension GL_KHR_shader_subgroup_arithmetic : enable
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp b/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/roll.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.glsl
+@@ -1,8 +1,8 @@
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#include "rte.comp"
++#include "rte.glsl"
+ 
+ layout(local_size_x = 1, local_size_y = 256, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "rope_head.comp"
++#include "rope_head.glsl"
+ 
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "rope_head.comp"
++#include "rope_head.glsl"
+ 
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "rope_head.comp"
++#include "rope_head.glsl"
+ 
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "rope_head.comp"
++#include "rope_head.glsl"
+ 
+ void main() {
+     const uint i0 = 2*gl_GlobalInvocationID.y;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/scale.comp b/ggml/src/ggml-vulkan/vulkan-shaders/scale.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/scale.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/scale.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ const uint num_threads = 128;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sigmoid.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/silu.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/silu_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/silu_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/silu_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/silu_back.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max.comp
+@@ -23,7 +23,7 @@ layout (push_constant) uniform parameter
+     uint has_sinks;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(constant_id = 0) const uint BLOCK_SIZE = 32;
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/soft_max_back.comp
+@@ -2,8 +2,8 @@
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ layout(constant_id = 0) const uint BLOCK_SIZE = 32;
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/square.comp b/ggml/src/ggml-vulkan/vulkan-shaders/square.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/square.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/square.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "types.comp"
+-#include "generic_unary_head.comp"
++#include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sub.comp
+@@ -2,8 +2,8 @@
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+ 
+-#include "types.comp"
+-#include "generic_binary_head.comp"
++#include "types.glsl"
++#include "generic_binary_head.glsl"
+ 
+ const uint num_threads = 256;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/swiglu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/swiglu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/swiglu.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/swiglu.comp
+@@ -1,9 +1,9 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ float op(float a, float b) {
+     return a / (1.0f + exp(-a)) * b;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/swiglu_oai.comp b/ggml/src/ggml-vulkan/vulkan-shaders/swiglu_oai.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/swiglu_oai.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/swiglu_oai.comp
+@@ -1,6 +1,6 @@
+ #version 450
+ 
+-#include "glu_head.comp"
++#include "glu_head.glsl"
+ 
+ float op(float a, float b) {
+     float xi = min(a, p.limit);
+@@ -11,4 +11,4 @@ float op(float a, float b) {
+     return out_glu;
+ }
+ 
+-#include "glu_main.comp"
++#include "glu_main.glsl"
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp b/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/tanh.comp
+@@ -1,7 +1,7 @@
+ #version 450
+ 
+-#include "generic_head.comp"
+-#include "types.comp"
++#include "generic_head.glsl"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/timestep_embedding.comp b/ggml/src/ggml-vulkan/vulkan-shaders/timestep_embedding.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/timestep_embedding.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/timestep_embedding.comp
+@@ -9,7 +9,7 @@ layout (push_constant) uniform parameter
+     uint max_period;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 256
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/upscale.comp b/ggml/src/ggml-vulkan/vulkan-shaders/upscale.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/upscale.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/upscale.comp
+@@ -9,7 +9,7 @@ layout (push_constant) uniform parameter
+     float sf0; float sf1; float sf2; float sf3;
+ } p;
+ 
+-#include "types.comp"
++#include "types.glsl"
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 

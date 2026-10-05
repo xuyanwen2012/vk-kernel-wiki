@@ -93,6 +93,12 @@ int8-cooperative-matrix:
   - int8_coopmat
   - "int8 cooperative matrix"
 
+cooperative-matrix2:
+  - coopmat2
+  - "cooperative matrix 2"
+  - VK_NV_cooperative_matrix2
+  - GL_NV_cooperative_matrix2
+
 coopmat-shape:
   - "coopmat shape"
   - "coopmat shapes"
@@ -137,6 +143,11 @@ fp16-arithmetic:
   - fp16
   - float16_t
   - GL_EXT_shader_explicit_arithmetic_types_float16
+
+bfloat16-arithmetic:
+  - bf16
+  - bfloat16
+  - GL_EXT_bfloat16
 
 int8-arithmetic:
   - int8_t
@@ -316,6 +327,53 @@ gemm:
 gemv:
   - GEMV
   - "single-token"
+
+moe:
+  - MoE
+  - "mixture of experts"
+  - mul_mat_id
+
+convolution:
+  - conv2d
+  - conv3d
+  - im2col
+
+dequantize:
+  - dequant
+  - dequantization
+
+rope:
+  - RoPE
+  - "rotary position embedding"
+
+normalization:
+  - rms_norm
+  - "RMS norm"
+  - l2_norm
+  - group_norm
+
+softmax:
+  - soft_max
+
+topk-sort:
+  - argsort
+  - "top-k"
+  - topk
+  - argmax
+
+gated-delta-net:
+  - GDN
+  - "gated delta net"
+
+tensor-copy:
+  - get_rows
+  - set_rows
+  - "contiguous copy"
+
+elementwise:
+  - "element-wise"
+  - "unary operator"
+  - "binary operator"
 
 # Languages
 spirv:

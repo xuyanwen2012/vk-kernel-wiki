@@ -1,0 +1,296 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+@@ -12,7 +12,7 @@ layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+ #endif
+ 
+ void main() {
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+     if (gl_LocalInvocationIndex.x != 0) {
+         return;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+@@ -217,7 +217,7 @@ void quantize(uint dst_idx, uint src_idx)
+ #endif
+ 
+ void main() {
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+     if (gl_LocalInvocationIndex.x != 0) {
+         return;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.comp
+@@ -304,6 +304,42 @@ vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
+ }
+ #endif
+ 
++#if defined(DATA_A_IQ4_XS)
++vec2 dequantize(uint ib, uint iqs, uint a_offset) {
++    const uint ib32 = iqs / 32;
++    const uint iq = 16 * ib32 + (iqs % 16);
++
++    const uint sl = (data_a[a_offset + ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++    const uint sh = (data_a[a_offset + ib].scales_h >> (2 * ib32)) & 3;
++    const uint qshift = (iqs & 16) >> 2;
++    u8vec2 qs = u8vec2(data_a[a_offset + ib].qs[iq], data_a[a_offset + ib].qs[iq + 1]);
++    qs = (qs >> qshift) & uint8_t(0xF);
++
++    const float dl = float(int(sl | (sh << 4)) - 32);
++    return dl * vec2(kvalues_iq4nl[qs.x], kvalues_iq4nl[qs.y]);
++}
++vec4 dequantize4(uint ib, uint iqs, uint a_offset) {
++    const uint ib32 = iqs / 32;
++    const uint iq = 16 * ib32 + (iqs % 16);
++
++    const uint sl = (data_a[a_offset + ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++    const uint sh = (data_a[a_offset + ib].scales_h >> (2 * ib32)) & 3;
++    const uint qshift = (iqs & 16) >> 2;
++    u8vec4 qs = u8vec4(
++        data_a[a_offset + ib].qs[iq + 0],
++        data_a[a_offset + ib].qs[iq + 1],
++        data_a[a_offset + ib].qs[iq + 2],
++        data_a[a_offset + ib].qs[iq + 3]
++    );
++    qs = (qs >> qshift) & uint8_t(0xF);
++
++    const float dl = float(int(sl | (sh << 4)) - 32);
++    return dl * vec4(
++        kvalues_iq4nl[qs.x], kvalues_iq4nl[qs.y],
++        kvalues_iq4nl[qs.z], kvalues_iq4nl[qs.w]);
++}
++#endif
++
+ #if defined(DATA_A_IQ4_NL)
+ vec2 dequantize(uint ib, uint iqs, uint a_offset) {
+     const uint vui = uint(data_a[a_offset + ib].qs[iqs]);
+@@ -321,7 +357,7 @@ vec2 get_dm(uint ib, uint a_offset) {
+ }
+ #endif
+ 
+-#if defined(DATA_A_Q4_0) || defined(DATA_A_Q5_0) || defined(DATA_A_Q8_0) || defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_Q4_0) || defined(DATA_A_Q5_0) || defined(DATA_A_Q8_0) || defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+ vec2 get_dm(uint ib, uint a_offset) {
+     return vec2(float(data_a[a_offset + ib].d), 0);
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.comp
+@@ -454,6 +454,27 @@ float16_t dequantFuncIQ3_S(const in decodeBufIQ3_S bl, const in uint blockCoords
+ }
+ #endif
+ 
++#if defined(DATA_A_IQ4_XS)
++layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufIQ4_XS {
++   block_iq4_xs block;
++};
++
++float16_t dequantFuncIQ4_XS(const in decodeBufIQ4_XS bl, const in uint blockCoords[2], const in uint coordInBlock[2])
++{
++    const float16_t d = bl.block.d;
++    const uint idx = coordInBlock[1];
++
++    const uint ib32 = (idx & 0xE0) >> 5; // 0..7
++
++    const uint sl = (bl.block.scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++    const uint sh = ((bl.block.scales_h) >> (2 * ib32)) & 3;
++    const uint qshift = (idx & 16) >> 2;
++    const uint q = (bl.block.qs[16 * ib32 + (idx % 16)] >> qshift) & 0xF;
++
++    float16_t ret = d * float16_t(int(sl | (sh << 4)) - 32) * float16_t(kvalues_iq4nl[q]);
++    return ret;
++}
++#endif
+ 
+ #if defined(DATA_A_IQ4_NL)
+ layout(buffer_reference, std430, buffer_reference_align = 2) buffer decodeBufIQ4_NL {
+@@ -504,6 +525,8 @@ float16_t dequantFuncIQ4_NL(const in decodeBufIQ4_NL bl, const in uint blockCoor
+ #define dequantFuncA dequantFuncIQ3_XXS
+ #elif defined(DATA_A_IQ3_S)
+ #define dequantFuncA dequantFuncIQ3_S
++#elif defined(DATA_A_IQ4_XS)
++#define dequantFuncA dequantFuncIQ4_XS
+ #elif defined(DATA_A_IQ4_NL)
+ #define dequantFuncA dequantFuncIQ4_NL
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/dequant_iq4_xs.comp
+@@ -0,0 +1,34 @@
++#version 450
++
++#include "dequant_head.comp"
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++layout (binding = 0) readonly buffer A {block_iq4_xs data_a[];};
++layout (binding = 1) writeonly buffer D {D_TYPE data_b[];};
++
++void main() {
++    // Each thread handles 1 subblock (1 scale and 32 quantized values)
++    const uint ib = gl_WorkGroupID.x * 32 + gl_LocalInvocationID.x / 8;
++
++    init_iq_shmem(gl_WorkGroupSize);
++
++    if (ib >= p.nel / 256) {
++        return;
++    }
++
++    const uint ib32 = gl_LocalInvocationID.x % 8;
++
++    const float d = float(data_a[ib].d);
++    // Scales are 6 bits
++    const uint scale = ((data_a[ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF)
++                     | (((data_a[ib].scales_h >> (2 * ib32)) & 3) << 4);
++    const float dl = d * (int(scale) - 32);
++
++    const uint b_idx = 256 * ib + 32 * ib32;
++    const uint q_idx = 16 * ib32;
++    [[unroll]] for (uint l = 0; l < 16; ++l) {
++        data_b[b_idx + l +  0] = D_TYPE(dl * kvalues_iq4nl[data_a[ib].qs[q_idx + l] & 0xF]);
++        data_b[b_idx + l + 16] = D_TYPE(dl * kvalues_iq4nl[data_a[ib].qs[q_idx + l] >>  4]);
++    }
++}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -104,7 +104,7 @@ ACC_TYPE Max(const in uint32_t row, const in uint32_t col, const in ACC_TYPE ele
+ #endif
+ 
+ void main() {
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/get_rows_quant.comp
+@@ -12,7 +12,7 @@ void main() {
+     const uint i11 = (gl_GlobalInvocationID.z)/p.ne12;
+     const uint i12 = (gl_GlobalInvocationID.z)%p.ne12;
+ 
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -133,7 +133,7 @@ void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
+ void main() {
+     const uint first_row = NUM_ROWS * (gl_WorkGroupID.x + gl_NumWorkGroups.x * gl_WorkGroupID.z);
+ 
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -95,7 +95,7 @@ shared ACC_TYPE coopmat_stage[TM * TN * NUM_WARPS];
+ #endif
+ 
+ void main() {
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+@@ -547,6 +547,25 @@ void main() {
+             const uint32_t grid = iq3s_grid[qs | ((qh << (8 - (iqs % 8))) & 256)] >> (16 * (idx % 2));
+             const vec2 v = db * vec2(sign01) * vec2(unpack8(grid).xy);
+ 
++            buf_a[buf_idx    ] = FLOAT_TYPE(v.x);
++            buf_a[buf_idx + 1] = FLOAT_TYPE(v.y);
++#elif defined(DATA_A_IQ4_XS)
++            const uint idx = pos_a + (loadc_a + l) * p.stride_a / LOAD_VEC_A + loadr_a;
++            const uint buf_idx = (loadc_a + l) * SHMEM_STRIDE + loadr_a * LOAD_VEC_A;
++
++            const uint ib = idx / 128;                  // 2 values per idx
++            const uint ib32 = (idx % 128) / 16;         // 0..7
++            const uint iq = 16 * ib32 + 2 * (idx % 8);
++
++            const uint sl = (data_a[ib].scales_l[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
++            const uint sh = ((data_a[ib].scales_h) >> (2 * ib32)) & 3;
++            const uint qshift = (idx & 8) >> 1;
++            u8vec2 qs = u8vec2(data_a[ib].qs[iq], data_a[ib].qs[iq + 1]);
++            qs = (qs >> qshift) & uint8_t(0xF);
++
++            const float d = float(data_a[ib].d);
++            const vec2 v = d * float(int(sl | (sh << 4)) - 32) * vec2(kvalues_iq4nl[qs.x], kvalues_iq4nl[qs.y]);
++
+             buf_a[buf_idx    ] = FLOAT_TYPE(v.x);
+             buf_a[buf_idx + 1] = FLOAT_TYPE(v.y);
+ #elif defined(DATA_A_IQ4_NL)
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -106,7 +106,7 @@ D_TYPE perElemOpD(const in uint32_t r, const in uint32_t c, const in D_TYPE elem
+ #endif
+ 
+ void main() {
+-#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_NL)
++#if defined(DATA_A_IQ2_XXS) || defined(DATA_A_IQ2_XS) || defined(DATA_A_IQ2_S) || defined(DATA_A_IQ3_XXS) || defined(DATA_A_IQ3_S) || defined(DATA_A_IQ4_XS) || defined(DATA_A_IQ4_NL)
+     init_iq_shmem(gl_WorkGroupSize);
+ #endif
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/types.comp
+@@ -1026,6 +1026,23 @@ void init_iq_shmem(uvec3 wgsize)
+ #define A_TYPE_PACKED16 block_iq3_s_packed16
+ #endif
+ 
++#define QUANT_K_IQ4_XS 256
++#define QUANT_R_IQ4_XS 1
++
++struct block_iq4_xs
++{
++    float16_t d;
++    uint16_t scales_h;
++    uint8_t scales_l[QUANT_K_IQ4_XS/64];
++    uint8_t qs[QUANT_K_IQ4_XS/2];
++};
++
++#if defined(DATA_A_IQ4_XS)
++#define QUANT_K QUANT_K_IQ4_XS
++#define QUANT_R QUANT_R_IQ4_XS
++#define A_TYPE block_iq4_xs
++#endif
++
+ #define QUANT_K_IQ4_NL 32
+ #define QUANT_R_IQ4_NL 2
+ 
+@@ -1042,7 +1059,13 @@ struct block_iq4_nl_packed16
+ };
+ 
+ #if defined(DATA_A_IQ4_NL)
++#define QUANT_K QUANT_K_IQ4_NL
++#define QUANT_R QUANT_R_IQ4_NL
++#define A_TYPE block_iq4_nl
++#define A_TYPE_PACKED16 block_iq4_nl_packed16
++#endif
+ 
++#if defined(DATA_A_IQ4_NL) || defined(DATA_A_IQ4_XS)
+ const int8_t kvalues_iq4nl_const[16] = {
+     int8_t(-127), int8_t(-104), int8_t(-83), int8_t(-65), int8_t(-49), int8_t(-35), int8_t(-22), int8_t(-10),
+     int8_t(1), int8_t(13), int8_t(25), int8_t(38), int8_t(53), int8_t(69), int8_t(89), int8_t(113)
+@@ -1058,11 +1081,6 @@ void init_iq_shmem(uvec3 wgsize)
+     }
+     barrier();
+ }
+-
+-#define QUANT_K QUANT_K_IQ4_NL
+-#define QUANT_R QUANT_R_IQ4_NL
+-#define A_TYPE block_iq4_nl
+-#define A_TYPE_PACKED16 block_iq4_nl_packed16
+ #endif
+ 
+ #endif // !defined(GGML_TYPES_COMP)

@@ -1,0 +1,13 @@
+repo: ggml-org/llama.cpp
+pr: 7475
+url: https://github.com/ggml-org/llama.cpp/pull/7475
+merge_sha: 1b1e27cb49158123ef4902aa41eb368c9e76e6a1
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/7475/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml_vk_generate_shaders.py
+  status: modified
+  sha256: 5ac5aa7f1fd55e62bc2de1378a79a3ddd60c7dcd2c4edac0d2adcf8ff6a14d4e

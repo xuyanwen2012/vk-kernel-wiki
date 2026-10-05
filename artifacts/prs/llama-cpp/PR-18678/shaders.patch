@@ -1,0 +1,249 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+@@ -87,7 +87,6 @@ void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
+     const uint tid = gl_LocalInvocationID.x;
+ 
+     get_offsets(a_offset, b_offset, d_offset);
+-    a_offset /= QUANT_K;
+ 
+     y_offset = QUANT_R == 1 ? 1 : QUANT_K/2;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+@@ -65,9 +65,9 @@ void get_offsets(out uint a_offset, out uint b_offset, out uint d_offset) {
+ 
+     a_offset =
+ #ifdef MUL_MAT_ID
+-            expert_id * p.batch_stride_a;
++            expert_id * (p.batch_stride_a / QUANT_K);
+ #else
+-            batch_idx_a * p.batch_stride_a;
++            batch_idx_a * (p.batch_stride_a / QUANT_K);
+ #endif
+     b_offset =
+ #ifdef MUL_MAT_ID
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_m.comp
+@@ -11,7 +11,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint ib32,
+                                const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
+     // Compute starting index in matrix B for this superblock
+     const uint y_idx = i * QUANT_K + 32 * ib32;
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+ 
+     // Precompute indices for quantization lookup tables
+     const uint qh_base = 2 * ib32;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq1_s.comp
+@@ -17,7 +17,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint ib32,
+             const vec4 b_val_1 = vec4(data_b_v4[base_b_idx + 2 * l + 1]);
+ 
+             // index for data_a
+-            uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++            uint ibi = a_offset + first_row * num_blocks_per_row + i;
+ 
+             [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+                 const float d = float(data_a[ibi].d);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_s.comp
+@@ -12,7 +12,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint nibble_shift = 4 * (itid & 1);
+     const uint ib32 = itid / 2; // 0..7
+ 
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+         const float d = float(data_a[ibi].d);
+         const uint scale = (data_a[ibi].scales[ib32] >> nibble_shift) & 0xF;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xs.comp
+@@ -11,7 +11,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint y_idx = i * QUANT_K + 16 * itid;
+     const uint nibble_shift = 4 * (itid & 1);
+     const uint ib32 = itid / 2; // 0..7
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+     // Precompute db multiplication factors
+     float db_vals[NUM_ROWS];
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+@@ -22,7 +22,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+         db_vals[n] = d * (0.125f + float(scale) * 0.25f);
+         ibi += num_blocks_per_row;
+     }
+-    ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    ibi = a_offset + first_row * num_blocks_per_row + i;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+         // Preload grid and sign data for all l values
+         vec4 grid0_vals[2], grid1_vals[2];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq2_xxs.comp
+@@ -11,7 +11,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint y_idx = i * QUANT_K + 16 * itid;
+     const uint ib32 = itid / 2; // 0..7
+ 
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+         const float d = float(data_a[ibi].d);
+         const uint signscale = pack32(u16vec2(
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_s.comp
+@@ -10,7 +10,7 @@ FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
+ void calc_superblock(const uint a_offset, const uint b_offset, const uint ib32, const uint i, const uint num_blocks_per_row, const uint first_row, const uint num_rows) {
+     const uint y_idx = i * QUANT_K + 32 * ib32;
+ 
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+         const float d = float(data_a[ibi].d);
+         const uint scale = (data_a[ibi].scales[ib32/2] >> (4 * (ib32 & 1))) & 0xF;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iq3_xxs.comp
+@@ -11,7 +11,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint y_idx = i * QUANT_K + 16 * itid;
+     const uint ib32 = itid / 2; // 0..7
+ 
+-    uint ibi = a_offset / QUANT_K + first_row * num_blocks_per_row + i;
++    uint ibi = a_offset + first_row * num_blocks_per_row + i;
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+         const float d = float(data_a[ibi].d);
+         const uint signscale = pack32(u16vec2(
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q2_k.comp
+@@ -15,7 +15,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint y_idx = i * QUANT_K + y_offset;
+ 
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib0 = a_offset / QUANT_K + (first_row+n)*num_blocks_per_row;
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
+         csel ^= 1;
+ 
+         if (!all_threads) { // when we don't have enough blocks to use all threads
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q3_k.comp
+@@ -14,7 +14,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint ix, co
+     const uint y_idx = i * QUANT_K + y_offset;
+ 
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib0 = a_offset / QUANT_K + (first_row+n)*num_blocks_per_row;
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
+         csel ^= 1;
+ 
+         if (!all_threads) { // when we don't have enough blocks to use all threads
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q4_k.comp
+@@ -13,7 +13,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint v_im,
+     const uint y2_idx = y1_idx + 128;
+ 
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib0 = a_offset / QUANT_K + (first_row+n)*num_blocks_per_row;
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
+         const FLOAT_TYPE_VEC2 dm = FLOAT_TYPE_VEC2(data_a[ib0 + i].dm);
+ 
+         const uint32_t scale0_u32 = data_a_packed16[ib0 + i].scales[v_im    ];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q5_k.comp
+@@ -13,7 +13,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint v_im,
+     const uint y2_idx = y1_idx + 128;
+ 
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib0 = a_offset / QUANT_K + (first_row+n)*num_blocks_per_row;
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
+         const FLOAT_TYPE_VEC2 dm = FLOAT_TYPE_VEC2(data_a[ib0 + i].dm);
+ 
+         const uint32_t scale0_u32 = data_a_packed16[ib0 + i].scales[v_im    ];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_q6_k.comp
+@@ -15,7 +15,7 @@ void calc_superblock(const uint a_offset, const uint b_offset, const uint itid,
+     const uint y_idx = i * QUANT_K + y_offset;
+ 
+     [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-        const uint ib0 = a_offset / QUANT_K + (first_row+n)*num_blocks_per_row;
++        const uint ib0 = a_offset + (first_row+n)*num_blocks_per_row;
+         csel ^= 1;
+ 
+         if (!all_threads) { // when we don't have enough blocks to use all threads
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+@@ -79,7 +79,7 @@ void compute_outputs(const uint32_t first_row, const uint32_t num_rows) {
+     const uint tid = gl_LocalInvocationID.x;
+ 
+     get_offsets(a_offset, b_offset, d_offset);
+-    a_offset /= QUANT_K_Q8_1;
++    a_offset *= QUANT_K / QUANT_K_Q8_1;
+     b_offset /= QUANT_K_Q8_1;
+ 
+     FLOAT_TYPE temp[NUM_COLS][NUM_ROWS];
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -234,13 +234,13 @@ void main() {
+     const uint end_k = min(p.K, (ik + 1) * p.k_split);
+ #endif
+ 
+-    uint pos_a = (
++    uint pos_a =
+ #ifdef MUL_MAT_ID
+-        expert_idx * p.batch_stride_a +
++        expert_idx * (p.batch_stride_a / LOAD_VEC_A) +
+ #else
+-        batch_idx_a * p.batch_stride_a +
++        batch_idx_a * (p.batch_stride_a / LOAD_VEC_A) +
+ #endif
+-        ir * BM * p.stride_a + start_k) / LOAD_VEC_A;
++        (ir * BM * p.stride_a + start_k) / LOAD_VEC_A;
+ #ifdef MUL_MAT_ID
+     uint pos_b = 0;
+ #else
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -250,10 +250,10 @@ void main() {
+ #endif
+ 
+ #ifdef MUL_MAT_ID
+-    uint pos_a = (expert_idx * p.batch_stride_a) / QUANT_K;
++    uint pos_a = expert_idx * (p.batch_stride_a / QUANT_K);
+     uint pos_b = 0;
+ #else
+-    uint pos_a = (batch_idx_a * p.batch_stride_a) / QUANT_K;
++    uint pos_a = batch_idx_a * (p.batch_stride_a / QUANT_K);
+     uint pos_b = batch_idx * p.batch_stride_b;
+     uint pos_d = batch_idx * p.batch_stride_d + ik * p.batch_stride_d * gl_NumWorkGroups.z;
+ #endif
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+@@ -189,13 +189,13 @@ void main() {
+     const uint end_k = min(p.K, (ik + 1) * p.k_split);
+ #endif
+ 
+-    uint pos_a_ib = (
++    uint pos_a_ib =
+ #ifdef MUL_MAT_ID
+-        expert_idx * p.batch_stride_a +
++        expert_idx * (p.batch_stride_a / BK) +
+ #else
+-        batch_idx_a * p.batch_stride_a +
++        batch_idx_a * (p.batch_stride_a / BK) +
+ #endif
+-        ir * BM * p.stride_a + start_k) / BK;
++        (ir * BM * p.stride_a + start_k) / BK;
+ #ifdef MUL_MAT_ID
+     uint pos_b_ib = 0;
+ #else

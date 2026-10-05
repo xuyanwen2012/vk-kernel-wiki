@@ -1,0 +1,124 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -334,6 +334,9 @@ void main() {
+     [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+         [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+             Of[r][d] *= Lfrcp[r];
++#if defined(ACC_TYPE_MAX)
++            Of[r][d] = clamp(Of[r][d], -vec4(ACC_TYPE_MAX), vec4(ACC_TYPE_MAX));
++#endif
+         }
+     }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -373,6 +373,9 @@ void main() {
+     [[unroll]] for (uint32_t d = 0; d < HSV_per_thread / 4; ++d) {
+         [[unroll]] for (uint32_t r = 0; r < rows_per_thread; ++r) {
+             Of[r][d] *= ACC_TYPE(Lfrcp[r]);
++#if defined(ACC_TYPE_MAX)
++            Of[r][d] = clamp(Of[r][d], -ACC_TYPE_MAX, ACC_TYPE_MAX);
++#endif
+         }
+     }
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+@@ -283,6 +283,10 @@ void main() {
+ 
+     O = Ldiag*O;
+ 
++#if defined(ACC_TYPE_MAX)
++    [[unroll]] for (uint i = 0; i < O.length(); ++i) { O[i] = clamp(O[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
++#endif
++
+     uint32_t o_offset = iq3*p.ne2*p.ne1*HSV;
+ 
+     coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator> O_D = coopmat<D_TYPE, gl_ScopeWorkgroup, Br, HSV_pad, gl_MatrixUseAccumulator>(O);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+@@ -111,6 +111,10 @@ void main() {
+             }
+         }
+         O *= L;
++
++        const float FLT_MAX = uintBitsToFloat(0x7F7FFFFF);
++        O = clamp(O, -FLT_MAX, FLT_MAX);
++
+         data_d[iq3 * D * N + D * n + d] = O;
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+@@ -891,6 +891,20 @@ void main() {
+         barrier();
+     }
+ 
++#if defined(ACC_TYPE_MAX)
++#ifdef COOPMAT
++    [[unroll]] for (uint j = 0; j < cms_per_row * cms_per_col; j++) {
++        [[unroll]] for (uint i = 0; i < sums[j].length(); ++i) {
++            sums[j][i] = clamp(sums[j][i], -ACC_TYPE_MAX, ACC_TYPE_MAX);
++        }
++    }
++#else
++    [[unroll]] for (uint i = 0; i < WMITER*TM*WNITER*TN; i++) {
++        sums[i] = clamp(sums[i], -ACC_TYPE_MAX, ACC_TYPE_MAX);
++    }
++#endif
++#endif
++
+     const uint dr = ir * BM + warp_r * WM;
+     const uint dc = ic * BN + warp_c * WN;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+@@ -349,6 +349,10 @@ void main() {
+                 sum = coopMatMulAdd(mat_a, mat_b, sum);
+                 block_k += BK;
+             }
++#if defined(ACC_TYPE_MAX)
++            [[unroll]] for (uint i = 0; i < sum.length(); ++i) { sum[i] = clamp(sum[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
++#endif
++
+             coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BNover4, gl_MatrixUseAccumulator> mat_d = coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BNover4, gl_MatrixUseAccumulator>(sum);
+ 
+             coopMatStoreTensorNV(mat_d, data_d, pos_d, sliceTensorLayoutNV(tensorLayoutD, ic * BN, BNover4, ir * BM, BM), tensorViewTranspose);
+@@ -388,6 +392,10 @@ void main() {
+                 sum = coopMatMulAdd(mat_a, mat_b, sum);
+                 block_k += BK;
+             }
++#if defined(ACC_TYPE_MAX)
++            [[unroll]] for (uint i = 0; i < sum.length(); ++i) { sum[i] = clamp(sum[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
++#endif
++
+             coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BNover2, gl_MatrixUseAccumulator> mat_d = coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BNover2, gl_MatrixUseAccumulator>(sum);
+ 
+             coopMatStoreTensorNV(mat_d, data_d, pos_d, sliceTensorLayoutNV(tensorLayoutD, ic * BN, BNover2, ir * BM, BM), tensorViewTranspose);
+@@ -428,6 +436,10 @@ void main() {
+                 sum = coopMatMulAdd(mat_a, mat_b, sum);
+                 block_k += BK;
+             }
++#if defined(ACC_TYPE_MAX)
++            [[unroll]] for (uint i = 0; i < sum.length(); ++i) { sum[i] = clamp(sum[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
++#endif
++
+             coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BN, gl_MatrixUseAccumulator> mat_d = coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BN, gl_MatrixUseAccumulator>(sum);
+ 
+             coopMatStoreTensorNV(mat_d, data_d, pos_d, sliceTensorLayoutNV(tensorLayoutD, ic * BN, BN, ir * BM, BM), tensorViewTranspose);
+@@ -485,6 +497,9 @@ void main() {
+                 sum = coopMatMulAdd(mat_a, mat_b, sum);
+             }
+         }
++#if defined(ACC_TYPE_MAX)
++        [[unroll]] for (uint i = 0; i < sum.length(); ++i) { sum[i] = clamp(sum[i], -ACC_TYPE_MAX, ACC_TYPE_MAX); }
++#endif
+ 
+         // Convert from ACC_TYPE to D_TYPE
+         coopmat<D_TYPE, gl_ScopeWorkgroup, BM, BN, gl_MatrixUseAccumulator> mat_d;

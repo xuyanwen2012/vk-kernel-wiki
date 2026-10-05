@@ -1,0 +1,80 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/copy_to_quant.comp
+@@ -1,10 +1,6 @@
+ #version 450
+ 
+-#if RTE16
+-#extension GL_EXT_spirv_intrinsics : enable
+-spirv_execution_mode(capabilities = [4467], 4462, 16); // RoundingModeRTE, 16 bits
+-#endif // RTE16
+-
++#include "rte.comp"
+ #include "types.comp"
+ 
+ #if defined(SET_ROWS) && QUANT_K == 1
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.comp b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/generic_binary_head.comp
+@@ -1,6 +1,8 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
++#include "rte.comp"
++
+ layout (push_constant) uniform parameter
+ {
+     uint ne;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.comp b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.comp
+@@ -1,5 +1,7 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ 
++#include "rte.comp"
++
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+ layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/im2col.comp
+@@ -1,12 +1,9 @@
+ #version 450
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+-#extension GL_EXT_spirv_intrinsics: enable
+ #extension GL_EXT_control_flow_attributes : require
+ 
+-#if RTE16
+-spirv_execution_mode(capabilities = [4467], 4462, 16); // RoundingModeRTE, 16 bits
+-#endif
++#include "rte.comp"
+ 
+ layout (push_constant) uniform parameter
+ {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rope_head.comp
+@@ -1,11 +1,8 @@
+ #include "types.comp"
+ 
+ #extension GL_EXT_shader_16bit_storage : require
+-#extension GL_EXT_spirv_intrinsics: enable
+ 
+-#if RTE16
+-spirv_execution_mode(capabilities = [4467], 4462, 16); // RoundingModeRTE, 16 bits
+-#endif
++#include "rte.comp"
+ 
+ layout(local_size_x = 1, local_size_y = 256, local_size_z = 1) in;
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/rte.comp b/ggml/src/ggml-vulkan/vulkan-shaders/rte.comp
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/rte.comp
+@@ -0,0 +1,5 @@
++
++#if RTE16
++#extension GL_EXT_spirv_intrinsics : enable
++spirv_execution_mode(capabilities = [4467], 4462, 16); // RoundingModeRTE, 16 bits
++#endif // RTE16

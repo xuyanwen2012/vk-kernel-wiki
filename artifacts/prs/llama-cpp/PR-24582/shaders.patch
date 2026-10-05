@@ -1,0 +1,248 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp b/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/clamp.comp
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#version 450
+-
+-#include "types.glsl"
+-#include "generic_unary_head.glsl"
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-void main() {
+-    const uint idx = get_idx();
+-
+-    if (idx >= p.ne) {
+-        return;
+-    }
+-
+-    const FLOAT_TYPE val = FLOAT_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+-    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(val < p.param1 ? p.param1 : (val > p.param2 ? p.param2 : val));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp b/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/cos.comp
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#version 450
+-
+-#include "types.glsl"
+-#include "generic_unary_head.glsl"
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-void main() {
+-    const uint idx = get_idx();
+-
+-    if (idx >= p.ne) {
+-        return;
+-    }
+-
+-    const FLOAT_TYPE val = FLOAT_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+-    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(cos(val));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/l2_norm.comp
+@@ -14,16 +14,13 @@ void main() {
+     const uint row = gl_WorkGroupID.z * 262144 + gl_WorkGroupID.y * 512 + gl_WorkGroupID.x;
+     const uint tid = gl_LocalInvocationID.x;
+ 
+-    const uint i3 = row / (p.ne11 * p.ne12);
+-    const uint i3_offset = i3 * p.ne12 * p.ne11;
+-    const uint i2 = (row - i3_offset) / p.ne11;
+-    const uint i2_offset = i2 * p.ne11;
+-    const uint i1 = row - i3_offset - i2_offset;
++    const uint a_base = get_aoffset() + src0_idx(row * p.ne00);
++    const uint d_base = get_doffset() + dst_idx(row * p.ne10);
+ 
+     sum[tid] = FLOAT_TYPE(0.0f); // partial sum for thread in warp
+ 
+     [[unroll]] for (uint i0 = tid; i0 < p.ne00; i0 += BLOCK_SIZE) {
+-        const FLOAT_TYPE xi = FLOAT_TYPE(data_a[i3*p.nb03 + i2*p.nb02 + i1*p.nb01 + i0]);
++        const FLOAT_TYPE xi = FLOAT_TYPE(data_a[a_base + i0*p.nb00]);
+         sum[tid] += xi * xi;
+     }
+ 
+@@ -39,6 +36,6 @@ void main() {
+     const FLOAT_TYPE scale = 1.0f / max(sqrt(sum[0]), FLOAT_TYPE(p.param1));
+ 
+     [[unroll]] for (uint i0 = tid; i0 < p.ne00; i0 += BLOCK_SIZE) {
+-        data_d[i3*p.nb13 + i2*p.nb12 + i1*p.nb11 + i0] = D_TYPE(scale * FLOAT_TYPE(data_a[i3*p.nb03 + i2*p.nb02 + i1*p.nb01 + i0]));
++        data_d[d_base + i0*p.nb10] = D_TYPE(scale * FLOAT_TYPE(data_a[a_base + i0*p.nb00]));
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp b/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/leaky_relu.comp
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#version 450
+-
+-#include "generic_head.glsl"
+-#include "types.glsl"
+-
+-#extension GL_EXT_control_flow_attributes : enable
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+-void main() {
+-    const uint i = gl_GlobalInvocationID.z * 262144 + gl_GlobalInvocationID.y * 512 + gl_GlobalInvocationID.x;
+-
+-    if (i >= p.KX) {
+-        return;
+-    }
+-
+-    const float val = float(data_a[i]);
+-    data_d[i] = D_TYPE(max(val, 0.0f) + min(val, 0.0f) * p.param1);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/norm.comp
+@@ -1,26 +1,26 @@
+ #version 450
+ 
+-#include "generic_head.glsl"
+ #include "types.glsl"
++#include "generic_unary_head.glsl"
+ 
+ #extension GL_EXT_control_flow_attributes : enable
+ #define BLOCK_SIZE 512
+ 
+ layout(local_size_x = BLOCK_SIZE, local_size_y = 1, local_size_z = 1) in;
+ 
+-layout (binding = 0) readonly buffer X {A_TYPE data_a[];};
+-layout (binding = 1) writeonly buffer D {D_TYPE data_d[];};
+-
+ shared vec2 sum[BLOCK_SIZE];
+ 
+ void main() {
+     const uint row = gl_WorkGroupID.z * 262144 + gl_WorkGroupID.y * 512 + gl_WorkGroupID.x;
+     const uint tid = gl_LocalInvocationID.x;
+ 
++    const uint a_base = get_aoffset() + src0_idx(row * p.ne00);
++    const uint d_base = get_doffset() + dst_idx(row * p.ne10);
++
+     sum[tid] = vec2(0.0f, 0.0f);
+ 
+-    [[unroll]] for (uint col = tid; col < p.KX; col += BLOCK_SIZE) {
+-        const float xi = float(data_a[row*p.KX + col]);
++    [[unroll]] for (uint i0 = tid; i0 < p.ne00; i0 += BLOCK_SIZE) {
++        const float xi = float(data_a[a_base + i0*p.nb00]);
+         sum[tid].x += xi;
+         sum[tid].y += xi * xi;
+     }
+@@ -34,11 +34,11 @@ void main() {
+         barrier();
+     }
+ 
+-    const float mean = sum[0].x / p.KX;
+-    const float var = sum[0].y / p.KX - mean * mean;
++    const float mean = sum[0].x / p.ne00;
++    const float var = sum[0].y / p.ne00 - mean * mean;
+     const float inv_std = inversesqrt(var + p.param1);
+ 
+-    [[unroll]] for (uint col = tid; col < p.KX; col += BLOCK_SIZE) {
+-        data_d[row*p.KX + col] = D_TYPE((float(data_a[row*p.KX + col]) - mean) * inv_std);
++    [[unroll]] for (uint i0 = tid; i0 < p.ne00; i0 += BLOCK_SIZE) {
++        data_d[d_base + i0*p.nb10] = D_TYPE((float(data_a[a_base + i0*p.nb00]) - mean) * inv_std);
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sin.comp
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#version 450
+-
+-#include "types.glsl"
+-#include "generic_unary_head.glsl"
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-void main() {
+-    const uint idx = get_idx();
+-
+-    if (idx >= p.ne) {
+-        return;
+-    }
+-
+-    const FLOAT_TYPE val = FLOAT_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+-    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(sin(val));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp b/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sqrt.comp
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#version 450
+-
+-#include "types.glsl"
+-#include "generic_unary_head.glsl"
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-void main() {
+-    const uint idx = get_idx();
+-
+-    if (idx >= p.ne) {
+-        return;
+-    }
+-
+-    const FLOAT_TYPE val = FLOAT_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+-    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(sqrt(val));
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/square.comp b/ggml/src/ggml-vulkan/vulkan-shaders/square.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/square.comp
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#version 450
+-
+-#include "types.glsl"
+-#include "generic_unary_head.glsl"
+-
+-layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+-
+-void main() {
+-    const uint idx = get_idx();
+-
+-    if (idx >= p.ne) {
+-        return;
+-    }
+-
+-    const FLOAT_TYPE val = FLOAT_TYPE(data_a[get_aoffset() + src0_idx(idx)]);
+-    data_d[get_doffset() + dst_idx(idx)] = D_TYPE(val * val);
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp b/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/unary.comp
+@@ -17,6 +17,30 @@ float op_neg(float x) {
+     return -x;
+ }
+ 
++float op_sqr(float x) {
++    return x * x;
++}
++
++float op_sqrt(float x) {
++    return sqrt(x);
++}
++
++float op_sin(float x) {
++    return sin(x);
++}
++
++float op_cos(float x) {
++    return cos(x);
++}
++
++float op_clamp(float x) {
++    return clamp(x, p.param1, p.param2);
++}
++
++float op_leaky_relu(float x) {
++    return max(x, 0.0f) + min(x, 0.0f) * p.param1;
++}
++
+ float op_step(float x) {
+     return x >= 0.0f ? 1.0f : 0.0f;
+ }

@@ -1,0 +1,25 @@
+repo: ggml-org/llama.cpp
+pr: 18306
+url: https://github.com/ggml-org/llama.cpp/pull/18306
+merge_sha: 10dc500bdb043e16d7bb4e16bc4ee8480fad5262
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/18306/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_multi.comp
+  status: modified
+  sha256: d2291ed22c30610883d8c4afd9a014bd7583a5af098ec1c0d165972641d17701
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_neox.comp
+  status: modified
+  sha256: 96af7265bba667f99e36f3b4f59752d41b1f92ddc4e2e9ce193f9f8b3e1a1da1
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_norm.comp
+  status: modified
+  sha256: cc2bc09dbe61999972feb0f2bc42b7c6fc070b84c625eee4077b725b4597a8df
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_params.glsl
+  status: modified
+  sha256: e6b723417bdcf29945cdb41e827e3c86b7cb798df3eee291494cb6669d7ede26
+- path: ggml/src/ggml-vulkan/vulkan-shaders/rope_vision.comp
+  status: modified
+  sha256: c2dcd15557edb13b050ff3201f42246ad15af7a6cad7df9ca2d57878f2da4447

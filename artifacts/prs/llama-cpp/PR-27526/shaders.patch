@@ -1,0 +1,185 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/conv2d_mm.comp
+@@ -19,6 +19,7 @@
+ #endif
+ 
+ #include "types.glsl"
++#include "utils.glsl"
+ 
+ // shape notation: [dim(N), ..., dim(0)] -- stride(dim(j)) >= stride(dim(i)) if i > j
+ layout(binding = 0) readonly buffer A {
+@@ -193,14 +194,6 @@ uint32_t       Br    = tid / BS_NPQ;
+ uint32_t       Bc    = tid % BS_NPQ;
+ const uint32_t BrpWg = WG_SIZE / BS_NPQ;
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    // msbs = mulhi(n, mp)
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+-
+ #ifdef COOPMAT2
+ #define ACC_TYPE float16_t
+ 
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/conv3d_mm.comp b/ggml/src/ggml-vulkan/vulkan-shaders/conv3d_mm.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/conv3d_mm.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/conv3d_mm.comp
+@@ -15,6 +15,7 @@
+ #endif
+ 
+ #include "types.glsl"
++#include "utils.glsl"
+ 
+ // shape notation: [dim(N), ..., dim(0)] -- stride(dim(j)) >= stride(dim(i)) if i > j
+ layout(binding = 0) readonly buffer A {
+@@ -178,14 +179,6 @@ uint32_t       Br    = tid / BS_NPQ;
+ uint32_t       Bc    = tid % BS_NPQ;
+ const uint32_t BrpWg = WG_SIZE / BS_NPQ;
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    // msbs = mulhi(n, mp)
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+-
+ void split_crs(uint32_t crs_idx, out uint32_t ic, out uint32_t kd, out uint32_t kh, out uint32_t kw) {
+     const uint32_t KHKW = KH * KW;
+     const uint32_t KDKHKW = KD * KHKW;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/count_experts.comp
+@@ -8,6 +8,7 @@
+ #endif
+ 
+ #include "types.glsl"
++#include "utils.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+@@ -33,14 +34,6 @@ shared uint vals[BLOCK_SIZE];
+ shared uint offsets[BLOCK_SIZE];
+ shared uint cursors[BLOCK_SIZE];
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    // msbs = mulhi(n, mp)
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+-
+ // data_d layout when p.hoist_row_ids is set:
+ //   [0,              n_experts)   per-expert row count
+ //   [n_experts,    2*n_experts)   per-expert start offset into the row id region
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/generic_unary_head.glsl
+@@ -1,6 +1,8 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ #extension GL_EXT_control_flow_attributes : require
+ 
++#include "utils.glsl"
++
+ layout (push_constant) uniform parameter
+ {
+     uint ne;
+@@ -32,18 +34,6 @@ uint get_idx() {
+ uint get_aoffset() { return p.misalign_offsets >> 16; }
+ uint get_doffset() { return p.misalign_offsets & 0xFFFF; }
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    // msbs = mulhi(n, mp)
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+-
+-uint fastdiv_L(uint packed, uint slot) {
+-    return (packed >> (slot * 8)) & 0x3Fu;
+-}
+-
+ uint src0_idx(uint idx) {
+     const uint i03 = fastdiv(idx, p.ne0_012mp, fastdiv_L(p.ne0_Ls, 0));
+     const uint i03_offset = i03 * p.ne02*p.ne01*p.ne00;
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/glu_head.glsl
+@@ -1,5 +1,7 @@
+ #extension GL_EXT_shader_16bit_storage : require
+ 
++#include "utils.glsl"
++
+ 
+ layout(local_size_x = 512, local_size_y = 1, local_size_z = 1) in;
+ 
+@@ -39,9 +41,3 @@ uint get_aoffset() { return p.misalign_offsets >> 16; }
+ uint get_boffset() { return (p.misalign_offsets >> 8) & 0xFF; }
+ uint get_doffset() { return p.misalign_offsets & 0xFF; }
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/sum_rows.glsl
+@@ -1,4 +1,6 @@
+ 
++#include "utils.glsl"
++
+ // vk_op_sum_rows_push_constants
+ layout (push_constant) uniform parameter
+ {
+@@ -15,11 +17,3 @@ layout (push_constant) uniform parameter
+ uint get_aoffset() { return p.misalign_offsets >> 16; }
+ uint get_doffset() { return p.misalign_offsets & 0xFFFF; }
+ 
+-// see init_fastdiv_values in ggml-vulkan.cpp
+-uint fastdiv(uint n, uint mp, uint L) {
+-    uint msbs, lsbs;
+-    // msbs = mulhi(n, mp)
+-    umulExtended(n, mp, msbs, lsbs);
+-    return (msbs + n) >> L;
+-}
+-
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/utils.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/utils.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/utils.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/utils.glsl
+@@ -9,14 +9,26 @@ uint fastmod(uint a, uint b) {
+     return a % b;
+ }
+ 
+-uint fastdiv(uint a, uint b) {
++// see init_fastdiv_values in ggml-vulkan.cpp
++uint fastdiv(uint n, uint mp, uint L) {
++    uint msbs, lsbs;
++    // msbs = mulhi(n, mp)
++    umulExtended(n, mp, msbs, lsbs);
++    return (msbs + n) >> L;
++}
++
++uint fastdiv_L(uint packed, uint slot) {
++    return (packed >> (slot * 8)) & 0x3Fu;
++}
++
++uint fastdiv_small(uint a, uint b) {
+     return (a < b) ? 0 : (a / b);
+ }
+ 
+ void get_indices(uint idx, out uint i00, out uint i01, out uint i02, out uint i03, uint ne00, uint ne01, uint ne02, uint ne03) {
+-    i03 = fastdiv(idx, (ne02*ne01*ne00));
++    i03 = fastdiv_small(idx, (ne02*ne01*ne00));
+     const uint i03_offset = i03 * ne02*ne01*ne00;
+-    i02 = fastdiv((idx - i03_offset), (ne01*ne00));
++    i02 = fastdiv_small((idx - i03_offset), (ne01*ne00));
+     const uint i02_offset = i02*ne01*ne00;
+     i01 = (idx - i03_offset - i02_offset) / ne00;
+     i00 = idx - i03_offset - i02_offset - i01*ne00;

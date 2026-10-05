@@ -1,0 +1,28 @@
+repo: ggml-org/llama.cpp
+pr: 21455
+url: https://github.com/ggml-org/llama.cpp/pull/21455
+merge_sha: 6a6780a232b73fe44799b0c0d5f01c61612f1b79
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-05'
+origin: GitHub REST API, repos/ggml-org/llama.cpp/pulls/21455/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/copy_from_quant.comp
+  status: modified
+  sha256: 4c900e3ee02148e8243a1c9f6a1df24e78975bd9a060e7fd7e1b5d4abaa29ef9
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+  status: modified
+  sha256: 1adff06d91b391f721fd58abe6cd5c97ea9736542d9693b8c647b855c9883db2
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+  status: modified
+  sha256: bfca0d38eb6435c99079b3b7b630479747d02633aae362e08c2e54bd4f54056d
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_nvfp4.comp
+  status: added
+  sha256: 49e72cd96bb31593651a085509d419d6013c9cd5f0856a7fa4e0297efb35db2a
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+  status: modified
+  sha256: bf1ea3f24a86d9e0c281b0299e95c59f43685b70afafaea2f89f89463456bdf7
+- path: ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+  status: modified
+  sha256: 710315e96894a88a0ef87305c20feab524636e8b8995f1f663ca194a59a2c6e3

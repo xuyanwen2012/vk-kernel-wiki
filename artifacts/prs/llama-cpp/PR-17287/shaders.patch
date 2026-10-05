@@ -1,0 +1,269 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+@@ -11,29 +11,7 @@
+ #define EXPERT_COUNT 8
+ #endif
+ 
+-#include "types.glsl"
+-
+-#ifndef MMQ
+-layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+-#else
+-layout (binding = 0) readonly buffer A {A_TYPE_PACKED16 data_a[];};
+-#endif
+-
+-layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+-#ifdef B_TYPE_VEC2
+-layout (binding = 1) readonly buffer BV2 {B_TYPE_VEC2 data_b_v2[];};
+-#endif
+-#ifdef B_TYPE_VEC4
+-layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+-#endif
+-
+-layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
+-
+-layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
+-
+-#ifdef MUL_MAT_ID
+-layout (binding = 4) readonly buffer IDS {int data_ids[];};
+-#endif
++#include "mul_mat_vec_iface.glsl"
+ 
+ #include "dequant_funcs.glsl"
+ 
+@@ -48,8 +26,7 @@ layout (push_constant) uniform parameter
+     uint batch_stride_b;
+     uint batch_stride_d;
+ 
+-    uint enable_bias;
+-    uint enable_scale;
++    uint fusion_flags;
+ 
+ #ifdef MUL_MAT_ID
+     uint nei0;
+@@ -123,17 +100,24 @@ void reduce_result(inout FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t
+     if (tid == 0) {
+         [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
+             [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-                if (p.enable_bias != 0) {
+ #ifdef MUL_MAT_ID
+-                    temp[j][n] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
+-#else
+-                    temp[j][n] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
+-#endif
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse0[expert_id*p.stride_d + first_row + n]);
+                 }
+-#ifdef MUL_MAT_ID
+-                if (p.enable_scale != 0) {
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE0) != 0) {
+                     const uint expert_idx = gl_GlobalInvocationID.y;
+-                    temp[j][n] *= FLOAT_TYPE(data_bias[expert_idx]);
++                    temp[j][n] *= FLOAT_TYPE(data_fuse0[expert_idx]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE1) != 0) {
++                    const uint expert_idx = gl_GlobalInvocationID.y;
++                    temp[j][n] *= FLOAT_TYPE(data_fuse1[expert_idx]);
++                }
++#else
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse0[j*p.batch_stride_d + d_offset + first_row + n]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS1) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse1[j*p.batch_stride_d + d_offset + first_row + n]);
+                 }
+ #endif
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(temp[j][n]);
+@@ -171,17 +155,24 @@ void reduce_result(FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t d_offs
+                 [[unroll]] for (uint s = 0; s < gl_NumSubgroups; ++s) {
+                     temp[j][n] += tmpsh[j][n][s];
+                 }
+-                if (p.enable_bias != 0) {
+ #ifdef MUL_MAT_ID
+-                    temp[j][n] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
+-#else
+-                    temp[j][n] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
+-#endif
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse0[expert_id*p.stride_d + first_row + n]);
+                 }
+-#ifdef MUL_MAT_ID
+-                if (p.enable_scale != 0) {
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE0) != 0) {
+                     const uint expert_idx = gl_GlobalInvocationID.y;
+-                    temp[j][n] *= FLOAT_TYPE(data_bias[expert_idx]);
++                    temp[j][n] *= FLOAT_TYPE(data_fuse0[expert_idx]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE1) != 0) {
++                    const uint expert_idx = gl_GlobalInvocationID.y;
++                    temp[j][n] *= FLOAT_TYPE(data_fuse1[expert_idx]);
++                }
++#else
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse0[j*p.batch_stride_d + d_offset + first_row + n]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS1) != 0) {
++                    temp[j][n] += FLOAT_TYPE(data_fuse1[j*p.batch_stride_d + d_offset + first_row + n]);
+                 }
+ #endif
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(temp[j][n]);
+@@ -209,17 +200,24 @@ void reduce_result(FLOAT_TYPE temp[NUM_COLS][NUM_ROWS], const in uint32_t d_offs
+     if (tid == 0) {
+         [[unroll]] for (uint j = 0; j < NUM_COLS; ++j) {
+             [[unroll]] for (uint n = 0; n < num_rows; ++n) {
+-                if (p.enable_bias != 0) {
+ #ifdef MUL_MAT_ID
+-                    tmpsh[j][n][0] += FLOAT_TYPE(data_bias[expert_id*p.stride_d + first_row + n]);
+-#else
+-                    tmpsh[j][n][0] += FLOAT_TYPE(data_bias[j*p.batch_stride_d + d_offset + first_row + n]);
+-#endif
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    tmpsh[j][n][0] += FLOAT_TYPE(data_fuse0[expert_id*p.stride_d + first_row + n]);
+                 }
+-#ifdef MUL_MAT_ID
+-                if (p.enable_scale != 0) {
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE0) != 0) {
++                    const uint expert_idx = gl_GlobalInvocationID.y;
++                    tmpsh[j][n][0] *= FLOAT_TYPE(data_fuse0[expert_idx]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_SCALE1) != 0) {
+                     const uint expert_idx = gl_GlobalInvocationID.y;
+-                    tmpsh[j][n][0] *= FLOAT_TYPE(data_bias[expert_idx]);
++                    tmpsh[j][n][0] *= FLOAT_TYPE(data_fuse1[expert_idx]);
++                }
++#else
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                    tmpsh[j][n][0] += FLOAT_TYPE(data_fuse0[j*p.batch_stride_d + d_offset + first_row + n]);
++                }
++                if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS1) != 0) {
++                    tmpsh[j][n][0] += FLOAT_TYPE(data_fuse1[j*p.batch_stride_d + d_offset + first_row + n]);
+                 }
+ #endif
+                 data_d[j*p.batch_stride_d + d_offset + first_row + n] = D_TYPE(tmpsh[j][n][0]);
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl
+--- /dev/null
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_iface.glsl
+@@ -0,0 +1,33 @@
++#include "types.glsl"
++
++#define MAT_VEC_FUSION_FLAGS_BIAS0 0x1
++#define MAT_VEC_FUSION_FLAGS_BIAS1 0x2
++#define MAT_VEC_FUSION_FLAGS_SCALE0 0x4
++#define MAT_VEC_FUSION_FLAGS_SCALE1 0x8
++
++#ifndef MMQ
++layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
++#if defined(A_TYPE_VEC4)
++layout (binding = 0) readonly buffer AV4 {A_TYPE_VEC4 data_a_v4[];};
++#endif
++#else
++layout (binding = 0) readonly buffer A {A_TYPE_PACKED16 data_a[];};
++#endif
++
++layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
++#ifdef B_TYPE_VEC2
++layout (binding = 1) readonly buffer BV2 {B_TYPE_VEC2 data_b_v2[];};
++#endif
++#ifdef B_TYPE_VEC4
++layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
++#endif
++
++layout (binding = 2) writeonly buffer D {D_TYPE data_d[];};
++
++layout (binding = 3) readonly buffer Fuse0 {D_TYPE data_fuse0[];};
++layout (binding = 4) readonly buffer Fuse1 {D_TYPE data_fuse1[];};
++
++#ifdef MUL_MAT_ID
++layout (binding = 5) readonly buffer IDS {int data_ids[];};
++#endif
++
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_nc.comp
+@@ -8,14 +8,7 @@
+ 
+ layout(local_size_x = BLOCK_SIZE, local_size_y = 1, local_size_z = 1) in;
+ 
+-layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+-layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+-layout (binding = 2) writeonly buffer D {D_TYPE dst[];};
+-
+-layout (binding = 0) readonly buffer AV4 {A_TYPE_VEC4 data_a_v4[];};
+-layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+-
+-layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
++#include "mul_mat_vec_iface.glsl"
+ 
+ layout (push_constant) uniform parameter
+ {
+@@ -31,7 +24,7 @@ layout (push_constant) uniform parameter
+     uint nb03;
+     uint nb13;
+     uint nb23;
+-    uint enable_bias;
++    uint fusion_flags;
+ } p;
+ 
+ shared FLOAT_TYPE tmp[BLOCK_SIZE];
+@@ -120,9 +113,12 @@ void main() {
+     }
+ 
+     if (tid == 0) {
+-        if (p.enable_bias != 0) {
+-            tmp[0] += FLOAT_TYPE(data_bias[idst]);
++        if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++            tmp[0] += FLOAT_TYPE(data_fuse0[idst]);
++        }
++        if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS1) != 0) {
++            tmp[0] += FLOAT_TYPE(data_fuse1[idst]);
+         }
+-        dst[idst] = tmp[0];
++        data_d[idst] = tmp[0];
+     }
+ }
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_p021.comp
+@@ -10,14 +10,7 @@
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+ 
+-layout (binding = 0) readonly buffer A {A_TYPE data_a[];};
+-layout (binding = 1) readonly buffer B {B_TYPE data_b[];};
+-layout (binding = 2) writeonly buffer D {D_TYPE dst[];};
+-
+-layout (binding = 0) readonly buffer AV4 {A_TYPE_VEC4 data_a_v4[];};
+-layout (binding = 1) readonly buffer BV4 {B_TYPE_VEC4 data_b_v4[];};
+-
+-layout (binding = 3) readonly buffer Bias {D_TYPE data_bias[];};
++#include "mul_mat_vec_iface.glsl"
+ 
+ layout(constant_id = 0) const int BLOCK_SIZE = 32;
+ // gqa_ratio is in the range [1,8]
+@@ -31,7 +24,7 @@ layout (push_constant) uniform parameter
+     uint nchannels_y;
+     uint b_offset;
+     uint d_offset;
+-    uint enable_bias;
++    uint fusion_flags;
+ } p;
+ 
+ #if !USE_SUBGROUP_ADD
+@@ -151,10 +144,13 @@ void main() {
+         [[unroll]] for (uint c = 0; c < gqa_ratio; ++c) {
+             // dst is not transposed and not permuted
+             const uint idst = (channel + c)*nrows_dst + row_dst;
+-            if (p.enable_bias != 0) {
+-                temp[c] += FLOAT_TYPE(data_bias[idst]);
++            if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS0) != 0) {
++                temp[c] += FLOAT_TYPE(data_fuse0[idst]);
++            }
++            if ((p.fusion_flags & MAT_VEC_FUSION_FLAGS_BIAS1) != 0) {
++                temp[c] += FLOAT_TYPE(data_fuse1[idst]);
+             }
+-            dst[idst] = temp[c];
++            data_d[idst] = temp[c];
+         }
+     }
+ }

@@ -1,0 +1,26 @@
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+@@ -256,6 +256,9 @@ void main() {
+         barrier();
+     }
+ 
++    // prevent race on tmpsh
++    barrier();
++
+     // reduce across threads
+ 
+     [[unroll]] for (uint32_t r = 0; r < Br; ++r) {
+diff --git a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+--- a/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
++++ b/ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+@@ -302,6 +302,9 @@ void main() {
+         barrier();
+     }
+ 
++    // prevent race on tmpsh
++    barrier();
++
+     // reduce across threads
+ 
+     float rowmaxf[rows_per_thread], eMf[rows_per_thread], Moldf[rows_per_thread];
