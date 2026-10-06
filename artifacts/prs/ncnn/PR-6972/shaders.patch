@@ -1,0 +1,1365 @@
+diff --git a/src/layer/vulkan/shader/convolution1d_1x1s1d1_cm.comp b/src/layer/vulkan/shader/convolution1d_1x1s1d1_cm.comp
+--- a/src/layer/vulkan/shader/convolution1d_1x1s1d1_cm.comp
++++ b/src/layer/vulkan/shader/convolution1d_1x1s1d1_cm.comp
+@@ -19,6 +19,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const int bias_term = 0;
+ layout(constant_id = 1) const int activation_type = 0;
+ layout(constant_id = 2) const float activation_param_0 = 0;
+@@ -91,7 +97,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -110,7 +121,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+@@ -176,6 +192,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -693,11 +711,15 @@ void main()
+             }
+         }
+     }
+-    else if (kk >= UNROLL_SG_K)
++#endif
++
++    for (; k + UNROLL_SG_K - 1 < kk; k += UNROLL_SG_K)
+     {
+         // no ping-pong version
+ 
+-        const uint ki = 0;
++        const uint ki = k * K;
++
++        barrier();
+ 
+         // load bottom_blob
+         {
+@@ -792,7 +814,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + zk * Kd4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+@@ -893,8 +920,6 @@ void main()
+                 }
+             }
+         }
+-
+-        k += UNROLL_SG_K;
+     }
+ 
+     for (; k < kk; k++)
+@@ -976,7 +1001,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+diff --git a/src/layer/vulkan/shader/convolution1d_gemm_cm.comp b/src/layer/vulkan/shader/convolution1d_gemm_cm.comp
+--- a/src/layer/vulkan/shader/convolution1d_gemm_cm.comp
++++ b/src/layer/vulkan/shader/convolution1d_gemm_cm.comp
+@@ -19,6 +19,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const uint kernel_w = 1;
+ layout(constant_id = 1) const uint dilation_w = 1;
+ layout(constant_id = 2) const uint stride_w = 1;
+@@ -96,7 +102,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(outw) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -117,7 +128,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+diff --git a/src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp b/src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+--- a/src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
++++ b/src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+@@ -19,6 +19,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const int bias_term = 0;
+ layout(constant_id = 1) const int activation_type = 0;
+ layout(constant_id = 2) const float activation_param_0 = 0;
+@@ -89,7 +95,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -108,7 +119,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+@@ -174,6 +190,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -677,11 +695,15 @@ void main()
+             }
+         }
+     }
+-    else if (kk >= UNROLL_SG_K)
++#endif
++
++    for (; k + UNROLL_SG_K - 1 < kk; k += UNROLL_SG_K)
+     {
+         // no ping-pong version
+ 
+-        const uint ki = 0;
++        const uint ki = k * K;
++
++        barrier();
+ 
+         // load bottom_blob
+         {
+@@ -769,7 +791,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + zk * Kd4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+@@ -870,8 +897,6 @@ void main()
+                 }
+             }
+         }
+-
+-        k += UNROLL_SG_K;
+     }
+ 
+     for (; k < kk; k++)
+@@ -946,7 +971,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+diff --git a/src/layer/vulkan/shader/convolution_1x1s1d1_int8_cm.comp b/src/layer/vulkan/shader/convolution_1x1s1d1_int8_cm.comp
+--- a/src/layer/vulkan/shader/convolution_1x1s1d1_int8_cm.comp
++++ b/src/layer/vulkan/shader/convolution_1x1s1d1_int8_cm.comp
+@@ -20,6 +20,11 @@
+ #extension GL_GOOGLE_include_directive : enable
+ #include "vulkan_activation.comp"
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 4 for these packed int8 loads; int32 stores are unchanged
++#define coopMatLoad(m, buf, element, stride, layout) coopMatLoad(m, buf, element, (stride) * 4, layout)
++#endif
++
+ layout(constant_id = 0) const int bias_term = 0;
+ layout(constant_id = 1) const int activation_type = 0;
+ layout(constant_id = 2) const float activation_param_0 = 0;
+@@ -82,7 +87,12 @@ shared ivec4 tmp_o[UNROLL_WG_N * UNROLL_WG_M][UNROLL_SG_N * UNROLL_SG_M * M * N
+ void main()
+ {
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (psc(num_output) + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -99,7 +109,12 @@ void main()
+     if (wgmi >= wgmm)
+         return;
+ 
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+@@ -126,6 +141,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -484,6 +501,7 @@ void main()
+         barrier();
+     }
+     else
++#endif
+     {
+         for (uint ki = 0; ki < kk; ki += UNROLL_SG_K)
+         {
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm_int8_cm.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm_int8_cm.comp
+--- a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm_int8_cm.comp
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm_int8_cm.comp
+@@ -17,6 +17,11 @@
+ #extension GL_NV_integer_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 4 for these packed int8 loads; int32 stores are unchanged
++#define coopMatLoad(m, buf, element, stride, layout) coopMatLoad(m, buf, element, (stride) * 4, layout)
++#endif
++
+ layout(constant_id = 0) const uint batch = 1;
+ layout(constant_id = 1) const uint M = 1;
+ layout(constant_id = 2) const uint N = 1;
+@@ -78,7 +83,12 @@ void main()
+         return;
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -94,15 +104,22 @@ void main()
+ 
+     const uint kk = (inch + K - 1) / K;
+     const uint kk_padded = (kk + UNROLL_SG_K - 1) / UNROLL_SG_K * UNROLL_SG_K;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+ 
+ #if ncnn_VK_KHR_cooperative_matrix
+     coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator> sum[UNROLL_SG_N][UNROLL_SG_M];
++#if ncnn_vendorID != 0x5143 || !ncnn_VK_KHR_cooperative_matrix
+     coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator> sum8[UNROLL_SG_N][UNROLL_SG_M];
+     coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator> sum16[UNROLL_SG_N][UNROLL_SG_M];
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+     icoopmatNV<32, gl_ScopeSubgroup, M, N> sum[UNROLL_SG_N][UNROLL_SG_M];
+     icoopmatNV<32, gl_ScopeSubgroup, M, N> sum8[UNROLL_SG_N][UNROLL_SG_M];
+@@ -115,8 +132,10 @@ void main()
+         {
+ #if ncnn_VK_KHR_cooperative_matrix
+             sum[zn][zm] = coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator>(0);
++#if ncnn_vendorID != 0x5143 || !ncnn_VK_KHR_cooperative_matrix
+             sum8[zn][zm] = coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator>(0);
+             sum16[zn][zm] = coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator>(0);
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+             sum[zn][zm] = icoopmatNV<32, gl_ScopeSubgroup, M, N>(0);
+             sum8[zn][zm] = icoopmatNV<32, gl_ScopeSubgroup, M, N>(0);
+@@ -125,6 +144,7 @@ void main()
+         }
+     }
+ 
++#if ncnn_vendorID != 0x5143 || !ncnn_VK_KHR_cooperative_matrix
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -268,7 +288,9 @@ void main()
+                             const uint gm = (mi + zm) * Md4 + j;
+ 
+                             const uint gi = (gz * inch + gk) * cstepd4 + gm;
+-                            prefetch_tmp_v[q] = ivec2(i8buffer_sm4(bottom_tm_low_data, gi), i8buffer_sm4(bottom_tm_high_data, gi));
++                            prefetch_tmp_v[q] = ivec2(0);
++                            if (gk < inch)
++                                prefetch_tmp_v[q] = ivec2(i8buffer_sm4(bottom_tm_low_data, gi), i8buffer_sm4(bottom_tm_high_data, gi));
+                         }
+                     }
+                 }
+@@ -294,7 +316,9 @@ void main()
+                             const uint gk = (ki + zk) * Kd4 + j;
+ 
+                             const uint gi = (gz * inchd4 + gk) * cstepd2 + gm;
+-                            prefetch_tmp_v[q] = bottom_tm_low_high_data[gi];
++                            prefetch_tmp_v[q] = ivec2(0);
++                            if (gk < inchd4)
++                                prefetch_tmp_v[q] = bottom_tm_low_high_data[gi];
+                         }
+                     }
+                 }
+@@ -485,6 +509,7 @@ void main()
+         }
+     }
+     else
++#endif
+     {
+         // no ping-pong version
+         for (uint k = 0; k < kk; k += UNROLL_SG_K)
+@@ -516,8 +541,12 @@ void main()
+ 
+                             const uint cstepd4 = psc(cstep) / 4;
+                             const uint gi = (gz * inch + gk) * cstepd4 + gm;
+-                            tmp_v0[sgmi][siq] = i8buffer_sm4(bottom_tm_low_data, gi);
+-                            tmp_v1[sgmi][siq] = i8buffer_sm4(bottom_tm_high_data, gi);
++                            // padded K tiles have zero weights but no corresponding input channels
++                            ivec2 v01 = ivec2(0);
++                            if (gk < inch)
++                                v01 = ivec2(i8buffer_sm4(bottom_tm_low_data, gi), i8buffer_sm4(bottom_tm_high_data, gi));
++                            tmp_v0[sgmi][siq] = v01.x;
++                            tmp_v1[sgmi][siq] = v01.y;
+                         }
+                         else
+                         {
+@@ -532,7 +561,9 @@ void main()
+                             const uint gm = (mi + zm) * M + i;
+                             const uint gk = (k + zk) * Kd4 + j;
+ 
+-                            const ivec2 v01 = bottom_tm_low_high_data[(gz * (inch / 4) + gk) * cstepd2 + gm];
++                            ivec2 v01 = ivec2(0);
++                            if (gk < inch / 4)
++                                v01 = bottom_tm_low_high_data[(gz * (inch / 4) + gk) * cstepd2 + gm];
+                             tmp_v0[sgmi][siq] = v01.x;
+                             tmp_v1[sgmi][siq] = v01.y;
+                         }
+@@ -560,6 +591,7 @@ void main()
+ 
+             barrier();
+ 
++#if ncnn_vendorID != 0x5143 || !ncnn_VK_KHR_cooperative_matrix
+ #if ncnn_VK_KHR_cooperative_matrix
+             coopmat<int8_t, gl_ScopeSubgroup, M, K, gl_MatrixUseA> A0[UNROLL_SG_M];
+             coopmat<int8_t, gl_ScopeSubgroup, M, K, gl_MatrixUseA> A1[UNROLL_SG_M];
+@@ -571,9 +603,84 @@ void main()
+             icoopmatNV<8, gl_ScopeSubgroup, K, N> B0[UNROLL_SG_N];
+             icoopmatNV<8, gl_ScopeSubgroup, K, N> B1[UNROLL_SG_N];
+ #endif
++#endif
+ 
++#if ncnn_vendorID == 0x5143 && ncnn_VK_KHR_cooperative_matrix
++            // adreno register allocation fails when unrolling the K tile loop
++            [[dont_unroll]] for (uint zk = 0; zk < UNROLL_SG_K; zk++)
++#else
+             [[unroll]] for (uint zk = 0; zk < UNROLL_SG_K; zk++)
++#endif
+             {
++#if ncnn_vendorID == 0x5143 && ncnn_VK_KHR_cooperative_matrix
++                [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
++                {
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        // keep one cooperative accumulator live on adreno
++                        int previous[M * N / subgroup_size];
++                        // adreno fails with constant component indices for a single K tile with N=16
++                        if (kk == 1 && N == 16)
++                        {
++                            for (uint i = 0; i < sum[zn][zm].length(); i++)
++                                previous[i] = sum[zn][zm][i];
++                        }
++                        else
++                        {
++                            [[unroll]] for (uint i = 0; i < previous.length(); i++)
++                                previous[i] = sum[zn][zm][i];
++                        }
++                        sum[zn][zm] = coopmat<int, gl_ScopeSubgroup, M, N, gl_MatrixUseAccumulator>(0);
++
++                        coopmat<int8_t, gl_ScopeSubgroup, M, K, gl_MatrixUseA> A;
++                        coopmat<int8_t, gl_ScopeSubgroup, K, N, gl_MatrixUseB> B;
++
++                        // reload both operands before each multiply-add on adreno
++                        const uint v_offset = (zk * UNROLL_SG_M + zm) * (M * Kd4p);
++                        const uint k_offset = (zk * UNROLL_SG_N + zn) * (K * Nd4p);
++                        if (elempack == 1)
++                            coopMatLoad(A, tmp_v1[sgmi], (zk * UNROLL_SG_M + zm) * (Md4 * K), Md4, gl_CooperativeMatrixLayoutColumnMajor);
++                        else
++                            coopMatLoad(A, tmp_v1[sgmi], v_offset, Kd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        coopMatLoad(B, tmp_k1[sgni], k_offset, Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        sum[zn][zm] = coopMatMulAdd(A, B, sum[zn][zm]);
++                        sum[zn][zm] *= 256;
++
++                        if (elempack == 1)
++                            coopMatLoad(A, tmp_v1[sgmi], (zk * UNROLL_SG_M + zm) * (Md4 * K), Md4, gl_CooperativeMatrixLayoutColumnMajor);
++                        else
++                            coopMatLoad(A, tmp_v1[sgmi], v_offset, Kd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        coopMatLoad(B, tmp_k0[sgni], k_offset, Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        sum[zn][zm] = coopMatMulAdd(A, B, sum[zn][zm]);
++
++                        if (elempack == 1)
++                            coopMatLoad(A, tmp_v0[sgmi], (zk * UNROLL_SG_M + zm) * (Md4 * K), Md4, gl_CooperativeMatrixLayoutColumnMajor);
++                        else
++                            coopMatLoad(A, tmp_v0[sgmi], v_offset, Kd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        coopMatLoad(B, tmp_k1[sgni], k_offset, Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        sum[zn][zm] = coopMatMulAdd(A, B, sum[zn][zm]);
++                        sum[zn][zm] *= 256;
++
++                        if (elempack == 1)
++                            coopMatLoad(A, tmp_v0[sgmi], (zk * UNROLL_SG_M + zm) * (Md4 * K), Md4, gl_CooperativeMatrixLayoutColumnMajor);
++                        else
++                            coopMatLoad(A, tmp_v0[sgmi], v_offset, Kd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        coopMatLoad(B, tmp_k0[sgni], k_offset, Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++                        sum[zn][zm] = coopMatMulAdd(A, B, sum[zn][zm]);
++
++                        if (kk == 1 && N == 16)
++                        {
++                            for (uint i = 0; i < sum[zn][zm].length(); i++)
++                                sum[zn][zm][i] += previous[i];
++                        }
++                        else
++                        {
++                            [[unroll]] for (uint i = 0; i < previous.length(); i++)
++                                sum[zn][zm][i] += previous[i];
++                        }
++                    }
++                }
++#else
+                 [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
+                 {
+                     if (elempack == 1)
+@@ -628,19 +735,22 @@ void main()
+ #endif
+                     }
+                 }
++#endif
+             }
+ 
+             barrier();
+         }
+     }
+ 
++#if ncnn_vendorID != 0x5143 || !ncnn_VK_KHR_cooperative_matrix
+     [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+     {
+         [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
+         {
+             sum[zn][zm] += sum8[zn][zm] * (1 << 8) + sum16[zn][zm] * (1 << 16);
+         }
+     }
++#endif
+ 
+     [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+     {
+diff --git a/src/layer/vulkan/shader/convolution_gemm_cm.comp b/src/layer/vulkan/shader/convolution_gemm_cm.comp
+--- a/src/layer/vulkan/shader/convolution_gemm_cm.comp
++++ b/src/layer/vulkan/shader/convolution_gemm_cm.comp
+@@ -19,6 +19,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const uint kernel_w = 1;
+ layout(constant_id = 1) const uint kernel_h = 1;
+ layout(constant_id = 2) const uint dilation_w = 1;
+@@ -101,7 +107,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(outw) * psc(outh) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -122,7 +133,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+diff --git a/src/layer/vulkan/shader/convolution_gemm_int8_cm.comp b/src/layer/vulkan/shader/convolution_gemm_int8_cm.comp
+--- a/src/layer/vulkan/shader/convolution_gemm_int8_cm.comp
++++ b/src/layer/vulkan/shader/convolution_gemm_int8_cm.comp
+@@ -20,6 +20,11 @@
+ #extension GL_GOOGLE_include_directive : enable
+ #include "vulkan_activation.comp"
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 4 for these packed int8 loads; int32 stores are unchanged
++#define coopMatLoad(m, buf, element, stride, layout) coopMatLoad(m, buf, element, (stride) * 4, layout)
++#endif
++
+ layout(constant_id = 0) const uint kernel_w = 1;
+ layout(constant_id = 1) const uint kernel_h = 1;
+ layout(constant_id = 2) const uint dilation_w = 1;
+@@ -99,7 +104,12 @@ void main()
+     const uint K04 = psc(num_input) / 4 * maxk;
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (size + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (psc(num_output) + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -116,7 +126,12 @@ void main()
+     if (wgmi >= wgmm)
+         return;
+ 
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+@@ -143,6 +158,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -591,6 +608,7 @@ void main()
+         barrier();
+     }
+     else
++#endif
+     {
+         for (uint ki = 0; ki < kk; ki += UNROLL_SG_K)
+         {
+diff --git a/src/layer/vulkan/shader/convolution_winograd_gemm_cm.comp b/src/layer/vulkan/shader/convolution_winograd_gemm_cm.comp
+--- a/src/layer/vulkan/shader/convolution_winograd_gemm_cm.comp
++++ b/src/layer/vulkan/shader/convolution_winograd_gemm_cm.comp
+@@ -16,6 +16,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const uint batch = 1;
+ layout(constant_id = 1) const uint M = 1;
+ layout(constant_id = 2) const uint N = 1;
+@@ -87,7 +93,12 @@ void main()
+         return;
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -106,7 +117,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+@@ -143,6 +159,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -646,11 +664,15 @@ void main()
+             }
+         }
+     }
+-    else if (kk >= UNROLL_SG_K)
++#endif
++
++    for (; k + UNROLL_SG_K - 1 < kk; k += UNROLL_SG_K)
+     {
+         // no ping-pong version
+ 
+-        const uint ki = 0;
++        const uint ki = k * K;
++
++        barrier();
+ 
+         // load bottom_blob
+         {
+@@ -738,7 +760,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + zk * Kd4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_tm_blob_data[(gz * inchd4 + gk) * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_tm_blob_data[(gz * inchd4 + gk) * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+@@ -839,8 +866,6 @@ void main()
+                 }
+             }
+         }
+-
+-        k += UNROLL_SG_K;
+     }
+ 
+     for (; k < kk; k++)
+@@ -915,7 +940,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_tm_blob_data[(gz * inchd4 + gk) * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_tm_blob_data[(gz * inchd4 + gk) * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+diff --git a/src/layer/vulkan/shader/deconvolution_gemm_cm.comp b/src/layer/vulkan/shader/deconvolution_gemm_cm.comp
+--- a/src/layer/vulkan/shader/deconvolution_gemm_cm.comp
++++ b/src/layer/vulkan/shader/deconvolution_gemm_cm.comp
+@@ -19,6 +19,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const uint M = 1;
+ layout(constant_id = 1) const uint N = 1;
+ layout(constant_id = 2) const uint K = 1;
+@@ -84,7 +90,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(size) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (outch + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -103,7 +114,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint Md4 = M / 4;
+     const uint Nd4 = N / 4;
+@@ -140,6 +156,8 @@ void main()
+ 
+     uint k = 0;
+ 
++    // adreno drops K tiles in the prefetch loop
++#if ncnn_vendorID != 0x5143
+     if (kk >= UNROLL_SG_K * 2)
+     {
+         // local stack and shared memory ping-pong
+@@ -643,11 +661,15 @@ void main()
+             }
+         }
+     }
+-    else if (kk >= UNROLL_SG_K)
++#endif
++
++    for (; k + UNROLL_SG_K - 1 < kk; k += UNROLL_SG_K)
+     {
+         // no ping-pong version
+ 
+-        const uint ki = 0;
++        const uint ki = k * K;
++
++        barrier();
+ 
+         // load bottom_blob
+         {
+@@ -735,7 +757,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + zk * Kd4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+@@ -836,8 +863,6 @@ void main()
+                 }
+             }
+         }
+-
+-        k += UNROLL_SG_K;
+     }
+ 
+     for (; k < kk; k++)
+@@ -912,7 +937,12 @@ void main()
+                         const uint gm = mi * M + zmi;
+                         const uint gk = ki / 4 + j;
+ 
++#if ncnn_vendorID == 0x5143
++                        // adreno miscompiles the pack4 input bound check when cstep is specialized or cached
++                        uvec2 v = gk < inchd4 && gm < p.cstep ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#else
+                         uvec2 v = gk < inchd4 && gm < psc(cstep) ? bottom_blob_data[gk * psc(cstep) + gm] : uvec2(0);
++#endif
+ 
+                         tmp_v[sgmi][siq] = v;
+                     }
+diff --git a/src/layer/vulkan/shader/gemm_cm.comp b/src/layer/vulkan/shader/gemm_cm.comp
+--- a/src/layer/vulkan/shader/gemm_cm.comp
++++ b/src/layer/vulkan/shader/gemm_cm.comp
+@@ -16,6 +16,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const float alpha = 1.f;
+ layout(constant_id = 1) const float beta = 1.f;
+ layout(constant_id = 2) const int transA = 0;
+@@ -88,8 +94,20 @@ const uint Kd4p = Kd4 + PAD;
+ 
+ // cannot alias output with a and b
+ // cm store may happen while another subgroup is loading
++#if ncnn_vendorID == 0x5143
++// avoid specialization select in shared array lengths on adreno
++// max(x, y) = x - ((x - y) & ((x - y) >> 31)) for these small tile sizes
++const int tmp_a_size_diff = int(M * Kd4p) - int(K * Md4p);
++const int tmp_b_size_diff = int(K * Nd4p) - int(N * Kd4p);
++const uint tmp_a_size = M * Kd4p - uint(tmp_a_size_diff & (tmp_a_size_diff >> 31));
++const uint tmp_b_size = K * Nd4p - uint(tmp_b_size_diff & (tmp_b_size_diff >> 31));
++
++shared uvec2 tmp_a[UNROLL_WG_M][UNROLL_SG_K * UNROLL_SG_M * tmp_a_size];
++shared uvec2 tmp_b[UNROLL_WG_N][UNROLL_SG_K * UNROLL_SG_N * tmp_b_size];
++#else
+ shared uvec2 tmp_a[UNROLL_WG_M][UNROLL_SG_K * UNROLL_SG_M * (M * Kd4p > K * Md4p ? M * Kd4p : K * Md4p)];
+ shared uvec2 tmp_b[UNROLL_WG_N][UNROLL_SG_K * UNROLL_SG_N * (K * Nd4p > N * Kd4p ? K * Nd4p : N * Kd4p)];
++#endif
+ shared uvec2 tmp_o[UNROLL_WG_N * UNROLL_WG_M][UNROLL_SG_N * UNROLL_SG_M * M * N / 4];
+ 
+ void main()
+@@ -120,7 +138,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(GM) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (psc(GN) + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -139,7 +162,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;
+@@ -1703,6 +1731,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -1713,6 +1748,13 @@ void main()
+                         {
+ #if ncnn_VK_KHR_cooperative_matrix
+                             coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                            // adreno driver must consume the matrix before merging layout branches
++                            [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                            {
++                                sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                            }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                             coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+@@ -1721,6 +1763,13 @@ void main()
+                         {
+ #if ncnn_VK_KHR_cooperative_matrix
+                             coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                            // adreno driver must consume the matrix before merging layout branches
++                            [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                            {
++                                sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                            }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                             coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -1732,6 +1781,13 @@ void main()
+                         {
+ #if ncnn_VK_KHR_cooperative_matrix
+                             coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                            // adreno driver must consume the matrix before merging layout branches
++                            [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                            {
++                                sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                            }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                             coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -1740,13 +1796,22 @@ void main()
+                         {
+ #if ncnn_VK_KHR_cooperative_matrix
+                             coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                            // adreno driver must consume the matrix before merging layout branches
++                            [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                            {
++                                sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                            }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                             coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+                         }
+                     }
+                 }
+ 
++// adreno already performs mul-add inside the B load branches
++#if ncnn_vendorID != 0x5143
+                 // sum += k * v
+                 [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+                 {
+@@ -1759,6 +1824,7 @@ void main()
+ #endif
+                     }
+                 }
++#endif
+             }
+         }
+ 
+@@ -1993,6 +2059,13 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2003,6 +2076,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+@@ -2011,6 +2091,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2022,6 +2109,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2030,13 +2124,22 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+                     }
+                 }
+             }
+ 
++// adreno already performs mul-add inside the B load branches
++#if ncnn_vendorID != 0x5143
+             // sum += k * v
+             [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+             {
+@@ -2049,6 +2152,7 @@ void main()
+ #endif
+                 }
+             }
++#endif
+         }
+     }
+     else if (kk >= UNROLL_SG_K)
+@@ -2688,6 +2792,13 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2698,6 +2809,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+@@ -2706,6 +2824,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2717,6 +2842,13 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -2725,13 +2857,22 @@ void main()
+                     {
+ #if ncnn_VK_KHR_cooperative_matrix
+                         coopMatLoad(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                        // adreno driver must consume the matrix before merging layout branches
++                        [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                        {
++                            sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                        }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                         coopMatLoadNV(B[zn], tmp_b[sgni], (zk * UNROLL_SG_N + zn) * (Kd4p * N), Kd4p, true);
+ #endif
+                     }
+                 }
+             }
+ 
++// adreno already performs mul-add inside the B load branches
++#if ncnn_vendorID != 0x5143
+             // sum += k * v
+             [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+             {
+@@ -2744,6 +2885,7 @@ void main()
+ #endif
+                 }
+             }
++#endif
+         }
+ 
+         k += UNROLL_SG_K;
+@@ -3342,6 +3484,13 @@ void main()
+             {
+ #if ncnn_VK_KHR_cooperative_matrix
+                 coopMatLoad(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                // adreno driver must consume the matrix before merging layout branches
++                [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                {
++                    sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                 coopMatLoadNV(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -3352,6 +3501,13 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], zn * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], zn * (Kd4p * N), Kd4p, true);
+ #endif
+@@ -3360,6 +3516,13 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -3371,6 +3534,13 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, gl_CooperativeMatrixLayoutRowMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], zn * (Nd4p * K), Nd4p, false);
+ #endif
+@@ -3379,13 +3549,22 @@ void main()
+                 {
+ #if ncnn_VK_KHR_cooperative_matrix
+                     coopMatLoad(B[zn], tmp_b[sgni], zn * (Kd4p * N), Kd4p, gl_CooperativeMatrixLayoutColumnMajor);
++#if ncnn_vendorID == 0x5143
++                    // adreno driver must consume the matrix before merging layout branches
++                    [[unroll]] for (uint zm = 0; zm < UNROLL_SG_M; zm++)
++                    {
++                        sum[zn][zm] = coopMatMulAdd(A[zm], B[zn], sum[zn][zm]);
++                    }
++#endif
+ #elif ncnn_VK_NV_cooperative_matrix
+                     coopMatLoadNV(B[zn], tmp_b[sgni], zn * (Kd4p * N), Kd4p, true);
+ #endif
+                 }
+             }
+         }
+ 
++// adreno already performs mul-add inside the B load branches
++#if ncnn_vendorID != 0x5143
+         // sum += k * v
+         [[unroll]] for (uint zn = 0; zn < UNROLL_SG_N; zn++)
+         {
+@@ -3398,6 +3577,7 @@ void main()
+ #endif
+             }
+         }
++#endif
+     }
+ 
+     if (alpha != 1.f)
+diff --git a/src/layer/vulkan/shader/gemm_int8_cm.comp b/src/layer/vulkan/shader/gemm_int8_cm.comp
+--- a/src/layer/vulkan/shader/gemm_int8_cm.comp
++++ b/src/layer/vulkan/shader/gemm_int8_cm.comp
+@@ -17,6 +17,11 @@
+ #extension GL_NV_integer_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 4 for these packed int8 loads; int32 stores are unchanged
++#define coopMatLoad(m, buf, element, stride, layout) coopMatLoad(m, buf, element, (stride) * 4, layout)
++#endif
++
+ layout(constant_id = 0) const float alpha = 1.f;
+ layout(constant_id = 1) const float beta = 1.f;
+ layout(constant_id = 2) const int constantC = 0;
+@@ -104,7 +109,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(GM) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (psc(GN) + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -120,7 +130,12 @@ void main()
+     if (wgmi >= wgmm)
+         return;
+ 
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;
+diff --git a/src/layer/vulkan/shader/sdpa_cross_cm.comp b/src/layer/vulkan/shader/sdpa_cross_cm.comp
+--- a/src/layer/vulkan/shader/sdpa_cross_cm.comp
++++ b/src/layer/vulkan/shader/sdpa_cross_cm.comp
+@@ -16,6 +16,12 @@
+ #extension GL_NV_cooperative_matrix : require
+ #endif
+ 
++#if ncnn_vendorID == 0x5143
++// adreno needs stride * 2 for these packed fp16 buffers
++#define coopMatLoad(m, buf, element, stride, layout)  coopMatLoad(m, buf, element, (stride) * 2, layout)
++#define coopMatStore(m, buf, element, stride, layout) coopMatStore(m, buf, element, (stride) * 2, layout)
++#endif
++
+ layout(constant_id = 0) const int attn_mask = 0;
+ layout(constant_id = 1) const float scale = 0.f;
+ layout(constant_id = 2) const int GM = 0;
+@@ -72,7 +78,12 @@ const uint Nd8p = Nd8 + PAD;
+ const uint Kd8p = Kd8 + PAD;
+ 
+ const uint tmp_a_size = UNROLL_WG_M * UNROLL_SG_K * UNROLL_SG_M * (M * Kd8p);
++#if ncnn_vendorID == 0x5143
++// transB is 0 or 1; avoid specialization select in shared array lengths on adreno
++const uint tmp_b_size = UNROLL_WG_N * UNROLL_SG_K * UNROLL_SG_N * ((1 - uint(transB)) * K * Nd8p + uint(transB) * N * Kd8p);
++#else
+ const uint tmp_b_size = UNROLL_WG_N * UNROLL_SG_K * UNROLL_SG_N * (transB == 0 ? K * Nd8p : N * Kd8p);
++#endif
+ const uint tmp_o_size = UNROLL_WG_N * UNROLL_WG_M * UNROLL_SG_N * UNROLL_SG_M * (M * Nd8p);
+ 
+ // cannot alias output with a and b
+@@ -114,7 +125,12 @@ void main()
+     //
+ 
+     const uint wgi = gl_WorkGroupID.x;
++#if ncnn_vendorID == 0x5143
++    // keep the subgroup index consistent with the adreno lane index workaround
++    const uint sgi = gl_LocalInvocationID.x / subgroup_size;
++#else
+     const uint sgi = gl_SubgroupID;
++#endif
+ 
+     const uint wgmm = (psc(GM) + M * UNROLL_SG_M * UNROLL_WG_M - 1) / (M * UNROLL_SG_M * UNROLL_WG_M);
+     const uint wgnn = (psc(GN) + N * UNROLL_SG_N * UNROLL_WG_N - 1) / (N * UNROLL_SG_N * UNROLL_WG_N);
+@@ -133,7 +149,12 @@ void main()
+         return;
+ 
+     const uint li = gl_LocalInvocationID.x;
++#if ncnn_vendorID == 0x5143
++    // adreno corrupts the subgroup invocation index in cooperative matrix shaders
++    const uint si = gl_LocalInvocationID.x % subgroup_size;
++#else
+     const uint si = gl_SubgroupInvocationID;
++#endif
+ 
+     const uint ni = (wgni * UNROLL_WG_N + sgni) * UNROLL_SG_N;
+     const uint mi = (wgmi * UNROLL_WG_M + sgmi) * UNROLL_SG_M;

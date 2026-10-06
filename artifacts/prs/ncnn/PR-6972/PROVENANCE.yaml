@@ -1,0 +1,47 @@
+repo: Tencent/ncnn
+pr: 6972
+url: https://github.com/Tencent/ncnn/pull/6972
+merge_sha: 3a3ceb6b9edd65d7597d345a49d9ee2665f39a04
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6972/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/convolution1d_1x1s1d1_cm.comp
+  status: modified
+  sha256: d189ff55aee569433d084f66e01e715d1349accc8c33ca608a198e29dd01300e
+- path: src/layer/vulkan/shader/convolution1d_gemm_cm.comp
+  status: modified
+  sha256: 6c9adc3eec7238a1bab61178937070415610ab16a3554ead50171304fa6dba0c
+- path: src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+  status: modified
+  sha256: 03233daed0dbe69e6dedd3b44dfcd632dcd1c8efe091f3323015044046525ab9
+- path: src/layer/vulkan/shader/convolution_1x1s1d1_int8_cm.comp
+  status: modified
+  sha256: 596575e2ebd84ba8b6feae7bb5c20a9a24f59112f6129bc8a93a0c3b406f3d08
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm_int8_cm.comp
+  status: modified
+  sha256: 3703b110e692c6c0193d4eefabb627ca216a2f12529409d3ab4c399e4f6193d7
+- path: src/layer/vulkan/shader/convolution_gemm_cm.comp
+  status: modified
+  sha256: 100fece1ed58f6cf5db72f75f7f195110bef4f4b5b39c0dbbbe9c5039a18fc9c
+- path: src/layer/vulkan/shader/convolution_gemm_int8_cm.comp
+  status: modified
+  sha256: e0567a106e5ff35973528f32e07d4997c1261230fc3890cd5c0f4c37f624096f
+- path: src/layer/vulkan/shader/convolution_winograd_gemm_cm.comp
+  status: modified
+  sha256: 1bd1068425f2844f34cc8cdcb3e983557a148ce10d9dd309d5f6dd821b1dc089
+- path: src/layer/vulkan/shader/deconvolution_gemm_cm.comp
+  status: modified
+  sha256: 839b1e56395f4c1253854060197c0ae148495de487ea0dc97acd5563dcb303e4
+- path: src/layer/vulkan/shader/gemm_cm.comp
+  status: modified
+  sha256: 2096b4e530d42dbb1504c867bf684114c931e7e50ca5c62a30f4b674f2d9aa50
+- path: src/layer/vulkan/shader/gemm_int8_cm.comp
+  status: modified
+  sha256: 41e46d48230c0dbfcab186139353918b87f7db9393c919a2eb779fa894e52ae1
+- path: src/layer/vulkan/shader/sdpa_cross_cm.comp
+  status: modified
+  sha256: 0763b1923ed3c8462a693cce838dc721938b8024283f1dd9b81764481b9d097b

@@ -1474,6 +1474,68 @@ class PrPolicyTest(unittest.TestCase):
         both = [{"filename": "src/a.cpp", "patch": "@@\n+FIXTURE_ID_AMD FIXTURE_ARCH_RDNA3"}]
         self.assertEqual(self.policy.derive_architectures("FIXTURE for AMD", both, markers)[0], ["rdna3"])
 
+    def test_driver_mode_needs_topic_and_driver_path(self):
+        config = self.policy.PathConfig.from_ledger({
+            "scope_mode": "driver",
+            "driver_path_markers": ["src/fixture-driver/"],
+            "topic_patterns": ["fixture[ -]topic"],
+        })
+        files = [{"filename": "src/fixture-driver/a.c"}, {"filename": "src/other/b.c"}]
+        hit = self.policy.classify_scope(files, config, "FIXTURE topic change")
+        self.assertEqual((hit.decision, hit.rule), ("include", "driver-source-on-topic"))
+        self.assertEqual(hit.evidence_paths, ("src/fixture-driver/a.c",))
+        self.assertEqual(self.policy.classify_scope(files, config, "FIXTURE other change").rule, "no-topic-in-title")
+        self.assertEqual(self.policy.classify_scope(files[1:], config, "FIXTURE topic change").rule, "no-driver-path")
+        # In driver mode the saved files are the ones under the driver paths.
+        self.assertEqual([f["filename"] for f in self.policy.shader_files(files, config)], ["src/fixture-driver/a.c"])
+        with self.assertRaises(ValueError):
+            self.policy.PathConfig.from_ledger({"scope_mode": "fixture"})
+
+    def test_architectures_from_changed_paths(self):
+        files = [{"filename": "src/fixture-amd/a.c"}, {"filename": "src/gone/b.c", "status": "removed"}]
+        markers = {"src/fixture-amd/": "amd", "src/gone/": "intel", "src/absent/": "nvidia"}
+        self.assertEqual(
+            self.policy.derive_architectures("FIXTURE", files, path_markers=markers),
+            (["amd"], [{"node": "amd", "locator": "changed-path:src/fixture-amd/a.c", "matched": "src/fixture-amd/"}]),
+        )
+
+    def test_c_and_header_languages(self):
+        def languages(*names):
+            files = [{"filename": n} for n in names]
+            return self.policy.derive_metadata("FIXTURE", files, self.vocab, self.config)["languages"]
+        self.assertEqual(languages("a.c", "a.h"), ["c"])
+        self.assertEqual(languages("a.cpp", "a.h"), ["cpp"])
+        self.assertEqual(languages("a.h"), ["cpp"])
+
+    def test_gitlab_merge_request_is_normalized(self):
+        import pr_evidence
+        mr = {
+            "iid": 7, "title": "FIXTURE merge request", "description": "FIXTURE text", "state": "merged",
+            "web_url": "https://example.invalid/g/p/-/merge_requests/7", "merged_at": "2000-01-03T00:00:00Z",
+            "created_at": "2000-01-01T00:00:00Z", "merge_commit_sha": None, "squash_commit_sha": None,
+            "sha": "0123456789abcdef0123456789abcdef01234567", "author": {"username": "fixture-author"},
+        }
+        diffs = [
+            {"new_path": "a.c", "old_path": "a.c", "diff": "@@ -1 +1 @@\n-x\n+y\n"},
+            {"new_path": "b.c", "old_path": "b.c", "new_file": True, "diff": "@@ -0,0 +1 @@\n+z\n"},
+            {"new_path": "d.c", "old_path": "c.c", "renamed_file": True, "diff": ""},
+        ]
+        evidence = pr_evidence.normalize_gitlab("g/p", mr, diffs, "2000-01-04")
+        self.assertEqual(evidence["pr"]["number"], 7)
+        self.assertTrue(evidence["pr"]["merged"])
+        self.assertEqual(evidence["pr"]["merge_commit_sha"], mr["sha"])  # fast-forward merge: the head commit
+        self.assertEqual(evidence["pr"]["author"], "fixture-author")
+        self.assertEqual(
+            [(f["filename"], f["status"], f["patch"]) for f in evidence["files"]],
+            [("a.c", "modified", "@@ -1 +1 @@\n-x\n+y"), ("b.c", "added", "@@ -0,0 +1 @@\n+z"), ("d.c", "renamed", None)],
+        )
+        self.assertEqual(pr_evidence.request_noun({"forge": "gitlab", "gitlab_api": "https://example.invalid/api/v4"}),
+                         "merge request")
+        with self.assertRaises(pr_evidence.EvidenceError):
+            pr_evidence.forge_of({"forge": "gitlab"})
+        with self.assertRaises(pr_evidence.EvidenceError):
+            pr_evidence.forge_of({"forge": "fixture"})
+
     def test_reserved_vendor_is_never_emitted(self):
         import arch_policy
         reserved = [
@@ -1582,6 +1644,38 @@ class PrPipelineTest(TempRoots):
         run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline", "--reclassify", root=root)
         ledger = yaml.safe_load((root / "candidates" / "fixture-repo.yaml").read_text(encoding="utf-8"))
         self.assertEqual(ledger["prs"][1]["decision"], "include")
+
+    def test_driver_ledger_writes_driver_patch(self):
+        root = self.make_root()
+        (root / "candidates" / "fixture-repo.yaml").unlink()
+        (root / "candidates" / "fixture-driver.yaml").write_text(
+            "repo: example-org/example-driver\nforge: gitlab\ngitlab_api: https://example.invalid/api/v4\n"
+            "license: MIT\nlicense_path: LICENSE\nscope_mode: driver\nkeywords_used:\n- fixture\n"
+            "driver_path_markers:\n- src/fixture-amd/\ntopic_patterns:\n- fixture topic\n"
+            "architecture_path_markers:\n  src/fixture-amd/: amd\nprs:\n- number: 9\n", encoding="utf-8")
+        cache = root / ".cache" / "pr-evidence" / "fixture-driver"
+        cache.mkdir(parents=True)
+        evidence = fixture_evidence(9, "FIXTURE topic in the driver", ["src/fixture-amd/a.c", "docs/readme.md"])
+        (cache / "9.json").write_text(json.dumps(evidence), encoding="utf-8")
+        (root / "artifacts" / "prs" / "fixture-driver").mkdir(parents=True)
+        (root / "artifacts" / "prs" / "fixture-driver" / "LICENSE").write_text("FIXTURE\n", encoding="utf-8")
+        for script in ("refresh_candidate_ledger.py --cutoff 2000-01-31 --reclassify", "fetch_pr_diff.py",
+                       "generate-pr-pages.py"):
+            name, *args = script.split()
+            proc = run_script(name, *args, "--offline", root=root)
+            self.assertEqual(proc.returncode, 0, script + proc.stdout + proc.stderr)
+        bundle = root / "artifacts" / "prs" / "fixture-driver" / "PR-9"
+        self.assertEqual(sorted(p.name for p in bundle.iterdir()), ["PROVENANCE.yaml", "driver.patch"])
+        provenance = yaml.safe_load((bundle / "PROVENANCE.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(provenance["patch_file"], "driver.patch")
+        self.assertEqual([f["path"] for f in provenance["files"]], ["src/fixture-amd/a.c"])
+        self.assertIn("GitLab REST API", provenance["origin"])
+        page = root / "sources" / "prs" / "fixture-driver" / "PR-9.md"
+        fm = load_frontmatter(page)
+        self.assertEqual((fm["architectures"], fm["languages"], fm["kernel_types"]), (["amd"], ["c"], []))
+        self.assertIn("(merge request description, complete)", page.read_text(encoding="utf-8"))
+        self.assertEqual(run_script("validate.py", root=root).returncode, 0)
+        self.assertEqual(run_script("verify_verbatim.py", "--against-cache", root=root).returncode, 0)
 
     def test_tampered_or_missing_artifact_is_reported(self):
         root = self.make_root()

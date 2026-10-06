@@ -1,0 +1,580 @@
+diff --git a/src/amd/common/ac_gpu_info.c b/src/amd/common/ac_gpu_info.c
+--- a/src/amd/common/ac_gpu_info.c
++++ b/src/amd/common/ac_gpu_info.c
+@@ -870,6 +870,13 @@ bool ac_query_gpu_info(int fd, void *dev_p, struct radeon_info *info,
+    /* Whether chips support double rate packed math instructions. */
+    info->has_packed_math_16bit = info->chip_class >= GFX9;
+ 
++   /* Whether chips support dot product instructions. A subset of these support a smaller
++    * instruction encoding which accumulates with the destination.
++    */
++   info->has_accelerated_dot_product =
++      info->family == CHIP_ARCTURUS || info->family == CHIP_ALDEBARAN ||
++      info->family == CHIP_VEGA20 || info->family >= CHIP_NAVI12;
++
+    /* TODO: Figure out how to use LOAD_CONTEXT_REG on GFX6-GFX7. */
+    info->has_load_ctx_reg_pkt =
+       info->chip_class >= GFX9 || (info->chip_class >= GFX8 && info->me_fw_feature >= 41);
+diff --git a/src/amd/common/ac_gpu_info.h b/src/amd/common/ac_gpu_info.h
+--- a/src/amd/common/ac_gpu_info.h
++++ b/src/amd/common/ac_gpu_info.h
+@@ -70,6 +70,7 @@ struct radeon_info {
+    bool has_load_ctx_reg_pkt;
+    bool has_out_of_order_rast;
+    bool has_packed_math_16bit;
++   bool has_accelerated_dot_product;
+    bool cpdma_prefetch_writes_memory;
+    bool has_gfx9_scissor_bug;
+    bool has_tc_compat_zrange_bug;
+diff --git a/src/amd/compiler/aco_instruction_selection.cpp b/src/amd/compiler/aco_instruction_selection.cpp
+--- a/src/amd/compiler/aco_instruction_selection.cpp
++++ b/src/amd/compiler/aco_instruction_selection.cpp
+@@ -713,7 +713,7 @@ get_alu_src(struct isel_context* ctx, nir_alu_src src, unsigned size = 1)
+       return get_ssa_temp(ctx, src.src.ssa);
+ 
+    Temp vec = get_ssa_temp(ctx, src.src.ssa);
+-   unsigned elem_size = vec.bytes() / src.src.ssa->num_components;
++   unsigned elem_size = src.src.ssa->bit_size / 8u;
+    bool identity_swizzle = true;
+ 
+    for (unsigned i = 0; identity_swizzle && i < size; i++) {
+@@ -726,13 +726,16 @@ get_alu_src(struct isel_context* ctx, nir_alu_src src, unsigned size = 1)
+    assert(elem_size > 0);
+    assert(vec.bytes() % elem_size == 0);
+ 
+-   if (elem_size < 4 && vec.type() == RegType::sgpr) {
++   if (elem_size < 4 && vec.type() == RegType::sgpr && size == 1) {
+       assert(src.src.ssa->bit_size == 8 || src.src.ssa->bit_size == 16);
+-      assert(size == 1);
+       return extract_8_16_bit_sgpr_element(ctx, ctx->program->allocateTmp(s1), &src,
+                                            sgpr_extract_undef);
+    }
+ 
++   bool as_uniform = elem_size < 4 && vec.type() == RegType::sgpr;
++   if (as_uniform)
++      vec = as_vgpr(ctx, vec);
++
+    RegClass elem_rc = elem_size < 4 ? RegClass(vec.type(), elem_size).as_subdword()
+                                     : RegClass(vec.type(), elem_size / 4);
+    if (size == 1) {
+@@ -750,7 +753,7 @@ get_alu_src(struct isel_context* ctx, nir_alu_src src, unsigned size = 1)
+       vec_instr->definitions[0] = Definition(dst);
+       ctx->block->instructions.emplace_back(std::move(vec_instr));
+       ctx->allocated_vec.emplace(dst.id(), elems);
+-      return dst;
++      return vec.type() == RegType::sgpr ? Builder(ctx->program, ctx->block).as_uniform(dst) : dst;
+    }
+ }
+ 
+@@ -957,6 +960,24 @@ emit_vop3p_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, T
+    return res;
+ }
+ 
++void
++emit_idot_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, Temp dst, bool clamp)
++{
++   Temp src[3] = {Temp(0, v1), Temp(0, v1), Temp(0, v1)};
++   bool has_sgpr = false;
++   for (unsigned i = 0; i < 3; i++) {
++      src[i] = get_alu_src(ctx, instr->src[i]);
++      if (has_sgpr)
++         src[i] = as_vgpr(ctx, src[i]);
++      else
++         has_sgpr = src[i].type() == RegType::sgpr;
++   }
++
++   Builder bld(ctx->program, ctx->block);
++   bld.is_precise = instr->exact;
++   bld.vop3p(op, Definition(dst), src[0], src[1], src[2], 0x0, 0x7).instr->vop3p().clamp = clamp;
++}
++
+ void
+ emit_vop1_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, Temp dst)
+ {
+@@ -1809,6 +1830,22 @@ visit_alu_instr(isel_context* ctx, nir_alu_instr* instr)
+       }
+       break;
+    }
++   case nir_op_iadd_sat: {
++      Temp src0 = get_alu_src(ctx, instr->src[0]);
++      Temp src1 = as_vgpr(ctx, get_alu_src(ctx, instr->src[1]));
++      if (dst.regClass() == v2b) {
++         Instruction* add_instr =
++            bld.vop3(aco_opcode::v_add_i16, Definition(dst), src0, src1).instr;
++         add_instr->vop3().clamp = 1;
++      } else if (dst.regClass() == v1) {
++         Instruction* add_instr =
++            bld.vop3(aco_opcode::v_add_i32, Definition(dst), src0, src1).instr;
++         add_instr->vop3().clamp = 1;
++      } else {
++         isel_err(&instr->instr, "Unimplemented NIR instr bit size");
++      }
++      break;
++   }
+    case nir_op_uadd_carry: {
+       Temp src0 = get_alu_src(ctx, instr->src[0]);
+       Temp src1 = get_alu_src(ctx, instr->src[1]);
+@@ -2093,6 +2130,38 @@ visit_alu_instr(isel_context* ctx, nir_alu_instr* instr)
+       }
+       break;
+    }
++   case nir_op_sdot_4x8_iadd: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, false);
++      break;
++   }
++   case nir_op_sdot_4x8_iadd_sat: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, true);
++      break;
++   }
++   case nir_op_udot_4x8_uadd: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_u32_u8, dst, false);
++      break;
++   }
++   case nir_op_udot_4x8_uadd_sat: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_u32_u8, dst, true);
++      break;
++   }
++   case nir_op_sdot_2x16_iadd: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot2_i32_i16, dst, false);
++      break;
++   }
++   case nir_op_sdot_2x16_iadd_sat: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot2_i32_i16, dst, true);
++      break;
++   }
++   case nir_op_udot_2x16_uadd: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot2_u32_u16, dst, false);
++      break;
++   }
++   case nir_op_udot_2x16_uadd_sat: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot2_u32_u16, dst, true);
++      break;
++   }
+    case nir_op_cube_face_coord_amd: {
+       Temp in = get_alu_src(ctx, instr->src[0], 3);
+       Temp src[3] = {emit_extract_vector(ctx, in, 0, v1), emit_extract_vector(ctx, in, 1, v1),
+@@ -3132,6 +3201,7 @@ visit_alu_instr(isel_context* ctx, nir_alu_instr* instr)
+       }
+       break;
+    }
++   case nir_op_pack_32_4x8: bld.copy(Definition(dst), get_alu_src(ctx, instr->src[0], 4)); break;
+    case nir_op_pack_half_2x16_split: {
+       if (dst.regClass() == v1) {
+          nir_const_value* val = nir_src_as_const_value(instr->src[1].src);
+diff --git a/src/amd/compiler/aco_instruction_selection_setup.cpp b/src/amd/compiler/aco_instruction_selection_setup.cpp
+--- a/src/amd/compiler/aco_instruction_selection_setup.cpp
++++ b/src/amd/compiler/aco_instruction_selection_setup.cpp
+@@ -593,7 +593,16 @@ init_context(isel_context* ctx, nir_shader* shader)
+                case nir_op_frexp_exp:
+                case nir_op_cube_face_index_amd:
+                case nir_op_cube_face_coord_amd:
+-               case nir_op_sad_u8x4: type = RegType::vgpr; break;
++               case nir_op_sad_u8x4:
++               case nir_op_iadd_sat:
++               case nir_op_udot_4x8_uadd:
++               case nir_op_sdot_4x8_iadd:
++               case nir_op_udot_4x8_uadd_sat:
++               case nir_op_sdot_4x8_iadd_sat:
++               case nir_op_udot_2x16_uadd:
++               case nir_op_sdot_2x16_iadd:
++               case nir_op_udot_2x16_uadd_sat:
++               case nir_op_sdot_2x16_iadd_sat: type = RegType::vgpr; break;
+                case nir_op_f2i16:
+                case nir_op_f2u16:
+                case nir_op_f2i32:
+diff --git a/src/amd/compiler/aco_opcodes.py b/src/amd/compiler/aco_opcodes.py
+--- a/src/amd/compiler/aco_opcodes.py
++++ b/src/amd/compiler/aco_opcodes.py
+@@ -680,6 +680,7 @@ VOP2 = {
+    (0x0a, 0x0a, 0x07, 0x07, 0x0a, "v_mul_hi_i32_i24", False),
+    (0x0b, 0x0b, 0x08, 0x08, 0x0b, "v_mul_u32_u24", False),
+    (0x0c, 0x0c, 0x09, 0x09, 0x0c, "v_mul_hi_u32_u24", False),
++   (  -1,   -1,   -1, 0x39, 0x0d, "v_dot4c_i32_i8", False),
+    (0x0d, 0x0d,   -1,   -1,   -1, "v_min_legacy_f32", True),
+    (0x0e, 0x0e,   -1,   -1,   -1, "v_max_legacy_f32", True),
+    (0x0f, 0x0f, 0x0a, 0x0a, 0x0f, "v_min_f32", True),
+@@ -963,6 +964,10 @@ VOPP = {
+ # (gfx6, gfx7, gfx8, gfx9, gfx10, name) = (-1, -1, -1, code, code, name)
+ for (code, name, modifiers) in VOPP:
+    opcode(name, -1, code, code, Format.VOP3P, InstrClass.Valu32, modifiers, modifiers)
++opcode("v_dot2_i32_i16", -1, 0x26, 0x14, Format.VOP3P, InstrClass.Valu32)
++opcode("v_dot2_u32_u16", -1, 0x27, 0x15, Format.VOP3P, InstrClass.Valu32)
++opcode("v_dot4_i32_i8", -1, 0x28, 0x16, Format.VOP3P, InstrClass.Valu32)
++opcode("v_dot4_u32_u8", -1, 0x29, 0x17, Format.VOP3P, InstrClass.Valu32)
+ 
+ 
+ # VINTERP instructions: 
+diff --git a/src/amd/compiler/aco_register_allocation.cpp b/src/amd/compiler/aco_register_allocation.cpp
+--- a/src/amd/compiler/aco_register_allocation.cpp
++++ b/src/amd/compiler/aco_register_allocation.cpp
+@@ -510,12 +510,12 @@ add_subdword_operand(ra_ctx& ctx, aco_ptr<Instruction>& instr, unsigned idx, uns
+    if (instr->isVALU()) {
+       /* check if we can use opsel */
+       if (instr->format == Format::VOP3) {
+-         assert(rc == v2b && byte == 2);
++         assert(byte == 2);
+          instr->vop3().opsel |= 1 << idx;
+          return;
+       }
+       if (instr->isVOP3P()) {
+-         assert(rc == v2b && byte == 2 && !(instr->vop3p().opsel_lo & (1 << idx)));
++         assert(byte == 2 && !(instr->vop3p().opsel_lo & (1 << idx)));
+          instr->vop3p().opsel_lo |= 1 << idx;
+          instr->vop3p().opsel_hi |= 1 << idx;
+          return;
+@@ -2477,7 +2477,8 @@ register_allocation(Program* program, std::vector<IDSet>& live_out_per_block, ra
+               instr->opcode == aco_opcode::v_mad_f16 ||
+               instr->opcode == aco_opcode::v_mad_legacy_f16 ||
+               (instr->opcode == aco_opcode::v_fma_f16 && program->chip_class >= GFX10) ||
+-              (instr->opcode == aco_opcode::v_pk_fma_f16 && program->chip_class >= GFX10)) &&
++              (instr->opcode == aco_opcode::v_pk_fma_f16 && program->chip_class >= GFX10) ||
++              (instr->opcode == aco_opcode::v_dot4_i32_i8 && program->family != CHIP_VEGA20)) &&
+              instr->operands[2].isTemp() && instr->operands[2].isKillBeforeDef() &&
+              instr->operands[2].getTemp().type() == RegType::vgpr && instr->operands[1].isTemp() &&
+              instr->operands[1].getTemp().type() == RegType::vgpr && !instr->usesModifiers() &&
+@@ -2496,6 +2497,7 @@ register_allocation(Program* program, std::vector<IDSet>& live_out_per_block, ra
+                case aco_opcode::v_mad_legacy_f16: instr->opcode = aco_opcode::v_mac_f16; break;
+                case aco_opcode::v_fma_f16: instr->opcode = aco_opcode::v_fmac_f16; break;
+                case aco_opcode::v_pk_fma_f16: instr->opcode = aco_opcode::v_pk_fmac_f16; break;
++               case aco_opcode::v_dot4_i32_i8: instr->opcode = aco_opcode::v_dot4c_i32_i8; break;
+                default: break;
+                }
+             }
+@@ -2507,7 +2509,8 @@ register_allocation(Program* program, std::vector<IDSet>& live_out_per_block, ra
+              instr->opcode == aco_opcode::v_mac_f16 || instr->opcode == aco_opcode::v_fmac_f16 ||
+              instr->opcode == aco_opcode::v_pk_fmac_f16 ||
+              instr->opcode == aco_opcode::v_writelane_b32 ||
+-             instr->opcode == aco_opcode::v_writelane_b32_e64) {
++             instr->opcode == aco_opcode::v_writelane_b32_e64 ||
++             instr->opcode == aco_opcode::v_dot4c_i32_i8) {
+             instr->definitions[0].setFixed(instr->operands[2].physReg());
+          } else if (instr->opcode == aco_opcode::s_addk_i32 ||
+                     instr->opcode == aco_opcode::s_mulk_i32) {
+diff --git a/src/amd/llvm/ac_nir_to_llvm.c b/src/amd/llvm/ac_nir_to_llvm.c
+--- a/src/amd/llvm/ac_nir_to_llvm.c
++++ b/src/amd/llvm/ac_nir_to_llvm.c
+@@ -582,6 +582,7 @@ static void visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+    case nir_op_cube_face_index_amd:
+       src_components = 3;
+       break;
++   case nir_op_pack_32_4x8:
+    case nir_op_pack_64_4x16:
+       src_components = 4;
+       break;
+@@ -625,6 +626,15 @@ static void visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+       else
+          result = LLVMBuildAdd(ctx->ac.builder, src[0], src[1], "");
+       break;
++   case nir_op_uadd_sat:
++   case nir_op_iadd_sat: {
++      char name[64], type[64];
++      ac_build_type_name_for_intr(def_type, type, sizeof(type));
++      snprintf(name, sizeof(name), "llvm.%cadd.sat.%s",
++               instr->op == nir_op_uadd_sat ? 'u' : 's', type);
++      result = ac_build_intrinsic(&ctx->ac, name, def_type, src, 2, AC_FUNC_ATTR_READNONE);
++      break;
++   }
+    case nir_op_fadd:
+       src[0] = ac_to_float(&ctx->ac, src[0]);
+       src[1] = ac_to_float(&ctx->ac, src[1]);
+@@ -1153,6 +1163,7 @@ static void visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+       break;
+    }
+ 
++   case nir_op_pack_32_4x8:
+    case nir_op_pack_32_2x16: {
+       result = LLVMBuildBitCast(ctx->ac.builder, src[0],
+             ctx->ac.i32, "");
+@@ -1236,6 +1247,34 @@ static void visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+       break;
+    }
+ 
++   case nir_op_sdot_4x8_iadd:
++   case nir_op_udot_4x8_uadd:
++   case nir_op_sdot_4x8_iadd_sat:
++   case nir_op_udot_4x8_uadd_sat: {
++      const char *name = instr->op == nir_op_sdot_4x8_iadd ||
++                         instr->op == nir_op_sdot_4x8_iadd_sat
++                         ? "llvm.amdgcn.sdot4" : "llvm.amdgcn.udot4";
++      src[3] = LLVMConstInt(ctx->ac.i1, instr->op == nir_op_sdot_4x8_iadd_sat ||
++                                        instr->op == nir_op_udot_4x8_uadd_sat, false);
++      result = ac_build_intrinsic(&ctx->ac, name, def_type, src, 4, AC_FUNC_ATTR_READNONE);
++      break;
++   }
++
++   case nir_op_sdot_2x16_iadd:
++   case nir_op_udot_2x16_uadd:
++   case nir_op_sdot_2x16_iadd_sat:
++   case nir_op_udot_2x16_uadd_sat: {
++      const char *name = instr->op == nir_op_sdot_2x16_iadd ||
++                         instr->op == nir_op_sdot_2x16_iadd_sat
++                         ? "llvm.amdgcn.sdot2" : "llvm.amdgcn.udot2";
++      src[0] = LLVMBuildBitCast(ctx->ac.builder, src[0], ctx->ac.v2i16, "");
++      src[1] = LLVMBuildBitCast(ctx->ac.builder, src[1], ctx->ac.v2i16, "");
++      src[3] = LLVMConstInt(ctx->ac.i1, instr->op == nir_op_sdot_2x16_iadd_sat ||
++                                        instr->op == nir_op_udot_2x16_uadd_sat, false);
++      result = ac_build_intrinsic(&ctx->ac, name, def_type, src, 4, AC_FUNC_ATTR_READNONE);
++      break;
++   }
++
+    default:
+       fprintf(stderr, "Unknown NIR alu instr: ");
+       nir_print_instr(&instr->instr, stderr);
+diff --git a/src/amd/vulkan/radv_device.c b/src/amd/vulkan/radv_device.c
+--- a/src/amd/vulkan/radv_device.c
++++ b/src/amd/vulkan/radv_device.c
+@@ -437,6 +437,7 @@ radv_physical_device_get_supported_extensions(const struct radv_physical_device
+       .KHR_shader_draw_parameters = true,
+       .KHR_shader_float16_int8 = true,
+       .KHR_shader_float_controls = true,
++      .KHR_shader_integer_dot_product = true,
+       .KHR_shader_non_semantic_info = true,
+       .KHR_shader_subgroup_extended_types = true,
+       .KHR_shader_subgroup_uniform_control_flow = true,
+@@ -708,6 +709,8 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
+ 
+    radv_physical_device_get_supported_extensions(device, &device->vk.supported_extensions);
+ 
++   radv_get_nir_options(device);
++
+ #ifndef _WIN32
+    if (drm_device) {
+       struct stat primary_stat = {0}, render_stat = {0};
+@@ -1704,6 +1707,12 @@ radv_GetPhysicalDeviceFeatures2(VkPhysicalDevice physicalDevice,
+          features->primitiveTopologyPatchListRestart = false;
+          break;
+       }
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES_KHR: {
++         VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR *features =
++            (VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR *)ext;
++         features->shaderIntegerDotProduct = true;
++         break;
++      }
+       default:
+          break;
+       }
+@@ -2416,6 +2425,45 @@ radv_GetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
+          props->maxMultiDrawCount = 2048;
+          break;
+       }
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES_KHR: {
++         VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR *props =
++            (VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR *)ext;
++
++         bool accel = pdevice->rad_info.has_accelerated_dot_product;
++
++         props->integerDotProduct8BitUnsignedAccelerated = accel;
++         props->integerDotProduct8BitSignedAccelerated = accel;
++         props->integerDotProduct8BitMixedSignednessAccelerated = false;
++         props->integerDotProduct4x8BitPackedUnsignedAccelerated = accel;
++         props->integerDotProduct4x8BitPackedSignedAccelerated = accel;
++         props->integerDotProduct4x8BitPackedMixedSignednessAccelerated = false;
++         props->integerDotProduct16BitUnsignedAccelerated = accel;
++         props->integerDotProduct16BitSignedAccelerated = accel;
++         props->integerDotProduct16BitMixedSignednessAccelerated = false;
++         props->integerDotProduct32BitUnsignedAccelerated = false;
++         props->integerDotProduct32BitSignedAccelerated = false;
++         props->integerDotProduct32BitMixedSignednessAccelerated = false;
++         props->integerDotProduct64BitUnsignedAccelerated = false;
++         props->integerDotProduct64BitSignedAccelerated = false;
++         props->integerDotProduct64BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating8BitUnsignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating8BitSignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated =
++            false;
++         props->integerDotProductAccumulatingSaturating16BitUnsignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating16BitSignedAccelerated = accel;
++         props->integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitMixedSignednessAccelerated = false;
++         break;
++      }
+       default:
+          break;
+       }
+diff --git a/src/amd/vulkan/radv_pipeline.c b/src/amd/vulkan/radv_pipeline.c
+--- a/src/amd/vulkan/radv_pipeline.c
++++ b/src/amd/vulkan/radv_pipeline.c
+@@ -3224,6 +3224,9 @@ lower_bit_size_callback(const nir_instr *instr, void *_)
+       case nir_op_uadd_sat:
+          return (bit_size == 8 || !(chip >= GFX8 && nir_dest_is_divergent(alu->dest.dest))) ? 32
+                                                                                             : 0;
++      case nir_op_iadd_sat:
++         return bit_size == 8 || !nir_dest_is_divergent(alu->dest.dest) ? 32 : 0;
++
+       default:
+          return 0;
+       }
+@@ -3495,9 +3498,7 @@ radv_create_shaders(struct radv_pipeline *pipeline, struct radv_device *device,
+          /* lower ALU operations */
+          nir_lower_int64(nir[i]);
+ 
+-         /* TODO: Implement nir_op_uadd_sat with LLVM. */
+-         if (!radv_use_llvm_for_stage(device, i))
+-            nir_opt_idiv_const(nir[i], 8);
++         nir_opt_idiv_const(nir[i], 8);
+ 
+          nir_lower_idiv(nir[i],
+                         &(nir_lower_idiv_options){
+diff --git a/src/amd/vulkan/radv_private.h b/src/amd/vulkan/radv_private.h
+--- a/src/amd/vulkan/radv_private.h
++++ b/src/amd/vulkan/radv_private.h
+@@ -297,6 +297,8 @@ struct radv_physical_device {
+    dev_t primary_devid;
+    dev_t render_devid;
+ #endif
++
++   nir_shader_compiler_options nir_options;
+ };
+ 
+ struct radv_instance {
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -47,51 +47,58 @@
+ #include "sid.h"
+ #include "vk_format.h"
+ 
+-static const struct nir_shader_compiler_options nir_options = {
+-   .vertex_id_zero_based = true,
+-   .lower_scmp = true,
+-   .lower_flrp16 = true,
+-   .lower_flrp32 = true,
+-   .lower_flrp64 = true,
+-   .lower_device_index_to_zero = true,
+-   .lower_fdiv = true,
+-   .lower_fmod = true,
+-   .lower_ineg = true,
+-   .lower_bitfield_insert_to_bitfield_select = true,
+-   .lower_bitfield_extract = true,
+-   .lower_pack_snorm_2x16 = true,
+-   .lower_pack_snorm_4x8 = true,
+-   .lower_pack_unorm_2x16 = true,
+-   .lower_pack_unorm_4x8 = true,
+-   .lower_pack_half_2x16 = true,
+-   .lower_pack_64_2x32 = true,
+-   .lower_pack_64_4x16 = true,
+-   .lower_pack_32_2x16 = true,
+-   .lower_unpack_snorm_2x16 = true,
+-   .lower_unpack_snorm_4x8 = true,
+-   .lower_unpack_unorm_2x16 = true,
+-   .lower_unpack_unorm_4x8 = true,
+-   .lower_unpack_half_2x16 = true,
+-   .lower_ffma16 = true,
+-   .lower_ffma32 = true,
+-   .lower_ffma64 = true,
+-   .lower_fpow = true,
+-   .lower_mul_2x32_64 = true,
+-   .lower_rotate = true,
+-   .has_fsub = true,
+-   .has_isub = true,
+-   .use_scoped_barrier = true,
+-   .max_unroll_iterations = 32,
+-   .max_unroll_iterations_aggressive = 128,
+-   .use_interpolated_input_intrinsics = true,
+-   .vectorize_vec2_16bit = true,
+-   /* nir_lower_int64() isn't actually called for the LLVM backend, but
+-    * this helps the loop unrolling heuristics. */
+-   .lower_int64_options = nir_lower_imul64 | nir_lower_imul_high64 | nir_lower_imul_2x32_64 |
+-                          nir_lower_divmod64 | nir_lower_minmax64 | nir_lower_iabs64,
+-   .lower_doubles_options = nir_lower_drcp | nir_lower_dsqrt | nir_lower_drsq | nir_lower_ddiv,
+-   .divergence_analysis_options = nir_divergence_view_index_uniform,
+-};
++void
++radv_get_nir_options(struct radv_physical_device *device)
++{
++   device->nir_options = (nir_shader_compiler_options){
++      .vertex_id_zero_based = true,
++      .lower_scmp = true,
++      .lower_flrp16 = true,
++      .lower_flrp32 = true,
++      .lower_flrp64 = true,
++      .lower_device_index_to_zero = true,
++      .lower_fdiv = true,
++      .lower_fmod = true,
++      .lower_ineg = true,
++      .lower_bitfield_insert_to_bitfield_select = true,
++      .lower_bitfield_extract = true,
++      .lower_pack_snorm_2x16 = true,
++      .lower_pack_snorm_4x8 = true,
++      .lower_pack_unorm_2x16 = true,
++      .lower_pack_unorm_4x8 = true,
++      .lower_pack_half_2x16 = true,
++      .lower_pack_64_2x32 = true,
++      .lower_pack_64_4x16 = true,
++      .lower_pack_32_2x16 = true,
++      .lower_unpack_snorm_2x16 = true,
++      .lower_unpack_snorm_4x8 = true,
++      .lower_unpack_unorm_2x16 = true,
++      .lower_unpack_unorm_4x8 = true,
++      .lower_unpack_half_2x16 = true,
++      .lower_ffma16 = true,
++      .lower_ffma32 = true,
++      .lower_ffma64 = true,
++      .lower_fpow = true,
++      .lower_mul_2x32_64 = true,
++      .lower_rotate = true,
++      .lower_iadd_sat = device->rad_info.chip_class <= GFX8,
++      .has_fsub = true,
++      .has_isub = true,
++      .has_dot_4x8 = device->rad_info.has_accelerated_dot_product,
++      .has_dot_2x16 = device->rad_info.has_accelerated_dot_product,
++      .use_scoped_barrier = true,
++      .max_unroll_iterations = 32,
++      .max_unroll_iterations_aggressive = 128,
++      .use_interpolated_input_intrinsics = true,
++      .vectorize_vec2_16bit = true,
++      /* nir_lower_int64() isn't actually called for the LLVM backend,
++       * but this helps the loop unrolling heuristics. */
++      .lower_int64_options = nir_lower_imul64 | nir_lower_imul_high64 | nir_lower_imul_2x32_64 |
++                             nir_lower_divmod64 | nir_lower_minmax64 | nir_lower_iabs64,
++      .lower_doubles_options = nir_lower_drcp | nir_lower_dsqrt | nir_lower_drsq | nir_lower_ddiv,
++      .divergence_analysis_options = nir_divergence_view_index_uniform,
++   };
++}
+ 
+ bool
+ radv_can_dump_shader(struct radv_device *device, struct vk_shader_module *module,
+@@ -427,7 +434,7 @@ radv_shader_compile_to_nir(struct radv_device *device, struct vk_shader_module *
+        * shader directly.  In that case, we just ignore the SPIR-V entirely
+        * and just use the NIR shader */
+       nir = module->nir;
+-      nir->options = &nir_options;
++      nir->options = &device->physical_device->nir_options;
+       nir_validate_shader(nir, "in internal shader");
+ 
+       assert(exec_list_length(&nir->functions) == 1);
+@@ -518,7 +525,7 @@ radv_shader_compile_to_nir(struct radv_device *device, struct vk_shader_module *
+             },
+       };
+       nir = spirv_to_nir(spirv, module->size / 4, spec_entries, num_spec_entries, stage,
+-                         entrypoint_name, &spirv_options, &nir_options);
++                         entrypoint_name, &spirv_options, &device->physical_device->nir_options);
+       assert(nir->info.stage == stage);
+       nir_validate_shader(nir, "after spirv_to_nir");
+ 
+diff --git a/src/amd/vulkan/radv_shader.h b/src/amd/vulkan/radv_shader.h
+--- a/src/amd/vulkan/radv_shader.h
++++ b/src/amd/vulkan/radv_shader.h
+@@ -41,6 +41,7 @@
+ 
+ #define RADV_VERT_ATTRIB_MAX MAX2(VERT_ATTRIB_MAX, VERT_ATTRIB_GENERIC0 + MAX_VERTEX_ATTRIBS)
+ 
++struct radv_physical_device;
+ struct radv_device;
+ struct radv_pipeline;
+ struct radv_pipeline_cache;
+@@ -573,4 +574,6 @@ void radv_lower_ngg(struct radv_device *device, struct nir_shader *nir,
+ bool radv_consider_culling(struct radv_device *device, struct nir_shader *nir,
+                            uint64_t ps_inputs_read);
+ 
++void radv_get_nir_options(struct radv_physical_device *device);
++
+ #endif

@@ -1,0 +1,35 @@
+repo: Tencent/ncnn
+pr: 6903
+url: https://github.com/Tencent/ncnn/pull/6903
+merge_sha: 946fe3fb14a8dff8c06df763f67be522167b2f00
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6903/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/layernorm_coeffs.comp
+  status: modified
+  sha256: a48c7cbf143f2d172cfb90cca3f2f4bbc1e65d6b822035b0497d8ab2128b665c
+- path: src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
+  status: modified
+  sha256: 0300b4e7005c520bf71ceb1455759c0b0d27c3c2bc6744ca60c70aa5c7abd0b1
+- path: src/layer/vulkan/shader/layernorm_norm.comp
+  status: modified
+  sha256: 67ad2ae42d0d320c9f97da4cefba6c6a695e930bfa2a66345a4526b324b94c51
+- path: src/layer/vulkan/shader/layernorm_norm_pack4.comp
+  status: modified
+  sha256: 0ec7f8e95794f2fb3053c9c77873de7c6ed10a757f55a3867186986206c87d44
+- path: src/layer/vulkan/shader/rmsnorm_coeffs.comp
+  status: modified
+  sha256: e73de5e934e289dd8a7d7dd7f3afe59930b7d7291de83ec25b7d4913284d1874
+- path: src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+  status: modified
+  sha256: 782b70f172affb4711d4db81e250641bc00b5320da4bd7bd5db43571184717b8
+- path: src/layer/vulkan/shader/rmsnorm_norm.comp
+  status: modified
+  sha256: 48cd07f8b65631a8bd8bfab2dd4260bce487b33abb6bab7f3e299c7a01d8321d
+- path: src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+  status: modified
+  sha256: fd209b5bac407e9aad059a8da7f2a8f28177ebd57e5a83386005c1ef02b0f851

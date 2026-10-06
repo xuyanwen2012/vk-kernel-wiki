@@ -1,0 +1,1369 @@
+diff --git a/src/layer/vulkan/shader/dequantize.comp b/src/layer/vulkan/shader/dequantize.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/dequantize.comp
+@@ -0,0 +1,80 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++layout (constant_id = 2) const int bias_data_size = 0;
++layout (constant_id = 3) const float bias_value = 0.f;
++
++#define shape_constant_id_offset 4
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { int bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfp scale_blob_data[]; };
++layout (binding = 3) readonly buffer bias_blob { sfp bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    int v = bottom_blob_data[gi];
++
++    afp scale;
++    if (scale_data_size == 1)
++    {
++        scale = afp(scale_value);
++    }
++    else
++    {
++        scale = buffer_ld1(scale_blob_data, gy);
++    }
++
++    afp bias;
++    if (bias_data_size == 0)
++    {
++        bias = afp(0.f);
++    }
++    else if (bias_data_size == 1)
++    {
++        bias = afp(bias_value);
++    }
++    else
++    {
++        bias = buffer_ld1(bias_blob_data, gy);
++    }
++
++    afp v_fp = afp(v) * scale + bias;
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    buffer_st1(top_blob_data, outgi, v_fp);
++}
+diff --git a/src/layer/vulkan/shader/dequantize_pack4.comp b/src/layer/vulkan/shader/dequantize_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/dequantize_pack4.comp
+@@ -0,0 +1,80 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++layout (constant_id = 2) const int bias_data_size = 0;
++layout (constant_id = 3) const float bias_value = 0.f;
++
++#define shape_constant_id_offset 4
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { ivec4 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfpvec4 scale_blob_data[]; };
++layout (binding = 3) readonly buffer bias_blob { sfpvec4 bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    ivec4 v = bottom_blob_data[gi];
++
++    afpvec4 scale;
++    if (scale_data_size == 1)
++    {
++        scale = afpvec4(scale_value);
++    }
++    else
++    {
++        scale = buffer_ld4(scale_blob_data, gy);
++    }
++
++    afpvec4 bias;
++    if (bias_data_size == 0)
++    {
++        bias = afpvec4(0.f);
++    }
++    else if (bias_data_size == 1)
++    {
++        bias = afpvec4(bias_value);
++    }
++    else
++    {
++        bias = buffer_ld4(bias_blob_data, gy);
++    }
++
++    afpvec4 v_fp = afpvec4(v) * scale + bias;
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    buffer_st4(top_blob_data, outgi, v_fp);
++}
+diff --git a/src/layer/vulkan/shader/dequantize_pack8.comp b/src/layer/vulkan/shader/dequantize_pack8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/dequantize_pack8.comp
+@@ -0,0 +1,84 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++layout (constant_id = 2) const int bias_data_size = 0;
++layout (constant_id = 3) const float bias_value = 0.f;
++
++#define shape_constant_id_offset 4
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { ivec8 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfpvec8 scale_blob_data[]; };
++layout (binding = 3) readonly buffer bias_blob { sfpvec8 bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    ivec8 v = bottom_blob_data[gi];
++
++    afpvec8 scale;
++    if (scale_data_size == 1)
++    {
++        scale = afpvec8(afpvec4(scale_value), afpvec4(scale_value));
++    }
++    else
++    {
++        scale = buffer_ld8(scale_blob_data, gy);
++    }
++
++    afpvec8 bias;
++    if (bias_data_size == 0)
++    {
++        bias[0] = afpvec4(0.f);
++        bias[1] = afpvec4(0.f);
++    }
++    else if (bias_data_size == 1)
++    {
++        bias[0] = afpvec4(bias_value);
++        bias[1] = afpvec4(bias_value);
++    }
++    else
++    {
++        bias = buffer_ld8(bias_blob_data, gy);
++    }
++
++    afpvec8 v_fp;
++    v_fp[0] = afpvec4(v.abcd) * scale[0] + bias[0];
++    v_fp[1] = afpvec4(v.efgh) * scale[1] + bias[1];
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    buffer_st8(top_blob_data, outgi, v_fp);
++}
+diff --git a/src/layer/vulkan/shader/packing_int8.comp b/src/layer/vulkan/shader/packing_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_int8.comp
+@@ -0,0 +1,73 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8vec4 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { ivec4 bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8vec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { ivec4 top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uint gi = gy * psc(n) + gx;
++
++    if (cast_type_from == cast_type_to)
++    {
++        i8buffer_cp4(top_blob_data, gi, bottom_blob_data, gi);
++        return;
++    }
++
++    const uint gi2 = gy * psc(stride) + gx;
++
++    ivec4 v;
++    if (cast_type_from == 3)
++    {
++        v = bottom_blob_int32_data[gi];
++    }
++    else
++    {
++        v = i8buffer_ld4(bottom_blob_data, gi2);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi] = v;
++    }
++    else
++    {
++        i8buffer_st4(top_blob_data, gi2, v);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack1to4_int8.comp b/src/layer/vulkan/shader/packing_pack1to4_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack1to4_int8.comp
+@@ -0,0 +1,79 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { int bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8vec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { ivec4 top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uvec4 gi4 = (gy * 4 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++
++    const uint gi = gy * psc(n) + gx;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         i8buffer_cp1to4(top_blob_data, gi, bottom_blob_data, gi4);
++//         return;
++//     }
++
++    ivec4 v;
++    if (cast_type_from == 3)
++    {
++        v.r = bottom_blob_int32_data[gi4.r];
++        v.g = bottom_blob_int32_data[gi4.g];
++        v.b = bottom_blob_int32_data[gi4.b];
++        v.a = bottom_blob_int32_data[gi4.a];
++    }
++    else
++    {
++        v.r = i8buffer_ld1(bottom_blob_data, gi4.r);
++        v.g = i8buffer_ld1(bottom_blob_data, gi4.g);
++        v.b = i8buffer_ld1(bottom_blob_data, gi4.b);
++        v.a = i8buffer_ld1(bottom_blob_data, gi4.a);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi] = v;
++    }
++    else
++    {
++        i8buffer_st4(top_blob_data, gi, v);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack1to8_int8.comp b/src/layer/vulkan/shader/packing_pack1to8_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack1to8_int8.comp
+@@ -0,0 +1,88 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { int bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8vec8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { ivec8 top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uvec4 gi4 = (gy * 8 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++    const uvec4 gi8 = gi4 + psc(stride) * 4;
++
++    const uint gi = gy * psc(n) + gx;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         i8buffer_cp1to8(top_blob_data, gi, bottom_blob_data, gi4, gi8);
++//         return;
++//     }
++
++    ivec8 v;
++    if (cast_type_from == 3)
++    {
++        v.abcd.r = bottom_blob_int32_data[gi4.r];
++        v.abcd.g = bottom_blob_int32_data[gi4.g];
++        v.abcd.b = bottom_blob_int32_data[gi4.b];
++        v.abcd.a = bottom_blob_int32_data[gi4.a];
++        v.efgh.r = bottom_blob_int32_data[gi8.r];
++        v.efgh.g = bottom_blob_int32_data[gi8.g];
++        v.efgh.b = bottom_blob_int32_data[gi8.b];
++        v.efgh.a = bottom_blob_int32_data[gi8.a];
++    }
++    else
++    {
++        v.abcd.r = i8buffer_ld1(bottom_blob_data, gi4.r);
++        v.abcd.g = i8buffer_ld1(bottom_blob_data, gi4.g);
++        v.abcd.b = i8buffer_ld1(bottom_blob_data, gi4.b);
++        v.abcd.a = i8buffer_ld1(bottom_blob_data, gi4.a);
++        v.efgh.r = i8buffer_ld1(bottom_blob_data, gi8.r);
++        v.efgh.g = i8buffer_ld1(bottom_blob_data, gi8.g);
++        v.efgh.b = i8buffer_ld1(bottom_blob_data, gi8.b);
++        v.efgh.a = i8buffer_ld1(bottom_blob_data, gi8.a);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi] = v;
++    }
++    else
++    {
++        i8buffer_st8(top_blob_data, gi, v);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack4to1_int8.comp b/src/layer/vulkan/shader/packing_pack4to1_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack4to1_int8.comp
+@@ -0,0 +1,79 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8vec4 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { ivec4 bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { int top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uint gi = gy * psc(n) + gx;
++
++    const uvec4 gi4 = (gy * 4 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         buffer_cp4to1(top_blob_data, gi4, bottom_blob_data, gi);
++//         return;
++//     }
++
++    ivec4 v;
++    if (cast_type_from == 3)
++    {
++        v = bottom_blob_int32_data[gi];
++    }
++    else
++    {
++        v = i8buffer_ld4(bottom_blob_data, gi);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi4.r] = v.r;
++        top_blob_int32_data[gi4.g] = v.g;
++        top_blob_int32_data[gi4.b] = v.b;
++        top_blob_int32_data[gi4.a] = v.a;
++    }
++    else
++    {
++        i8buffer_st1(top_blob_data, gi4.r, v.r);
++        i8buffer_st1(top_blob_data, gi4.g, v.g);
++        i8buffer_st1(top_blob_data, gi4.b, v.b);
++        i8buffer_st1(top_blob_data, gi4.a, v.a);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack4to8_int8.comp b/src/layer/vulkan/shader/packing_pack4to8_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack4to8_int8.comp
+@@ -0,0 +1,75 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8vec4 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { ivec4 bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8vec8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { ivec8 top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uvec2 gi2 = (gy * 2 + uvec2(0, 1)) * psc(stride) + gx;
++
++    const uint gi = gy * psc(n) + gx;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         buffer_cp4to8(top_blob_data, gi, bottom_blob_data, gi2);
++//         return;
++//     }
++
++    ivec8 v;
++    if (cast_type_from == 3)
++    {
++        v.abcd = bottom_blob_int32_data[gi2.r];
++        v.efgh = bottom_blob_int32_data[gi2.g];
++    }
++    else
++    {
++        v.abcd = i8buffer_ld4(bottom_blob_data, gi2.r);
++        v.efgh = i8buffer_ld4(bottom_blob_data, gi2.g);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi] = v;
++    }
++    else
++    {
++        i8buffer_st8(top_blob_data, gi, v);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack8to1_int8.comp b/src/layer/vulkan/shader/packing_pack8to1_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack8to1_int8.comp
+@@ -0,0 +1,88 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8vec8 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { ivec8 bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { int top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uint gi = gy * psc(n) + gx;
++
++    const uvec4 gi4 = (gy * 8 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++    const uvec4 gi8 = gi4 + psc(stride) * 4;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         i8buffer_cp8to1(top_blob_data, gi4, gi8, bottom_blob_data, gi);
++//         return;
++//     }
++
++    ivec8 v;
++    if (cast_type_from == 3)
++    {
++        v = bottom_blob_int32_data[gi];
++    }
++    else
++    {
++        v = i8buffer_ld8(bottom_blob_data, gi);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi4.r] = v.abcd.r;
++        top_blob_int32_data[gi4.g] = v.abcd.g;
++        top_blob_int32_data[gi4.b] = v.abcd.b;
++        top_blob_int32_data[gi4.a] = v.abcd.a;
++        top_blob_int32_data[gi8.r] = v.efgh.r;
++        top_blob_int32_data[gi8.g] = v.efgh.g;
++        top_blob_int32_data[gi8.b] = v.efgh.b;
++        top_blob_int32_data[gi8.a] = v.efgh.a;
++    }
++    else
++    {
++        i8buffer_st1(top_blob_data, gi4.r, v.abcd.r);
++        i8buffer_st1(top_blob_data, gi4.g, v.abcd.g);
++        i8buffer_st1(top_blob_data, gi4.b, v.abcd.b);
++        i8buffer_st1(top_blob_data, gi4.a, v.abcd.a);
++        i8buffer_st1(top_blob_data, gi8.r, v.efgh.r);
++        i8buffer_st1(top_blob_data, gi8.g, v.efgh.g);
++        i8buffer_st1(top_blob_data, gi8.b, v.efgh.b);
++        i8buffer_st1(top_blob_data, gi8.a, v.efgh.a);
++    }
++}
+diff --git a/src/layer/vulkan/shader/packing_pack8to4_int8.comp b/src/layer/vulkan/shader/packing_pack8to4_int8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/packing_pack8to4_int8.comp
+@@ -0,0 +1,75 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sint8vec8 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_int32 { ivec8 bottom_blob_int32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sint8vec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_int32 { ivec4 top_blob_int32_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint n;
++    uint c;
++    uint stride;
++} p;
++
++void main()
++{
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
++
++    if (gx >= psc(n) || gy >= psc(c))
++        return;
++
++    const uint gi = gy * psc(n) + gx;
++
++    const uvec2 gi2 = (gy * 2 + uvec2(0, 1)) * psc(stride) + gx;
++
++//     if (cast_type_from == cast_type_to)
++//     {
++//         buffer_cp8to4(top_blob_data, gi2, bottom_blob_data, gi);
++//         return;
++//     }
++
++    ivec8 v;
++    if (cast_type_from == 3)
++    {
++        v = bottom_blob_int32_data[gi];
++    }
++    else
++    {
++        v = i8buffer_ld8(bottom_blob_data, gi);
++    }
++
++    if (cast_type_to == 3)
++    {
++        top_blob_int32_data[gi2.r] = v.abcd;
++        top_blob_int32_data[gi2.g] = v.efgh;
++    }
++    else
++    {
++        i8buffer_st4(top_blob_data, gi2.r, v.abcd);
++        i8buffer_st4(top_blob_data, gi2.g, v.efgh);
++    }
++}
+diff --git a/src/layer/vulkan/shader/quantize.comp b/src/layer/vulkan/shader/quantize.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/quantize.comp
+@@ -0,0 +1,63 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfp scale_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    afp v = buffer_ld1(bottom_blob_data, gi);
++
++    afp scale;
++    if (scale_data_size == 1)
++    {
++        scale = afp(scale_value);
++    }
++    else
++    {
++        scale = buffer_ld1(scale_blob_data, gy);
++    }
++
++    int v_int = int(round(clamp(v * scale, afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st1(top_blob_data, outgi, v_int);
++}
+diff --git a/src/layer/vulkan/shader/quantize_pack4.comp b/src/layer/vulkan/shader/quantize_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/quantize_pack4.comp
+@@ -0,0 +1,63 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8vec4 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfpvec4 scale_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    afpvec4 v = buffer_ld4(bottom_blob_data, gi);
++
++    afpvec4 scale;
++    if (scale_data_size == 1)
++    {
++        scale = afpvec4(scale_value);
++    }
++    else
++    {
++        scale = buffer_ld4(scale_blob_data, gy);
++    }
++
++    ivec4 v_int = ivec4(round(clamp(v * scale, afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st4(top_blob_data, outgi, v_int);
++}
+diff --git a/src/layer/vulkan/shader/quantize_pack8.comp b/src/layer/vulkan/shader/quantize_pack8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/quantize_pack8.comp
+@@ -0,0 +1,65 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int scale_data_size = 0;
++layout (constant_id = 1) const float scale_value = 1.f;
++
++#define shape_constant_id_offset 2
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8vec8 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_blob { sfpvec8 scale_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    afpvec8 v = buffer_ld8(bottom_blob_data, gi);
++
++    afpvec8 scale;
++    if (scale_data_size == 1)
++    {
++        scale = afpvec8(afpvec4(scale_value), afpvec4(scale_value));
++    }
++    else
++    {
++        scale = buffer_ld8(scale_blob_data, gy);
++    }
++
++    ivec8 v_int;
++    v_int.abcd = ivec4(round(clamp(v[0] * scale[0], afp(-127.f), afp(127.f))));
++    v_int.efgh = ivec4(round(clamp(v[1] * scale[1], afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st8(top_blob_data, outgi, v_int);
++}
+diff --git a/src/layer/vulkan/shader/requantize.comp b/src/layer/vulkan/shader/requantize.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/requantize.comp
+@@ -0,0 +1,103 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#extension GL_GOOGLE_include_directive: enable
++#include "vulkan_activation.comp"
++
++layout (constant_id = 0) const int scale_in_data_size = 0;
++layout (constant_id = 1) const float scale_in_value = 1.f;
++layout (constant_id = 2) const int scale_out_data_size = 0;
++layout (constant_id = 3) const float scale_out_value = 1.f;
++layout (constant_id = 4) const int bias_data_size = 0;
++layout (constant_id = 5) const float bias_value = 0.f;
++layout (constant_id = 6) const int activation_type = 0;
++layout (constant_id = 7) const float activation_param_0 = 0;
++layout (constant_id = 8) const float activation_param_1 = 0;
++
++#define shape_constant_id_offset 9
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { int bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_in_blob { sfp scale_in_blob_data[]; };
++layout (binding = 3) readonly buffer scale_out_blob { sfp scale_out_blob_data[]; };
++layout (binding = 4) readonly buffer bias_blob { sfp bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    int v = bottom_blob_data[gi];
++
++    afp scale_in;
++    if (scale_in_data_size == 1)
++    {
++        scale_in = afp(scale_in_value);
++    }
++    else
++    {
++        scale_in = buffer_ld1(scale_in_blob_data, gy);
++    }
++
++    afp bias;
++    if (bias_data_size == 0)
++    {
++        bias = afp(0.f);
++    }
++    else if (bias_data_size == 1)
++    {
++        bias = afp(bias_value);
++    }
++    else
++    {
++        bias = buffer_ld1(bias_blob_data, gy);
++    }
++
++    afp v_fp = afp(v) * scale_in + bias;
++
++    v_fp = activation_afp(v_fp, activation_type, activation_param_0, activation_param_1);
++
++    afp scale_out;
++    if (scale_out_data_size == 1)
++    {
++        scale_out = afp(scale_out_value);
++    }
++    else
++    {
++        scale_out = buffer_ld1(scale_out_blob_data, gy);
++    }
++
++    int v_int = int(round(clamp(v_fp * scale_out, afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st1(top_blob_data, outgi, v_int);
++}
+diff --git a/src/layer/vulkan/shader/requantize_pack4.comp b/src/layer/vulkan/shader/requantize_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/requantize_pack4.comp
+@@ -0,0 +1,103 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#extension GL_GOOGLE_include_directive: enable
++#include "vulkan_activation.comp"
++
++layout (constant_id = 0) const int scale_in_data_size = 0;
++layout (constant_id = 1) const float scale_in_value = 1.f;
++layout (constant_id = 2) const int scale_out_data_size = 0;
++layout (constant_id = 3) const float scale_out_value = 1.f;
++layout (constant_id = 4) const int bias_data_size = 0;
++layout (constant_id = 5) const float bias_value = 0.f;
++layout (constant_id = 6) const int activation_type = 0;
++layout (constant_id = 7) const float activation_param_0 = 0;
++layout (constant_id = 8) const float activation_param_1 = 0;
++
++#define shape_constant_id_offset 9
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { ivec4 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8vec4 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_in_blob { sfpvec4 scale_in_blob_data[]; };
++layout (binding = 3) readonly buffer scale_out_blob { sfpvec4 scale_out_blob_data[]; };
++layout (binding = 4) readonly buffer bias_blob { sfpvec4 bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    ivec4 v = bottom_blob_data[gi];
++
++    afpvec4 scale_in;
++    if (scale_in_data_size == 1)
++    {
++        scale_in = afpvec4(scale_in_value);
++    }
++    else
++    {
++        scale_in = buffer_ld4(scale_in_blob_data, gy);
++    }
++
++    afpvec4 bias;
++    if (bias_data_size == 0)
++    {
++        bias = afpvec4(0.f);
++    }
++    else if (bias_data_size == 1)
++    {
++        bias = afpvec4(bias_value);
++    }
++    else
++    {
++        bias = buffer_ld4(bias_blob_data, gy);
++    }
++
++    afpvec4 v_fp = afpvec4(v) * scale_in + bias;
++
++    v_fp = activation_afpvec4(v_fp, activation_type, activation_param_0, activation_param_1);
++
++    afpvec4 scale_out;
++    if (scale_out_data_size == 1)
++    {
++        scale_out = afpvec4(scale_out_value);
++    }
++    else
++    {
++        scale_out = buffer_ld4(scale_out_blob_data, gy);
++    }
++
++    ivec4 v_int = ivec4(round(clamp(v_fp * scale_out, afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st4(top_blob_data, outgi, v_int);
++}
+diff --git a/src/layer/vulkan/shader/requantize_pack8.comp b/src/layer/vulkan/shader/requantize_pack8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/requantize_pack8.comp
+@@ -0,0 +1,107 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#extension GL_GOOGLE_include_directive: enable
++#include "vulkan_activation.comp"
++
++layout (constant_id = 0) const int scale_in_data_size = 0;
++layout (constant_id = 1) const float scale_in_value = 1.f;
++layout (constant_id = 2) const int scale_out_data_size = 0;
++layout (constant_id = 3) const float scale_out_value = 1.f;
++layout (constant_id = 4) const int bias_data_size = 0;
++layout (constant_id = 5) const float bias_value = 0.f;
++layout (constant_id = 6) const int activation_type = 0;
++layout (constant_id = 7) const float activation_param_0 = 0;
++layout (constant_id = 8) const float activation_param_1 = 0;
++
++#define shape_constant_id_offset 9
++layout (constant_id = shape_constant_id_offset + 0) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint in_stride = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint out_stride = 0;
++
++layout (binding = 0) readonly buffer bottom_blob { ivec8 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sint8vec8 top_blob_data[]; };
++layout (binding = 2) readonly buffer scale_in_blob { sfpvec8 scale_in_blob_data[]; };
++layout (binding = 3) readonly buffer scale_out_blob { sfpvec8 scale_out_blob_data[]; };
++layout (binding = 4) readonly buffer bias_blob { sfpvec8 bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    uint c;
++    uint in_stride;
++    uint out_stride;
++} p;
++
++void main()
++{
++    const uint gi = gl_GlobalInvocationID.x;
++
++    if (gi >= psc(in_stride) * psc(c))
++        return;
++
++    const uint gy = gi / psc(in_stride);
++    const uint gx = gi % psc(in_stride);
++
++    ivec8 v = bottom_blob_data[gi];
++
++    afpvec8 scale_in;
++    if (scale_in_data_size == 1)
++    {
++        scale_in = afpvec8(afpvec4(scale_in_value), afpvec4(scale_in_value));
++    }
++    else
++    {
++        scale_in = buffer_ld8(scale_in_blob_data, gy);
++    }
++
++    afpvec8 bias;
++    if (bias_data_size == 0)
++    {
++        bias = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    }
++    else if (bias_data_size == 1)
++    {
++        bias = afpvec8(afpvec4(bias_value), afpvec4(bias_value));
++    }
++    else
++    {
++        bias = buffer_ld8(bias_blob_data, gy);
++    }
++
++    afpvec8 v_fp;
++    v_fp[0] = afpvec4(v.abcd) * scale_in[0] + bias[0];
++    v_fp[1] = afpvec4(v.efgh) * scale_in[1] + bias[1];
++
++    v_fp = activation_afpvec8(v_fp, activation_type, activation_param_0, activation_param_1);
++
++    afpvec8 scale_out;
++    if (scale_out_data_size == 1)
++    {
++        scale_out = afpvec8(afpvec4(scale_out_value), afpvec4(scale_out_value));
++    }
++    else
++    {
++        scale_out = buffer_ld8(scale_out_blob_data, gy);
++    }
++
++    ivec8 v_int;
++    v_int.abcd = ivec4(round(clamp(v_fp[0] * scale_out[0], afp(-127.f), afp(127.f))));
++    v_int.efgh = ivec4(round(clamp(v_fp[1] * scale_out[1], afp(-127.f), afp(127.f))));
++
++    const uint outgi = gy * psc(out_stride) + gx;
++
++    i8buffer_st8(top_blob_data, outgi, v_int);
++}

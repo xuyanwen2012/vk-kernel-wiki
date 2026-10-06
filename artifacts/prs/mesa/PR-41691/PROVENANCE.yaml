@@ -1,0 +1,14 @@
+repo: mesa/mesa
+pr: 41691
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41691
+merge_sha: c8914985c47c93ee50231e1d24dd81499c8f1434
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/41691/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/compiler/spirv/vtn_cmat.c
+  status: modified
+  sha256: e0c7b2b08872b664256ca5ea78f346d91f0d364b33640407f2792ed85ba94fdc

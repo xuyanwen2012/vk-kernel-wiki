@@ -1,0 +1,74 @@
+repo: Tencent/ncnn
+pr: 5191
+url: https://github.com/Tencent/ncnn/pull/5191
+merge_sha: eea3fc9b41e895097010aff9301935a9d003c882
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/5191/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/pooling_global.comp
+  status: removed
+  sha256: 4f1c467ee3024a976222c4e59398588d8eda8c3f8b7cbaae6e2501dcb7933cf0
+- path: src/layer/vulkan/shader/pooling_global_pack4.comp
+  status: removed
+  sha256: 119e713a22ce5083c51243b6225a85df7e8314e3ef76743c667d21714ef01e84
+- path: src/layer/vulkan/shader/pooling_global_pack8.comp
+  status: removed
+  sha256: dd3fe19b9bc82dc622ee078de8c87b4fede94ede30e1d73b86214eb5ac30c18e
+- path: src/layer/vulkan/shader/pooling_global_reduce_max.comp
+  status: added
+  sha256: fd7dd5794fa9290354c3b5180ae6e5a1ccfccbe935223068e485233dec45b399
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_first.comp
+  status: added
+  sha256: 70aa9e7d237d3a0610ba7c60b7c6df438d0203b1986c8f50eb84fee63713f319
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_first_pack4.comp
+  status: added
+  sha256: cf32882580a2a36e9e12c3cb9dca446693480143ad6b378f1b01d724397d5520
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_first_pack8.comp
+  status: added
+  sha256: e87fbd7ea1ac45580dac8cb2b47d1279b1428f7857aab5ce71cd30d86335c644
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_last.comp
+  status: added
+  sha256: eee894f9f5fb4b093ee9c35338fb14a86d4d1fcb5696889cdac67d82f50bb9c9
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_last_pack4.comp
+  status: added
+  sha256: ed974f2c0cf18a4b68538d5907b215ea736b4b46bd74a6e73ae0c20bbd2ded64
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_last_pack8.comp
+  status: added
+  sha256: a079395b427b66a371ca0b3289c65b3314e2d04d3ef47c5ddca7b43f870f1e95
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_pack4.comp
+  status: added
+  sha256: b863eca86acf1ade3b8be0f8480c309f92786dbe14da9a681ff11d5640f4cf39
+- path: src/layer/vulkan/shader/pooling_global_reduce_max_pack8.comp
+  status: added
+  sha256: a2b313e6567d20113a817d848ae0e2bf0158243300932c623c96044a8386c665
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum.comp
+  status: added
+  sha256: 9f7deb2e539ac00817ea5159593509e31ac6165b6d05a21935d590e58ead2d14
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_first.comp
+  status: added
+  sha256: f11873bbcd4ead2a9715167067d70433147210624ece32fd67962c6e0dae67b8
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_first_pack4.comp
+  status: added
+  sha256: 81dbe45530ae48f6bbfc05e14eed4bf7e013b2ec2cf9015ad96600eb374c06d5
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_first_pack8.comp
+  status: added
+  sha256: 60bca2f72c96e5afae2aec6e209b83d2998c6d40bde20e7fc8ccb71ffd3910e6
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_last.comp
+  status: added
+  sha256: 39a076b63fa9afa5ce5e34e76928ebff3711e2bf853aeafe0c341267cc55d451
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_last_pack4.comp
+  status: added
+  sha256: 9fbb626ee0411c6008fdb0435762b2698feba84ba8b0ba30d86db3c0ed4e424d
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_last_pack8.comp
+  status: added
+  sha256: d06b0845f998d1df002052de7ec817c98bfdb4791faf7530587047693d1b735d
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_pack4.comp
+  status: added
+  sha256: cbd97c72eae63ffa08f98b90351802e0995494633e6df8119025285926dc4a70
+- path: src/layer/vulkan/shader/pooling_global_reduce_sum_pack8.comp
+  status: added
+  sha256: 5538c1c3b3327eeee276a867024005b6d3dbbda90670b656b5da73a00fd279a9

@@ -1,0 +1,74 @@
+repo: Tencent/ncnn
+pr: 772
+url: https://github.com/Tencent/ncnn/pull/772
+merge_sha: f0b4933eac6d4cb8b0dce953ff740556539a675c
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/772/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/shader/batchnorm_pack4.comp
+  status: added
+  sha256: 0f0972aefc985cc2e9cbc4ef63bf2a9af271713e2b9e95e21717d5c572544e8f
+- path: src/layer/shader/binaryop.comp
+  status: modified
+  sha256: 193def16363b7481de32f8baef5440d522203e0db631b1542862dcd6ab92b466
+- path: src/layer/shader/binaryop_pack4.comp
+  status: added
+  sha256: 7aa6a4be5f277830ae6e665bf34ab54e95e1864c20ca0edda67bc8876d4dc494
+- path: src/layer/shader/convolution_pack4.comp
+  status: added
+  sha256: 7908b97f16f3fe6377413edcd1ae0edcd76731185bd8d7f706f53de8d9310699
+- path: src/layer/shader/convolutiondepthwise.comp
+  status: modified
+  sha256: 9dbec61c5ba24e6f9f84a3ea31dd9e60d02fa0240aa8823366a74b5d24a9c688
+- path: src/layer/shader/convolutiondepthwise_pack4.comp
+  status: added
+  sha256: 0880ce60d081b0019e9931e735890f504d578f40ccdd2805432b1c89f987e748
+- path: src/layer/shader/dropout_pack4.comp
+  status: added
+  sha256: 5bb6f6cce59155d5d304e4ad4b9250e54ed19e509f0589b01b64cb86bbb82a27
+- path: src/layer/shader/eltwise_pack4.comp
+  status: added
+  sha256: 7022240ac1cd4dc57f1707ae8d837796823cbb059a5f09041d14b7da7da503e8
+- path: src/layer/shader/innerproduct_pack4.comp
+  status: added
+  sha256: 3a5ca46cf8572f45ee23b2a66316d367ca8d12c17d3ab3e8c35fb24084136994
+- path: src/layer/shader/padding_pack4.comp
+  status: added
+  sha256: 2595580d35b43ccad88480aad15fee3d5b7278bbac30afa635397e89623609bd
+- path: src/layer/shader/pooling_global.comp
+  status: modified
+  sha256: f1196e384fa715a392cbe657ede8b143608aaec72b5f4324c9da32c1fda34cfd
+- path: src/layer/shader/pooling_global_pack4.comp
+  status: added
+  sha256: 32262346446aeb1049c2abe28dc69657f8b11c94f21bd28973ca4d29ba66105d
+- path: src/layer/shader/pooling_pack4.comp
+  status: added
+  sha256: 9da11ccac0a76d5b987f3b0b12f048b6491690c3a6541279b8cd00e54e2feefc
+- path: src/layer/shader/relu_pack4.comp
+  status: added
+  sha256: 12338503edaf55ccd934aa99fde1160c85a843387d7eb60ddc1104fb7434cc9d
+- path: src/layer/shader/scale_pack4.comp
+  status: added
+  sha256: 9574319dae0e08ebccb5be61167061b57b9dd936bfcbd99f1b4a4e00918f57d2
+- path: src/layer/shader/softmax_div_sum_pack4.comp
+  status: added
+  sha256: 1df6fe7e1ad49c426298fefd67fd2237e0f69fa9c9c25867eb5e80ee3b671c79
+- path: src/layer/shader/softmax_exp_sub_max_pack4.comp
+  status: added
+  sha256: 5c523ff3f72b6251464a38a831b3d28247562fd0739c7d4fbc3c2c75177faff3
+- path: src/layer/shader/softmax_reduce_max_pack4.comp
+  status: added
+  sha256: 39b905be62def31d7227491d97620a88a3c51b10cb1e1da2f1273590dab7d8e9
+- path: src/layer/shader/softmax_reduce_sum_pack4.comp
+  status: added
+  sha256: fa06ae9c39151d0a5ff06dd463c652a6515012d87b50b6a2ea160243f3d0cf2d
+- path: src/layer/shader/unaryop.comp
+  status: modified
+  sha256: 1b0a039f5514a906f808e19f12cb668de84b77dfe83c07e57b9772124a9bd5af
+- path: src/layer/shader/unaryop_pack4.comp
+  status: added
+  sha256: a73dd364b6b32aa24da96ff403f0ac002b8db734e99e474cb1c718c92ff88603

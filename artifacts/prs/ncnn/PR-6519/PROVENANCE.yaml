@@ -1,0 +1,17 @@
+repo: Tencent/ncnn
+pr: 6519
+url: https://github.com/Tencent/ncnn/pull/6519
+merge_sha: cb349ce350a309626d18e0f98e9475c7495df02f
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6519/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/rotaryembed.comp
+  status: added
+  sha256: 6a735d7b5a30bc135c5e3f18ab36502f2ccde51426ff036cfd7118bd2f87861e
+- path: src/layer/vulkan/shader/rotaryembed_pack4.comp
+  status: added
+  sha256: 4c186dce46b9d98f3c71648d47d76c3119f61ae60c2d0bd3d87a5546f5d6d36e

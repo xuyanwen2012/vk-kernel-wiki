@@ -1,0 +1,1677 @@
+diff --git a/src/layer/shader/batchnorm.comp b/src/layer/shader/batchnorm.comp
+--- /dev/null
++++ b/src/layer/shader/batchnorm.comp
+@@ -0,0 +1,79 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer a { float a_data[]; };
++layout (binding = 2) readonly buffer b { float b_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1)
++    {
++        float v = bottom_top_blob_data[gx];
++
++        v = b_data[gx] * v + a_data[gx];
++
++        bottom_top_blob_data[gx] = v;
++
++        return;
++    }
++
++    if (p.dims == 2)
++    {
++        const int gi = gy * p.w + gx;
++
++        float v = bottom_top_blob_data[gi];
++
++        v = b_data[gy] * v + a_data[gy];
++
++        bottom_top_blob_data[gi] = v;
++
++        return;
++    }
++
++    if (p.dims == 3)
++    {
++        const int gi = gz * p.cstep + gy * p.w + gx;
++
++        float v = bottom_top_blob_data[gi];
++
++        v = b_data[gz] * v + a_data[gz];
++
++        bottom_top_blob_data[gi] = v;
++
++        return;
++    }
++}
+diff --git a/src/layer/shader/binaryop.comp b/src/layer/shader/binaryop.comp
+--- /dev/null
++++ b/src/layer/shader/binaryop.comp
+@@ -0,0 +1,102 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int op_type = 0;
++layout (constant_id = 1) const int with_scalar = 0;
++layout (constant_id = 2) const float b = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer a_blob { float a_blob_data[]; };
++layout (binding = 2) readonly buffer b_blob { float b_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int adims;
++    int aw;
++    int ah;
++    int ac;
++    int acstep;
++
++    int bdims;
++    int bw;
++    int bh;
++    int bc;
++    int bcstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    const int gi = gz * p.outcstep + gy * p.outw + gx;
++
++    float v1 = a_blob_data[gi];
++
++    float res = 233;
++
++    if (with_scalar == 1)
++    {
++        if (op_type == 0) res = v1 + b;
++        if (op_type == 1) res = v1 - b;
++        if (op_type == 2) res = v1 * b;
++        if (op_type == 3) res = v1 / b;
++        if (op_type == 4) res = max(v1, b);
++        if (op_type == 5) res = min(v1, b);
++        if (op_type == 6) res = pow(v1, b);
++        if (op_type == 7) res = b - v1;
++        if (op_type == 8) res = b / v1;
++
++        a_blob_data[gi] = res;
++
++        return;
++    }
++
++    if (p.adims == p.bdims)
++    {
++        float v2 = b_blob_data[gi];
++
++        if (op_type == 0) res = v1 + v2;
++        if (op_type == 1) res = v1 - v2;
++        if (op_type == 2) res = v1 * v2;
++        if (op_type == 3) res = v1 / v2;
++        if (op_type == 4) res = max(v1, v2);
++        if (op_type == 5) res = min(v1, v2);
++        if (op_type == 6) res = pow(v1, v2);
++        if (op_type == 7) res = v2 - v1;
++        if (op_type == 8) res = v2 / v1;
++
++        top_blob_data[gi] = res;
++
++        return;
++    }
++
++    // TODO broadcast
++}
+diff --git a/src/layer/shader/convolution.comp b/src/layer/shader/convolution.comp
+--- /dev/null
++++ b/src/layer/shader/convolution.comp
+@@ -0,0 +1,84 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int kernel_w = 1;
++layout (constant_id = 1) const int kernel_h = 1;
++layout (constant_id = 2) const int dilation_w = 1;
++layout (constant_id = 3) const int dilation_h = 1;
++layout (constant_id = 4) const int stride_w = 1;
++layout (constant_id = 5) const int stride_h = 1;
++layout (constant_id = 6) const int bias_term = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++layout (binding = 2) readonly buffer weight_blob { float weight_data[]; };
++layout (binding = 3) readonly buffer bias_blob { float bias_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float sum = 0;
++
++    if (bias_term == 1)
++    {
++        sum = bias_data[gz];
++    }
++
++    int w_offset = gz * p.c * kernel_w * kernel_h;
++
++    for (int z = 0; z < p.c; z++)
++    {
++        int v_offset = z * p.cstep + gy * stride_h * p.w + gx * stride_w;
++
++        for (int y = 0; y < kernel_h; y++)
++        {
++            for (int x = 0; x < kernel_w; x++)
++            {
++                sum += weight_data[w_offset + x] * bottom_blob_data[v_offset + x * dilation_w];
++            }
++
++            v_offset += dilation_h * p.w;
++            w_offset += kernel_w;
++        }
++    }
++
++    top_blob_data[gz * p.outcstep + gy * p.outw + gx] = sum;
++}
+diff --git a/src/layer/shader/convolution_1x1s1d1.comp b/src/layer/shader/convolution_1x1s1d1.comp
+--- /dev/null
++++ b/src/layer/shader/convolution_1x1s1d1.comp
+@@ -0,0 +1,73 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int bias_term = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { vec4 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { vec4 top_blob_data[]; };
++layout (binding = 2) readonly buffer weight_blob { float weight_data[]; };
++layout (binding = 3) readonly buffer bias_blob { float bias_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int size_4;
++    int c;
++    int cstep_4;
++
++    int outdims;
++    int outsize_4;
++    int outc;
++    int outcstep_4;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outsize_4 || gy >= 1 || gz >= p.outc)
++        return;
++
++    vec4 sum;
++
++    if (bias_term == 1)
++    {
++        sum = vec4(bias_data[gz]);
++    }
++    else
++    {
++        sum = vec4(0.f);
++    }
++
++    int w_offset = gz * p.c;
++    int v_offset = gx;
++
++    for (int z = 0; z < p.c; z++)
++    {
++        sum += weight_data[w_offset] * bottom_blob_data[v_offset];
++
++        w_offset += 1;
++        v_offset += p.cstep_4;
++    }
++
++    top_blob_data[gz * p.outcstep_4 + gx] = sum;
++}
+diff --git a/src/layer/shader/convolutiondepthwise.comp b/src/layer/shader/convolutiondepthwise.comp
+--- /dev/null
++++ b/src/layer/shader/convolutiondepthwise.comp
+@@ -0,0 +1,112 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int kernel_w = 1;
++layout (constant_id = 1) const int kernel_h = 1;
++layout (constant_id = 2) const int dilation_w = 1;
++layout (constant_id = 3) const int dilation_h = 1;
++layout (constant_id = 4) const int stride_w = 1;
++layout (constant_id = 5) const int stride_h = 1;
++layout (constant_id = 6) const int bias_term = 0;
++layout (constant_id = 7) const int group = 1;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++layout (binding = 2) readonly buffer weight_blob { float weight_data[]; };
++layout (binding = 3) readonly buffer bias_blob { float bias_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float sum = 0;
++
++    if (bias_term == 1)
++    {
++        sum = bias_data[gz];
++    }
++
++    if (p.c == group && group == p.outc)
++    {
++        // depth-wise convolution
++        int w_offset = gz * kernel_w * kernel_h;
++        int v_offset = gz * p.cstep + gy * stride_h * p.w + gx * stride_w;
++
++        for (int y = 0; y < kernel_h; y++)
++        {
++            for (int x = 0; x < kernel_w; x++)
++            {
++                sum += weight_data[w_offset + x] * bottom_blob_data[v_offset + x * dilation_w];
++            }
++
++            v_offset += dilation_h * p.w;
++            w_offset += kernel_w;
++        }
++
++        top_blob_data[gz * p.outcstep + gy * p.outw + gx] = sum;
++
++        return;
++    }
++
++    // group convolution
++    const int c_g = p.c / group;
++    const int outc_g = p.outc / group;
++    const int g = gz / outc_g;
++
++    int w_offset = gz * c_g * kernel_w * kernel_h;
++
++    for (int z = 0; z < c_g; z++)
++    {
++        int v_offset = (g * c_g + z) * p.cstep + gy * stride_h * p.w + gx * stride_w;
++
++        for (int y = 0; y < kernel_h; y++)
++        {
++            for (int x = 0; x < kernel_w; x++)
++            {
++                sum += weight_data[w_offset + x] * bottom_blob_data[v_offset + x * dilation_w];
++            }
++
++            v_offset += dilation_h * p.w;
++            w_offset += kernel_w;
++        }
++    }
++
++    top_blob_data[gz * p.outcstep + gy * p.outw + gx] = sum;
++}
+diff --git a/src/layer/shader/dropout.comp b/src/layer/shader/dropout.comp
+--- /dev/null
++++ b/src/layer/shader/dropout.comp
+@@ -0,0 +1,50 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const float scale = 1;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    const int gi = gz * p.cstep + gy * p.w + gx;
++
++    float v = bottom_top_blob_data[gi];
++
++    v *= scale;
++
++    bottom_top_blob_data[gi] = v;
++}
+diff --git a/src/layer/shader/eltwise.comp b/src/layer/shader/eltwise.comp
+--- /dev/null
++++ b/src/layer/shader/eltwise.comp
+@@ -0,0 +1,80 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int op_type = 0;
++layout (constant_id = 1) const int coeff_term = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob1 { float bottom_blob1_data[]; };
++layout (binding = 1) readonly buffer bottom_blob2 { float bottom_blob2_data[]; };
++layout (binding = 2) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    float coeff0;
++    float coeff1;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    const int gi = gz * p.cstep + gy * p.w + gx;
++
++    float v1 = bottom_blob1_data[gi];
++    float v2 = bottom_blob2_data[gi];
++
++    float res = 233;
++
++    if (coeff_term == 0)
++    {
++        if (op_type == 0)
++            res = v1 * v2;
++
++        if (op_type == 1)
++            res = v1 + v2;
++
++        if (op_type == 2)
++            res = max(v1, v2);
++    }
++    else
++    {
++        if (op_type == 0)
++            res = v1 * p.coeff0 * v2 * p.coeff1;
++
++        if (op_type == 1)
++            res = v1 * p.coeff0 + v2 * p.coeff1;
++
++        if (op_type == 2)
++            res = max(v1 * p.coeff0, v2 * p.coeff1);
++    }
++
++    top_blob_data[gi] = res;
++}
+diff --git a/src/layer/shader/innerproduct.comp b/src/layer/shader/innerproduct.comp
+--- /dev/null
++++ b/src/layer/shader/innerproduct.comp
+@@ -0,0 +1,76 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int bias_term = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++layout (binding = 2) readonly buffer weight { float weight_data[]; };
++layout (binding = 3) readonly buffer bias { float bias_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float sum = 0;
++
++    if (bias_term == 1)
++    {
++        sum = bias_data[gx];
++    }
++
++    const int size = p.w * p.h;
++
++    int w_offset = gx * size * p.c;
++
++    for (int z = 0; z < p.c; z++)
++    {
++        int v_offset = z * p.cstep;
++
++        for (int i = 0; i < size; i++)
++        {
++            sum += weight_data[w_offset + i] * bottom_blob_data[v_offset + i];
++        }
++
++        w_offset += size;
++    }
++
++    top_blob_data[gx] = sum;
++}
+diff --git a/src/layer/shader/padding.comp b/src/layer/shader/padding.comp
+--- /dev/null
++++ b/src/layer/shader/padding.comp
+@@ -0,0 +1,82 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int top = 0;
++layout (constant_id = 1) const int bottom = 1;
++layout (constant_id = 2) const int left = 1;
++layout (constant_id = 3) const int right = 1;
++layout (constant_id = 4) const int type = 1;
++layout (constant_id = 5) const float value = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float res;
++
++    int x = gx - left;
++    int y = gy - top;
++
++    if (type == 0)
++    {
++        if (x >= 0 && x < p.w && y >= 0 && y < p.h)
++        {
++            int v_offset = gz * p.cstep + y * p.w + x;
++            res = bottom_blob_data[v_offset];
++        }
++        else
++        {
++            res = value;
++        }
++    }
++    else if (type == 1)
++    {
++        x = clamp(x, 0, p.w - 1);
++        y = clamp(y, 0, p.h - 1);
++
++        int v_offset = gz * p.cstep + y * p.w + x;
++        res = bottom_blob_data[v_offset];
++    }
++
++    top_blob_data[gz * p.outcstep + gy * p.outw + gx] = res;
++}
+diff --git a/src/layer/shader/pooling.comp b/src/layer/shader/pooling.comp
+--- /dev/null
++++ b/src/layer/shader/pooling.comp
+@@ -0,0 +1,94 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int pooling_type = 0;
++layout (constant_id = 1) const int kernel_w = 1;
++layout (constant_id = 2) const int kernel_h = 1;
++layout (constant_id = 3) const int stride_w = 1;
++layout (constant_id = 4) const int stride_h = 1;
++layout (constant_id = 5) const int global_pooling = 0;
++layout (constant_id = 6) const int pad_mode = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float res;
++
++    if (pooling_type == 0)
++    {
++        res = -99999999;
++
++        int v_offset = gz * p.cstep + gy * stride_h * p.w + gx * stride_w;
++
++        for (int y = 0; y < kernel_h; y++)
++        {
++            for (int x = 0; x < kernel_w; x++)
++            {
++                res = max(res, bottom_blob_data[v_offset + x]);
++            }
++
++            v_offset += p.w;
++        }
++    }
++    else if (pooling_type == 1)
++    {
++        res = 0;
++
++        int v_offset = gz * p.cstep + gy * stride_h * p.w + gx * stride_w;
++
++        for (int y = 0; y < kernel_h; y++)
++        {
++            for (int x = 0; x < kernel_w; x++)
++            {
++                res += bottom_blob_data[v_offset + x];
++            }
++
++            v_offset += p.w;
++        }
++
++        res /= kernel_w * kernel_h;
++    }
++
++    top_blob_data[gz * p.outcstep + gy * p.outw + gx] = res;
++}
+diff --git a/src/layer/shader/pooling_global.comp b/src/layer/shader/pooling_global.comp
+--- /dev/null
++++ b/src/layer/shader/pooling_global.comp
+@@ -0,0 +1,76 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int pooling_type = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    int size = p.w * p.h;
++
++    float res;
++
++    if (pooling_type == 0)
++    {
++        res = -99999999;
++
++        for (int i = 0; i < size; i++)
++        {
++            res = max(res, bottom_blob_data[i]);
++        }
++    }
++    else if (pooling_type == 1)
++    {
++        res = 0;
++
++        for (int i = 0; i < size; i++)
++        {
++            res += bottom_blob_data[i];
++        }
++
++        res /= size;
++    }
++
++    top_blob_data[gx] = res;
++}
+diff --git a/src/layer/shader/relu.comp b/src/layer/shader/relu.comp
+--- /dev/null
++++ b/src/layer/shader/relu.comp
+@@ -0,0 +1,53 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const float slope = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    const int gi = gz * p.cstep + gy * p.w + gx;
++
++    float v = bottom_top_blob_data[gi];
++
++    if (slope == 0)
++        v = max(v, 0.0);
++    else
++        v = v < 0 ? v * slope : v;
++
++    bottom_top_blob_data[gi] = v;
++}
+diff --git a/src/layer/shader/scale.comp b/src/layer/shader/scale.comp
+--- /dev/null
++++ b/src/layer/shader/scale.comp
+@@ -0,0 +1,90 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int bias_term = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer scale_blob { float scale_blob_data[]; };
++layout (binding = 2) readonly buffer bias_blob { float bias_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1)
++    {
++        float v = bottom_top_blob_data[gx];
++
++        if (bias_term == 1)
++            v = scale_blob_data[gx] * v + bias_blob_data[gx];
++        else
++            v = scale_blob_data[gx] * v;
++
++        bottom_top_blob_data[gx] = v;
++
++        return;
++    }
++
++    if (p.dims == 2)
++    {
++        const int gi = gy * p.w + gx;
++
++        float v = bottom_top_blob_data[gi];
++
++        if (bias_term == 1)
++            v = scale_blob_data[gy] * v + bias_blob_data[gy];
++        else
++            v = scale_blob_data[gy] * v;
++
++        bottom_top_blob_data[gi] = v;
++
++        return;
++    }
++
++    if (p.dims == 3)
++    {
++        const int gi = gz * p.cstep + gy * p.w + gx;
++
++        float v = bottom_top_blob_data[gi];
++
++        if (bias_term == 1)
++            v = scale_blob_data[gz] * v + bias_blob_data[gz];
++        else
++            v = scale_blob_data[gz] * v;
++
++        bottom_top_blob_data[gi] = v;
++
++        return;
++    }
++}
+diff --git a/src/layer/shader/softmax.comp b/src/layer/shader/softmax.comp
+--- /dev/null
++++ b/src/layer/shader/softmax.comp
+@@ -0,0 +1,115 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int axis = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { float bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { float top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1) // axis == 0
++    {
++        float max_value = -99999999;
++        for (int i=0; i<p.w; i++)
++        {
++            max_value = max(max_value, bottom_blob_data[i]);
++        }
++
++        float sum_value = 0.f;
++        for (int i=0; i<p.w; i++)
++        {
++            sum_value += exp(bottom_blob_data[i] - max_value);
++        }
++
++        top_blob_data[gx] = exp(bottom_blob_data[gx] - max_value) / sum_value;
++
++        return;
++    }
++
++    if (p.dims == 2 && axis == 0)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 2 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 0)
++    {
++        int gi = gz * p.cstep + gy * p.w + gx;
++
++        float max_value = -99999999;
++        for (int z = 0; z < p.c; z++)
++        {
++            int v_offset = z * p.cstep + gy * p.w + gx;
++            max_value = max(max_value, bottom_blob_data[v_offset]);
++        }
++
++        float sum_value = 0;
++        for (int z = 0; z < p.c; z++)
++        {
++            int v_offset = z * p.cstep + gy * p.w + gx;
++            sum_value += exp(bottom_blob_data[v_offset] - max_value);
++        }
++
++        top_blob_data[gi] = exp(bottom_blob_data[gi] - max_value) / sum_value;
++
++        return;
++    }
++
++    if (p.dims == 3 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 2)
++    {
++        // FIXME TODO
++        return;
++    }
++}
+diff --git a/src/layer/shader/softmax_div_sum.comp b/src/layer/shader/softmax_div_sum.comp
+--- /dev/null
++++ b/src/layer/shader/softmax_div_sum.comp
+@@ -0,0 +1,86 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int axis = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer sum_workspace { float sum_workspace_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1) // axis == 0
++    {
++        bottom_top_blob_data[gx] /= sum_workspace_data[0];
++        return;
++    }
++
++    if (p.dims == 2 && axis == 0)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 2 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 0)
++    {
++        int gi = gz * p.cstep + gy * p.w + gx;
++        bottom_top_blob_data[gi] /= sum_workspace_data[ gy * p.w + gx ];
++        return;
++    }
++
++    if (p.dims == 3 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 2)
++    {
++        // FIXME TODO
++        return;
++    }
++}
+diff --git a/src/layer/shader/softmax_exp_sub_max.comp b/src/layer/shader/softmax_exp_sub_max.comp
+--- /dev/null
++++ b/src/layer/shader/softmax_exp_sub_max.comp
+@@ -0,0 +1,86 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int axis = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer max_workspace { float max_workspace_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1) // axis == 0
++    {
++        bottom_top_blob_data[gx] = exp(bottom_top_blob_data[gx] - max_workspace_data[0]);
++        return;
++    }
++
++    if (p.dims == 2 && axis == 0)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 2 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 0)
++    {
++        int gi = gz * p.cstep + gy * p.w + gx;
++        bottom_top_blob_data[gi] = exp(bottom_top_blob_data[gi] - max_workspace_data[ gy * p.w + gx ]);
++        return;
++    }
++
++    if (p.dims == 3 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 2)
++    {
++        // FIXME TODO
++        return;
++    }
++}
+diff --git a/src/layer/shader/softmax_reduce_max.comp b/src/layer/shader/softmax_reduce_max.comp
+--- /dev/null
++++ b/src/layer/shader/softmax_reduce_max.comp
+@@ -0,0 +1,98 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int axis = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer max_workspace { float max_workspace_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1) // axis == 0
++    {
++        float max_value = -99999999;
++        for (int i=0; i<p.w; i++)
++        {
++            max_value = max(max_value, bottom_top_blob_data[i]);
++        }
++        max_workspace_data[0] = max_value;
++
++        return;
++    }
++
++    if (p.dims == 2 && axis == 0)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 2 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 0)
++    {
++        float max_value = -99999999;
++        for (int z = 0; z < p.c; z++)
++        {
++            int v_offset = z * p.cstep + gy * p.w + gx;
++            max_value = max(max_value, bottom_top_blob_data[v_offset]);
++        }
++        max_workspace_data[ gy * p.w + gx ] = max_value;
++
++        return;
++    }
++
++    if (p.dims == 3 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 2)
++    {
++        // FIXME TODO
++        return;
++    }
++}
+diff --git a/src/layer/shader/softmax_reduce_sum.comp b/src/layer/shader/softmax_reduce_sum.comp
+--- /dev/null
++++ b/src/layer/shader/softmax_reduce_sum.comp
+@@ -0,0 +1,98 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int axis = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer sum_workspace { float sum_workspace_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    if (p.dims == 1) // axis == 0
++    {
++        float sum_value = 0.f;
++        for (int i=0; i<p.w; i++)
++        {
++            sum_value += bottom_top_blob_data[i];
++        }
++        sum_workspace_data[0] = sum_value;
++
++        return;
++    }
++
++    if (p.dims == 2 && axis == 0)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 2 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 0)
++    {
++        float sum_value = 0;
++        for (int z = 0; z < p.c; z++)
++        {
++            int v_offset = z * p.cstep + gy * p.w + gx;
++            sum_value += bottom_top_blob_data[v_offset];
++        }
++        sum_workspace_data[ gy * p.w + gx ] = sum_value;
++
++        return;
++    }
++
++    if (p.dims == 3 && axis == 1)
++    {
++        // FIXME TODO
++        return;
++    }
++
++    if (p.dims == 3 && axis == 2)
++    {
++        // FIXME TODO
++        return;
++    }
++}
+diff --git a/src/layer/shader/unaryop.comp b/src/layer/shader/unaryop.comp
+--- /dev/null
++++ b/src/layer/shader/unaryop.comp
+@@ -0,0 +1,67 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2018 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++layout (constant_id = 0) const int op_type = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) buffer bottom_top_blob { float bottom_top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    const int gi = gz * p.cstep + gy * p.w + gx;
++
++    float v = bottom_top_blob_data[gi];
++
++    float res = 233;
++
++    if (op_type == 0) res = abs(v);
++    if (op_type == 1) res = -v;
++    if (op_type == 2) res = floor(v);
++    if (op_type == 3) res = ceil(v);
++    if (op_type == 4) res = v * v;
++    if (op_type == 5) res = sqrt(v);
++    if (op_type == 6) res = 1.f / sqrt(v);
++    if (op_type == 7) res = exp(v);
++    if (op_type == 8) res = log(v);
++    if (op_type == 9) res = sin(v);
++    if (op_type == 10) res = cos(v);
++    if (op_type == 11) res = tan(v);
++    if (op_type == 12) res = asin(v);
++    if (op_type == 13) res = acos(v);
++    if (op_type == 14) res = atan(v);
++    if (op_type == 15) res = 1.f / v;
++
++    bottom_top_blob_data[gi] = res;
++}

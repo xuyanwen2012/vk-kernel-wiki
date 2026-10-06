@@ -23,7 +23,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import base64
 import sys
 from pathlib import Path
 
@@ -44,14 +43,11 @@ def ensure_license(ledger: dict, slug: str, offline: bool) -> str:
         return spdx
     if offline:
         raise pr_evidence.EvidenceError(f"{target.relative_to(WIKI_ROOT)} is missing and --offline was given")
-    payload = pr_evidence.gh_json(f"repos/{ledger['repo']}/license")
-    reported = (payload.get("license") or {}).get("spdx_id")
-    if reported != spdx:
-        raise pr_evidence.EvidenceError(
-            f"candidates/{slug}.yaml says license {spdx!r} but GitHub reports {reported!r} for {ledger['repo']}"
-        )
+    text = pr_evidence.fetch_license_text(ledger)
+    if not text.strip():
+        raise pr_evidence.EvidenceError(f"candidates/{slug}.yaml: the upstream licence text came back empty")
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(base64.b64decode(payload.get("content") or ""))
+    target.write_bytes(text)
     return spdx
 
 
@@ -74,7 +70,9 @@ def write_bundle(ledger: dict, slug: str, evidence: dict, spdx: str) -> bool:
     pr = evidence["pr"]
     directory = WIKI_ROOT / pr_artifacts.bundle_rel(slug, pr["number"])
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / pr_artifacts.PATCH_NAME).write_text(pr_artifacts.render_patch(with_patch), encoding="utf-8")
+    patch_name = pr_artifacts.DRIVER_PATCH_NAME if config.mode == "driver" else pr_artifacts.PATCH_NAME
+    (directory / patch_name).write_text(pr_artifacts.render_patch(with_patch), encoding="utf-8")
+    forge = pr_evidence.forge_of(ledger)
     provenance = {
         "repo": ledger["repo"],
         "pr": int(pr["number"]),
@@ -83,7 +81,13 @@ def write_bundle(ledger: dict, slug: str, evidence: dict, spdx: str) -> bool:
         "license": spdx,
         "license_file": f"{pr_artifacts.ARTIFACTS_ROOT}/{slug}/{pr_artifacts.LICENSE_NAME}",
         "retrieved_at": evidence.get("fetched_at"),
-        "origin": f"GitHub REST API, repos/{ledger['repo']}/pulls/{int(pr['number'])}/files, field 'patch'",
+        "patch_file": patch_name,
+        "origin": (
+            f"GitLab REST API, {ledger['gitlab_api']}, project {ledger['repo']}, "
+            f"merge_requests/{int(pr['number'])}/diffs, field 'diff' without its final newline"
+            if forge == "gitlab" else
+            f"GitHub REST API, repos/{ledger['repo']}/pulls/{int(pr['number'])}/files, field 'patch'"
+        ),
         "extraction": "verbatim patch text per file; the diff/---/+++ header lines are generated",
         "files": [
             {
@@ -133,7 +137,7 @@ def main() -> int:
                 kept += 1
                 continue
             try:
-                evidence = pr_evidence.get(ledger["repo"], slug, number, args.cache_dir, args.offline)
+                evidence = pr_evidence.get(ledger, slug, number, args.cache_dir, args.offline)
             except pr_evidence.EvidenceError as exc:
                 print(f"WARN: {exc}", file=sys.stderr)
                 failed += 1

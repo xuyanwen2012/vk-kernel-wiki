@@ -1,0 +1,17 @@
+repo: Tencent/ncnn
+pr: 6384
+url: https://github.com/Tencent/ncnn/pull/6384
+merge_sha: 05a4c7dfc96de23672b79164176bbbf63e50feb2
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6384/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/eltwise.comp
+  status: modified
+  sha256: 57f0a8b96236712e45ffcd44de932e8d482ddeabe6f86c4b338bf834b29471b5
+- path: src/layer/vulkan/shader/eltwise_pack4.comp
+  status: removed
+  sha256: 0cd47d7916bccb248129ac785f0443704fdb3553ccad26e062d3b623c03114d7

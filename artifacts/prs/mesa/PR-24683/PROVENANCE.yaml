@@ -1,0 +1,56 @@
+repo: mesa/mesa
+pr: 24683
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/24683
+merge_sha: 653bcbcb091d4619bca6edfc44a0a2cfc4f30d50
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/24683/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/compiler/aco_insert_waitcnt.cpp
+  status: modified
+  sha256: d463742334fd1971c9e37e2e704049eaad9c8465f698e2a416010baadd2bfc2d
+- path: src/amd/compiler/aco_instruction_selection.cpp
+  status: modified
+  sha256: cd57f6cfaa2696df964e810d467d5a5014b36906deaa2874b96b7d105d95598f
+- path: src/amd/compiler/aco_instruction_selection_setup.cpp
+  status: modified
+  sha256: e1a00b70837093938d83a2c4fd8b0c27647a58adc279242886fd18b30945e556
+- path: src/amd/compiler/aco_ir.h
+  status: modified
+  sha256: 56fe7261634903f473db78b8b6b20817fdd18fadeef544dc542f49cab72a8e47
+- path: src/amd/compiler/aco_opcodes.py
+  status: modified
+  sha256: e969474a5c1c8504ebafe9f0cd8677e80ca99e6d1059f8f1841d113cd1ba560d
+- path: src/amd/compiler/aco_optimizer.cpp
+  status: modified
+  sha256: 241382a1d7c6346bb7ede2d7acce6858d1d0b2014693196d84703eb5b188abf8
+- path: src/amd/compiler/aco_register_allocation.cpp
+  status: modified
+  sha256: 7ce14ba1c361ef774f56ddfe9f497203ae305bf92db6adaa1bb5df525c684aea
+- path: src/amd/compiler/aco_statistics.cpp
+  status: modified
+  sha256: a5fa73f5aa62a818d283f7245e545225f45f12d52a0ac6477161b51e3e4151d1
+- path: src/amd/compiler/aco_validate.cpp
+  status: modified
+  sha256: e81d7fb2f95b8e8ae596d7a39d1dce56e0796fe9f3fa81dacfb46bcaccdb4558
+- path: src/amd/vulkan/nir/radv_nir.h
+  status: modified
+  sha256: 57ff050e4559697fe219acb1b2020b6e765222c7078675c3a414b6969a648958
+- path: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  status: added
+  sha256: c1349497a6b249e3143c02861943f4374d483f20b06f5ab5501361c70739f34d
+- path: src/amd/vulkan/meson.build
+  status: modified
+  sha256: f7a2980b5cc461f93a7a0fdbf55c92222a3441afbb8a1520de9a214f696fdca6
+- path: src/amd/vulkan/radv_physical_device.c
+  status: modified
+  sha256: 3384fd895385be852ac56c0010c7a72443eee3c4639f97cec27b5dc4ce53acb2
+- path: src/amd/vulkan/radv_shader.c
+  status: modified
+  sha256: b98f125b6ae01a716b58943e9a4027fdcddbdbac120166b84cd2947579266389
+- path: src/amd/vulkan/radv_shader_info.c
+  status: modified
+  sha256: cce481576a02c1bdc53cca35fccb80e5d69c847c9a4f5feef44def6ba93dbfe9

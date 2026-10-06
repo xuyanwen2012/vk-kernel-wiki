@@ -1,0 +1,47 @@
+repo: Tencent/ncnn
+pr: 6556
+url: https://github.com/Tencent/ncnn/pull/6556
+merge_sha: 7749b98a9f2eed51528b13c8883b64aa5ea328ec
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6556/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/groupnorm_coeffs.comp
+  status: added
+  sha256: 8ca82291ab93657e01dd2295e0f79d3c486806ee7e2a4a4345ae529a46190df3
+- path: src/layer/vulkan/shader/groupnorm_coeffs_pack4.comp
+  status: added
+  sha256: 22c2026f07c78b764d9dc237b0d6611e62f435ec8b2521d781168ce586e6a01b
+- path: src/layer/vulkan/shader/groupnorm_norm.comp
+  status: added
+  sha256: 21183b89ef0c18438213892ab7bb6d46e04fb138eabfb22cf370235bd703fcf7
+- path: src/layer/vulkan/shader/groupnorm_norm_pack4.comp
+  status: added
+  sha256: 8458e9d702ffa587dd54c6be5ca811d40da89688ff0b61f0ed90e934ca59bac0
+- path: src/layer/vulkan/shader/groupnorm_reduce_mean.comp
+  status: added
+  sha256: a9431794f8bf448572d7362e74495f4803bcbc7fdf7f5483ee1eb29687cc65a1
+- path: src/layer/vulkan/shader/groupnorm_reduce_mean_pack4.comp
+  status: added
+  sha256: ae7e9634d1813deb239dd2c7c19d88827652b72f121e758e819696a5d14749aa
+- path: src/layer/vulkan/shader/groupnorm_reduce_sum4_fp16_to_fp32.comp
+  status: added
+  sha256: f9b525854faff287fa7c423e3de3298dfa9ed36b0628b0924f8330a4ff22c81c
+- path: src/layer/vulkan/shader/groupnorm_reduce_sum4_fp16_to_fp32_pack4.comp
+  status: added
+  sha256: 7a9909006d84c9ff7bdf133271ef5a7ca2dbbb77fa74fd2073b52662291b7c56
+- path: src/layer/vulkan/shader/groupnorm_reduce_sum4_fp32.comp
+  status: added
+  sha256: 76297fea79f98ba86ec27c357c3d6052c6fbdeb3cb13cabd6fc768ed5153940a
+- path: src/layer/vulkan/shader/groupnorm_reduce_sum4_fp32_pack4.comp
+  status: added
+  sha256: d04e232849f828c70a8a5e43f822d80828f0a793008a87a85bd88bb127dd9df4
+- path: src/layer/vulkan/shader/groupnorm_sub_mean_square.comp
+  status: added
+  sha256: 805cde2586562ba970c49906bac3708e6df3450005dd1457ca85bdf182d000b0
+- path: src/layer/vulkan/shader/groupnorm_sub_mean_square_pack4.comp
+  status: added
+  sha256: 617f871dca693fa792af45328dfed8e2fa272126251a042af4a592682e56578b

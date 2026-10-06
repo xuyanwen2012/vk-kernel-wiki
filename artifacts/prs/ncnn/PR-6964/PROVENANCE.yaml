@@ -1,0 +1,14 @@
+repo: Tencent/ncnn
+pr: 6964
+url: https://github.com/Tencent/ncnn/pull/6964
+merge_sha: df3e53b1827e887a6ba4ca7965aa87c1998c01ff
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6964/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/reduction.comp
+  status: modified
+  sha256: a0913c4519472f25b652815a4642172ee0827d29fb040370474036840c829714

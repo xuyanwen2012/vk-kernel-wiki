@@ -1,0 +1,59 @@
+repo: Tencent/ncnn
+pr: 6116
+url: https://github.com/Tencent/ncnn/pull/6116
+merge_sha: 9cdc02bb7af55d34ea2b5374c8a03a6e205e01c6
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6116/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_cm_16_16_16.comp
+  status: renamed
+  sha256: 57b25d0f1e1b755873f474e5fe8b5b89c57ef9e965c0f21d896a6210fd552f8c
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_cm_16_8_8.comp
+  status: renamed
+  sha256: 9b09b55d862dc471bd4fc49d9ac21d21bb06f3a4b6b424d21e88df3154a6d921
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_nv_cm_16_16_16.comp
+  status: removed
+  sha256: a98dfae7a957491e645a7db3977b833764159148c7e5c3e666d00ec610a3c92a
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_nv_cm_16_8_8.comp
+  status: removed
+  sha256: 179083b4804bec71186e4dc294f699a825fc1c71f8ff5b1a7273664a7d668ea1
+- path: src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm_cm_16_16_16.comp
+  status: renamed
+  sha256: 53e0694fb35cc196db4dff66a9d53a710224175ba2a4dd90ce6a23283664572b
+- path: src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm_cm_16_8_8.comp
+  status: renamed
+  sha256: 85182f6821365252260de9fa5510b7a55cf312052c4884e49efd30a87109e9f7
+- path: src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm_nv_cm_16_16_16.comp
+  status: removed
+  sha256: 7bbe00493c57637ef8a591f065aa2be947bd41724a2f5d92e8ea5fdc0d25f05e
+- path: src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm_nv_cm_16_8_8.comp
+  status: removed
+  sha256: d54816b6626ffa9050d4a840afc58f154ca0b3766bc18fe555a1bbe816dda2d6
+- path: src/layer/vulkan/shader/convolution_pack4_gemm_cm_16_16_16.comp
+  status: renamed
+  sha256: 8cc8f9e2eb49ad6c51d9e62320bbb78b83231f65a57e99ca93e80063a067f839
+- path: src/layer/vulkan/shader/convolution_pack4_gemm_cm_16_8_8.comp
+  status: renamed
+  sha256: a70ad627c79875bfaca7ce51e87534891677a05ad993138f0b9ac00ba3ff8b3f
+- path: src/layer/vulkan/shader/convolution_pack4_gemm_nv_cm_16_16_16.comp
+  status: removed
+  sha256: 050b336eb47b1179fcd3fdd1c3003ae7cf4a3cc8ad0842108f27c4f49a9b4b0c
+- path: src/layer/vulkan/shader/convolution_pack4_gemm_nv_cm_16_8_8.comp
+  status: removed
+  sha256: c6507368112c1e58dce2a30d31d071d8450f38dac0ee06ba3f771e3e0d201746
+- path: src/layer/vulkan/shader/deconvolution_pack4_gemm_cm_16_16_16.comp
+  status: renamed
+  sha256: 1fe50d0da63d99f1a07f816c9a033af07a407639a3b74f15c13ddeb2babc645c
+- path: src/layer/vulkan/shader/deconvolution_pack4_gemm_cm_16_8_8.comp
+  status: renamed
+  sha256: 501a65146cc2105854ed6ffeab56c9f650b5ae5f28e2aabca90e444d8cb88e4b
+- path: src/layer/vulkan/shader/deconvolution_pack4_gemm_nv_cm_16_16_16.comp
+  status: removed
+  sha256: aac073adc33c6e546f1de7737182517cdee6e10e31cecd2a95c70d7282853e58
+- path: src/layer/vulkan/shader/deconvolution_pack4_gemm_nv_cm_16_8_8.comp
+  status: removed
+  sha256: 681c16b925d75be4a09018a4d05f3696668c3f3315e20816d5b3ef2d446a4509

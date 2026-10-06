@@ -1,0 +1,35 @@
+repo: Tencent/ncnn
+pr: 2618
+url: https://github.com/Tencent/ncnn/pull/2618
+merge_sha: db814e1640b49fe845aafebf223c02ad56368a92
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/2618/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp1to4.comp
+  status: renamed
+  sha256: 155c55f387181064d4dfc6c5bc3593c1318d8100e185c0d387683526d3363897
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp1to8.comp
+  status: renamed
+  sha256: 31baf373d0af59a5efca6cbf4dc516ebc38cb15203a043d65b35fc49812299db
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp4.comp
+  status: added
+  sha256: 5bb7fdd08a18eb3c3e97beef7d30aca266885cef824c9d17728d61bfaf2a836a
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp4to1.comp
+  status: added
+  sha256: 6860f7535ace2b1b0e399f0effea78d19b744caa5d3081f11114f149c6e36f58
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp4to8.comp
+  status: added
+  sha256: 3cb586bf8252600308df1d02d615c9327d386f74373ac6b8e90e027dac115b38
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp8.comp
+  status: added
+  sha256: 4b4776134fc02f578e5ddc6cc6cf5dedc105cb3404a0307a58cfc66558ffaeb2
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp8to1.comp
+  status: added
+  sha256: 8da2e99193470ca5d36b65beac372df216152d3358108829392794aab2bd0927
+- path: src/layer/vulkan/shader/innerproduct_gemm_wp8to4.comp
+  status: added
+  sha256: 69123d8d783bdd44da53c63e7a7cab61db77de75d1a98dfa3b8687904dff13fd

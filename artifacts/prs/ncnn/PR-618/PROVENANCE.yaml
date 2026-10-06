@@ -1,0 +1,68 @@
+repo: Tencent/ncnn
+pr: 618
+url: https://github.com/Tencent/ncnn/pull/618
+merge_sha: 10b8ac68cc36d262f569e36a86fbeed08a4f4967
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/618/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/shader/batchnorm.comp
+  status: added
+  sha256: e1a89b2609239438aec7d3a7099a8cc6d4fb17a43f355ddc5cfd7c2b06e343ff
+- path: src/layer/shader/binaryop.comp
+  status: added
+  sha256: dc11de40c68966a24fe40b401b0718a33d1ad6481c5aab475f8b68dad9cd8d09
+- path: src/layer/shader/convolution.comp
+  status: added
+  sha256: 9f364ab5c42740a0f3786e98a6ce74c840c5561e4b00b180c32c23c84322addc
+- path: src/layer/shader/convolution_1x1s1d1.comp
+  status: added
+  sha256: d6a82194716a02c8557bea8f7b8ac8bb47a07899cc58b51fae785c6a1649696c
+- path: src/layer/shader/convolutiondepthwise.comp
+  status: added
+  sha256: 13505b4108cadd19d98be160bf1b8bce330b1c6395c4938b5035bcc73062aba3
+- path: src/layer/shader/dropout.comp
+  status: added
+  sha256: 032572ec14bc776493da503dc5c483c7f990a6db895c3ed134e3db85f01c7f03
+- path: src/layer/shader/eltwise.comp
+  status: added
+  sha256: b7fb1f6de4a09fb52131d69ac5a3092d1183f3d6bee046feef44ed950c8cc4b6
+- path: src/layer/shader/innerproduct.comp
+  status: added
+  sha256: 41636e7574eb89cf2c5bbb8ad830ea3e7f4e2d7f807d7b1bc6baf820cd459131
+- path: src/layer/shader/padding.comp
+  status: added
+  sha256: 48fd2b541a00a015d05d4d0d44e63be68475db1422fdbd37ab1af2e1a34f4869
+- path: src/layer/shader/pooling.comp
+  status: added
+  sha256: e48f7cc4ec3456c383bf3cb3ad3305132ce757b40dbc0477bace7f5608a9015e
+- path: src/layer/shader/pooling_global.comp
+  status: added
+  sha256: 56fac5ce90838ee8d3732b0c6536f5ce08824b7efdbcda2234e3d751b314293b
+- path: src/layer/shader/relu.comp
+  status: added
+  sha256: 73e50579044e49f87106359138a46597d05c21675bd3ad436449974256dac4ba
+- path: src/layer/shader/scale.comp
+  status: added
+  sha256: 805da858faaf877f2e4bfe0deed5768cf81b2b9cddfcab9f5af30ce26770a8cf
+- path: src/layer/shader/softmax.comp
+  status: added
+  sha256: 86e5e83b12918f870d7d26ffd5a27c4f4832c98d60c250910bb4f1e27e9b10e5
+- path: src/layer/shader/softmax_div_sum.comp
+  status: added
+  sha256: 3a8b2ceb3ef614c0fb468a4dab7142c1e56a6d4e3d775d85c4df769bb5cb1f81
+- path: src/layer/shader/softmax_exp_sub_max.comp
+  status: added
+  sha256: 46986effbbf23103e239ad009d9a710c4fbf72e71f4fbfaff95db6d1de6fecac
+- path: src/layer/shader/softmax_reduce_max.comp
+  status: added
+  sha256: 9e8d3cd7e6b58a11f58749b3954a30dd1327bfcb984ed09f5fb2c9f425b84a64
+- path: src/layer/shader/softmax_reduce_sum.comp
+  status: added
+  sha256: 3db249434cf3f1151005eeabce23711b6eb6904ab16d830afe31fd102a2067e3
+- path: src/layer/shader/unaryop.comp
+  status: added
+  sha256: 61b6e2ec97e3274c977bf05be9a90fa365e2b4c12a9afa64eb898e9eb8a742b8

@@ -101,6 +101,7 @@ languages:
   - glsl
   - spirv
   - cpp
+  - c
   - python
 
 confidence:

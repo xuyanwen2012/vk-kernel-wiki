@@ -1,0 +1,297 @@
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_mean.comp b/src/layer/vulkan/shader/layernorm_reduce_mean.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_mean.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_mean.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer sum_blob { float sum_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer sum_blob { vec4 sum_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer bottom_top_blob { float bottom_top_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
+--- a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
+@@ -1,6 +1,8 @@
+ // Copyright 2025 Futz12 <pchar.cn>
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
++// RMSNorm also depends on this shader
++
+ #version 450
+ 
+ layout (binding = 0) readonly buffer bottom_top_blob { vec4 bottom_top_blob_data[]; };
+diff --git a/src/layer/vulkan/shader/rmsnorm_coeffs.comp b/src/layer/vulkan/shader/rmsnorm_coeffs.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_coeffs.comp
+@@ -0,0 +1,28 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const float eps = 0;
++
++layout (binding = 0) writeonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout (binding = 1) readonly buffer rms_blob     { float rms_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int num_groups_per_channel;
++    int channels;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x);
++    int gy=int(gl_GlobalInvocationID.y);
++    int gz=int(gl_GlobalInvocationID.z);
++    if (gx>=1 || gy>=p.num_groups_per_channel || gz>=p.channels)
++        return;
++
++    int group_id = gz * p.num_groups_per_channel + gy;
++    float rms = rms_data[group_id];
++    float a = 1.0 / sqrt(rms + eps);
++    buffer_st1(coeffs_blob_data, group_id, afp(a));
++}
+diff --git a/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp b/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+@@ -0,0 +1,28 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const float eps = 0;
++
++layout (binding = 0) writeonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout (binding = 1) readonly buffer rms_blob     { vec4 rms_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int num_groups_per_channel;
++    int channels;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x);
++    int gy=int(gl_GlobalInvocationID.y);
++    int gz=int(gl_GlobalInvocationID.z);
++    if (gx>=1 || gy>=p.num_groups_per_channel || gz>=p.channels)
++        return;
++
++    int group_id = gz * p.num_groups_per_channel + gy;
++    vec4 rms = rms_data[group_id];
++    vec4 a = inversesqrt(rms + vec4(eps));
++    buffer_st4(coeffs_blob_data, group_id, afpvec4(a));
++}
+diff --git a/src/layer/vulkan/shader/rmsnorm_norm.comp b/src/layer/vulkan/shader/rmsnorm_norm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_norm.comp
+@@ -0,0 +1,47 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++layout (constant_id = 0) const int affine = 0;
++layout (constant_id = 1) const int affine_size = 0;
++
++layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout (binding = 2) readonly buffer gamma_blob  { sfp gamma_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x);
++    int gy=int(gl_GlobalInvocationID.y);
++    int gz=int(gl_GlobalInvocationID.z);
++    if (gx>=p.w || gy>=p.h || gz>=p.c)
++        return;
++
++    int group_id, inner_id;
++    if (affine_size == p.w) {
++        group_id = gz * p.h + gy;
++        inner_id = gx;
++    } else { // affine_size == p.w * p.h
++             group_id = gz;
++             inner_id = gy * p.w + gx;
++    }
++
++    afp a = buffer_ld1(coeffs_blob_data, group_id);
++
++    int idx = gz * p.cstep + gy * p.w + gx;
++    afp v = buffer_ld1(bottom_top_blob_data, idx);
++    v = v * a;  // v = v / sqrt(rms+eps)
++
++    if (affine == 1) {
++        afp gamma = buffer_ld1(gamma_data, inner_id);
++        v = v * gamma;
++    }
++    buffer_st1(bottom_top_blob_data, idx, v);
++}
+diff --git a/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp b/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+@@ -0,0 +1,43 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++layout (constant_id = 0) const int affine = 0;
++layout (constant_id = 1) const int affine_size = 0;
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout (binding = 2) readonly buffer gamma_blob  { sfp gamma_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x), gy=int(gl_GlobalInvocationID.y), gz=int(gl_GlobalInvocationID.z);
++    if (gx>=p.w || gy>=p.h || gz>=p.c) return;
++
++    int group_id, inner_id;
++    if (affine_size == p.w) {
++        group_id = gz * p.h + gy;
++        inner_id = gx;
++    } else {
++        group_id = gz;
++        inner_id = gy * p.w + gx;
++    }
++
++    afpvec4 a = buffer_ld4(coeffs_blob_data, group_id);
++    int idx = gz * p.cstep + gy * p.w + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, idx);
++    v = v * a;
++
++    if (affine == 1) {
++        afp gamma = buffer_ld1(gamma_data, inner_id);
++        v = v * afpvec4(gamma);
++    }
++    buffer_st4(bottom_top_blob_data, idx, v);
++}
+diff --git a/src/layer/vulkan/shader/rmsnorm_square.comp b/src/layer/vulkan/shader/rmsnorm_square.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_square.comp
+@@ -0,0 +1,27 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer square_blob    { sfp square_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x);
++    int gy=int(gl_GlobalInvocationID.y);
++    int gz=int(gl_GlobalInvocationID.z);
++    if (gx>=p.w || gy>=p.h || gz>=p.c)
++        return;
++
++    int idx = gz*p.cstep + gy*p.w + gx;
++    float v = float(buffer_ld1(bottom_top_blob_data, idx));
++    buffer_st1(square_blob_data, idx, afp(v*v));
++}
+diff --git a/src/layer/vulkan/shader/rmsnorm_square_pack4.comp b/src/layer/vulkan/shader/rmsnorm_square_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/rmsnorm_square_pack4.comp
+@@ -0,0 +1,28 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer square_blob    { sfpvec4 square_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main(){
++    int gx=int(gl_GlobalInvocationID.x);
++    int gy=int(gl_GlobalInvocationID.y);
++    int gz=int(gl_GlobalInvocationID.z);
++
++    if (gx>=p.w || gy>=p.h || gz>=p.c)
++        return;
++
++    int idx = gz*p.cstep + gy*p.w + gx;
++    vec4 v = vec4(buffer_ld4(bottom_top_blob_data, idx));
++    buffer_st4(square_blob_data, idx, afpvec4(v*v));
++}

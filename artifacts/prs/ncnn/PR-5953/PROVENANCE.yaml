@@ -1,0 +1,17 @@
+repo: Tencent/ncnn
+pr: 5953
+url: https://github.com/Tencent/ncnn/pull/5953
+merge_sha: 409f9aef67a150d5c794e67e1adbc2c2dc193784
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/5953/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/padding_pack1to4.comp
+  status: modified
+  sha256: 4af7fdd9133189d3208631849429646cb6ccd0e5e36e8e093b6cc0b7f700695f
+- path: src/layer/vulkan/shader/padding_pack1to8.comp
+  status: modified
+  sha256: 3669dfd9e9a70503bf5aacf99411252955a82781b77a8272982ed957ec862a70

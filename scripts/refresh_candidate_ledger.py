@@ -23,7 +23,14 @@ A ledger starts as a header written by hand:
       - <substring>
     prs: []
 
-This script calls the GitHub API through the `gh` CLI. It is a refresh-time
+Optional header keys: `forge` and `gitlab_api` (see scripts/pr_evidence.py),
+`scope_mode: driver` with `driver_path_markers` and `topic_patterns` for a
+repository that holds driver source instead of shaders (see
+scripts/pr_policy.py), `embedded_shader_path_markers`,
+`architecture_code_markers`, `architecture_path_markers`, `license` and
+`license_path`.
+
+This script calls the forge API (GitHub through the `gh` CLI). It is a refresh-time
 utility: scripts/validate.py and the test suite stay offline.
 
 Usage:
@@ -35,7 +42,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
@@ -46,47 +52,18 @@ import pr_evidence  # noqa: E402
 import pr_policy  # noqa: E402
 from _wiki_root import WIKI_ROOT  # noqa: E402
 
-SEARCH_RESULT_CAP = 1000  # GitHub returns at most 1000 results per search query
-SEARCH_PAUSE_SECONDS = 2.5  # the search API allows 30 requests per minute
-
-
-def search_merged_prs(repo: str, keyword: str, cutoff: date) -> list:
-    """Return [{number, title, closed}] for merged PRs matching one query."""
-    query = f"repo:{repo} is:pr is:merged merged:<={cutoff.isoformat()} {keyword}"
-    hits, page = [], 1
-    while True:
-        payload = pr_evidence.gh_json(
-            "-X", "GET", "search/issues", "-f", f"q={query}",
-            "-f", "per_page=100", "-f", f"page={page}", "-f", "sort=created", "-f", "order=asc",
-        )
-        items = payload.get("items") or []
-        total = int(payload.get("total_count") or 0)
-        hits.extend(
-            {"number": int(i["number"]), "title": i.get("title") or "", "closed": (i.get("closed_at") or "")[:10]}
-            for i in items
-        )
-        time.sleep(SEARCH_PAUSE_SECONDS)
-        if not items or len(hits) >= min(total, SEARCH_RESULT_CAP):
-            if total > SEARCH_RESULT_CAP:
-                print(
-                    f"WARN: {repo} query {keyword!r} has {total} results; only the first "
-                    f"{SEARCH_RESULT_CAP} are reachable. Split the query.", file=sys.stderr,
-                )
-            return hits
-        page += 1
-
 
 def build_row(ledger: dict, slug: str, number: int, cache_dir=None, offline=False) -> dict:
     """Fetch evidence for one pull request and classify it."""
     try:
-        evidence = pr_evidence.get(ledger["repo"], slug, number, cache_dir, offline)
+        evidence = pr_evidence.get(ledger, slug, number, cache_dir, offline)
     except pr_evidence.EvidenceError as exc:
         return {
             "number": number, "decision": "defer", "rule": "evidence-unavailable",
             "reason": f"defer: pull request evidence unavailable ({exc})",
         }
     pr = evidence["pr"]
-    scope = pr_policy.classify_scope(evidence["files"], pr_policy.PathConfig.from_ledger(ledger))
+    scope = pr_policy.classify_scope(evidence["files"], pr_policy.PathConfig.from_ledger(ledger), pr.get("title") or "")
     return {
         "number": number,
         "title": pr.get("title") or "",
@@ -109,9 +86,9 @@ def refresh(path: Path, cutoff: date, reclassify: bool, dry_run: bool, jobs: int
     seen = set()
     if not offline:
         for keyword in ledger.get("keywords_used") or []:
-            hits = search_merged_prs(ledger["repo"], str(keyword), cutoff)
+            hits = pr_evidence.search_merged(ledger, str(keyword), cutoff)
             print(f"  {slug}: {len(hits)} merged pull request(s) for {keyword!r}")
-            seen.update(h["number"] for h in hits)
+            seen.update(hits)
 
     todo = sorted(n for n in seen if n not in rows)
     if reclassify:

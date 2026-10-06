@@ -1,0 +1,14 @@
+repo: Tencent/ncnn
+pr: 6478
+url: https://github.com/Tencent/ncnn/pull/6478
+merge_sha: a64aa7ff68af3f833fc160c6ee15b0f08aec4b11
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6478/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/softplus.comp
+  status: added
+  sha256: 94d7a7f01f8771ab68fc3f8177365773f9cbb890b815ce9639baad621d2db19f

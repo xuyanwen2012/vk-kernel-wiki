@@ -1,0 +1,2644 @@
+repo: mesa/mesa
+forge: gitlab
+gitlab_api: https://gitlab.freedesktop.org/api/v4
+license: MIT
+license_path: licenses/MIT
+scope_mode: driver
+keywords_used:
+- cooperative matrix
+- coopmat
+- cmat
+- wmma
+- subgroup size
+- dot product
+- float16
+- fp16
+- 8bit
+- int8
+driver_path_markers:
+- src/amd/
+- src/compiler/nir/nir_lower_cooperative_matrix.c
+- src/compiler/spirv/vtn_cmat.c
+topic_patterns:
+- cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma
+- subgroup[ _-]?size
+- dot[ _-]?product|[su]dot_?4x8|dp4a
+- float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float
+- 8[ -]?bit[ _-]?storage|(?<![a-z0-9])int8(?![a-z0-9])
+architecture_path_markers:
+  src/amd/: amd
+architecture_code_markers:
+  GFX11: rdna3
+searched_at: '2026-10-05'
+cutoff_date: '2026-10-05'
+total_candidates: 259
+included: 64
+deferred: 0
+excluded: 195
+prs:
+- number: 331
+  title: 'staging/19.0: radv: Fix rebase issue in 19.0 for float16 fix.'
+  author: bnieuwenhuizen
+  merged_at: '2019-02-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/331
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/radv_nir_to_llvm.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_nir_to_llvm.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 691
+  title: 'docs/relnotes: add support for VK_KHR_shader_float16_int8 on Intel'
+  author: tanty
+  merged_at: '2019-04-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/691
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 694
+  title: 'intel/fs: Add support for float16 to the fsign optimizations'
+  author: idr
+  merged_at: '2019-04-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/694
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 794
+  title: Enable fp16 visuals and fbconfigs
+  author: strassek
+  merged_at: '2019-08-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/794
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 30 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 1411
+  title: 'anv: Implement VK_EXT_subgroup_size_control'
+  author: gfxstrand
+  merged_at: '2019-07-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1411
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 17 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 1480
+  title: 'anv: implement VK_EXT_index_type_uint8'
+  author: llandwerlin
+  merged_at: '2019-07-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1480
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 1646
+  title: 'anv: Implement VK_EXT_subgroup_size_control version 2'
+  author: gfxstrand
+  merged_at: '2019-08-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1646
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 4 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 1752
+  title: 'radv: fix getting the index type size for uint8_t'
+  author: hakzsam
+  merged_at: '2019-08-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1752
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 1811
+  title: 'egl/android: Enable HAL_PIXEL_FORMAT_RGBA_FP16 format'
+  author: gurchetansingh
+  merged_at: '2019-08-30'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1811
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 1942
+  title: Add FP16 surface format support for wayland and surfaceless
+  author: ajax
+  merged_at: '2019-09-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1942
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 2331
+  title: 'radv: rename VK_KHR_shader_float16_int8 structs/constants'
+  author: hakzsam
+  merged_at: '2019-10-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/2331
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/radv_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_device.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 2588
+  title: 'radv: implement VK_EXT_subgroup_size_control'
+  author: hakzsam
+  merged_at: '2019-11-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/2588
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_instruction_selection_setup.cpp, src/amd/vulkan/radv_cmd_buffer.c,
+    src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_extensions.py, src/amd/vulkan/radv_nir_to_llvm.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_private.h, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/vulkan/radv_cmd_buffer.c
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_extensions.py
+  - src/amd/vulkan/radv_nir_to_llvm.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_private.h
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+- number: 2872
+  title: 'radv: fix reporting subgroup size with VK_KHR_pipeline_executable_properties'
+  author: hakzsam
+  merged_at: '2019-11-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/2872
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/vulkan/radv_pipeline.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_pipeline.c
+- number: 3737
+  title: 'freedreno: Ir3 fp16 prep'
+  author: krh
+  merged_at: '2020-02-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/3737
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 4 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 3929
+  title: Prepare GLSL compiler for GLSL_TYPE_FLOAT16
+  author: krh
+  merged_at: '2020-03-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/3929
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 17 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 4002
+  title: 'aco: implement storage_8bit / storage_16bit capabilities'
+  author: daniel-schuermann
+  merged_at: '2020-04-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4002
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 4215
+  title: 'radv: accepted fixes for VK_EXT_subgroup_size_control'
+  author: hakzsam
+  merged_at: '2020-03-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4215
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/vulkan/radv_nir_to_llvm.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/vulkan/radv_nir_to_llvm.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+- number: 4227
+  title: 'radv: remove wrong assert that checks compute subgroup size'
+  author: hakzsam
+  merged_at: '2020-03-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4227
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/vulkan/radv_pipeline.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_pipeline.c
+- number: 4230
+  title: 'radv: VK_EXT_subgroup_size_control fixes (backport)'
+  author: hakzsam
+  merged_at: '2020-03-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4230
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/radv_nir_to_llvm.c,
+    src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/vulkan/radv_nir_to_llvm.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 4299
+  title: 'radv: enable VK_KHR_8bit_storage on GFX6-GFX7'
+  author: hakzsam
+  merged_at: '2020-03-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4299
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /8[ -]?bit[ _-]?storage|(?<![a-z0-9])int8(?![a-z0-9])/ and driver source changed: src/amd/vulkan/radv_extensions.py'
+  evidence_paths:
+  - src/amd/vulkan/radv_extensions.py
+- number: 4321
+  title: 'radeonsi: Stop exposing PIPE_SHADER_CAP_FP16'
+  author: krh
+  merged_at: '2020-03-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4321
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 4452
+  title: 'aco: implement fp16 arithmetic operations'
+  author: hakzsam
+  merged_at: '2020-04-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4452
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_instruction_selection_setup.cpp'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+- number: 4453
+  title: 'radv: only expose fp16 features for chips with double rate'
+  author: hakzsam
+  merged_at: '2020-04-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4453
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/common/ac_gpu_info.c, src/amd/common/ac_gpu_info.h, src/amd/vulkan/radv_device.c,
+    src/amd/vulkan/radv_extensions.py, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/common/ac_gpu_info.c
+  - src/amd/common/ac_gpu_info.h
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_extensions.py
+  - src/amd/vulkan/radv_shader.c
+- number: 4552
+  title: 'aco: implement various 8bit 16bit conversions'
+  author: pendingchaos
+  merged_at: '2020-04-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4552
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 4615
+  title: 'pan/bi: Special functions (exp2/log2), fp16 work, etc.'
+  author: alyssa
+  merged_at: '2020-04-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4615
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 16 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 4766
+  title: 'pan/bi: Add prereqs for fp16 blend'
+  author: alyssa
+  merged_at: '2020-04-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4766
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 15 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 4793
+  title: 'pan/mdg: Prep work for fp16'
+  author: alyssa
+  merged_at: '2020-04-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/4793
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 12 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5056
+  title: 'radv/aco: enable VK_EXT_subgroup_size_control'
+  author: hakzsam
+  merged_at: '2020-05-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5056
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/vulkan/radv_extensions.py'
+  evidence_paths:
+  - src/amd/vulkan/radv_extensions.py
+- number: 5123
+  title: 'panfrost: Minor optimizations before landing fp16'
+  author: alyssa
+  merged_at: '2020-05-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5123
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 6 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5151
+  title: 'panfrost: FP16 support in Midgard'
+  author: alyssa
+  merged_at: '2020-05-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5151
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 25 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5287
+  title: 'nir: Remove nir_intrinsic_output_u8_as_fp16_pan'
+  author: alyssa
+  merged_at: '2020-06-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5287
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5318
+  title: 'nir: fix fp16 yuv lowering'
+  author: robclark
+  merged_at: '2020-06-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5318
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 4 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5347
+  title: 'radv/aco: enable FP16 features/extensions on GFX9+'
+  author: hakzsam
+  merged_at: '2020-06-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5347
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_extensions.py, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_extensions.py
+  - src/amd/vulkan/radv_shader.c
+- number: 5581
+  title: 'nir/algebraic: Don''t distrubte absolute-value into dot-products'
+  author: idr
+  merged_at: '2020-07-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5581
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5712
+  title: 'zink: implement Vk_EXT_index_type_uint8'
+  author: zmike
+  merged_at: '2020-07-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5712
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 5725
+  title: 'nir: Rename replicated-result dot-product instructions'
+  author: idr
+  merged_at: '2020-10-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5725
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 5960
+  title: 'panfrost: Enable FP16 by default'
+  author: alyssa
+  merged_at: '2020-07-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5960
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 6622
+  title: 'radeonsi: implement but not enable vectorized FP16 (mediump) for gfx9+ and LLVM 11'
+  author: mareko
+  merged_at: '2020-09-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/6622
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/llvm/ac_llvm_build.c,
+    src/amd/llvm/ac_llvm_build.h, src/amd/llvm/ac_nir_to_llvm.c'
+  evidence_paths:
+  - src/amd/llvm/ac_llvm_build.c
+  - src/amd/llvm/ac_llvm_build.h
+  - src/amd/llvm/ac_nir_to_llvm.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 7718
+  title: 'v3dv/cmd_buffer: missing (uint8_t *) casting when calling memcmp'
+  author: apinheiro
+  merged_at: '2020-11-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/7718
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 8082
+  title: 'lavapipe: implement VK_EXT_index_type_uint8'
+  author: kusma
+  merged_at: '2020-12-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/8082
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 9050
+  title: 'nir, glsl, mesa, gallium: FP16 varyings and uniforms for mediump, new passes for samplers with 16-bit srcs/dst'
+  author: mareko
+  merged_at: '2021-04-13'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9050
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 45 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 9051
+  title: 'ac/llvm, radeonsi: FP16 mediump enabled if radeonsi_fp16=true, supports varyings and uniforms'
+  author: mareko
+  merged_at: '2021-04-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9051
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/llvm/ac_llvm_build.c,
+    src/amd/llvm/ac_llvm_build.h, src/amd/llvm/ac_nir_to_llvm.c'
+  evidence_paths:
+  - src/amd/llvm/ac_llvm_build.c
+  - src/amd/llvm/ac_llvm_build.h
+  - src/amd/llvm/ac_nir_to_llvm.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 9239
+  title: 'pan/bi: FP16 support'
+  author: alyssa
+  merged_at: '2021-05-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9239
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 9441
+  title: Fix a couple of ES2 issues - fp16, mismatched fb dims
+  author: imirkin
+  merged_at: '2021-03-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9441
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 9459
+  title: 'aco: set compr for fp16 exports'
+  author: pendingchaos
+  merged_at: '2021-03-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9459
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/vulkan/radv_nir_to_llvm.c'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/vulkan/radv_nir_to_llvm.c
+- number: 9622
+  title: 'lavapipe: fix primitive-restart for uint8 indices'
+  author: kusma
+  merged_at: '2021-03-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9622
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 9993
+  title: 'docs: mark float_controls,float16_int8,16bit_storage as done on Turnip'
+  author: Danil
+  merged_at: '2021-04-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/9993
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 10391
+  title: 'nir/lower_fragcolor: Fix for fp16 (and a cleanup)'
+  author: alyssa
+  merged_at: '2021-04-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/10391
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 10392
+  title: 'pan/bi: Prep for FP16'
+  author: alyssa
+  merged_at: '2021-05-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/10392
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 14 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 10393
+  title: 'panfrost: Prepare blending for fp16'
+  author: alyssa
+  merged_at: '2021-05-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/10393
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 23 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 10973
+  title: 'gallium: handle primconvert, prim-restart, and 8bit index translation'
+  author: zmike
+  merged_at: '2021-06-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/10973
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 11444
+  title: 'v3dv: implement VK_EXT_index_type_uint8'
+  author: itoral
+  merged_at: '2021-06-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/11444
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 11816
+  title: 'lavapipe/llvmpipe/gallivm: add support for FP16 + VK_KHR_shader_float16_int8/VK_KHR_subgroup_extended_types'
+  author: airlied
+  merged_at: '2021-09-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/11816
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 18 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 11872
+  title: 'lima: handle fp16 vertex formats'
+  author: anarsoul
+  merged_at: '2021-07-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/11872
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 12066
+  title: 'llvmpipe: fix nir dot products (fsum op)'
+  author: sroland
+  merged_at: '2021-07-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12066
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 12142
+  title: SPV_KHR_integer_dot_product support
+  author: idr
+  merged_at: '2021-08-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12142
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 21 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 12480
+  title: 'gallium: make sizeof(enum pipe_prim_mode) == 1 on GNUC, make pipe_draw_info::mode uint8_t on MSVC'
+  author: mareko
+  merged_at: '2021-08-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12480
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 12617
+  title: 'nir,spirv,radv,aco: implement VK_KHR_shader_integer_dot_product'
+  author: pendingchaos
+  merged_at: '2021-09-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12617
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ and driver source changed: src/amd/common/ac_gpu_info.c, src/amd/common/ac_gpu_info.h, src/amd/compiler/aco_instruction_selection.cpp,
+    src/amd/compiler/aco_instruction_selection_setup.cpp, src/amd/compiler/aco_opcodes.py, src/amd/compiler/aco_register_allocation.cpp, src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_pipeline.c,
+    src/amd/vulkan/radv_private.h, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/common/ac_gpu_info.c
+  - src/amd/common/ac_gpu_info.h
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/compiler/aco_opcodes.py
+  - src/amd/compiler/aco_register_allocation.cpp
+  - src/amd/llvm/ac_nir_to_llvm.c
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_private.h
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+- number: 12624
+  title: 'anv: Enable KHR_shader_integer_dot_product'
+  author: idr
+  merged_at: '2021-08-31'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12624
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 12946
+  title: 'anv: Simplify subgroup_size_type rules'
+  author: cmarcelo
+  merged_at: '2021-09-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12946
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 12959
+  title: 'intel,spirv: Handle the SubgroupSize execution mode for kernels'
+  author: gfxstrand
+  merged_at: '2021-09-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12959
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 13182
+  title: Two FP16 fixes
+  author: ajax
+  merged_at: '2021-10-13'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13182
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 13530
+  title: 'zink: stop exporting PIPE_SHADER_CAP_FP16_DERIVATIVES'
+  author: zmike
+  merged_at: '2021-10-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13530
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 13960
+  title: 'turnip, ir3: VK_EXT_subgroup_size_control'
+  author: cwabbott0
+  merged_at: '2022-01-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13960
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 16 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 13986
+  title: 'tu: Implement VK_KHR_shader_integer_dot_product'
+  author: Danil
+  merged_at: '2022-01-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13986
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/common/ac_nir_lower_ngg.c,
+    src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/common/ac_nir_lower_ngg.c
+  - src/amd/vulkan/radv_shader.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 14304
+  title: 'nvc0: avoid converting a too large value from int to uint8_t'
+  author: phomes
+  merged_at: '2022-08-31'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14304
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 14380
+  title: 'zink: add missing assert for 8bit vertex decompose'
+  author: zmike
+  merged_at: '2022-01-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14380
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 14403
+  title: 'i915g: Turn off FP16 in the vertex shaders.'
+  author: anholt
+  merged_at: '2022-01-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14403
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 14648
+  title: 'v3dv: implement VK_KHR_16bit_storage and VK_KHR_8bit_storage'
+  author: itoral
+  merged_at: '2022-01-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14648
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /8[ -]?bit[ _-]?storage|(?<![a-z0-9])int8(?![a-z0-9])/ but none of the 9 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 14817
+  title: 'glsl/types: fix dword slots calc for float16 matricies.'
+  author: airlied
+  merged_at: '2022-10-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14817
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 14835
+  title: 'zink: disable PIPE_SHADER_CAP_FP16_CONST_BUFFERS'
+  author: zmike
+  merged_at: '2022-02-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14835
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 14979
+  title: 'anv: Enable requiredSubgroupSize for Task/Mesh'
+  author: cmarcelo
+  merged_at: '2022-02-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/14979
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 15354
+  title: 'lavapipe: EXT_subgroup_size_control'
+  author: zmike
+  merged_at: '2022-03-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/15354
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 15384
+  title: 'lavapipe: VK_KHR_shader_integer_dot_product'
+  author: zmike
+  merged_at: '2022-03-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/15384
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 15652
+  title: Add `VK_EXT_{conditional_rendering,index_type_uint8}` extensions
+  author: igor.torrente
+  merged_at: '2022-04-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/15652
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 15838
+  title: 'nir, aco: Add algebraic optimization for VKD3D-Proton fp32->fp16 conversion.'
+  author: Venemo
+  merged_at: '2023-01-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/15838
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_instruction_selection_setup.cpp,
+    src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/llvm/ac_nir_to_llvm.c
+  - src/amd/vulkan/radv_shader.c
+- number: 16636
+  title: 'd3d12: add missing cmath includes'
+  author: kusma
+  merged_at: '2022-05-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/16636
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 16752
+  title: 'pan/bi: Interpolate varyings at FP16'
+  author: alyssa
+  merged_at: '2022-05-30'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/16752
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 7 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 18452
+  title: 'mesa: Lower mediump temps and CS shared when the driver supports FP16+INT16.'
+  author: anholt
+  merged_at: '2022-09-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/18452
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 19041
+  title: 'rusticl/kernel: preserve fp16 denorms to fix vload/vstore_half'
+  author: karolherbst
+  merged_at: '2022-10-13'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/19041
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 19114
+  title: 'aco,ac/llvm,radv,radeonsi: Integer dot products on GFX11.'
+  author: DadSchoorse
+  merged_at: '2022-10-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/19114
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_instruction_selection_setup.cpp, src/amd/compiler/aco_optimizer.cpp,
+    src/amd/llvm/ac_llvm_build.c, src/amd/llvm/ac_llvm_build.h, src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/compiler/aco_optimizer.cpp
+  - src/amd/llvm/ac_llvm_build.c
+  - src/amd/llvm/ac_llvm_build.h
+  - src/amd/llvm/ac_nir_to_llvm.c
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_shader.c
+- number: 19391
+  title: 'nir/lower_int64: Fix float16 to int64 conversions.'
+  author: currojerez
+  merged_at: '2022-11-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/19391
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 20284
+  title: 'radeonsi/vcn: add support for 10bit input and enc 8bit output'
+  author: davidwu2
+  merged_at: '2022-12-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/20284
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 20587
+  title: 'aco: Use v_fma_mix_f32 for v_fma_f32 with 2 fp16 representable, different literals.'
+  author: DadSchoorse
+  merged_at: '2023-03-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/20587
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_optimizer.cpp, src/amd/compiler/tests/test_optimizer.cpp'
+  evidence_paths:
+  - src/amd/compiler/aco_optimizer.cpp
+  - src/amd/compiler/tests/test_optimizer.cpp
+- number: 20639
+  title: 'v3dv: expose VK_KHR_shader_integer_dot_product'
+  author: itoral
+  merged_at: '2023-01-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/20639
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 21282
+  title: 'intel/fs: bound subgroup invocation read to dispatch size'
+  author: llandwerlin
+  merged_at: '2023-02-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/21282
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 21486
+  title: 'anv: fix invalid masking of 48bit address'
+  author: llandwerlin
+  merged_at: '2023-02-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/21486
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 21622
+  title: 'nir/lower_mediump: don''t use fp16 for constants if the result is denormal'
+  author: DadSchoorse
+  merged_at: '2023-03-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/21622
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 21633
+  title: 'aco/tests: add tests for v_fma_f32 with 2 fp16 literals'
+  author: pendingchaos
+  merged_at: '2023-03-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/21633
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/tests/test_optimizer.cpp'
+  evidence_paths:
+  - src/amd/compiler/tests/test_optimizer.cpp
+- number: 22804
+  title: 'nir/lower_fp16_casts: Fix SSA dominance'
+  author: KonstantinSeurer
+  merged_at: '2023-05-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/22804
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 22810
+  title: 'dzn: Fixes for pipeline cache hashes and subgroup size control'
+  author: jenatali
+  merged_at: '2023-05-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/22810
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 23011
+  title: 'rusticl: Add  cl_khr_integer_dot_product extension'
+  author: nora
+  merged_at: '2023-05-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23011
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 7 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 23572
+  title: 'radv/rt: Stop forcing wave32 by setting compute_subgroup_size'
+  author: KonstantinSeurer
+  merged_at: '2023-06-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23572
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/ci/external/radv-navi22-aco-fails.txt, src/amd/ci/radv-navi21-aco-fails.txt, src/amd/ci/radv-vangogh-aco-fails.txt,
+    src/amd/vulkan/radv_pipeline_rt.c, src/amd/vulkan/radv_rt_shader.c, src/amd/vulkan/radv_shader.h, src/amd/vulkan/radv_shader_info.c'
+  evidence_paths:
+  - src/amd/ci/external/radv-navi22-aco-fails.txt
+  - src/amd/ci/radv-navi21-aco-fails.txt
+  - src/amd/ci/radv-vangogh-aco-fails.txt
+  - src/amd/vulkan/radv_pipeline_rt.c
+  - src/amd/vulkan/radv_rt_shader.c
+  - src/amd/vulkan/radv_shader.h
+  - src/amd/vulkan/radv_shader_info.c
+- number: 23577
+  title: 'treewide:  Replace usage of boolean/ubyte/ushort/uint with bool/uint8_t/uint16_t/uint32_t'
+  author: lygstate
+  merged_at: '2023-06-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23577
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 23788
+  title: 'rusticl: allow to enable fp16 support'
+  author: karolherbst
+  merged_at: '2023-06-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23788
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 6 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 23825
+  title: 'spirv, nir, types: Implement front-end of SPV_KHR_cooperative_matrix'
+  author: cmarcelo
+  merged_at: '2023-09-28'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23825
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/compiler/spirv/vtn_cmat.c
+- number: 23837
+  title: 'vulkan: Add NV suffix to VK_NV_cooperative_matrix feature names'
+  author: cmarcelo
+  merged_at: '2023-06-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23837
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 23845
+  title: 'draw: Replace usage of boolean/TRUE/FALSE/ubyte/ushort/uint with bool/true/false/uint8_t/uint16_t/uint32_t  in draw_pt_vsplit*'
+  author: lygstate
+  merged_at: '2023-06-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23845
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 23925
+  title: 'radv: Enable required subgroup size on mesh/task.'
+  author: Venemo
+  merged_at: '2023-07-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23925
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /subgroup[ _-]?size/ and driver source changed: src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_pipeline_compute.c, src/amd/vulkan/radv_pipeline_graphics.c,
+    src/amd/vulkan/radv_pipeline_rt.c, src/amd/vulkan/radv_private.h, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h, src/amd/vulkan/radv_shader_info.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_pipeline_compute.c
+  - src/amd/vulkan/radv_pipeline_graphics.c
+  - src/amd/vulkan/radv_pipeline_rt.c
+  - src/amd/vulkan/radv_private.h
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+  - src/amd/vulkan/radv_shader_info.c
+- number: 24610
+  title: 'panfrost: upcast uint8/uint16 before shifting them beyond their range'
+  author: eric
+  merged_at: '2023-08-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/24610
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 24683
+  title: 'radv: Implement VK_KHR_cooperative_matrix.'
+  author: bnieuwenhuizen
+  merged_at: '2023-10-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/24683
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/compiler/aco_insert_waitcnt.cpp, src/amd/compiler/aco_instruction_selection.cpp,
+    src/amd/compiler/aco_instruction_selection_setup.cpp, src/amd/compiler/aco_ir.h, src/amd/compiler/aco_opcodes.py, src/amd/compiler/aco_optimizer.cpp, src/amd/compiler/aco_register_allocation.cpp, src/amd/compiler/aco_statistics.cpp,
+    src/amd/compiler/aco_validate.cpp, src/amd/vulkan/meson.build, src/amd/vulkan/nir/radv_nir.h, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_shader.c,
+    src/amd/vulkan/radv_shader_info.c'
+  evidence_paths:
+  - src/amd/compiler/aco_insert_waitcnt.cpp
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/compiler/aco_ir.h
+  - src/amd/compiler/aco_opcodes.py
+  - src/amd/compiler/aco_optimizer.cpp
+  - src/amd/compiler/aco_register_allocation.cpp
+  - src/amd/compiler/aco_statistics.cpp
+  - src/amd/compiler/aco_validate.cpp
+  - src/amd/vulkan/meson.build
+  - src/amd/vulkan/nir/radv_nir.h
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader_info.c
+- number: 25281
+  title: Fix casting from fp64 to fp16
+  author: ibriano
+  merged_at: '2023-10-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25281
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 9 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 25566
+  title: 'nir/lower_fp16_casts,radv,intel/compiler: add and use option to split fp64 casts'
+  author: pendingchaos
+  merged_at: '2023-11-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25566
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/vulkan/radv_pipeline.c'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/vulkan/radv_pipeline.c
+- number: 25871
+  title: 'nir/split_vars: Don''t split arrays of cooperative matrix types'
+  author: idr
+  merged_at: '2023-10-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25871
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 25994
+  title: 'intel/dev: Enable VK_KHR_cooperative_matrix on all Gfx9+ GPUs'
+  author: idr
+  merged_at: '2023-12-30'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25994
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 38 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 26385
+  title: 'anv/hasvk/drirc: change anv_assume_full_subgroups to have subgroup size'
+  author: tpalli
+  merged_at: '2023-12-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26385
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 8 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 26437
+  title: 'anv: fix minSubgroupSize for xe2'
+  author: cmarcelo
+  merged_at: '2023-12-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26437
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 26445
+  title: 'aco: implement 16-bit derivatives and improve fp16 support on gfx8'
+  author: pendingchaos
+  merged_at: '2023-12-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26445
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_interface.cpp,
+    src/amd/compiler/aco_optimizer.cpp'
+  evidence_paths:
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_interface.cpp
+  - src/amd/compiler/aco_optimizer.cpp
+- number: 26503
+  title: 'nvk: Advertise VK_EXT_subgroup_size_control'
+  author: gfxstrand
+  merged_at: '2023-12-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26503
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 26533
+  title: 'nak,nvk: KHR_shader_integer_dot_product'
+  author: gfxstrand
+  merged_at: '2023-12-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26533
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_shader.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 26768
+  title: 'radv: Use correct writemask for cooperative matrix ordering.'
+  author: bnieuwenhuizen
+  merged_at: '2023-12-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26768
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 26968
+  title: 'v3dv: expose VK_EXT_subgroup_size_control'
+  author: itoral
+  merged_at: '2024-01-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26968
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 27164
+  title: 'intel: Use an intel enum for cmat scope'
+  author: cmarcelo
+  merged_at: '2024-01-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27164
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 27228
+  title: 'gallivm: passing fp16_split_fp64 to fp16 lowering.'
+  author: airlied
+  merged_at: '2024-01-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27228
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 27261
+  title: 'vulkan: promote VK_EXT_index_type_uint8/VK_EXT_line_rasterization to KHR'
+  author: hakzsam
+  merged_at: '2024-01-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27261
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 27262
+  title: 'radv: promote VK_EXT_index_type_uint8/VK_EXT_line_rasterization to KHR'
+  author: hakzsam
+  merged_at: '2024-01-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27262
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 27635
+  title: 'nvk, nak: Implement shaderFloat16'
+  author: marysaka
+  merged_at: '2024-04-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27635
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 27903
+  title: 'intel/cmat: stride is in number of elements of the pointer type'
+  author: ibriano
+  merged_at: '2024-03-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27903
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 28086
+  title: 'compiler/types: fix serialization of cooperative matrix'
+  author: ibriano
+  merged_at: '2024-03-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28086
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 28254
+  title: 'tu: KHR_8bit_storage support'
+  author: zdobersek
+  merged_at: '2024-07-03'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28254
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /8[ -]?bit[ _-]?storage|(?<![a-z0-9])int8(?![a-z0-9])/ but none of the 23 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 28361
+  title: 'pvr: Implement VK_KHR_index_type_uint8'
+  author: VladSchillerimgtec
+  merged_at: '2024-03-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28361
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 28404
+  title: 'intel/compiler: Misc cooperative matrix and Xe2 related fixes'
+  author: idr
+  merged_at: '2024-03-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28404
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 8 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 28822
+  title: 'intel/brw: nir: Fix handling of cmat_signed_mask'
+  author: idr
+  merged_at: '2024-04-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28822
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 29091
+  title: 'spirv: Use fp16 fp_fast_math settings when lowering fp16 asin and acos'
+  author: idr
+  merged_at: '2024-05-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/29091
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 29177
+  title: 'intel/brw: fix subgroup size of geometry stages for lnl+'
+  author: ibriano
+  merged_at: '2024-05-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/29177
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 6 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 29875
+  title: 'tu: enable shaderInt8 functionality'
+  author: zdobersek
+  merged_at: '2024-08-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/29875
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 30059
+  title: 'nvk: Enable 8bit and 16bit access in VK_KHR_workgroup_memory_explicit_layout.'
+  author: esdrastarsis
+  merged_at: '2024-07-08'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/30059
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 32248
+  title: 'panvk: Enable depthClamp,depthBiasClamp,shaderInt16 and VK_KHR_index_type_uint8'
+  author: marysaka
+  merged_at: '2024-11-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/32248
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 32777
+  title: 'nvk: Implement VK_KHR_cooperative_matrix'
+  author: marysaka
+  merged_at: '2025-07-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/32777
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 15 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 32778
+  title: 'nir: optimize unpacking 8bit values from a 64bit source'
+  author: DadSchoorse
+  merged_at: '2024-12-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/32778
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 33120
+  title: 'radv: add a helper to report if cooperative matrix is enabled'
+  author: hakzsam
+  merged_at: '2025-01-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33120
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_physical_device.c
+- number: 33257
+  title: 'radv: disable VK_KHR_cooperative_matrix on GFX12'
+  author: hakzsam
+  merged_at: '2025-01-28'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33257
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_physical_device.c
+- number: 33378
+  title: 'radv: add support for VK_KHR_cooperative_matrix on GFX12'
+  author: hakzsam
+  merged_at: '2025-02-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33378
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir.h, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c,
+    src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir.h
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_shader.c
+- number: 33416
+  title: 'panvk: enable uniformAndStorageBuffer8BitAccess and storagePushConstant8'
+  author: olivia
+  merged_at: '2025-04-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33416
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 33521
+  title: 'nvk: enable fp16 support on turing'
+  author: airlied
+  merged_at: '2025-02-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33521
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 33637
+  title: 'panvk: implement shaderFloat16'
+  author: olivia
+  merged_at: '2025-02-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33637
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 7 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 33664
+  title: 'brw: Add EU assembler support for BFloat16 including EU validation'
+  author: cmarcelo
+  merged_at: '2025-03-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33664
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 17 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 33881
+  title: 'panvk: disable shaderFloat16 on bifrost'
+  author: kusma
+  merged_at: '2025-03-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33881
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34008
+  title: 'brw: fix SIMD lowering of sampler messages with fp16 data'
+  author: llandwerlin
+  merged_at: '2025-11-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34008
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34035
+  title: 'brw: Add BFloat16 support for DPAS'
+  author: cmarcelo
+  merged_at: '2025-03-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34035
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34053
+  title: 'rusticl: proper fp16 support'
+  author: karolherbst
+  merged_at: '2025-06-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34053
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 12 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34105
+  title: 'spirv, nir, intel: Add support for VK_KHR_shader_bfloat16'
+  author: cmarcelo
+  merged_at: '2025-04-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34105
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/compiler/spirv/vtn_cmat.c
+- number: 34364
+  title: 'spirv: fix cooperative matrix function params'
+  author: DadSchoorse
+  merged_at: '2025-04-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34364
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34382
+  title: 'radv/nir/lower_cmat: tightly pack 8bit gfx11 acc matrix'
+  author: DadSchoorse
+  merged_at: '2025-04-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34382
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 34396
+  title: 'radv,nir,aco: optimize cooperative matrix input modifiers and inline constants'
+  author: DadSchoorse
+  merged_at: '2025-04-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34396
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/compiler/aco_insert_NOPs.cpp, src/amd/compiler/aco_instruction_selection.cpp,
+    src/amd/vulkan/nir/radv_nir.h, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_pipeline.c'
+  evidence_paths:
+  - src/amd/compiler/aco_insert_NOPs.cpp
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/vulkan/nir/radv_nir.h
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_pipeline.c
+- number: 34426
+  title: 'hk: maint8'
+  author: alyssa
+  merged_at: '2025-04-08'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34426
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 34511
+  title: 'spirv, radv, intel: Add NIR intrinsic for cmat conversion'
+  author: cmarcelo
+  merged_at: '2025-04-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34511
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 34695
+  title: 'panvk: Advertise support for VK_KHR_shader_integer_dot_product'
+  author: bbrezillon
+  merged_at: '2025-04-28'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34695
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 34768
+  title: 'radv: VK_KHR_shader_bfloat16'
+  author: DadSchoorse
+  merged_at: '2025-05-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34768
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/common/nir/ac_nir.c, src/amd/compiler/aco_instruction_selection.cpp, src/amd/compiler/aco_instruction_selection_setup.cpp,
+    src/amd/compiler/aco_optimizer.cpp, src/amd/llvm/ac_llvm_build.c, src/amd/llvm/ac_llvm_build.h, src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/common/nir/ac_nir.c
+  - src/amd/compiler/aco_instruction_selection.cpp
+  - src/amd/compiler/aco_instruction_selection_setup.cpp
+  - src/amd/compiler/aco_optimizer.cpp
+  - src/amd/llvm/ac_llvm_build.c
+  - src/amd/llvm/ac_llvm_build.h
+  - src/amd/llvm/ac_nir_to_llvm.c
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+- number: 34793
+  title: 'spirv,nir,radv: implement VK_NV_cooperative_matrix2/CooperativeMatrixConversionsNV'
+  author: DadSchoorse
+  merged_at: '2025-06-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34793
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/ci/gitlab-ci-inc.yml, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c,
+    src/amd/vulkan/radv_instance.c, src/amd/vulkan/radv_instance.h, src/amd/vulkan/radv_physical_device.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/ci/gitlab-ci-inc.yml
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_instance.c
+  - src/amd/vulkan/radv_instance.h
+  - src/amd/vulkan/radv_physical_device.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 34882
+  title: 'util: fix float to bfloat16 conversion with NaN'
+  author: pendingchaos
+  merged_at: '2025-05-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34882
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35133
+  title: 'rusticl: Implement cl_intel_required_subgroup_size'
+  author: ajax
+  merged_at: '2025-06-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35133
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35320
+  title: 'intel: Add support for BFloat16 as cooperative matrix destination/accumulator'
+  author: mattst88
+  merged_at: '2025-07-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35320
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35564
+  title: 'anv: only expose VK_KHR_cooperative_matrix on devices with hw instructions.'
+  author: airlied
+  merged_at: '2025-06-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35564
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35570
+  title: 'radv/nir/lower_cmat: use common matrix layout on gfx12'
+  author: DadSchoorse
+  merged_at: '2025-06-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35570
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 35616
+  title: 'anv: Add support for Float16 as cooperative matrix destination/accumulator'
+  author: mattst88
+  merged_at: '2025-06-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35616
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 6 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35633
+  title: 'radv/nir/lower_cmat: set optimal load/store alignment'
+  author: DadSchoorse
+  merged_at: '2025-06-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35633
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 35668
+  title: 'spirv: Fix cooperative matrix in OpVariable initializer'
+  author: jrprice
+  merged_at: '2025-06-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35668
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35709
+  title: 'tu: Use 2D path for float16 formats'
+  author: CreativeCylon
+  merged_at: '2025-07-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35709
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 9 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35713
+  title: 'radv/nir/lower_cmat: fix gfx11 B->ACC conversion'
+  author: DadSchoorse
+  merged_at: '2025-06-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35713
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 35757
+  title: 'nir: Support printing cmat constants'
+  author: dneto
+  merged_at: '2025-07-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35757
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35759
+  title: 'ir3: Prioritize max waves over doubling threadsize for non-fp16 shaders.'
+  author: anholt
+  merged_at: '2025-07-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35759
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 35854
+  title: 'aco: vectorize conversions/extracts from 8bit to 16bit'
+  author: DadSchoorse
+  merged_at: '2025-07-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35854
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 36016
+  title: 'radv/nir/lower_cmat: use explicit shift when calculating gfx12 wave64 layout'
+  author: DadSchoorse
+  merged_at: '2025-07-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36016
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 36115
+  title: 'radv/nir/lower_cmat: optimize gfx11 matrix use conversions'
+  author: DadSchoorse
+  merged_at: '2025-07-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36115
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/compiler/instruction_selection/aco_isel_setup.cpp, src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp,
+    src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+  - src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 36117
+  title: 'radv,nir: gfx11 8bit cmat load optimizations'
+  author: DadSchoorse
+  merged_at: '2025-07-30'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36117
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 36163
+  title: 'nvk,nak: Blackwell cooperative matrix fixes'
+  author: gfxstrand
+  merged_at: '2025-07-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36163
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 36185
+  title: 'brw: Fix cmat conversion between bfloat16 and non-float32'
+  author: cmarcelo
+  merged_at: '2025-07-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36185
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 36328
+  title: 'aco: WMMA statistics and s_delay_alu tweaks'
+  author: DadSchoorse
+  merged_at: '2025-07-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36328
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/compiler/aco_insert_delay_alu.cpp, src/amd/compiler/aco_statistics.cpp'
+  evidence_paths:
+  - src/amd/compiler/aco_insert_delay_alu.cpp
+  - src/amd/compiler/aco_statistics.cpp
+- number: 36583
+  title: 'spirv: move cmat store barrier after the store.'
+  author: airlied
+  merged_at: '2025-08-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36583
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/compiler/spirv/vtn_cmat.c
+- number: 36833
+  title: 'compiler/types: handle BFLOAT16 when decoding blob'
+  author: tpalli
+  merged_at: '2025-08-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36833
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 36869
+  title: 'aco/isel: fix vectorized i2i16 with 8bit vec8 source'
+  author: DadSchoorse
+  merged_at: '2025-08-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36869
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 36992
+  title: 'nir/radv: add support for cooperative matrix per-element operations'
+  author: airlied
+  merged_at: '2025-11-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36992
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c,
+    src/compiler/nir/nir_lower_cooperative_matrix.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 37002
+  title: 'radv: cooperative matrix cleanup'
+  author: DadSchoorse
+  merged_at: '2025-08-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37002
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+- number: 37213
+  title: 'radv/nir/lower_cmat: add shuffle_xor_imm helper'
+  author: DadSchoorse
+  merged_at: '2025-09-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37213
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 37258
+  title: 'nir: rework subgroup size information'
+  author: DadSchoorse
+  merged_at: '2025-09-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37258
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 52 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37294
+  title: 'radv: determine subgroup/wave size early'
+  author: DadSchoorse
+  merged_at: '2025-09-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37294
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 37442
+  title: 'radv: make sure fp16 is enabled consistently on gfx8'
+  author: eric
+  merged_at: '2025-09-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37442
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_physical_device.c
+- number: 37477
+  title: 'vulkan: setup max_subgroup_size for drivers without varying/max/min size support'
+  author: simon-perretta-img
+  merged_at: '2025-09-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37477
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37597
+  title: 'etnaviv: 128bit format emulation - part 1'
+  author: austriancoder
+  merged_at: '2025-10-13'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37597
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 37619
+  title: 'radv: add a helper whether shader fp16 is enabled'
+  author: hakzsam
+  merged_at: '2025-09-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37619
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_physical_device.c
+- number: 37867
+  title: 'aco/optimizer: add separate fp16 temp labels, rework label_canonicalized'
+  author: DadSchoorse
+  merged_at: '2025-10-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37867
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ and driver source changed: src/amd/compiler/aco_optimizer.cpp'
+  evidence_paths:
+  - src/amd/compiler/aco_optimizer.cpp
+- number: 37879
+  title: 'nir/coopmat: fix non square load/store lowering for flexible dimensions'
+  author: airlied
+  merged_at: '2025-10-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37879
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 37888
+  title: 'nvk,nak,nir: Implement VK_NV_shader_atomic_float16_vector redux'
+  author: Sid127
+  merged_at: '2026-06-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37888
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 22 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37941
+  title: 'nak: ensure deref has a ptr_stride in cmat load/store lowering'
+  author: karolherbst
+  merged_at: '2025-10-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37941
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37966
+  title: 'brw: use the right int8/int16 division lowering'
+  author: alyssa
+  merged_at: '2025-10-22'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37966
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /8[ -]?bit[ _-]?storage|(?<![a-z0-9])int8(?![a-z0-9])/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37980
+  title: 'panvk: Fix integer dot product properties'
+  author: gfxstrand
+  merged_at: '2025-10-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37980
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 37998
+  title: 'nak/cmat: vectorize cmat_load and store'
+  author: karolherbst
+  merged_at: '2025-11-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37998
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38109
+  title: 'pan/bi: Add missing 8bit widen swizzles'
+  author: chrpil
+  merged_at: '2025-11-28'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38109
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 38214
+  title: 'radv: do not report wave32 in gl_SubgroupSize for Doom Dark Ages'
+  author: DadSchoorse
+  merged_at: '2025-11-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38214
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/radv_instance.c,
+    src/amd/vulkan/radv_instance.h, src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_physical_device.h, src/amd/vulkan/radv_shader.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_instance.c
+  - src/amd/vulkan/radv_instance.h
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_physical_device.h
+  - src/amd/vulkan/radv_shader.c
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 38379
+  title: 'pan,nir: Use nir_lower_point_size for the float16 conversion'
+  author: gfxstrand
+  merged_at: '2025-11-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38379
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 11 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38389
+  title: 'nir/radv: add support for coopmat2 reduce'
+  author: airlied
+  merged_at: '2025-11-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38389
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/ci/radv-gfx1201-fails.txt, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp,
+    src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_shader.c, src/compiler/nir/nir_lower_cooperative_matrix.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/ci/radv-gfx1201-fails.txt
+  - src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_shader.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 38455
+  title: 'brw: fix SIMD lowering of fp16 sampler message data with multiple components'
+  author: calder
+  merged_at: '2025-11-17'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38455
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38589
+  title: 'lvp/radv/nir: add coopmat2 support for Tensor Addressing and Block Loads'
+  author: airlied
+  merged_at: '2026-07-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38589
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/ci/radv-gfx1201-fails.txt, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c,
+    src/amd/vulkan/radv_physical_device.c, src/compiler/nir/nir_lower_cooperative_matrix.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/ci/radv-gfx1201-fails.txt
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 38835
+  title: 'nir: suppress clang warnings for cooperative matrix lowering'
+  author: zzyiwei
+  merged_at: '2025-12-08'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38835
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 38843
+  title: 'nak/cmat: free the type mapping hash table.'
+  author: airlied
+  merged_at: '2025-12-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38843
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38847
+  title: 'kk: Enable float16 and int8'
+  author: aitor
+  merged_at: '2025-12-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38847
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 4 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38935
+  title: 'lavapipe: support VK_KHR_cooperative_matrix'
+  author: airlied
+  merged_at: '2026-01-16'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38935
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 38964
+  title: 'lavapipe: add support for NV_cooperative_matrix2 to same level as radv'
+  author: airlied
+  merged_at: '2026-01-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38964
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39068
+  title: 'nir/opt_algebraic: improve dot product narrowing'
+  author: ondracka
+  merged_at: '2026-01-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39068
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39124
+  title: 'tu: enable storageBuffer8BitAccess on all a7xx hardware'
+  author: zdobersek
+  merged_at: '2026-01-08'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39124
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 39256
+  title: 'radv/coopmat: fix deref stride'
+  author: airlied
+  merged_at: '2026-01-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39256
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 39456
+  title: 'radv/gfx11: add a RADV_PERFTEST flag to expose bfloat16 cmat'
+  author: DadSchoorse
+  merged_at: '2026-01-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39456
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/radv_debug.h, src/amd/vulkan/radv_instance.c, src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_debug.h
+  - src/amd/vulkan/radv_instance.c
+  - src/amd/vulkan/radv_physical_device.c
+- number: 39652
+  title: 'lavapipe: Fix gnu-empty-initializer in NV_cooperative_matrix2 conversions/reductions'
+  author: issor.oruam
+  merged_at: '2026-02-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39652
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39728
+  title: 'anv: Two small changes to cooperative matrix feature handling'
+  author: cmarcelo
+  merged_at: '2026-02-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39728
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39769
+  title: 'brw: Fix cooperative matrix constant sources other than src0'
+  author: cmarcelo
+  merged_at: '2026-02-09'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39769
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39903
+  title: 'nir: Handle nir_instr_type_cmat_call in more places'
+  author: cmarcelo
+  merged_at: '2026-02-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39903
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 13 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 39904
+  title: 'anv: Enable cooperativeMatrixPerElementOperations'
+  author: cmarcelo
+  merged_at: '2026-02-26'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39904
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 40003
+  title: 'radv: VK_VALVE_shader_mixed_float_dot_product'
+  author: DadSchoorse
+  merged_at: '2026-02-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40003
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ and driver source changed: src/amd/compiler/aco_ir.cpp, src/amd/compiler/aco_opcodes.py, src/amd/compiler/aco_register_allocation.cpp,
+    src/amd/compiler/instruction_selection/aco_isel_setup.cpp, src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp, src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_physical_device.c'
+  evidence_paths:
+  - src/amd/compiler/aco_ir.cpp
+  - src/amd/compiler/aco_opcodes.py
+  - src/amd/compiler/aco_register_allocation.cpp
+  - src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+  - src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp
+  - src/amd/llvm/ac_nir_to_llvm.c
+  - src/amd/vulkan/radv_physical_device.c
+- number: 40163
+  title: 'nir: fix nir_round_int_to_float for fp16'
+  author: karolherbst
+  merged_at: '2026-03-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40163
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 40350
+  title: 'anv: Add vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV'
+  author: cmarcelo
+  merged_at: '2026-03-12'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40350
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 40607
+  title: 'pvr, pco: add native u{add,sub}{carry,borrow,sat} ops, advertise VK_KHR_shader_integer_dot_product'
+  author: simon-perretta-img
+  merged_at: '2026-04-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40607
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 8 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 40813
+  title: 'drirc/anv: add flag to disable VK_EXT_subgroup_size_control'
+  author: tpalli
+  merged_at: '2026-04-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40813
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 40938
+  title: 'anv: Lower any remaining globals when cmat_calls are inlined'
+  author: cmarcelo
+  merged_at: '2026-04-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40938
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41135
+  title: 'drirc/anv: add flag to disable VK_EXT_subgroup_size_control'
+  author: tpalli
+  merged_at: '2026-04-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41135
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41234
+  title: 'pan/compiler: Clamp fp16 ldexp exponent range'
+  author: EricGuo
+  merged_at: '2026-05-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41234
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41255
+  title: 'v3dv: Expose hardware-accelerated integer dot products on V3D 7.1+'
+  author: chema
+  merged_at: '2026-04-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41255
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 11 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41295
+  title: 'util/half: Add a simpler double_to_float16()'
+  author: gfxstrand
+  merged_at: '2026-05-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41295
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41333
+  title: 'kk: Support VK_(KHR/EXT)_index_type_uint8'
+  author: squidbus
+  merged_at: '2026-05-11'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41333
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 41375
+  title: 'compiler/rust: Add a float16 wrapper'
+  author: gfxstrand
+  merged_at: '2026-05-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41375
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 9 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41500
+  title: 'nir/coopmat: refactoring to prepare for workgroup support'
+  author: airlied
+  merged_at: '2026-05-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41500
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 41564
+  title: 'intel: Move cmat configurations to anv_physical_device'
+  author: cmarcelo
+  merged_at: '2026-05-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41564
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41653
+  title: 'radv,nir: use global_load_tr_b{64,128} for cooperative matrix loads'
+  author: pendingchaos
+  merged_at: '2026-05-27'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41653
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/common/nir/ac_nir_lower_global_access.c, src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c,
+    src/amd/compiler/instruction_selection/aco_isel_setup.cpp, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp, src/amd/vulkan/nir/radv_nir.h, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c,
+    src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/common/nir/ac_nir_lower_global_access.c
+  - src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c
+  - src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+  - src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+  - src/amd/vulkan/nir/radv_nir.h
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+- number: 41690
+  title: 'nir: Add print for other cmat_description slots'
+  author: cmarcelo
+  merged_at: '2026-05-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41690
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41691
+  title: 'compiler: Support more than 255 cols/rows in cmat descriptions'
+  author: cmarcelo
+  merged_at: '2026-05-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41691
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/compiler/spirv/vtn_cmat.c
+- number: 41722
+  title: 'zink: proper advertise keep_weak_ffma for fp16'
+  author: karolherbst
+  merged_at: '2026-05-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41722
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41810
+  title: 'v3dv: enable shaderFloat16 / shaderInt16 / shaderInt8 on V3D 7.1+'
+  author: chema
+  merged_at: '2026-06-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41810
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 11 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41814
+  title: 'intel/brw: Add pass to vectorize dot products into systolic-array matrix multiplications.'
+  author: currojerez
+  merged_at: '2026-06-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41814
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /dot[ _-]?product|[su]dot_?4x8|dp4a/ but none of the 9 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 41859
+  title: 'pvr: re-enable {EXT,KHR}_index_type_uint8'
+  author: frankbinns
+  merged_at: '2026-05-29'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41859
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 41922
+  title: 'radv: fix usage of radv_nir_cmat_length'
+  author: pendingchaos
+  merged_at: '2026-06-02'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41922
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 42199
+  title: 'jay: add bfloat16 support'
+  author: adrianb
+  merged_at: '2026-06-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42199
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42201
+  title: 'etnaviv: 128bit format emulation (rt and sampler)'
+  author: austriancoder
+  merged_at: '2026-06-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42201
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 42309
+  title: 'clc: fix fp16 fallback mask for remquo'
+  author: ahesham
+  merged_at: '2026-06-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42309
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42312
+  title: 'jay: Handle convert_cmat_intel intrinsic'
+  author: cmarcelo
+  merged_at: '2026-06-19'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42312
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 10 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42457
+  title: 'doc/features.txt: enable VK_KHR_shader_float16_int8 for v3dv'
+  author: jasuarez
+  merged_at: '2026-06-25'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42457
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42534
+  title: 'anv: Bump subgroup size for histogram and prefix shader'
+  author: sagarghuge
+  merged_at: '2026-07-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42534
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42546
+  title: 'doc/features.txt: fix VK_KHR_shader_float16_int8 for v3dv'
+  author: jasuarez
+  merged_at: '2026-07-06'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42546
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42723
+  title: 'panvk: Advertise VK_KHR_cooperative_matrix'
+  author: austriancoder
+  merged_at: '2026-08-05'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42723
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 15 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42835
+  title: 'nir: lower boolean shuffle without subgroup size (+ an easy algebraic rule)'
+  author: alyssa
+  merged_at: '2026-07-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42835
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 3 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42875
+  title: 'kk: Enable shaderRoundingModeRTEFloat16/32'
+  author: squidbus
+  merged_at: '2026-07-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42875
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 42939
+  title: 'intel/compiler: Delete brw_nir_apply_key, rework subgroup size handling'
+  author: kwg
+  merged_at: '2026-07-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42939
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 17 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43010
+  title: 'ir3, tu: Small subgroup size fixes'
+  author: Valentine
+  merged_at: '2026-07-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43010
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 5 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43056
+  title: 'nir/coopmat: use nir_shader_get_entrypoint()'
+  author: gye976
+  merged_at: '2026-07-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43056
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 43148
+  title: 'nir/coopmat: use args for flexible dimension lowering info.'
+  author: airlied
+  merged_at: '2026-07-23'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43148
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/radv_shader.c, src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/vulkan/radv_shader.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 43181
+  title: 'nir: Account for cmat memory accesses in copy_prop_vars'
+  author: cmarcelo
+  merged_at: '2026-07-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43181
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43220
+  title: 'vtn/opencl: fix libclc needing fp16 lowering to fp32'
+  author: karolherbst
+  merged_at: '2026-07-28'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43220
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /float16|(?<![a-z0-9])fp16(?![a-z0-9])|16[ -]?bit float/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43426
+  title: 'radv: drop support for cooperativeMatrixRobustBufferAccess and other radv_compiler_info feature fixes'
+  author: pendingchaos
+  merged_at: '2026-08-04'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43426
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir.h, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c,
+    src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_physical_device.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir.h
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_device.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/amd/vulkan/radv_pipeline.c
+  - src/amd/vulkan/radv_shader.c
+  - src/amd/vulkan/radv_shader.h
+- number: 43558
+  title: 'anv: Bump up the subgroup size to 32 for RT shaders'
+  author: sagarghuge
+  merged_at: '2026-08-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43558
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /subgroup[ _-]?size/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43562
+  title: 'docs: fix reporting VK_KHR_index_type_uint8 on RADV'
+  author: hakzsam
+  merged_at: '2026-08-07'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43562
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 43634
+  title: 'nir,radv: add nir_intrinsic_deref_buffer_address and fix transposed cmat loads with descriptor heap'
+  author: pendingchaos
+  merged_at: '2026-08-24'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43634
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/common/nir/ac_nir_lower_resinfo.c, src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/amd/common/nir/ac_nir_lower_resinfo.c
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+- number: 43730
+  title: 'radv/nir/spirv: add support for VK_EXT_cooperative_matrix_maintenance1'
+  author: airlied
+  merged_at: '2026-08-14'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43730
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c, src/amd/vulkan/radv_physical_device.c,
+    src/compiler/nir/nir_lower_cooperative_matrix.c, src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/amd/vulkan/radv_physical_device.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c
+- number: 43771
+  title: 'nir/load_store_vectorize,nir/uub: optimizations for cooperative matrix loads/stores'
+  author: pendingchaos
+  merged_at: '2026-09-08'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43771
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/amd/common/nir/ac_nir_lower_global_access.c'
+  evidence_paths:
+  - src/amd/common/nir/ac_nir_lower_global_access.c
+- number: 43781
+  title: 'lavapipe: add support for VK_EXT_cooperative_matrix_maintenance1'
+  author: airlied
+  merged_at: '2026-08-15'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43781
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 43786
+  title: 'nir/coopmat: use hidden variables, cleanup and refactor reduce code'
+  author: airlied
+  merged_at: '2026-08-21'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43786
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/nir/nir_lower_cooperative_matrix.c'
+  evidence_paths:
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+- number: 43800
+  title: 'radv/ci: add khronos link to the bfloat16 dequant failures.'
+  author: airlied
+  merged_at: '2026-08-18'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43800
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/ci/radv-gfx1201-fails.txt'
+  evidence_paths:
+  - src/amd/ci/radv-gfx1201-fails.txt
+  decision_source: manual
+  reviewed_at: '2026-10-05'
+- number: 43864
+  title: 'spirv,docs: some missed VK_EXT_cooperative_matrix_maintenance1 details'
+  author: DadSchoorse
+  merged_at: '2026-08-20'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43864
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ and driver source changed: src/compiler/spirv/vtn_cmat.c'
+  evidence_paths:
+  - src/compiler/spirv/vtn_cmat.c
+- number: 44028
+  title: 'anv: fix regression on coopmat per element operations feature.'
+  author: airlied
+  merged_at: '2026-08-30'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/44028
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 44107
+  title: 'nvk/nak/cmat: fix inconsistent enum name.'
+  author: airlied
+  merged_at: '2026-08-31'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/44107
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat|(?<![a-z])cmat(?![a-z])|wmma/ but none of the 1 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 44322
+  title: 'radv: enable emulated RT and fp16 by default for DOOM: The Dark Ages'
+  author: DadSchoorse
+  merged_at: '2026-09-10'
+  url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/44322
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): outside the Vulkan compute-kernel scope (stable-branch backport, OpenGL driver, another vendor''s driver, CI list or per-game profile): src/amd/vulkan/00-radv-defaults.conf'
+  evidence_paths:
+  - src/amd/vulkan/00-radv-defaults.conf
+  decision_source: manual
+  reviewed_at: '2026-10-05'

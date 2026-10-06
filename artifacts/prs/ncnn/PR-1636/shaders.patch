@@ -1,0 +1,169 @@
+diff --git a/src/layer/vulkan/shader/flatten_pack4to8.comp b/src/layer/vulkan/shader/flatten_pack4to8.comp
+--- a/src/layer/vulkan/shader/flatten_pack4to8.comp
++++ b/src/layer/vulkan/shader/flatten_pack4to8.comp
+@@ -86,9 +86,9 @@ void main()
+         ivec4 yy4 = ii4 / psc(w);
+         ivec4 xx4 = ii4 % psc(w);
+ 
+-        v_offset = ((y4 / 8) * psc(w) + x4) * 2 + (y4 % 8) / 2;
++        v_offset = ((y4 / 4) * psc(w) + x4) * 2 + (y4 % 4) / 2;
+         lane4 = y4 % 2;
+-        vv_offset = ((yy4 / 8) * psc(w) + xx4) * 2 + (yy4 % 8) / 2;
++        vv_offset = ((yy4 / 4) * psc(w) + xx4) * 2 + (yy4 % 4) / 2;
+         lane8 = yy4 % 2;
+     }
+     else // if (psc(dims) == 3)
+@@ -102,9 +102,9 @@ void main()
+         ivec4 yy4 = ii4 % size / psc(w);
+         ivec4 xx4 = ii4 % size % psc(w);
+ 
+-        v_offset = ((z4 / 8) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
++        v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+         lane4 = z4 % 2;
+-        vv_offset = ((zz4 / 8) * psc(cstep) + yy4 * psc(w) + xx4) * 2 + (zz4 % 4) / 2;
++        vv_offset = ((zz4 / 4) * psc(cstep) + yy4 * psc(w) + xx4) * 2 + (zz4 % 4) / 2;
+         lane8 = zz4 % 2;
+     }
+ 
+diff --git a/src/layer/vulkan/shader/flatten_pack8.comp b/src/layer/vulkan/shader/flatten_pack8.comp
+--- a/src/layer/vulkan/shader/flatten_pack8.comp
++++ b/src/layer/vulkan/shader/flatten_pack8.comp
+@@ -86,9 +86,9 @@ void main()
+         ivec4 yy4 = ii4 / psc(w);
+         ivec4 xx4 = ii4 % psc(w);
+ 
+-        v_offset = ((y4 / 8) * psc(w) + x4) * 2 + (y4 % 8) / 2;
++        v_offset = ((y4 / 8) * psc(w) + x4) * 4 + (y4 % 8) / 2;
+         lane4 = y4 % 2;
+-        vv_offset = ((yy4 / 8) * psc(w) + xx4) * 2 + (yy4 % 8) / 2;
++        vv_offset = ((yy4 / 8) * psc(w) + xx4) * 4 + (yy4 % 8) / 2;
+         lane8 = yy4 % 2;
+     }
+     else // if (psc(dims) == 3)
+@@ -102,9 +102,9 @@ void main()
+         ivec4 yy4 = ii4 % size / psc(w);
+         ivec4 xx4 = ii4 % size % psc(w);
+ 
+-        v_offset = ((z4 / 8) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
++        v_offset = ((z4 / 8) * psc(cstep) + y4 * psc(w) + x4) * 4 + (z4 % 8) / 2;
+         lane4 = z4 % 2;
+-        vv_offset = ((zz4 / 8) * psc(cstep) + yy4 * psc(w) + xx4) * 2 + (zz4 % 4) / 2;
++        vv_offset = ((zz4 / 8) * psc(cstep) + yy4 * psc(w) + xx4) * 4 + (zz4 % 8) / 2;
+         lane8 = zz4 % 2;
+     }
+ 
+diff --git a/src/layer/vulkan/shader/interp_pack8.comp b/src/layer/vulkan/shader/interp_pack8.comp
+--- a/src/layer/vulkan/shader/interp_pack8.comp
++++ b/src/layer/vulkan/shader/interp_pack8.comp
+@@ -122,6 +122,8 @@ void main()
+         afpvec8 a;
+         afpvec8 b;
+         a[0] = a0[0] * (afp(1.f) - fx) + a1[0] * fx;
++        a[1] = a0[1] * (afp(1.f) - fx) + a1[1] * fx;
++        b[0] = b0[0] * (afp(1.f) - fx) + b1[0] * fx;
+         b[1] = b0[1] * (afp(1.f) - fx) + b1[1] * fx;
+ 
+         afpvec8 res;
+diff --git a/src/layer/vulkan/shader/slice_pack4to8.comp b/src/layer/vulkan/shader/slice_pack4to8.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/slice_pack4to8.comp
+@@ -0,0 +1,87 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++struct sfpvec8 { f16vec4 abcd; f16vec4 efgh; };
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int axis = 0;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
++layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
++layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
++layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++
++layout (local_size_x_id = 233) in;
++layout (local_size_y_id = 234) in;
++layout (local_size_z_id = 235) in;
++
++layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int dims;
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outdims;
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++
++    int offset;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
++        return;
++
++    const int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    ivec3 gxyz = ivec3(gx, gy, gz);
++
++    gxyz[psc(dims) - 1] *= 2;
++    gxyz[psc(dims) - 1 - axis] += p.offset;
++
++    int v_offset_0 = gxyz.z * psc(cstep) + gxyz.y * psc(w) + gxyz.x;
++
++    ivec3 gxyz4 = ivec3(1, psc(w), psc(cstep));
++
++    ivec2 v_offset = v_offset_0 + ivec2(0, 1) * gxyz4[psc(dims) - 1 - axis];
++
++    buffer_cp4to8(top_blob_data, gi, bottom_blob_data, v_offset);
++}
+diff --git a/src/layer/vulkan/shader/slice_pack8.comp b/src/layer/vulkan/shader/slice_pack8.comp
+--- a/src/layer/vulkan/shader/slice_pack8.comp
++++ b/src/layer/vulkan/shader/slice_pack8.comp
+@@ -70,7 +70,7 @@ void main()
+     if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
++    const int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+     ivec3 gxyz = ivec3(gx, gy, gz);
+ 

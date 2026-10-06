@@ -1,0 +1,92 @@
+repo: Tencent/ncnn
+pr: 6128
+url: https://github.com/Tencent/ncnn/pull/6128
+merge_sha: 626d9d09106571f04f895445e5108e39506face5
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6128/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/packing.comp
+  status: modified
+  sha256: 999a25df4bf085834193e7c2f7a4f1ee88354cfbbb8d001a66e933bd6803db98
+- path: src/layer/vulkan/shader/packing_fp16_to_fp32.comp
+  status: removed
+  sha256: 8e746996ec806c528df30adf5f8cfecc527d2b8e2a259e723025744b8297a8c8
+- path: src/layer/vulkan/shader/packing_fp32_to_fp16.comp
+  status: removed
+  sha256: c3592d5c657ef37f67d98a14b2372311bd5729b9a25e29bbae173fdcafcedb84
+- path: src/layer/vulkan/shader/packing_pack1to4.comp
+  status: modified
+  sha256: 69b4060cbe1946b7ef424be55577dcc7583fd4f5b87e1055ff4b6e0004fb44f8
+- path: src/layer/vulkan/shader/packing_pack1to4_fp16_to_fp32.comp
+  status: removed
+  sha256: b447821aa80cda6c6fd2788bf8ac430943f78ffc37bd616ace5d3b676b4e7604
+- path: src/layer/vulkan/shader/packing_pack1to4_fp32_to_fp16.comp
+  status: removed
+  sha256: 4a4dbf1e775e90c5fd110f2ad193023f3b1a56329ebe9e317fc72bb905d5ffa5
+- path: src/layer/vulkan/shader/packing_pack1to8.comp
+  status: modified
+  sha256: d5dec3916eae6b020ade63cd2098ec2f377fd714db0a1ae7755669c46cbd0f19
+- path: src/layer/vulkan/shader/packing_pack1to8_fp16_to_fp32.comp
+  status: removed
+  sha256: 670ca86b609c1879e28364faead3497c8f524dc2e1330855c8b50ad502bfeeb9
+- path: src/layer/vulkan/shader/packing_pack1to8_fp32_to_fp16.comp
+  status: removed
+  sha256: fe11d84a9544f11344469a291708b7ab9e7dedcf6c97b987c7323864665787bc
+- path: src/layer/vulkan/shader/packing_pack4.comp
+  status: removed
+  sha256: 93bcdfe128bf6aebf88bed914ff7ba590a8557de06548fcbc01ecdff9d6f3d2f
+- path: src/layer/vulkan/shader/packing_pack4_fp16_to_fp32.comp
+  status: removed
+  sha256: e77d81770d9b05b60f6c81ca9fab41afc8ac52d9ba62a4226d09ad847be15217
+- path: src/layer/vulkan/shader/packing_pack4_fp32_to_fp16.comp
+  status: removed
+  sha256: 0b658da118f2060587e61e2bff46e666aa5b58a07d74116b90a2af3ad9c4a41b
+- path: src/layer/vulkan/shader/packing_pack4to1.comp
+  status: modified
+  sha256: e64318a47ad66242c55f5158f0e629f32951aa6f76dbbc7aa08896aa920a7882
+- path: src/layer/vulkan/shader/packing_pack4to1_fp16_to_fp32.comp
+  status: removed
+  sha256: 3ae132151d1bfef7c670cfd3181544f4149eb31cfa786220b2bf12b03b91a894
+- path: src/layer/vulkan/shader/packing_pack4to1_fp32_to_fp16.comp
+  status: removed
+  sha256: a3ef9b62c18c2f2f65f0bcd77a78b72e89be4948f8688f8a7fb56b6171607bf3
+- path: src/layer/vulkan/shader/packing_pack4to8.comp
+  status: modified
+  sha256: a03352014c03d2ff78a45616c08e4714758b1ff13aed31ef94a283045b3de1df
+- path: src/layer/vulkan/shader/packing_pack4to8_fp16_to_fp32.comp
+  status: removed
+  sha256: 060bcfa09d61e8f8446fc212ad361c8add4fddfc653d31c4cf6874ad063d1dc8
+- path: src/layer/vulkan/shader/packing_pack4to8_fp32_to_fp16.comp
+  status: removed
+  sha256: 68640ed85a424dafb6ba73014672f6983dbfc6186fcd81605647bfbe288ec998
+- path: src/layer/vulkan/shader/packing_pack8.comp
+  status: removed
+  sha256: b70afd7bbf5c253693b7024b71e9d247458137128f89b22372839827b68e3433
+- path: src/layer/vulkan/shader/packing_pack8_fp16_to_fp32.comp
+  status: removed
+  sha256: 2a9a52a1733b3186831f72ddfba1ba42a5a09fd3477620703002aa82d9cd4c0e
+- path: src/layer/vulkan/shader/packing_pack8_fp32_to_fp16.comp
+  status: removed
+  sha256: bf16f52fc39a5d0e823527e648ccbb08c2dd82bfb82beb33568672de81f9994f
+- path: src/layer/vulkan/shader/packing_pack8to1.comp
+  status: modified
+  sha256: 94604a39e60cd308223a8aa02334fe969e711997e5fa6a4d385d79c4317a5245
+- path: src/layer/vulkan/shader/packing_pack8to1_fp16_to_fp32.comp
+  status: removed
+  sha256: e2ee2581b45582ab09194745f72c38b18aa50787ddcc2c7077cd341732d43ab6
+- path: src/layer/vulkan/shader/packing_pack8to1_fp32_to_fp16.comp
+  status: removed
+  sha256: 63bfe10a66373271874966fa27352cdf253b33c3bbd89fa3eb0cdf34f1cb84ce
+- path: src/layer/vulkan/shader/packing_pack8to4.comp
+  status: modified
+  sha256: dba4c357130fdd809b5265737274ea1370875991eee219013ec375153ab0e7ae
+- path: src/layer/vulkan/shader/packing_pack8to4_fp16_to_fp32.comp
+  status: removed
+  sha256: 6ede12d73cd736a42633ebe6e5c8d90dfc79318dd6984a5b74448f51ed035261
+- path: src/layer/vulkan/shader/packing_pack8to4_fp32_to_fp16.comp
+  status: removed
+  sha256: 258c4a26db7784c05172c4a6cea62718ddd15c31efceb2b127be6510ff1dc589

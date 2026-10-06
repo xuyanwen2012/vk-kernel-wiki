@@ -1,0 +1,38 @@
+repo: Tencent/ncnn
+pr: 4618
+url: https://github.com/Tencent/ncnn/pull/4618
+merge_sha: b640574b88f3433d4e11ddc233f6ce57dfe256e8
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/4618/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/gemm.comp
+  status: added
+  sha256: 9ed429c6f94acb83fa1ed04f971d4d11890ce97c32470cf1058a93856b744bd0
+- path: src/layer/vulkan/shader/multiheadattention_qk_cross.comp
+  status: added
+  sha256: cd1ceacabeaea8d2fed13504bcc9bfa31a9105d3e7a5419ace26cdf1e0123c41
+- path: src/layer/vulkan/shader/multiheadattention_qk_cross_pack1to4.comp
+  status: added
+  sha256: 5f484bd4eab0fcacf5e39d22bee2cb466bfff6d14d7d72bd22e54af64a171b93
+- path: src/layer/vulkan/shader/multiheadattention_qk_cross_pack4.comp
+  status: added
+  sha256: 1a42931d31daac30aeb6129061c4bd3f94a3f70c22c95deea2fa9cc2e8a1e23d
+- path: src/layer/vulkan/shader/multiheadattention_qk_cross_pack4to1.comp
+  status: added
+  sha256: 3807a846221a09613daa83cc16350df8a14cc54183d159d95edbabbc39e8d2ad
+- path: src/layer/vulkan/shader/multiheadattention_qkv_cross.comp
+  status: added
+  sha256: 0027d52602f707c8cb3288f303e2fc26ef7540f4897748e3ffc3192b241b8006
+- path: src/layer/vulkan/shader/multiheadattention_qkv_cross_pack1to4.comp
+  status: added
+  sha256: 3eb6adc66eaa1786e4e9b736e65c7766433a81a6df546b4ae0ab6969a7925dc6
+- path: src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4.comp
+  status: added
+  sha256: 8103aa9db3b335470c7152c4b8129c412a14afdbbd9a3e4409eaabadbaa2565b
+- path: src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4to1.comp
+  status: added
+  sha256: b76bf46e2cb9c5fbd64ba2a49c5e5d15e3c15b61309b80998c4ab5914464c0e6

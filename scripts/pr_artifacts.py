@@ -3,10 +3,11 @@
 An artifact bundle is the directory `artifacts/prs/<slug>/PR-<number>/`:
 
     shaders.patch     the shader-file patches of the pull request
+                      (driver.patch for a ledger with `scope_mode: driver`)
     PROVENANCE.yaml   where each patch came from and its sha256
 
-`shaders.patch` is a unified diff. Its hunks are the verbatim `patch` text
-GitHub returns for each changed file; the three header lines in front of each
+The patch file is a unified diff. Its hunks are the verbatim patch text the
+forge returns for each changed file; the three header lines in front of each
 file (`diff --git`, `---`, `+++`) are written by this module so that standard
 tools can read the file. `PROVENANCE.yaml` records the sha256 of each file's
 verbatim hunk text, which makes the bundle checkable offline.
@@ -26,6 +27,8 @@ from _wiki_root import WIKI_ROOT
 
 ARTIFACTS_ROOT = "artifacts/prs"
 PATCH_NAME = "shaders.patch"
+DRIVER_PATCH_NAME = "driver.patch"
+PATCH_NAMES = (PATCH_NAME, DRIVER_PATCH_NAME)
 PROVENANCE_NAME = "PROVENANCE.yaml"
 LICENSE_NAME = "LICENSE"
 _HEADER_RE = re.compile(r"^diff --git a/(.+) b/\1$")
@@ -87,9 +90,12 @@ def bundle_errors(rel: str, root: Path = WIKI_ROOT) -> list:
             errors.append(f"{rel}/{PROVENANCE_NAME}: missing '{field}'")
     if not (directory.parent / LICENSE_NAME).is_file():
         errors.append(f"{rel}: missing upstream licence text at {directory.parent.name}/{LICENSE_NAME}")
-    patch_path = directory / PATCH_NAME
+    patch_name = provenance.get("patch_file") or PATCH_NAME
+    if patch_name not in PATCH_NAMES:
+        return errors + [f"{rel}/{PROVENANCE_NAME}: unknown patch_file '{patch_name}'"]
+    patch_path = directory / patch_name
     if not patch_path.is_file():
-        return errors + [f"{rel}: missing {PATCH_NAME}"]
+        return errors + [f"{rel}: missing {patch_name}"]
     hunks = split_patch(patch_path.read_text(encoding="utf-8"))
     listed = {}
     for entry in provenance.get("files") or []:
@@ -100,10 +106,10 @@ def bundle_errors(rel: str, root: Path = WIKI_ROOT) -> list:
         if entry.get("sha256") is None:
             continue  # recorded as carrying no patch (pure rename)
         if entry["path"] not in hunks:
-            errors.append(f"{rel}: {PATCH_NAME} has no diff for '{entry['path']}'")
+            errors.append(f"{rel}: {patch_name} has no diff for '{entry['path']}'")
         elif sha256_text(hunks[entry["path"]]) != entry["sha256"]:
             errors.append(f"{rel}: patch text of '{entry['path']}' does not match its recorded sha256")
     for path in hunks:
         if path not in listed:
-            errors.append(f"{rel}: {PATCH_NAME} contains '{path}', which {PROVENANCE_NAME} does not list")
+            errors.append(f"{rel}: {patch_name} contains '{path}', which {PROVENANCE_NAME} does not list")
     return errors

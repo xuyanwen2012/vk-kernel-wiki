@@ -1,0 +1,828 @@
+diff --git a/src/amd/ci/radv-gfx1201-fails.txt b/src/amd/ci/radv-gfx1201-fails.txt
+--- a/src/amd/ci/radv-gfx1201-fails.txt
++++ b/src/amd/ci/radv-gfx1201-fails.txt
+@@ -19,3 +19,104 @@ dEQP-VK.image.host_image_copy.query.optimal.r16g16_uint,Fail
+ dEQP-VK.image.host_image_copy.query.optimal.r32g32b32a32_sfloat,Fail
+ dEQP-VK.image.host_image_copy.query.optimal.r8g8b8a8_unorm,Fail
+ dEQP-VK.image.host_image_copy.query.optimal.d32_sfloat,Fail
++
++# CTS bug https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/5988
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.pipeline.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_binary.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_min_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_2x2.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_col_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_row_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.physical_buffer.rowmajor.linear,Fail
++dEQP-VK.compute.shader_object_spirv.cooperative_matrix.khr_r.subgroupscope.reduce_sum_rowcol_changedim.bfloat16_bfloat16.workgroup.rowmajor.linear,Fail
+diff --git a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+--- a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
++++ b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+@@ -4707,7 +4707,8 @@ visit_intrinsic(isel_context* ctx, nir_intrinsic_instr* instr)
+ 
+       if (src.regClass() == s1) {
+          bld.copy(Definition(dst), src);
+-      } else if (dst.regClass() == v1 && src.regClass() == v1) {
++      } else if (dst.type() == RegType::vgpr && src.type() == RegType::vgpr && dst.size() == 1 &&
++                 src.size() == 1) {
+          bld.vop3(aco_opcode::v_permlane16_b32, Definition(dst), src,
+                   bld.as_uniform(get_ssa_temp(ctx, instr->src[1].ssa)),
+                   bld.as_uniform(get_ssa_temp(ctx, instr->src[2].ssa)));
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -733,6 +733,245 @@ lower_cmat_copy(nir_builder *b, nir_intrinsic_instr *intr)
+    return true;
+ }
+ 
++static bool
++lower_cmat_reduce_finish_call(nir_builder *b, nir_cmat_call_instr *call, const lower_cmat_params *params)
++{
++   nir_deref_instr *dst_deref = nir_src_as_deref(call->params[0]);
++   nir_deref_instr *src0_deref = nir_src_as_deref(call->params[1]);
++   nir_function *fnptr = call->callee;
++   nir_cmat_reduce reduce = nir_cmat_call_reduce_flags(call);
++   struct glsl_cmat_description src_desc = *glsl_get_cmat_description(src0_deref->type);
++
++   nir_def *src0 = radv_nir_load_cmat(b, params, call->params[1].ssa);
++   nir_def *src1 = radv_nir_load_cmat(b, params, call->params[2].ssa);
++
++   unsigned length = radv_nir_cmat_length(src_desc, params);
++   unsigned mul = radv_nir_cmat_length_mul(src_desc, params);
++   nir_def *vars[NIR_MAX_VEC_COMPONENTS];
++
++   assert(src_desc.use == GLSL_CMAT_USE_ACCUMULATOR);
++
++   if (mul > 1) {
++      for (unsigned i = 0; i < length; ++i)
++         if (i % mul != 0)
++            vars[i] = nir_undef(b, 1, radv_nir_cmat_bits(src_desc));
++   }
++
++   if (reduce & NIR_CMAT_REDUCE_COLUMN) {
++      nir_variable *col_tmp = nir_local_variable_create(b->impl, glsl_get_bare_type(fnptr->params[0].type), "col_tmp");
++      /* All of the rows contains the same data, so just reduce both first rows. */
++      nir_def *row_accum0 = nir_channel(b, src0, 0);
++      nir_def *row_accum1 = nir_channel(b, src1, 0);
++
++      nir_deref_instr *col_tmp_deref = nir_build_deref_var(b, col_tmp);
++
++      nir_call(b, fnptr, &col_tmp_deref->def, row_accum0, row_accum1);
++
++      nir_def *first_col = nir_load_deref(b, col_tmp_deref);
++
++      for (unsigned i = 0; i < length / mul; i++)
++         vars[i * mul] = first_col;
++   } else if (reduce & NIR_CMAT_REDUCE_ROW) {
++      /* All of the columns contain the same data, but not the rows, so across all components. */
++      for (unsigned i = 0; i < length / mul; ++i) {
++         nir_def *row0_accum = nir_channel(b, src0, i * mul);
++         nir_def *row1_accum = nir_channel(b, src1, i * mul);
++
++         nir_variable *row_tmp = nir_local_variable_create(b->impl, glsl_get_bare_type(fnptr->params[0].type), "row_tmp");
++         nir_deref_instr *row_tmp_deref = nir_build_deref_var(b, row_tmp);
++
++         nir_call(b, fnptr, &row_tmp_deref->def, row0_accum, row1_accum);
++
++         nir_def *row = nir_load_deref(b, row_tmp_deref);
++         vars[i * mul] = row;
++      }
++   }
++
++   nir_def *mat = nir_vec(b, vars, length);
++   nir_store_deref(b, dst_deref, mat, nir_component_mask(mat->num_components));
++   nir_instr_remove(&call->instr);
++   return true;
++}
++
++static bool
++lower_cmat_reduce_call(nir_builder *b, nir_cmat_call_instr *call, const lower_cmat_params *params)
++{
++   nir_deref_instr *dst_deref = nir_src_as_deref(call->params[0]);
++   nir_deref_instr *src_deref = nir_src_as_deref(call->params[1]);
++   struct glsl_cmat_description src_desc = *glsl_get_cmat_description(src_deref->type);
++   nir_def *src = radv_nir_load_cmat(b, params, call->params[1].ssa);
++   nir_function *fnptr = call->callee;
++
++   nir_cmat_reduce reduce = nir_cmat_call_reduce_flags(call);
++
++   unsigned length = radv_nir_cmat_length(src_desc, params);
++   unsigned mul = radv_nir_cmat_length_mul(src_desc, params);
++   nir_def *vars[16];
++
++   assert(src_desc.use == GLSL_CMAT_USE_ACCUMULATOR);
++
++   for (unsigned i = 0; i < length; ++i) {
++      if (mul > 1 && (i % mul != 0))
++         vars[i] = nir_undef(b, 1, radv_nir_cmat_bits(src_desc));
++      else
++         vars[i] = nir_channel(b, src, i);
++   }
++
++   if (reduce & NIR_CMAT_REDUCE_COLUMN) {
++      nir_variable *col_tmp = nir_local_variable_create(b->impl, glsl_get_bare_type(fnptr->params[0].type), "col_tmp");
++
++      nir_deref_instr *col_tmp_deref = nir_build_deref_var(b, col_tmp);
++      nir_store_deref(b, col_tmp_deref, vars[0], 1);
++
++      for (unsigned i = 1; i < (length / mul); i++) {
++         nir_def *col_accum_val = nir_load_deref(b, col_tmp_deref);
++         nir_call(b, fnptr, &col_tmp_deref->def, col_accum_val, vars[i * mul]);
++      }
++
++      for (unsigned x_mask = 16; x_mask < params->wave_size; x_mask *= 2) {
++         nir_def *col_accum_val = nir_load_deref(b, col_tmp_deref);
++         nir_def *other_row = shuffle_xor_imm(b, col_accum_val, x_mask);
++         nir_call(b, fnptr, &col_tmp_deref->def, col_accum_val, other_row);
++      }
++      for (unsigned i = 0; i < length / mul; i++)
++         vars[i * mul] = nir_load_deref(b, col_tmp_deref);
++   }
++
++   if (reduce & NIR_CMAT_REDUCE_ROW) {
++      for (unsigned i = 0; i < length / mul; ++i) {
++         nir_def *row_accum = vars[i * mul];
++
++         nir_variable *row_tmp = nir_local_variable_create(b->impl, glsl_get_bare_type(fnptr->params[0].type), "row_tmp");
++         nir_deref_instr *row_tmp_deref = nir_build_deref_var(b, row_tmp);
++         nir_store_deref(b, row_tmp_deref, row_accum, 1);
++
++         /* 4 steps for 16 wide reduction */
++         for (unsigned j = 1; j < 16; j *= 2) {
++            nir_def *prev_row_accum_val = nir_load_deref(b, row_tmp_deref);
++
++            nir_def *this_row = shuffle_xor_imm(b, prev_row_accum_val, j);
++
++            nir_call(b, fnptr, &row_tmp_deref->def, prev_row_accum_val, this_row);
++         }
++         row_tmp_deref = nir_build_deref_var(b, row_tmp);
++         vars[i * mul] = nir_load_deref(b, row_tmp_deref);
++      }
++   }
++
++   /* this should be lowered earlier */
++   assert(!(reduce & NIR_CMAT_REDUCE_2X2));
++   nir_def *mat = nir_vec(b, vars, length);
++   nir_store_deref(b, dst_deref, mat, nir_component_mask(mat->num_components));
++   nir_instr_remove(&call->instr);
++   return true;
++}
++
++static bool
++lower_cmat_reduce_2x2_call(nir_builder *b, nir_cmat_call_instr *call, const lower_cmat_params *params)
++{
++   nir_deref_instr *dst_deref = nir_src_as_deref(call->params[0]);
++   nir_deref_instr *src_deref = nir_src_as_deref(call->params[1]);
++   struct glsl_cmat_description src_desc = *glsl_get_cmat_description(src_deref->type);
++   nir_function *fnptr = call->callee;
++
++   unsigned length = radv_nir_cmat_length(src_desc, params);
++   unsigned mul = radv_nir_cmat_length_mul(src_desc, params);
++
++   assert(src_desc.use == GLSL_CMAT_USE_ACCUMULATOR);
++
++   nir_def *src_components[4][NIR_MAX_VEC_COMPONENTS];
++   for (unsigned m = 0; m < 4; m++) {
++      nir_def *src = radv_nir_load_cmat(b, params, call->params[m + 1].ssa);
++      for (unsigned i = 0; i < length / mul; i++) {
++         src_components[m][i] = nir_channel(b, src, i * mul);
++      }
++   }
++
++   nir_variable *qd_tmp = nir_local_variable_create(b->impl, glsl_get_bare_type(fnptr->params[0].type), "qd_tmp");
++   nir_deref_instr *qd_tmp_deref = nir_build_deref_var(b, qd_tmp);
++
++   nir_def *low16 = nir_inverse_ballot_imm(b, 0xffff0000ffff, params->wave_size);
++   for (unsigned m = 0; m < 4; m++) {
++      for (unsigned i = 0; i < length / mul / 2; i++) {
++         if (params->gfx_level >= GFX12) {
++            /* The neighboring row is in the VGPR next to us */
++            nir_call(b, fnptr, &qd_tmp_deref->def, src_components[m][i * 2], src_components[m][i * 2 + 1]);
++            src_components[m][i] = nir_load_deref(b, qd_tmp_deref);
++         } else {
++            /* The neighboring row is in the upper 16 lanes */
++            for (unsigned j = 0; j < 2; j++) {
++               nir_def *other_row = shuffle_xor_imm(b, src_components[m][i * 2 + j], 16);
++               nir_call(b, fnptr, &qd_tmp_deref->def, src_components[m][i * 2 + j], other_row);
++               src_components[m][i * 2 + j] = nir_load_deref(b, qd_tmp_deref);
++            }
++
++            /* Fill the duplicated space with the rows from the next VGPR */
++            src_components[m][i] = nir_bcsel(b, low16, src_components[m][i * 2], src_components[m][i * 2 + 1]);
++         }
++
++         /* Get data from the neighboring column */
++         nir_def *other_col = shuffle_xor_imm(b, src_components[m][i], 1);
++         nir_call(b, fnptr, &qd_tmp_deref->def, src_components[m][i], other_col);
++         src_components[m][i] = nir_load_deref(b, qd_tmp_deref);
++      }
++   }
++
++   nir_def *vars[NIR_MAX_VEC_COMPONENTS];
++
++   /* Combine the matrices into one matrix. */
++   nir_def *even = nir_inverse_ballot_imm(b, 0x5555555555555555, params->wave_size);
++   for (unsigned m = 0; m < 2; m++) {
++      for (unsigned i = 0; i < length / mul / 2; i++) {
++         nir_def *m0_comp = src_components[m * 2][i];
++         nir_def *m1_comp = src_components[m * 2 + 1][i];
++
++         nir_def *combined = nir_bcsel(b, even, m0_comp, m1_comp);
++         vars[m * (length / mul / 2) + i] = combined;
++      }
++   }
++
++   /* In each row, every second element needs to be moved to the end, and the others to the front.
++    * This can be done with v_permlane16_b32.
++    */
++   nir_def *perm_low = nir_imm_int(b, 0xeca86420);
++   nir_def *perm_high = nir_imm_int(b, 0xfdb97531);
++   for (unsigned i = 0; i < length / mul; i++)
++      vars[i] = nir_lane_permute_16_amd(b, vars[i], perm_low, perm_high);
++
++   if (params->gfx_level >= GFX12) {
++      /* For GFX12, we still have to swap the row(s) in upper half coming from the bottom two
++       * matrices with low row(s) in the from other two matrices.
++       */
++      nir_def *low = nir_inverse_ballot_imm(b, BITFIELD64_MASK(params->wave_size / 2), params->wave_size);
++      for (unsigned i = 0; i < length / mul / 2; i++) {
++         nir_def **comp0 = &vars[i];
++         nir_def **comp1 = &vars[length / mul / 2 + i];
++         nir_def *comp0x = shuffle_xor_imm(b, *comp0, params->wave_size / 2);
++         nir_def *comp1x = shuffle_xor_imm(b, *comp1, params->wave_size / 2);
++         *comp0 = nir_bcsel(b, low, *comp0, comp1x);
++         *comp1 = nir_bcsel(b, low, comp0x, *comp1);
++      }
++   }
++
++   if (params->wave_size == 64) {
++      /* For wave64, we also need to swap the inner two rows. */
++      nir_def *keep = nir_inverse_ballot_imm(b, 0xffff00000000ffff, params->wave_size);
++      for (unsigned i = 0; i < length / mul; i++)
++         vars[i] = nir_bcsel(b, keep, vars[i], shuffle_xor_imm(b, vars[i], 0x30));
++   }
++
++   for (int i = length / mul - 1; i >= 0; i--) {
++      vars[i * mul] = vars[i];
++      for (unsigned j = 1; j < mul; j++)
++         vars[i * mul + j] = nir_undef(b, 1, radv_nir_cmat_bits(src_desc));
++   }
++
++   nir_def *mat = nir_vec(b, vars, length);
++   nir_store_deref(b, dst_deref, mat, nir_component_mask(mat->num_components));
++   nir_instr_remove(&call->instr);
++   return true;
++}
++
+ static bool
+ lower_cmat_deref(nir_deref_instr *deref, struct hash_table *type_map, const lower_cmat_params *params)
+ {
+@@ -833,6 +1072,23 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+          case nir_instr_type_deref:
+             progress |= lower_cmat_deref(nir_instr_as_deref(instr), type_map, &params);
+             break;
++         case nir_instr_type_cmat_call: {
++            nir_cmat_call_instr *call = nir_instr_as_cmat_call(instr);
++            switch (call->op) {
++            case nir_cmat_call_op_reduce_finish:
++               progress |= lower_cmat_reduce_finish_call(&b, call, &params);
++               break;
++            case nir_cmat_call_op_reduce:
++               progress |= lower_cmat_reduce_call(&b, call, &params);
++               break;
++            case nir_cmat_call_op_reduce_2x2:
++               progress |= lower_cmat_reduce_2x2_call(&b, call, &params);
++               break;
++            default:
++               break;
++            }
++            break;
++         }
+          default:
+             continue;
+          }
+@@ -841,6 +1097,9 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+ 
+    _mesa_hash_table_destroy(type_map, NULL);
+ 
++   nir_foreach_function_impl(fnim, shader)
++      nir_progress(progress, fnim, 0);
++
+    return nir_progress(progress, func->impl, 0);
+ }
+ 
+diff --git a/src/amd/vulkan/radv_physical_device.c b/src/amd/vulkan/radv_physical_device.c
+--- a/src/amd/vulkan/radv_physical_device.c
++++ b/src/amd/vulkan/radv_physical_device.c
+@@ -1401,6 +1401,7 @@ radv_physical_device_get_features(const struct radv_physical_device *pdev, struc
+       /* VK_NV_cooperative_matrix2 */
+       .cooperativeMatrixConversions = true,
+       .cooperativeMatrixFlexibleDimensions = true,
++      .cooperativeMatrixReductions = true,
+ 
+       /* VK_KHR_video_encode_av1 */
+       .videoEncodeAV1 = true,
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -536,8 +536,8 @@ radv_shader_spirv_to_nir(struct radv_device *device, const struct radv_shader_st
+       }
+       NIR_PASS(_, nir, nir_opt_deref);
+ 
+-      /* Pick off the single entrypoint that we want */
+-      nir_remove_non_entrypoints(nir);
++      /* Pick off the single entrypoint that we want - leave cmat call functions */
++      nir_remove_non_cmat_call_entrypoints(nir);
+ 
+       /* Make sure we lower constant initializers on output variables so that
+        * nir_remove_dead_variables below sees the corresponding stores
+@@ -558,7 +558,19 @@ radv_shader_spirv_to_nir(struct radv_device *device, const struct radv_shader_st
+          NIR_PASS(_, nir, nir_opt_dce);
+          NIR_PASS(_, nir, nir_remove_dead_variables, nir_var_function_temp | nir_var_shader_temp, NULL);
+       }
+-      NIR_PASS(_, nir, radv_nir_lower_cooperative_matrix, pdev->info.gfx_level, nir->info.max_subgroup_size);
++
++      NIR_PASS(progress, nir, radv_nir_lower_cooperative_matrix, pdev->info.gfx_level, nir->info.max_subgroup_size);
++      if (progress) {
++         NIR_PASS(_, nir, nir_opt_dce);
++         NIR_PASS(progress, nir, nir_inline_functions);
++         nir_remove_non_entrypoints(nir); /* remove the late inlined functions */
++         if (progress) {
++            NIR_PASS(_, nir, nir_opt_copy_prop_vars);
++            NIR_PASS(_, nir, nir_opt_copy_prop);
++         }
++         NIR_PASS(_, nir, nir_opt_deref);
++         NIR_PASS(_, nir, nir_opt_dce);
++      }
+ 
+       /* Split member structs.  We do this before lower_io_to_temporaries so that
+        * it doesn't lower system values to temporaries by accident.
+diff --git a/src/compiler/nir/nir_lower_cooperative_matrix.c b/src/compiler/nir/nir_lower_cooperative_matrix.c
+--- a/src/compiler/nir/nir_lower_cooperative_matrix.c
++++ b/src/compiler/nir/nir_lower_cooperative_matrix.c
+@@ -31,11 +31,21 @@ static struct split_mat *find_split(struct hash_table *split_mats,
+    return entry ? entry->data : NULL;
+ }
+ 
+-static struct nir_deref_instr *recreate_derefs(nir_builder *b, nir_intrinsic_instr *intr, int idx,
+-                                               nir_variable *var)
++static struct split_mat *find_call_split(struct hash_table *split_mats,
++                                         nir_cmat_call_instr *call, int idx)
+ {
+-   nir_deref_instr *deref = nir_src_as_deref(intr->src[idx]);
++   nir_deref_instr *deref = nir_src_as_deref(call->params[idx]);
++   if (!deref)
++      return NULL;
++   nir_variable *var = nir_deref_instr_get_variable(deref);
++   struct hash_entry *entry = _mesa_hash_table_search(split_mats, var);
++   return entry ? entry->data : NULL;
++}
+ 
++static struct nir_deref_instr *recreate_derefs(nir_builder *b, nir_src *src,
++                                                nir_variable *var)
++{
++   nir_deref_instr *deref = nir_src_as_deref(*src);
+    nir_deref_path path;
+    nir_deref_path_init(&path, deref, NULL);
+ 
+@@ -113,7 +123,7 @@ split_cmat_construct(nir_builder *b,
+       return false;
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_construct(b, &dst_deref->def, intr->src[1].ssa);
+    }
+@@ -140,8 +150,8 @@ split_cmat_copy(nir_builder *b,
+    assert(src_split);
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_copy(b, &dst_deref->def, &src_deref->def);
+    }
+@@ -211,8 +221,8 @@ split_cmat_insert(nir_builder *b,
+    nir_def *arr_idx = nir_udiv(b, intr->src[3].ssa, len);
+    nir_def *base_idx = nir_umod(b, intr->src[3].ssa, len);
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 2, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[2], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+ 
+       nir_def *new_def = nir_cmat_extract(b, nir_src_bit_size(intr->src[1]), &src_deref->def, base_idx);
+@@ -247,7 +257,7 @@ split_cmat_extract(nir_builder *b,
+    nir_def *base_idx = nir_umod(b, intr->src[1].ssa, len);
+    nir_def *last_def = nir_undef(b, 1, intr->def.bit_size);
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 0, src_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[0], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_def *cond = nir_ieq_imm(b, arr_idx, i);
+       nir_def *new_def = nir_cmat_extract(b, intr->def.bit_size, &src_deref->def, base_idx);
+@@ -274,8 +284,8 @@ split_cmat_convert(nir_builder *b,
+ 
+    unsigned splits = src_split->num_col_splits * src_split->num_row_splits;
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_convert(b, &dst_deref->def, &src_deref->def, .saturate = nir_intrinsic_saturate(intr),
+                        .cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr));
+@@ -303,8 +313,8 @@ split_cmat_transpose(nir_builder *b,
+       for (unsigned c = 0; c < src_split->num_col_splits; c++) {
+          int in_idx = r * src_split->num_col_splits + c;
+          int out_idx = c * dst_split->num_col_splits + r;
+-         nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[out_idx]);
+-         nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[in_idx]);
++         nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[out_idx]);
++         nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[in_idx]);
+          b->cursor = nir_before_instr(instr);
+          nir_cmat_transpose(b, &dst_deref->def, &src_deref->def);
+       }
+@@ -332,8 +342,8 @@ split_cmat_bitcast(nir_builder *b,
+    assert(src_split);
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_bitcast(b, &dst_deref->def, &src_deref->def);
+    }
+@@ -362,9 +372,9 @@ split_cmat_binary_op(nir_builder *b,
+    assert(src1_split);
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src0_deref = recreate_derefs(b, intr, 1, src0_split->split_vars[i]);
+-      nir_deref_instr *src1_deref = recreate_derefs(b, intr, 2, src1_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src0_deref = recreate_derefs(b, &intr->src[1], src0_split->split_vars[i]);
++      nir_deref_instr *src1_deref = recreate_derefs(b, &intr->src[2], src1_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_binary_op(b, &dst_deref->def, &src0_deref->def, &src1_deref->def,
+                          .alu_op = nir_intrinsic_alu_op(intr));
+@@ -392,8 +402,8 @@ split_cmat_unary_op(nir_builder *b,
+    assert(src_split);
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_unary_op(b, &dst_deref->def, &src_deref->def, .alu_op = nir_intrinsic_alu_op(intr));
+    }
+@@ -420,8 +430,8 @@ split_cmat_scalar_op(nir_builder *b,
+    assert(src_split);
+ 
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *dst_deref = recreate_derefs(b, intr, 0, dst_split->split_vars[i]);
+-      nir_deref_instr *src_deref = recreate_derefs(b, intr, 1, src_split->split_vars[i]);
++      nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[i]);
++      nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+       nir_cmat_scalar_op(b, &dst_deref->def, &src_deref->def, intr->src[2].ssa,
+                          .alu_op = nir_intrinsic_alu_op(intr));
+@@ -472,14 +482,14 @@ split_cmat_muladd(nir_builder *b,
+    for (unsigned m = 0; m < m_splits; m++) {
+       for (unsigned n = 0; n < n_splits; n++) {
+          unsigned idx = m * n_splits + n;
+-         nir_deref_instr *dst_deref = result_split ? recreate_derefs(b, intr, 0, result_split->split_vars[idx]) : nir_src_as_deref(intr->src[0]);
+-         nir_deref_instr *c_deref = c_split ? recreate_derefs(b, intr, 3, c_split->split_vars[idx]) : nir_src_as_deref(intr->src[3]);
++         nir_deref_instr *dst_deref = result_split ? recreate_derefs(b, &intr->src[0], result_split->split_vars[idx]) : nir_src_as_deref(intr->src[0]);
++         nir_deref_instr *c_deref = c_split ? recreate_derefs(b, &intr->src[3], c_split->split_vars[idx]) : nir_src_as_deref(intr->src[3]);
+ 
+          for (unsigned k = 0; k < k_splits; k++) {
+             unsigned a_idx = m * k_splits + k;
+             unsigned b_idx = k * n_splits + n;
+-            nir_deref_instr *a_deref = a_split ? recreate_derefs(b, intr, 1, a_split->split_vars[a_idx]) : nir_src_as_deref(intr->src[1]);
+-            nir_deref_instr *b_deref = b_split ? recreate_derefs(b, intr, 2, b_split->split_vars[b_idx]) : nir_src_as_deref(intr->src[2]);
++            nir_deref_instr *a_deref = a_split ? recreate_derefs(b, &intr->src[1], a_split->split_vars[a_idx]) : nir_src_as_deref(intr->src[1]);
++            nir_deref_instr *b_deref = b_split ? recreate_derefs(b, &intr->src[2], b_split->split_vars[b_idx]) : nir_src_as_deref(intr->src[2]);
+             nir_deref_instr *k_dst_deref = k == k_splits - 1 ? dst_deref : c_deref;
+             b->cursor = nir_before_instr(instr);
+ 
+@@ -494,6 +504,167 @@ split_cmat_muladd(nir_builder *b,
+    return true;
+ }
+ 
++static void
++call_reduce(nir_builder *b,
++            nir_cmat_call_instr *call,
++            nir_cmat_reduce reduce,
++            nir_def *dst, nir_def *src0)
++{
++   nir_cmat_call_instr *ncall = nir_cmat_call_instr_create(b->shader, nir_cmat_call_op_reduce, call->callee);
++   ncall->params[0] = nir_src_for_ssa(dst);
++   ncall->params[1] = nir_src_for_ssa(src0);
++   ncall->const_index[0] = reduce;
++   nir_builder_instr_insert(b, &ncall->instr);
++}
++
++static void
++call_reduce_finish(nir_builder *b,
++                   nir_cmat_call_instr *call,
++                   nir_cmat_reduce reduce,
++                   nir_def *dst, nir_def *src0, nir_def *src1)
++{
++   nir_cmat_call_instr *ncall = nir_cmat_call_instr_create(b->shader, nir_cmat_call_op_reduce_finish, call->callee);
++   ncall->params[0] = nir_src_for_ssa(dst);
++   ncall->params[1] = nir_src_for_ssa(src0);
++   ncall->params[2] = nir_src_for_ssa(src1);
++   ncall->const_index[0] = reduce;
++   nir_builder_instr_insert(b, &ncall->instr);
++}
++
++static void
++call_reduce_2x2(nir_builder *b,
++                nir_cmat_call_instr *call,
++                nir_def *dst,
++                nir_def *src0, nir_def *src1,
++                nir_def *src2, nir_def *src3)
++{
++   nir_cmat_call_instr *ncall = nir_cmat_call_instr_create(b->shader, nir_cmat_call_op_reduce_2x2, call->callee);
++   ncall->params[0] = nir_src_for_ssa(dst);
++   ncall->params[1] = nir_src_for_ssa(src0);
++   ncall->params[2] = nir_src_for_ssa(src1);
++   ncall->params[3] = nir_src_for_ssa(src2);
++   ncall->params[4] = nir_src_for_ssa(src3);
++   nir_builder_instr_insert(b, &ncall->instr);
++}
++
++static bool
++split_cmat_call_reduce(nir_builder *b,
++                       nir_function_impl *impl,
++                       nir_cmat_call_instr *call,
++                       struct split_info *info)
++{
++   nir_instr *instr = &call->instr;
++   nir_cmat_reduce reduce = nir_cmat_call_reduce_flags(call);
++   struct split_mat *dst_split = find_call_split(info->split_mats, call, 0);
++   struct split_mat *src_split = find_call_split(info->split_mats, call, 1);
++
++   if (reduce & (NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN)) {
++      assert(!(reduce & ~(NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN)));
++
++      /* for each source split - reduce it by itself. */
++      int src_splits = 1;
++      if (src_split)
++         src_splits = src_split->num_col_splits * src_split->num_row_splits;
++      nir_deref_instr **temp_derefs = ralloc_array(NULL, nir_deref_instr *, src_splits);
++
++      const struct glsl_type *temp_type = nir_deref_instr_get_variable(nir_src_as_deref(call->params[1]))->type;
++      if (src_splits > 1)
++         temp_type = src_split->split_vars[0]->type;
++      for (unsigned i = 0; i < src_splits; i++) {
++         nir_variable *temp_var = nir_local_variable_create(impl, temp_type,
++                                                            "reduce_split_srcs");
++         temp_derefs[i] = nir_build_deref_var(b, temp_var);
++      }
++
++      if (src_splits > 1) {
++         /* reduce each individual src matrix */
++         for (unsigned i = 0; i < src_splits; i++) {
++            nir_deref_instr *src_deref = recreate_derefs(b, &call->params[1], src_split->split_vars[i]);
++            b->cursor = nir_before_instr(instr);
++            call_reduce(b, call, reduce, &temp_derefs[i]->def, &src_deref->def);
++         }
++
++         if ((reduce & (NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN)) == (NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN)) {
++            for (unsigned i = 1; i < src_splits; i++) {
++               nir_deref_instr *second_deref = temp_derefs[i];
++               b->cursor = nir_before_instr(instr);
++               call_reduce_finish(b, call, reduce, &temp_derefs[0]->def, &temp_derefs[0]->def, &second_deref->def);
++            }
++         } else if (reduce & NIR_CMAT_REDUCE_ROW) {
++            for (unsigned i = 1; i < src_split->num_col_splits; i++) {
++               nir_deref_instr *second_deref = temp_derefs[i];
++               b->cursor = nir_before_instr(instr);
++               call_reduce_finish(b, call, reduce, &temp_derefs[0]->def, &temp_derefs[0]->def, &second_deref->def);
++            }
++         } else if (reduce & NIR_CMAT_REDUCE_COLUMN) {
++            for (unsigned i = 1; i < src_split->num_row_splits; i++) {
++               nir_deref_instr *second_deref = temp_derefs[i * src_split->num_col_splits];
++               b->cursor = nir_before_instr(instr);
++               call_reduce_finish(b, call, reduce, &temp_derefs[0]->def, &temp_derefs[0]->def, &second_deref->def);
++            }
++         }
++      } else {
++         call_reduce(b, call, reduce, &temp_derefs[0]->def, &nir_src_as_deref(call->params[1])->def);
++      }
++
++      /* at this point temp_derefs should contain all the split reduced src matrices
++         now to store them */
++      if (dst_split) {
++         for (unsigned r = 0; r < dst_split->num_row_splits; r++) {
++            for (unsigned c = 0; c < dst_split->num_col_splits; c++) {
++               int didx = r * dst_split->num_col_splits + c;
++               int idx;
++               if ((reduce & (NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN)) == (NIR_CMAT_REDUCE_ROW | NIR_CMAT_REDUCE_COLUMN))
++                  idx = 0;
++               else if (reduce & NIR_CMAT_REDUCE_ROW)
++                  idx = r % (src_split ? src_split->num_row_splits : 1);
++               else if (reduce & NIR_CMAT_REDUCE_COLUMN)
++                  idx = c % (src_split ? src_split->num_col_splits : 1);
++
++               nir_deref_instr *deref = recreate_derefs(b, &call->params[0], dst_split->split_vars[didx]);
++               b->cursor = nir_before_instr(instr);
++               nir_cmat_copy(b, &deref->def, &temp_derefs[idx]->def);
++            }
++         }
++      } else {
++         nir_cmat_copy(b, call->params[0].ssa, &temp_derefs[0]->def);
++      }
++
++      ralloc_free(temp_derefs);
++   } else if (reduce & NIR_CMAT_REDUCE_2X2) {
++      assert(reduce == NIR_CMAT_REDUCE_2X2);
++
++      /* dst can have target dimensions, but src but be at least twice as large */
++      assert (src_split);
++
++      int rows = 1, cols = 1;
++      if (dst_split) {
++         rows = dst_split->num_row_splits;
++         cols = dst_split->num_col_splits;
++      }
++
++      for (unsigned r = 0; r < rows; r++) {
++         for (unsigned c = 0; c < cols; c++) {
++            int d_idx = c + r * cols;
++            int src_top_left_col = c * 2;
++            int src_top_left_row = r * 2;
++            int src_top_idx = src_top_left_col + src_top_left_row * src_split->num_col_splits;
++            int src_bottom_idx = src_top_left_col + (src_top_left_row + 1) * src_split->num_col_splits;
++            nir_deref_instr *src0_deref = recreate_derefs(b, &call->params[1], src_split->split_vars[src_top_idx]);
++            nir_deref_instr *src1_deref = recreate_derefs(b, &call->params[1], src_split->split_vars[src_top_idx + 1]);
++            nir_deref_instr *src2_deref = recreate_derefs(b, &call->params[1], src_split->split_vars[src_bottom_idx]);
++            nir_deref_instr *src3_deref = recreate_derefs(b, &call->params[1], src_split->split_vars[src_bottom_idx + 1]);
++            nir_deref_instr *dst_deref = dst_split ? recreate_derefs(b, &call->params[0], dst_split->split_vars[d_idx]) : nir_src_as_deref(call->params[0]);
++            b->cursor = nir_before_instr(instr);
++            call_reduce_2x2(b, call, &dst_deref->def, &src0_deref->def, &src1_deref->def, &src2_deref->def, &src3_deref->def);
++         }
++      }
++   }
++
++   nir_instr_remove(instr);
++   return true;
++}
++
+ static bool
+ split_cmat_load_store(nir_builder *b,
+                       nir_intrinsic_instr *intr,
+@@ -510,7 +681,7 @@ split_cmat_load_store(nir_builder *b,
+    struct split_mat *split = entry->data;
+    unsigned splits = split->num_row_splits * split->num_col_splits;
+    for (unsigned i = 0; i < splits; i++) {
+-      nir_deref_instr *new_deref = recreate_derefs(b, intr, !is_load, split->split_vars[i]);
++      nir_deref_instr *new_deref = recreate_derefs(b, &intr->src[!is_load], split->split_vars[i]);
+       nir_deref_instr *ptr_deref;
+       nir_def *stride = intr->src[2].ssa;
+       nir_def *ptr = intr->src[is_load].ssa;
+@@ -610,6 +781,17 @@ split_matrix_impl(nir_function_impl *impl, struct split_info *info)
+             }
+             break;
+          }
++         case nir_instr_type_cmat_call: {
++            nir_cmat_call_instr *cmat_call = nir_instr_as_cmat_call(instr);
++            switch (cmat_call->op) {
++            case nir_cmat_call_op_reduce:
++               progress |= split_cmat_call_reduce(&b, impl, cmat_call, info);
++               break;
++            default:
++               break;
++            }
++            break;
++         }
+          default:
+             break;
+          }
+diff --git a/src/compiler/spirv/vtn_cmat.c b/src/compiler/spirv/vtn_cmat.c
+--- a/src/compiler/spirv/vtn_cmat.c
++++ b/src/compiler/spirv/vtn_cmat.c
+@@ -220,6 +220,24 @@ vtn_handle_cooperative_instruction(struct vtn_builder *b, SpvOp opcode,
+       break;
+    }
+ 
++   case SpvOpCooperativeMatrixReduceNV: {
++      struct vtn_type *dst_type = vtn_get_type(b, w[1]);
++      nir_deref_instr *src = vtn_get_cmat_deref(b, w[3]);
++
++      struct vtn_function *reduce_fn = vtn_value(b, w[5], vtn_value_type_function)->func;
++
++      reduce_fn->referenced = true;
++      reduce_fn->nir_func->cmat_call = true;
++      nir_deref_instr *dst = vtn_create_cmat_temporary(b, dst_type->type, "cmat_reduce_nv");
++      nir_cmat_call_instr *call = nir_cmat_call_instr_create(b->nb.shader, nir_cmat_call_op_reduce, reduce_fn->nir_func);
++      call->params[0] = nir_src_for_ssa(&dst->def);
++      call->params[1] = nir_src_for_ssa(&src->def);
++      call->const_index[0] = w[4];
++      nir_builder_instr_insert(&b->nb, &call->instr);
++      vtn_push_var_ssa(b, w[2], dst->var);
++      break;
++   }
++
+    default:
+       UNREACHABLE("Unexpected opcode for cooperative matrix instruction");
+    }

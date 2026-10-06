@@ -1,0 +1,397 @@
+diff --git a/src/amd/common/nir/ac_nir.c b/src/amd/common/nir/ac_nir.c
+--- a/src/amd/common/nir/ac_nir.c
++++ b/src/amd/common/nir/ac_nir.c
+@@ -62,6 +62,7 @@ void ac_nir_set_options(struct radeon_info *info, bool use_llvm,
+    options->lower_iadd_sat = info->gfx_level <= GFX8;
+    options->lower_hadd = true;
+    options->lower_mul_32x16 = true;
++   options->lower_bfloat16_conversions = true,
+    options->has_bfe = true;
+    options->has_bfm = true;
+    options->has_bitfield_select = true;
+@@ -76,6 +77,7 @@ void ac_nir_set_options(struct radeon_info *info, bool use_llvm,
+    options->has_sudot_4x8_sat = info->has_accelerated_dot_product && info->gfx_level >= GFX11;
+    options->has_udot_4x8_sat = info->has_accelerated_dot_product;
+    options->has_dot_2x16 = info->has_accelerated_dot_product && info->gfx_level < GFX11;
++   options->has_bfdot2_bfadd = info->gfx_level >= GFX12;
+    options->has_find_msb_rev = true;
+    options->has_pack_32_4x8 = true;
+    options->has_pack_half_2x16_rtz = true;
+diff --git a/src/amd/compiler/aco_instruction_selection.cpp b/src/amd/compiler/aco_instruction_selection.cpp
+--- a/src/amd/compiler/aco_instruction_selection.cpp
++++ b/src/amd/compiler/aco_instruction_selection.cpp
+@@ -2435,6 +2435,14 @@ visit_alu_instr(isel_context* ctx, nir_alu_instr* instr)
+       emit_idot_instruction(ctx, instr, aco_opcode::v_dot2_u32_u16, dst, true);
+       break;
+    }
++   case nir_op_bfdot2_bfadd: {
++      Temp src0 = as_vgpr(ctx, get_alu_src(ctx, instr->src[0], 2));
++      Temp src1 = as_vgpr(ctx, get_alu_src(ctx, instr->src[1], 2));
++      Temp src2 = get_alu_src(ctx, instr->src[2], 1);
++
++      bld.vop3(aco_opcode::v_dot2_bf16_bf16, Definition(dst), src0, src1, src2);
++      break;
++   }
+    case nir_op_cube_amd: {
+       Temp in = get_alu_src(ctx, instr->src[0], 3);
+       Temp src[3] = {emit_extract_vector(ctx, in, 0, v1), emit_extract_vector(ctx, in, 1, v1),
+@@ -8020,20 +8028,30 @@ visit_cmat_muladd(isel_context* ctx, nir_intrinsic_instr* instr)
+    bitarray8 neg_lo = nir_intrinsic_neg_lo_amd(instr);
+    bitarray8 neg_hi = nir_intrinsic_neg_hi_amd(instr);
+ 
+-   switch (instr->src[0].ssa->bit_size) {
+-   case 16:
++   enum glsl_base_type type_a = nir_intrinsic_src_base_type(instr);
++   enum glsl_base_type type_b = nir_intrinsic_src_base_type2(instr);
++
++   switch (type_a) {
++   case GLSL_TYPE_FLOAT16:
+       switch (instr->def.bit_size) {
+       case 32: opcode = aco_opcode::v_wmma_f32_16x16x16_f16; break;
+       case 16: opcode = aco_opcode::v_wmma_f16_16x16x16_f16; break;
+       }
+       break;
+-   case 8: {
++   case GLSL_TYPE_BFLOAT16:
++      switch (instr->def.bit_size) {
++      case 32: opcode = aco_opcode::v_wmma_f32_16x16x16_bf16; break;
++      case 16: opcode = aco_opcode::v_wmma_bf16_16x16x16_bf16; break;
++      }
++      break;
++   case GLSL_TYPE_UINT8:
++   case GLSL_TYPE_INT8: {
+       opcode = aco_opcode::v_wmma_i32_16x16x16_iu8;
+-      unsigned signed_mask = nir_intrinsic_cmat_signed_mask(instr);
+-      neg_lo[0] = signed_mask & NIR_CMAT_A_SIGNED;
+-      neg_lo[1] = signed_mask & NIR_CMAT_B_SIGNED;
++      neg_lo[0] = type_a == GLSL_TYPE_INT8;
++      neg_lo[1] = type_b == GLSL_TYPE_INT8;
+       break;
+    }
++   default: unreachable("invalid cmat_muladd_amd type");
+    }
+ 
+    if (opcode == aco_opcode::num_opcodes)
+@@ -8049,13 +8067,18 @@ visit_cmat_muladd(isel_context* ctx, nir_intrinsic_instr* instr)
+    uint32_t constant;
+    uint32_t acc_stride = ctx->program->gfx_level < GFX12 && instr->def.bit_size == 16 ? 2 : 1;
+    if (get_replicated_constant(instr->src[2].ssa, acc_stride, &constant)) {
+-      Operand constC =
+-         Operand::get_const(ctx->program->gfx_level, constant, instr->def.bit_size / 8);
++      unsigned constant_size = instr->def.bit_size;
++      if (opcode == aco_opcode::v_wmma_bf16_16x16x16_bf16) {
++         /* Bfloat16 uses the high bits of 32bit inline constants. */
++         constant <<= 16;
++         constant_size = 32;
++      }
++      Operand constC = Operand::get_const(ctx->program->gfx_level, constant, constant_size / 8);
+       if (!constC.isLiteral()) {
+          C = constC;
+       } else if (opcode != aco_opcode::v_wmma_i32_16x16x16_iu8) {
+-         constant ^= 1 << (instr->def.bit_size - 1);
+-         constC = Operand::get_const(ctx->program->gfx_level, constant, instr->def.bit_size / 8);
++         constant ^= 1 << (constant_size - 1);
++         constC = Operand::get_const(ctx->program->gfx_level, constant, constant_size / 8);
+          if (!constC.isLiteral()) {
+             C = constC;
+             neg_lo[2] ^= !neg_hi[2];
+diff --git a/src/amd/compiler/aco_instruction_selection_setup.cpp b/src/amd/compiler/aco_instruction_selection_setup.cpp
+--- a/src/amd/compiler/aco_instruction_selection_setup.cpp
++++ b/src/amd/compiler/aco_instruction_selection_setup.cpp
+@@ -438,6 +438,7 @@ init_context(isel_context* ctx, nir_shader* shader)
+                case nir_op_sdot_2x16_iadd:
+                case nir_op_udot_2x16_uadd_sat:
+                case nir_op_sdot_2x16_iadd_sat:
++               case nir_op_bfdot2_bfadd:
+                case nir_op_alignbyte_amd: type = RegType::vgpr; break;
+                case nir_op_fmul:
+                case nir_op_ffma:
+diff --git a/src/amd/compiler/aco_optimizer.cpp b/src/amd/compiler/aco_optimizer.cpp
+--- a/src/amd/compiler/aco_optimizer.cpp
++++ b/src/amd/compiler/aco_optimizer.cpp
+@@ -648,6 +648,7 @@ alu_can_accept_constant(const aco_ptr<Instruction>& instr, unsigned operand)
+    case aco_opcode::v_interp_p2_f16_f32_inreg:
+    case aco_opcode::v_interp_p10_rtz_f16_f32_inreg:
+    case aco_opcode::v_interp_p2_rtz_f16_f32_inreg:
++   case aco_opcode::v_dot2_bf16_bf16: /* TODO */
+    case aco_opcode::v_wmma_f32_16x16x16_f16:
+    case aco_opcode::v_wmma_f32_16x16x16_bf16:
+    case aco_opcode::v_wmma_f16_16x16x16_f16:
+diff --git a/src/amd/llvm/ac_llvm_build.c b/src/amd/llvm/ac_llvm_build.c
+--- a/src/amd/llvm/ac_llvm_build.c
++++ b/src/amd/llvm/ac_llvm_build.c
+@@ -61,12 +61,14 @@ void ac_llvm_context_init(struct ac_llvm_context *ctx, struct ac_llvm_compiler *
+    ctx->i64 = LLVMIntTypeInContext(ctx->context, 64);
+    ctx->i128 = LLVMIntTypeInContext(ctx->context, 128);
+    ctx->intptr = ctx->i32;
++   ctx->bf16 = LLVMBFloatTypeInContext(ctx->context);
+    ctx->f16 = LLVMHalfTypeInContext(ctx->context);
+    ctx->f32 = LLVMFloatTypeInContext(ctx->context);
+    ctx->f64 = LLVMDoubleTypeInContext(ctx->context);
+    ctx->v4i8 = LLVMVectorType(ctx->i8, 4);
+    ctx->v2i16 = LLVMVectorType(ctx->i16, 2);
+    ctx->v4i16 = LLVMVectorType(ctx->i16, 4);
++   ctx->v2bf16 = LLVMVectorType(ctx->bf16, 2);
+    ctx->v2f16 = LLVMVectorType(ctx->f16, 2);
+    ctx->v4f16 = LLVMVectorType(ctx->f16, 4);
+    ctx->v2i32 = LLVMVectorType(ctx->i32, 2);
+@@ -154,7 +156,7 @@ int ac_get_elem_bits(struct ac_llvm_context *ctx, LLVMTypeRef type)
+          return 32;
+    }
+ 
+-   if (type == ctx->f16)
++   if (type == ctx->f16 || type == ctx->bf16)
+       return 16;
+    if (type == ctx->f32)
+       return 32;
+@@ -172,6 +174,7 @@ unsigned ac_get_type_size(LLVMTypeRef type)
+    case LLVMIntegerTypeKind:
+       return LLVMGetIntTypeWidth(type) / 8;
+    case LLVMHalfTypeKind:
++   case LLVMBFloatTypeKind:
+       return 2;
+    case LLVMFloatTypeKind:
+       return 4;
+@@ -197,7 +200,7 @@ static LLVMTypeRef to_integer_type_scalar(struct ac_llvm_context *ctx, LLVMTypeR
+       return ctx->i1;
+    else if (t == ctx->i8)
+       return ctx->i8;
+-   else if (t == ctx->f16 || t == ctx->i16)
++   else if (t == ctx->f16 || t == ctx->bf16 || t == ctx->i16)
+       return ctx->i16;
+    else if (t == ctx->f32 || t == ctx->i32)
+       return ctx->i32;
+@@ -356,6 +359,9 @@ void ac_build_type_name_for_intr(LLVMTypeRef type, char *buf, unsigned bufsize)
+    case LLVMIntegerTypeKind:
+       snprintf(buf, bufsize, "i%d", LLVMGetIntTypeWidth(elem_type));
+       break;
++   case LLVMBFloatTypeKind:
++      snprintf(buf, bufsize, "bf16");
++      break;
+    case LLVMHalfTypeKind:
+       snprintf(buf, bufsize, "f16");
+       break;
+diff --git a/src/amd/llvm/ac_llvm_build.h b/src/amd/llvm/ac_llvm_build.h
+--- a/src/amd/llvm/ac_llvm_build.h
++++ b/src/amd/llvm/ac_llvm_build.h
+@@ -79,12 +79,14 @@ struct ac_llvm_context {
+    LLVMTypeRef i64;
+    LLVMTypeRef i128;
+    LLVMTypeRef intptr;
++   LLVMTypeRef bf16;
+    LLVMTypeRef f16;
+    LLVMTypeRef f32;
+    LLVMTypeRef f64;
+    LLVMTypeRef v4i8;
+    LLVMTypeRef v2i16;
+    LLVMTypeRef v4i16;
++   LLVMTypeRef v2bf16;
+    LLVMTypeRef v2f16;
+    LLVMTypeRef v4f16;
+    LLVMTypeRef v2i32;
+diff --git a/src/amd/llvm/ac_nir_to_llvm.c b/src/amd/llvm/ac_nir_to_llvm.c
+--- a/src/amd/llvm/ac_nir_to_llvm.c
++++ b/src/amd/llvm/ac_nir_to_llvm.c
+@@ -1226,6 +1226,22 @@ static bool visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+       break;
+    }
+ 
++   case nir_op_bfdot2_bfadd: {
++      const char *name = "llvm.amdgcn.fdot2.bf16.bf16";
++      LLVMTypeRef vec2_type = ctx->ac.v2bf16;
++      LLVMTypeRef scalar_type = ctx->ac.bf16;
++#if LLVM_VERSION_MAJOR < 19 || (LLVM_VERSION_MAJOR == 19 && LLVM_VERSION_MINOR == 0)
++      /* Before LLVM 19.1, bf16 fdot used integer operands. */
++      vec2_type = ctx->ac.v2i16;
++      scalar_type = ctx->ac.i16;
++#endif
++      src[0] = LLVMBuildBitCast(ctx->ac.builder, src[0], vec2_type, "");
++      src[1] = LLVMBuildBitCast(ctx->ac.builder, src[1], vec2_type, "");
++      src[2] = LLVMBuildBitCast(ctx->ac.builder, src[2], scalar_type, "");
++      result = ac_build_intrinsic(&ctx->ac, name, scalar_type, src, 3, 0);
++      break;
++   }
++
+    case nir_op_msad_4x8:
+       result = ac_build_intrinsic(&ctx->ac, "llvm.amdgcn.msad.u8", ctx->ac.i32,
+                                   (LLVMValueRef[]){src[1], src[0], src[2]}, 3, 0);
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -181,6 +181,26 @@ radv_get_base_row(nir_builder *b, struct glsl_cmat_description desc, const lower
+    return base_row;
+ }
+ 
++static nir_def *
++convert_base_type(nir_builder *b, nir_def *src, enum glsl_base_type src_type, enum glsl_base_type dst_type)
++{
++   if (dst_type == src_type)
++      return src;
++
++   if (src_type == GLSL_TYPE_BFLOAT16) {
++      src = nir_bf2f(b, src);
++      return convert_base_type(b, src, GLSL_TYPE_FLOAT, dst_type);
++   } else if (dst_type == GLSL_TYPE_BFLOAT16) {
++      src = convert_base_type(b, src, src_type, GLSL_TYPE_FLOAT);
++      return nir_f2bf(b, src);
++   }
++
++   nir_op op = nir_type_conversion_op(nir_get_nir_type_for_glsl_base_type(src_type),
++                                      nir_get_nir_type_for_glsl_base_type(dst_type), nir_rounding_mode_undef);
++
++   return nir_build_alu1(b, op, src);
++}
++
+ bool
+ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size)
+ {
+@@ -417,11 +437,22 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+                nir_def *B = radv_nir_load_cmat(&b, &params, intr->src[2].ssa);
+                nir_def *C = radv_nir_load_cmat(&b, &params, intr->src[3].ssa);
+ 
+-               nir_deref_instr *dst_deref = nir_instr_as_deref(intr->src[0].ssa->parent_instr);
++               nir_deref_instr *a_deref = nir_src_as_deref(intr->src[1]);
++               nir_deref_instr *b_deref = nir_src_as_deref(intr->src[2]);
++               struct glsl_cmat_description a_desc = *glsl_get_cmat_description(a_deref->type);
++               struct glsl_cmat_description b_desc = *glsl_get_cmat_description(b_deref->type);
++
++               const nir_cmat_signed cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr);
++
++               enum glsl_base_type a_element_type =
++                  glsl_apply_signedness_to_base_type(a_desc.element_type, cmat_signed_mask & NIR_CMAT_A_SIGNED);
++               enum glsl_base_type b_element_type =
++                  glsl_apply_signedness_to_base_type(b_desc.element_type, cmat_signed_mask & NIR_CMAT_B_SIGNED);
+ 
+                nir_def *ret = nir_cmat_muladd_amd(&b, A, B, C, .saturate = nir_intrinsic_saturate(intr),
+-                                                  .cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr));
++                                                  .src_base_type = a_element_type, .src_base_type2 = b_element_type);
+ 
++               nir_deref_instr *dst_deref = nir_src_as_deref(intr->src[0]);
+                nir_store_deref(&b, dst_deref, ret, nir_component_mask(ret->num_components));
+                nir_instr_remove(instr);
+                progress = true;
+@@ -441,10 +472,6 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+                enum glsl_base_type src_element_type = glsl_apply_signedness_to_base_type(
+                   src_desc.element_type, cmat_signed_mask & NIR_CMAT_A_SIGNED);
+ 
+-               nir_op op = nir_type_conversion_op(nir_get_nir_type_for_glsl_base_type(src_element_type),
+-                                                  nir_get_nir_type_for_glsl_base_type(dst_element_type),
+-                                                  nir_rounding_mode_undef);
+-
+                unsigned dst_mul = radv_nir_cmat_length_mul(dst_desc, &params);
+                unsigned src_mul = radv_nir_cmat_length_mul(src_desc, &params);
+ 
+@@ -457,7 +484,7 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+                   src = nir_vec(&b, components, src->num_components / scale);
+                }
+ 
+-               nir_def *ret = nir_build_alu1(&b, op, src);
++               nir_def *ret = convert_base_type(&b, src, src_element_type, dst_element_type);
+ 
+                if (dst_mul > src_mul) {
+                   nir_def *components[NIR_MAX_VEC_COMPONENTS];
+@@ -637,13 +664,21 @@ opt_cmat(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
+    if (intrin->intrinsic != nir_intrinsic_cmat_muladd_amd)
+       return false;
+ 
++   enum glsl_base_type a_type = nir_intrinsic_src_base_type(intrin);
++
++   if (glsl_base_type_is_integer(a_type))
++      return false;
++
+    bool progress = false;
+ 
+-   if (intrin->src[0].ssa->bit_size != 8) {
+-      for (unsigned i = 0; i < 3; i++)
++   if (a_type == GLSL_TYPE_FLOAT16) {
++      for (unsigned i = 0; i < 2; i++)
+          progress |= opt_cmat_modifiers(b, intrin, gfx_level, i);
+    }
+ 
++   if (a_type == GLSL_TYPE_FLOAT16 || intrin->def.bit_size == 32)
++      progress |= opt_cmat_modifiers(b, intrin, gfx_level, 2);
++
+    return progress;
+ }
+ 
+diff --git a/src/amd/vulkan/radv_physical_device.c b/src/amd/vulkan/radv_physical_device.c
+--- a/src/amd/vulkan/radv_physical_device.c
++++ b/src/amd/vulkan/radv_physical_device.c
+@@ -579,6 +579,7 @@ radv_physical_device_get_supported_extensions(const struct radv_physical_device
+       .KHR_sampler_ycbcr_conversion = true,
+       .KHR_separate_depth_stencil_layouts = true,
+       .KHR_shader_atomic_int64 = true,
++      .KHR_shader_bfloat16 = pdev->info.gfx_level >= GFX12, /* GFX11 has precision issues. */
+       .KHR_shader_clock = true,
+       .KHR_shader_draw_parameters = true,
+       .KHR_shader_expect_assume = true,
+@@ -1305,6 +1306,11 @@ radv_physical_device_get_features(const struct radv_physical_device *pdev, struc
+ 
+       /* VK_EXT_device_memory_report */
+       .deviceMemoryReport = true,
++
++      /* VK_KHR_shader_bfloat16 */
++      .shaderBFloat16Type = true,
++      .shaderBFloat16DotProduct = true,
++      .shaderBFloat16CooperativeMatrix = radv_cooperative_matrix_enabled(pdev),
+    };
+ }
+ 
+@@ -2845,34 +2851,31 @@ VKAPI_ATTR VkResult VKAPI_CALL
+ radv_GetPhysicalDeviceCooperativeMatrixPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount,
+                                                      VkCooperativeMatrixPropertiesKHR *pProperties)
+ {
++   VK_FROM_HANDLE(radv_physical_device, pdev, physicalDevice);
+    VK_OUTARRAY_MAKE_TYPED(VkCooperativeMatrixPropertiesKHR, out, pProperties, pPropertyCount);
+ 
+-   vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
+-   {
+-      *p = (struct VkCooperativeMatrixPropertiesKHR){.sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
+-                                                     .MSize = 16,
+-                                                     .NSize = 16,
+-                                                     .KSize = 16,
+-                                                     .AType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .BType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .CType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .ResultType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .saturatingAccumulation = false,
+-                                                     .scope = VK_SCOPE_SUBGROUP_KHR};
+-   }
+-
+-   vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
+-   {
+-      *p = (struct VkCooperativeMatrixPropertiesKHR){.sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
+-                                                     .MSize = 16,
+-                                                     .NSize = 16,
+-                                                     .KSize = 16,
+-                                                     .AType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .BType = VK_COMPONENT_TYPE_FLOAT16_KHR,
+-                                                     .CType = VK_COMPONENT_TYPE_FLOAT32_KHR,
+-                                                     .ResultType = VK_COMPONENT_TYPE_FLOAT32_KHR,
+-                                                     .saturatingAccumulation = false,
+-                                                     .scope = VK_SCOPE_SUBGROUP_KHR};
++   for (unsigned bfloat = 0; bfloat < 2; bfloat++) {
++      for (unsigned fp32 = 0; fp32 < 2; fp32++) {
++         VkComponentTypeKHR ab_type = bfloat ? VK_COMPONENT_TYPE_BFLOAT16_KHR : VK_COMPONENT_TYPE_FLOAT16_KHR;
++         VkComponentTypeKHR cd_type = fp32 ? VK_COMPONENT_TYPE_FLOAT32_KHR : ab_type;
++
++         if (pdev->info.gfx_level < GFX12 && bfloat)
++            continue; /* BF16 isn't working precisely on GFX11. */
++
++         vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++         {
++            *p = (struct VkCooperativeMatrixPropertiesKHR){.sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++                                                           .MSize = 16,
++                                                           .NSize = 16,
++                                                           .KSize = 16,
++                                                           .AType = ab_type,
++                                                           .BType = ab_type,
++                                                           .CType = cd_type,
++                                                           .ResultType = cd_type,
++                                                           .saturatingAccumulation = false,
++                                                           .scope = VK_SCOPE_SUBGROUP_KHR};
++         }
++      }
+    }
+ 
+    for (unsigned asigned = 0; asigned < 2; asigned++) {

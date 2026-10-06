@@ -1,0 +1,53 @@
+diff --git a/src/layer/vulkan/shader/padding_pack1to4.comp b/src/layer/vulkan/shader/padding_pack1to4.comp
+--- a/src/layer/vulkan/shader/padding_pack1to4.comp
++++ b/src/layer/vulkan/shader/padding_pack1to4.comp
+@@ -173,12 +173,20 @@ void main()
+             ivec4 v_offset = y4 * psc(w) + x;
+ 
+             afpvec4 v;
++#if ncnn_vendorID == 4318
++            // out of index load cause stall on nvidia
++            v.r = mask.r ? buffer_ld1(bottom_blob_data, v_offset.r) : value;
++            v.g = mask.g ? buffer_ld1(bottom_blob_data, v_offset.g) : value;
++            v.b = mask.b ? buffer_ld1(bottom_blob_data, v_offset.b) : value;
++            v.a = mask.a ? buffer_ld1(bottom_blob_data, v_offset.a) : value;
++#else
+             v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+             v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+             v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+             v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+ 
+             v = mix(afpvec4(value), v, mask);
++#endif
+ 
+             buffer_st4(top_blob_data, gi, v);
+ #endif
+diff --git a/src/layer/vulkan/shader/padding_pack1to8.comp b/src/layer/vulkan/shader/padding_pack1to8.comp
+--- a/src/layer/vulkan/shader/padding_pack1to8.comp
++++ b/src/layer/vulkan/shader/padding_pack1to8.comp
+@@ -209,6 +209,17 @@ void main()
+             ivec4 v_offset2 = yy4 * psc(w) + x;
+ 
+             afpvec8 v;
++#if ncnn_vendorID == 4318
++            // out of index load cause stall on nvidia
++            v[0].r = mask.r ? buffer_ld1(bottom_blob_data, v_offset.r) : value;
++            v[0].g = mask.g ? buffer_ld1(bottom_blob_data, v_offset.g) : value;
++            v[0].b = mask.b ? buffer_ld1(bottom_blob_data, v_offset.b) : value;
++            v[0].a = mask.a ? buffer_ld1(bottom_blob_data, v_offset.a) : value;
++            v[1].r = mask2.r ? buffer_ld1(bottom_blob_data, v_offset2.r) : value;
++            v[1].g = mask2.g ? buffer_ld1(bottom_blob_data, v_offset2.g) : value;
++            v[1].b = mask2.b ? buffer_ld1(bottom_blob_data, v_offset2.b) : value;
++            v[1].a = mask2.a ? buffer_ld1(bottom_blob_data, v_offset2.a) : value;
++#else
+             v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+             v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+             v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+@@ -220,6 +231,7 @@ void main()
+ 
+             v[0] = mix(afpvec4(value), v[0], mask);
+             v[1] = mix(afpvec4(value), v[1], mask2);
++#endif
+ 
+             buffer_st8(top_blob_data, gi, v);
+ #endif

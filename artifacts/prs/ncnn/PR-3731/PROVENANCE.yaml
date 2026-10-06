@@ -1,0 +1,59 @@
+repo: Tencent/ncnn
+pr: 3731
+url: https://github.com/Tencent/ncnn/pull/3731
+merge_sha: 9f832c19c170322ecd01749a6d129e7e915ccdb1
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/3731/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/dequantize.comp
+  status: added
+  sha256: 6edf99cd59e569e14f9667f550f351e9e9d09a196dfec0c02dd95424882d2e70
+- path: src/layer/vulkan/shader/dequantize_pack4.comp
+  status: added
+  sha256: aa754aa66870c620c885b4696c14215c767ee4d4802bc542a3963d58e5e37e42
+- path: src/layer/vulkan/shader/dequantize_pack8.comp
+  status: added
+  sha256: e2ed4492516a5e8474020ed7c28a726544d5e4ecfac2aa9fa40d7d93474633f4
+- path: src/layer/vulkan/shader/packing_int8.comp
+  status: added
+  sha256: e352ec060f10a01a4f17bccd46d6eaa20ae7f5c43ba3dbb4ece3bc517c6cffed
+- path: src/layer/vulkan/shader/packing_pack1to4_int8.comp
+  status: added
+  sha256: b6ce06492b7b9fdad38946d90b8dbffdf8e3469c264f6a4707c33fb70206867e
+- path: src/layer/vulkan/shader/packing_pack1to8_int8.comp
+  status: added
+  sha256: 5247ed17c965209093ddea9a5e62ae6816cb713f554699e0c76182ee05c33c61
+- path: src/layer/vulkan/shader/packing_pack4to1_int8.comp
+  status: added
+  sha256: 997d8e90349ba89a7acc0942e51b8609e284ac1dfb5672dff0e41d12e9af5151
+- path: src/layer/vulkan/shader/packing_pack4to8_int8.comp
+  status: added
+  sha256: 32b28085a0d02808047cbe99ec802414553082629553ef54f843dad76ec7ea7e
+- path: src/layer/vulkan/shader/packing_pack8to1_int8.comp
+  status: added
+  sha256: 661794f78fca0495aa220c6d126365eb5daf2c48783fd03086c738cc27548054
+- path: src/layer/vulkan/shader/packing_pack8to4_int8.comp
+  status: added
+  sha256: 49d86e83150cf0a4c0c320d1b14f412f485acc114392fa1d38657b020e99fa0a
+- path: src/layer/vulkan/shader/quantize.comp
+  status: added
+  sha256: c224292f8c86729cfe252ec8f08f93c0c1b42c9f43e34ff45fb2cb56303d1c7f
+- path: src/layer/vulkan/shader/quantize_pack4.comp
+  status: added
+  sha256: 1ff2867dddd04f8a6ebc8e7d2f0d166d9c6ed5fc9e312a18697311f089d604c4
+- path: src/layer/vulkan/shader/quantize_pack8.comp
+  status: added
+  sha256: 065813d23a1b42f08b94218e435525b5bc0e27b10aed373c20380d47aefc32b1
+- path: src/layer/vulkan/shader/requantize.comp
+  status: added
+  sha256: 89edf9ab1c18bc73ed9477f9661f4d9a5e6217fa55097f603b6bb5b904adb86c
+- path: src/layer/vulkan/shader/requantize_pack4.comp
+  status: added
+  sha256: aab7533fdd85a81131808a1e16438945d53652556201204166d84d3ade51d009
+- path: src/layer/vulkan/shader/requantize_pack8.comp
+  status: added
+  sha256: 76c2695df2dff95930966ca14402a4e8286387d402323189e89c0c5f715bfbe6

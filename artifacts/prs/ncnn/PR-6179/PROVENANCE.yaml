@@ -1,0 +1,20 @@
+repo: Tencent/ncnn
+pr: 6179
+url: https://github.com/Tencent/ncnn/pull/6179
+merge_sha: 4f9f7d929efaa6269295757e5d4a3e7566526a6d
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6179/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/unaryop.comp
+  status: modified
+  sha256: 6a4db0a079635101d8b3b6207f380c92b356eda90d715f3495a1b968098f808a
+- path: src/layer/vulkan/shader/unaryop_pack4.comp
+  status: removed
+  sha256: 4da43ce67d5aabed43d7e16a6121712e3250886661e25b35b813e03f4da0773f
+- path: src/layer/vulkan/shader/unaryop_pack8.comp
+  status: removed
+  sha256: fbf05fc09a71212351e92b5ba83d10401488fa2f6048b34f31ea00dec989398b

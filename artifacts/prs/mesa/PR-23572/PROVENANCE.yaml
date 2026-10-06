@@ -1,0 +1,32 @@
+repo: mesa/mesa
+pr: 23572
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/23572
+merge_sha: daac72de3a2e01dd17e766a43ee2fd2dceee829f
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/23572/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/ci/external/radv-navi22-aco-fails.txt
+  status: modified
+  sha256: f0062399e06a2877b1ea83273bec3a15369961b9ca9f53726de22bfc282e06f3
+- path: src/amd/ci/radv-navi21-aco-fails.txt
+  status: modified
+  sha256: c645f007e6e9bc539d41b31e3a7ce77d030e36a6f1af5c16ccc9ee99e9b68405
+- path: src/amd/ci/radv-vangogh-aco-fails.txt
+  status: modified
+  sha256: 9adbc9c8222c447d996ad84f19d1163d11fcb2ab1fbf497cfd2955f4562df813
+- path: src/amd/vulkan/radv_pipeline_rt.c
+  status: modified
+  sha256: 3f68cadf6a93d01ffd69e641a8a87ca793f10e3f88e976c1de32cca2cdc65dc7
+- path: src/amd/vulkan/radv_rt_shader.c
+  status: modified
+  sha256: 69f9c6fb108dad4a7a7396015bfb57b02e6c046e910668c24c0d79d14d4b0f80
+- path: src/amd/vulkan/radv_shader.h
+  status: modified
+  sha256: 4bf8e36b6420448999701f9cb8cee211012562a39ff57567309d78bf3c328152
+- path: src/amd/vulkan/radv_shader_info.c
+  status: modified
+  sha256: 0e4ac77d9e50c48246d34b4288eb3fad3bf9802516b32a5e9d026ff7b965d87a

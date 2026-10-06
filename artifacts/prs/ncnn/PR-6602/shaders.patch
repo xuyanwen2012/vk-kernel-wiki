@@ -1,0 +1,60 @@
+diff --git a/src/layer/vulkan/shader/binaryop.comp b/src/layer/vulkan/shader/binaryop.comp
+--- a/src/layer/vulkan/shader/binaryop.comp
++++ b/src/layer/vulkan/shader/binaryop.comp
+@@ -103,7 +103,7 @@ void main()
+ #endif
+     if (op_type == 12) res = v1 - trunc(v1 / v2) * v2;
+     if (op_type == 13) res = v2 - trunc(v2 / v1) * v1;
+-    if (op_type == 14) res = max(v1, v2) + log(1.0 + exp(min(v1, v2) - max(v1, v2)));
++    if (op_type == 14) res = max(v1, v2) + log(afp(1.0) + exp(min(v1, v2) - max(v1, v2)));
+     if (op_type == 15) res = floor(v1 / v2);
+     if (op_type == 16) res = floor(v2 / v1);
+     if (op_type == 17) res = v1 - roundEven(v1 / v2) * v2;
+diff --git a/src/layer/vulkan/shader/binaryop_broadcast.comp b/src/layer/vulkan/shader/binaryop_broadcast.comp
+--- a/src/layer/vulkan/shader/binaryop_broadcast.comp
++++ b/src/layer/vulkan/shader/binaryop_broadcast.comp
+@@ -172,7 +172,7 @@ void main()
+ #endif
+     if (op_type == 12) res = v1 - trunc(v1 / v2) * v2;
+     if (op_type == 13) res = v2 - trunc(v2 / v1) * v1;
+-    if (op_type == 14) res = max(v1, v2) + log(1.0 + exp(min(v1, v2) - max(v1, v2)));
++    if (op_type == 14) res = max(v1, v2) + log(afp(1.0) + exp(min(v1, v2) - max(v1, v2)));
+     if (op_type == 15) res = floor(v1 / v2);
+     if (op_type == 16) res = floor(v2 / v1);
+     if (op_type == 17) res = v1 - roundEven(v1 / v2) * v2;
+diff --git a/src/layer/vulkan/shader/binaryop_broadcast_pack1to4.comp b/src/layer/vulkan/shader/binaryop_broadcast_pack1to4.comp
+--- a/src/layer/vulkan/shader/binaryop_broadcast_pack1to4.comp
++++ b/src/layer/vulkan/shader/binaryop_broadcast_pack1to4.comp
+@@ -103,7 +103,7 @@ void main()
+ #endif
+     if (op_type == 12) res = v1 - trunc(v1 / v2) * v2;
+     if (op_type == 13) res = v2 - trunc(v2 / v1) * v1;
+-    if (op_type == 14) res = max(v1, v2) + log(1.0 + exp(min(v1, v2) - max(v1, v2)));
++    if (op_type == 14) res = max(v1, v2) + log(afpvec4(1.0) + exp(min(v1, v2) - max(v1, v2)));
+     if (op_type == 15) res = floor(v1 / v2);
+     if (op_type == 16) res = floor(v2 / v1);
+     if (op_type == 17) res = v1 - roundEven(v1 / v2) * v2;
+diff --git a/src/layer/vulkan/shader/binaryop_broadcast_pack4.comp b/src/layer/vulkan/shader/binaryop_broadcast_pack4.comp
+--- a/src/layer/vulkan/shader/binaryop_broadcast_pack4.comp
++++ b/src/layer/vulkan/shader/binaryop_broadcast_pack4.comp
+@@ -172,7 +172,7 @@ void main()
+ #endif
+     if (op_type == 12) res = v1 - trunc(v1 / v2) * v2;
+     if (op_type == 13) res = v2 - trunc(v2 / v1) * v1;
+-    if (op_type == 14) res = max(v1, v2) + log(1.0 + exp(min(v1, v2) - max(v1, v2)));
++    if (op_type == 14) res = max(v1, v2) + log(afpvec4(1.0) + exp(min(v1, v2) - max(v1, v2)));
+     if (op_type == 15) res = floor(v1 / v2);
+     if (op_type == 16) res = floor(v2 / v1);
+     if (op_type == 17) res = v1 - roundEven(v1 / v2) * v2;
+diff --git a/src/layer/vulkan/shader/binaryop_pack4.comp b/src/layer/vulkan/shader/binaryop_pack4.comp
+--- a/src/layer/vulkan/shader/binaryop_pack4.comp
++++ b/src/layer/vulkan/shader/binaryop_pack4.comp
+@@ -98,7 +98,7 @@ void main()
+ #endif
+     if (op_type == 12) res = v1 - trunc(v1 / v2) * v2;
+     if (op_type == 13) res = v2 - trunc(v2 / v1) * v1;
+-    if (op_type == 14) res = max(v1, v2) + log(1.0 + exp(min(v1, v2) - max(v1, v2)));
++    if (op_type == 14) res = max(v1, v2) + log(afpvec4(1.0) + exp(min(v1, v2) - max(v1, v2)));
+     if (op_type == 15) res = floor(v1 / v2);
+     if (op_type == 16) res = floor(v2 / v1);
+     if (op_type == 17) res = v1 - roundEven(v1 / v2) * v2;

@@ -1,0 +1,44 @@
+repo: Tencent/ncnn
+pr: 3645
+url: https://github.com/Tencent/ncnn/pull/3645
+merge_sha: 62a872bad3980244d2af541a9d092d7d0b6e921c
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/3645/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_input.comp
+  status: added
+  sha256: c1294e517bd6272a12483f62fcad744f441ede3b1044fbfa206b0ce29489df29
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_output.comp
+  status: added
+  sha256: c2d4ea9fec930313cc54af19c183701cccbaaa47a15341d485ed03dd8a4a00cd
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_input.comp
+  status: added
+  sha256: ac8bf53244b1c1bf9368e9573f73a4d4038e5fd96426d8f482851381c9d9f5f0
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_output.comp
+  status: added
+  sha256: 2affb4c74c19bea930204963c61bf86b7338e731b50ef0ad38400feff3a5d17c
+- path: src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: 7828de4859bdef2619fbd34d6161de5264ab98d6c61897c45aeab4dcc010c3d5
+- path: src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: df1ea1d2ad309100ce8f9b3cfab287d0bd6f9f26d40b80c29a6858fc62d2cfec
+- path: src/layer/vulkan/shader/convolution_pack1to8_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: 93d87afd518a94f7af294dd608f3b52ecfe356b6d555bf6d78ecc5e756eaae83
+- path: src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: f318703b18834ab85e81264f11f4c6ceaff64be7018f80482fb34989b270c474
+- path: src/layer/vulkan/shader/convolution_pack4to8_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: 9e897477c2892a582eb41101e2c3b171a7c2a8803d1014500699fa8dacbcf185
+- path: src/layer/vulkan/shader/convolution_pack8to1_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: 80f52e70282fc9b77393f8915d0200ed3e9dc881bf8ef4da08aaa4128e5a001e
+- path: src/layer/vulkan/shader/convolution_pack8to4_3x3s1d1_winograd_gemm.comp
+  status: added
+  sha256: f9def6ddbdd4567b14b3586914b442a5fad81d3d442947954d7fd21fc2d1833e

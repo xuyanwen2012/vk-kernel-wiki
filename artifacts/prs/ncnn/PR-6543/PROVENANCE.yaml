@@ -1,0 +1,23 @@
+repo: Tencent/ncnn
+pr: 6543
+url: https://github.com/Tencent/ncnn/pull/6543
+merge_sha: d7d6615079c8f659424fc46960f6bf5d03a69e82
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6543/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/unfold_im2col.comp
+  status: added
+  sha256: a7c6b352949ee0dc120ba38646b37dd3dccb03e9d772853a67bce3b49d591f80
+- path: src/layer/vulkan/shader/unfold_im2col_pack1to4.comp
+  status: added
+  sha256: 4cbc91116d67e7bfd4152804af6bfd026a86bff2886d6165291cdcc9ee32df2f
+- path: src/layer/vulkan/shader/unfold_im2col_pack4.comp
+  status: added
+  sha256: 91f48e1b7618936757b803ac9f6bbcd519b1b581b99adb82edbd714d54ab7295
+- path: src/layer/vulkan/shader/unfold_im2col_pack4to1.comp
+  status: added
+  sha256: 0c80f0363c5f4ebaca2618d018dee6effa1368610fb4244f2618ea1f89c15a55

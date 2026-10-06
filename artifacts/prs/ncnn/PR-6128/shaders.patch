@@ -1,0 +1,3657 @@
+diff --git a/src/layer/vulkan/shader/packing.comp b/src/layer/vulkan/shader/packing.comp
+--- a/src/layer/vulkan/shader/packing.comp
++++ b/src/layer/vulkan/shader/packing.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,97 +14,60 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afp v;
++    const uint gi = gy * psc(n) + gx;
+ 
+-    if (psc(dims) == 1)
++    if (cast_type_from == cast_type_to)
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
++        buffer_cp4(top_blob_data, gi, bottom_blob_data, gi);
++        return;
++    }
+ 
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
++    const uint gi2 = gy * psc(stride) + gx;
+ 
+-            buffer_st1(top_blob_data, gi, v);
+-        }
++    afpvec4 v;
++    if (cast_type_from == 1)
++    {
++        v = afpvec4(bottom_blob_fp32_data[gi]);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
++        v = buffer_ld4(bottom_blob_data, gi2);
++    }
+ 
+-            buffer_st1(top_blob_data, gi, v);
+-        }
++    if (cast_type_to == 1)
++    {
++        top_blob_fp32_data[gi] = vec4(v);
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st1(top_blob_data, gi, v);
+-        }
++        buffer_st4(top_blob_data, gi2, v);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { float top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afp v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = float(v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = float(v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld1(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = float(v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { float bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afp v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afp(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st1(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afp(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st1(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afp(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st1(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack1to4.comp b/src/layer/vulkan/shader/packing_pack1to4.comp
+--- a/src/layer/vulkan/shader/packing_pack1to4.comp
++++ b/src/layer/vulkan/shader/packing_pack1to4.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,112 +14,68 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { float bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
++    const uvec4 gi4 = (gy * 4 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
+ 
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp1to4(top_blob_data, gi, bottom_blob_data, gi4);
++        return;
++    }
+ 
+-            buffer_st4(top_blob_data, gi, v);
+-        }
++    afpvec4 v;
++    if (cast_type_from == 1)
++    {
++        vec4 vf;
++        vf.r = bottom_blob_fp32_data[gi4.r];
++        vf.g = bottom_blob_fp32_data[gi4.g];
++        vf.b = bottom_blob_fp32_data[gi4.b];
++        vf.a = bottom_blob_fp32_data[gi4.a];
++        v = afpvec4(vf);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
++        v.r = buffer_ld1(bottom_blob_data, gi4.r);
++        v.g = buffer_ld1(bottom_blob_data, gi4.g);
++        v.b = buffer_ld1(bottom_blob_data, gi4.b);
++        v.a = buffer_ld1(bottom_blob_data, gi4.a);
++    }
+ 
+-            buffer_st4(top_blob_data, gi, v);
+-        }
++    if (cast_type_to == 1)
++    {
++        top_blob_fp32_data[gi] = vec4(v);
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
++        buffer_st4(top_blob_data, gi, v);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack1to4_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack1to4_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack1to4_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,125 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v.r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v.g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v.b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v.a = buffer_ld1(bottom_blob_data, v_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack1to4_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack1to4_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack1to4_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,125 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { float bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-
+-            v.r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v.g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v.b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v.a = afp(bottom_blob_fp32_data[v_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-
+-            v.r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v.g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v.b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v.a = afp(bottom_blob_fp32_data[v_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v.r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v.g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v.b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v.a = afp(bottom_blob_fp32_data[v_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack1to8.comp b/src/layer/vulkan/shader/packing_pack1to8.comp
+--- a/src/layer/vulkan/shader/packing_pack1to8.comp
++++ b/src/layer/vulkan/shader/packing_pack1to8.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,127 +14,79 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { float bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { mat2x4 top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
++    const uvec4 gi4 = (gy * 8 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++    const uvec4 gi8 = gi4 + psc(stride) * 4;
+ 
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp1to8(top_blob_data, gi, bottom_blob_data, gi4, gi8);
++        return;
++    }
+ 
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++    afpvec8 v;
++    if (cast_type_from == 1)
++    {
++        vec4 vf0;
++        vec4 vf1;
++        vf0.r = bottom_blob_fp32_data[gi4.r];
++        vf0.g = bottom_blob_fp32_data[gi4.g];
++        vf0.b = bottom_blob_fp32_data[gi4.b];
++        vf0.a = bottom_blob_fp32_data[gi4.a];
++        vf1.r = bottom_blob_fp32_data[gi8.r];
++        vf1.g = bottom_blob_fp32_data[gi8.g];
++        vf1.b = bottom_blob_fp32_data[gi8.b];
++        vf1.a = bottom_blob_fp32_data[gi8.a];
++        v[0] = afpvec4(vf0);
++        v[1] = afpvec4(vf1);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(w) + gx;
+-
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
++        v[0].r = buffer_ld1(bottom_blob_data, gi4.r);
++        v[0].g = buffer_ld1(bottom_blob_data, gi4.g);
++        v[0].b = buffer_ld1(bottom_blob_data, gi4.b);
++        v[0].a = buffer_ld1(bottom_blob_data, gi4.a);
++        v[1].r = buffer_ld1(bottom_blob_data, gi8.r);
++        v[1].g = buffer_ld1(bottom_blob_data, gi8.g);
++        v[1].b = buffer_ld1(bottom_blob_data, gi8.b);
++        v[1].a = buffer_ld1(bottom_blob_data, gi8.a);
++    }
+ 
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++    if (cast_type_to == 1)
++    {
++        top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++        buffer_st8(top_blob_data, gi, v);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack1to8_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack1to8_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack1to8_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,140 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { mat2x4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
+-
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(w) + gx;
+-
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v[0].r = buffer_ld1(bottom_blob_data, v_offset.r);
+-            v[0].g = buffer_ld1(bottom_blob_data, v_offset.g);
+-            v[0].b = buffer_ld1(bottom_blob_data, v_offset.b);
+-            v[0].a = buffer_ld1(bottom_blob_data, v_offset.a);
+-            v[1].r = buffer_ld1(bottom_blob_data, vv_offset.r);
+-            v[1].g = buffer_ld1(bottom_blob_data, vv_offset.g);
+-            v[1].b = buffer_ld1(bottom_blob_data, vv_offset.b);
+-            v[1].a = buffer_ld1(bottom_blob_data, vv_offset.a);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack1to8_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack1to8_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack1to8_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,140 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { float bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
+-
+-            v[0].r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v[0].g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v[0].b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v[0].a = afp(bottom_blob_fp32_data[v_offset.a]);
+-            v[1].r = afp(bottom_blob_fp32_data[vv_offset.r]);
+-            v[1].g = afp(bottom_blob_fp32_data[vv_offset.g]);
+-            v[1].b = afp(bottom_blob_fp32_data[vv_offset.b]);
+-            v[1].a = afp(bottom_blob_fp32_data[vv_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(w) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(w) + gx;
+-
+-            v[0].r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v[0].g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v[0].b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v[0].a = afp(bottom_blob_fp32_data[v_offset.a]);
+-            v[1].r = afp(bottom_blob_fp32_data[vv_offset.r]);
+-            v[1].g = afp(bottom_blob_fp32_data[vv_offset.g]);
+-            v[1].b = afp(bottom_blob_fp32_data[vv_offset.b]);
+-            v[1].a = afp(bottom_blob_fp32_data[vv_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(cstep) + ivec4(gy * psc(w) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(cstep) + ivec4(gy * psc(w) + gx);
+-
+-            v[0].r = afp(bottom_blob_fp32_data[v_offset.r]);
+-            v[0].g = afp(bottom_blob_fp32_data[v_offset.g]);
+-            v[0].b = afp(bottom_blob_fp32_data[v_offset.b]);
+-            v[0].a = afp(bottom_blob_fp32_data[v_offset.a]);
+-            v[1].r = afp(bottom_blob_fp32_data[vv_offset.r]);
+-            v[1].g = afp(bottom_blob_fp32_data[vv_offset.g]);
+-            v[1].b = afp(bottom_blob_fp32_data[vv_offset.b]);
+-            v[1].a = afp(bottom_blob_fp32_data[vv_offset.a]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4.comp b/src/layer/vulkan/shader/packing_pack4.comp
+--- a/src/layer/vulkan/shader/packing_pack4.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack4_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack4_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = vec4(v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack4_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack4_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4to1.comp b/src/layer/vulkan/shader/packing_pack4to1.comp
+--- a/src/layer/vulkan/shader/packing_pack4to1.comp
++++ b/src/layer/vulkan/shader/packing_pack4to1.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,112 +14,67 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { float top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
++    const uvec4 gi4 = (gy * 4 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
+ 
+-            ivec4 v_offset = x4;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp4to1(top_blob_data, gi4, bottom_blob_data, gi);
++        return;
++    }
+ 
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
++    afpvec4 v;
++    if (cast_type_from == 1)
++    {
++        v = afpvec4(bottom_blob_fp32_data[gi]);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
++        v = buffer_ld4(bottom_blob_data, gi);
++    }
+ 
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
++    if (cast_type_to == 1)
++    {
++        vec4 vf = vec4(v);
++        top_blob_fp32_data[gi4.r] = vf.r;
++        top_blob_fp32_data[gi4.g] = vf.g;
++        top_blob_fp32_data[gi4.b] = vf.b;
++        top_blob_fp32_data[gi4.a] = vf.a;
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
++        buffer_st1(top_blob_data, gi4.r, v.r);
++        buffer_st1(top_blob_data, gi4.g, v.g);
++        buffer_st1(top_blob_data, gi4.b, v.b);
++        buffer_st1(top_blob_data, gi4.a, v.a);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack4to1_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack4to1_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack4to1_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,125 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { float top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-
+-            top_blob_fp32_data[v_offset.r] = float(v.r);
+-            top_blob_fp32_data[v_offset.g] = float(v.g);
+-            top_blob_fp32_data[v_offset.b] = float(v.b);
+-            top_blob_fp32_data[v_offset.a] = float(v.a);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
+-
+-            top_blob_fp32_data[v_offset.r] = float(v.r);
+-            top_blob_fp32_data[v_offset.g] = float(v.g);
+-            top_blob_fp32_data[v_offset.b] = float(v.b);
+-            top_blob_fp32_data[v_offset.a] = float(v.a);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld4(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            top_blob_fp32_data[v_offset.r] = float(v.r);
+-            top_blob_fp32_data[v_offset.g] = float(v.g);
+-            top_blob_fp32_data[v_offset.b] = float(v.b);
+-            top_blob_fp32_data[v_offset.a] = float(v.a);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4to1_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack4to1_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack4to1_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,125 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec4 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
+-
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afpvec4(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 4) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            buffer_st1(top_blob_data, v_offset.r, v.r);
+-            buffer_st1(top_blob_data, v_offset.g, v.g);
+-            buffer_st1(top_blob_data, v_offset.b, v.b);
+-            buffer_st1(top_blob_data, v_offset.a, v.a);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4to8.comp b/src/layer/vulkan/shader/packing_pack4to8.comp
+--- a/src/layer/vulkan/shader/packing_pack4to8.comp
++++ b/src/layer/vulkan/shader/packing_pack4to8.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,106 +14,62 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { mat2x4 top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = x2;
++    const uvec2 gi2 = (gy * 2 + uvec2(0, 1)) * psc(stride) + gx;
+ 
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp4to8(top_blob_data, gi, bottom_blob_data, gi2);
++        return;
++    }
+ 
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++    afpvec8 v;
++    if (cast_type_from == 1)
++    {
++        v[0] = afpvec4(bottom_blob_fp32_data[gi2.r]);
++        v[1] = afpvec4(bottom_blob_fp32_data[gi2.g]);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(w) + gx;
+-
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
++        v[0] = buffer_ld4(bottom_blob_data, gi2.r);
++        v[1] = buffer_ld4(bottom_blob_data, gi2.g);
++    }
+ 
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++    if (cast_type_to == 1)
++    {
++        top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(cstep) + ivec2(gy * psc(w) + gx);
+-
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
++        buffer_st8(top_blob_data, gi, v);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack4to8_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack4to8_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack4to8_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,119 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { mat2x4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = x2;
+-
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(w) + gx;
+-
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(cstep) + ivec2(gy * psc(w) + gx);
+-
+-            v[0] = buffer_ld4(bottom_blob_data, v_offset.r);
+-            v[1] = buffer_ld4(bottom_blob_data, v_offset.g);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(vec4(v[0]), vec4(v[1]));
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack4to8_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack4to8_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack4to8_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,119 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { vec4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = x2;
+-
+-            v[0] = afpvec4(bottom_blob_fp32_data[v_offset.r]);
+-            v[1] = afpvec4(bottom_blob_fp32_data[v_offset.g]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(w) + gx;
+-
+-            v[0] = afpvec4(bottom_blob_fp32_data[v_offset.r]);
+-            v[1] = afpvec4(bottom_blob_fp32_data[v_offset.g]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(cstep) + ivec2(gy * psc(w) + gx);
+-
+-            v[0] = afpvec4(bottom_blob_fp32_data[v_offset.r]);
+-            v[1] = afpvec4(bottom_blob_fp32_data[v_offset.g]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8.comp b/src/layer/vulkan/shader/packing_pack8.comp
+--- a/src/layer/vulkan/shader/packing_pack8.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack8_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack8_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { mat2x4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            top_blob_fp32_data[gi] = mat2x4(v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack8_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack8_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2019 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { mat2x4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec8 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(outw) || gy >= psc(outh) || gz >= psc(outc))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+-
+-            buffer_st8(top_blob_data, gi, v);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8to1.comp b/src/layer/vulkan/shader/packing_pack8to1.comp
+--- a/src/layer/vulkan/shader/packing_pack8to1.comp
++++ b/src/layer/vulkan/shader/packing_pack8to1.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,127 +14,79 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { mat2x4 bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { float top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
++    const uvec4 gi4 = (gy * 8 + uvec4(0, 1, 2, 3)) * psc(stride) + gx;
++    const uvec4 gi8 = gi4 + psc(stride) * 4;
+ 
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp8to1(top_blob_data, gi4, gi8, bottom_blob_data, gi);
++        return;
++    }
+ 
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
++    afpvec8 v;
++    if (cast_type_from == 1)
++    {
++        mat2x4 vf = bottom_blob_fp32_data[gi];
++        v[0] = afpvec4(vf[0]);
++        v[1] = afpvec4(vf[1]);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(outw) + gx;
++        v = buffer_ld8(bottom_blob_data, gi);
++    }
+ 
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
++    if (cast_type_to == 1)
++    {
++        vec4 vf0 = vec4(v[0]);
++        vec4 vf1 = vec4(v[1]);
++        top_blob_fp32_data[gi4.r] = vf0.r;
++        top_blob_fp32_data[gi4.g] = vf0.g;
++        top_blob_fp32_data[gi4.b] = vf0.b;
++        top_blob_fp32_data[gi4.a] = vf0.a;
++        top_blob_fp32_data[gi8.r] = vf1.r;
++        top_blob_fp32_data[gi8.g] = vf1.g;
++        top_blob_fp32_data[gi8.b] = vf1.b;
++        top_blob_fp32_data[gi8.a] = vf1.a;
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
++        buffer_st1(top_blob_data, gi4.r, v[0].r);
++        buffer_st1(top_blob_data, gi4.g, v[0].g);
++        buffer_st1(top_blob_data, gi4.b, v[0].b);
++        buffer_st1(top_blob_data, gi4.a, v[0].a);
++        buffer_st1(top_blob_data, gi8.r, v[1].r);
++        buffer_st1(top_blob_data, gi8.g, v[1].g);
++        buffer_st1(top_blob_data, gi8.b, v[1].b);
++        buffer_st1(top_blob_data, gi8.a, v[1].a);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack8to1_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack8to1_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack8to1_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,140 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { float top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
+-
+-            top_blob_fp32_data[v_offset.r] = float(v[0].r);
+-            top_blob_fp32_data[v_offset.g] = float(v[0].g);
+-            top_blob_fp32_data[v_offset.b] = float(v[0].b);
+-            top_blob_fp32_data[v_offset.a] = float(v[0].a);
+-            top_blob_fp32_data[vv_offset.r] = float(v[1].r);
+-            top_blob_fp32_data[vv_offset.g] = float(v[1].g);
+-            top_blob_fp32_data[vv_offset.b] = float(v[1].b);
+-            top_blob_fp32_data[vv_offset.a] = float(v[1].a);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(outw) + gx;
+-
+-            top_blob_fp32_data[v_offset.r] = float(v[0].r);
+-            top_blob_fp32_data[v_offset.g] = float(v[0].g);
+-            top_blob_fp32_data[v_offset.b] = float(v[0].b);
+-            top_blob_fp32_data[v_offset.a] = float(v[0].a);
+-            top_blob_fp32_data[vv_offset.r] = float(v[1].r);
+-            top_blob_fp32_data[vv_offset.g] = float(v[1].g);
+-            top_blob_fp32_data[vv_offset.b] = float(v[1].b);
+-            top_blob_fp32_data[vv_offset.a] = float(v[1].a);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            top_blob_fp32_data[v_offset.r] = float(v[0].r);
+-            top_blob_fp32_data[v_offset.g] = float(v[0].g);
+-            top_blob_fp32_data[v_offset.b] = float(v[0].b);
+-            top_blob_fp32_data[v_offset.a] = float(v[0].a);
+-            top_blob_fp32_data[vv_offset.r] = float(v[1].r);
+-            top_blob_fp32_data[vv_offset.g] = float(v[1].g);
+-            top_blob_fp32_data[vv_offset.b] = float(v[1].b);
+-            top_blob_fp32_data[vv_offset.a] = float(v[1].a);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8to1_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack8to1_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack8to1_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,140 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { mat2x4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 x4 = ivec4(gx * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = x4;
+-            ivec4 vv_offset = x4 + 4;
+-
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 y4 = ivec4(gy * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = y4 * psc(outw) + gx;
+-            ivec4 vv_offset = (y4 + 4) * psc(outw) + gx;
+-
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec4 z4 = ivec4(gz * 8) + ivec4(0, 1, 2, 3);
+-
+-            ivec4 v_offset = z4 * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-            ivec4 vv_offset = (z4 + 4) * psc(outcstep) + ivec4(gy * psc(outw) + gx);
+-
+-            buffer_st1(top_blob_data, v_offset.r, v[0].r);
+-            buffer_st1(top_blob_data, v_offset.g, v[0].g);
+-            buffer_st1(top_blob_data, v_offset.b, v[0].b);
+-            buffer_st1(top_blob_data, v_offset.a, v[0].a);
+-            buffer_st1(top_blob_data, vv_offset.r, v[1].r);
+-            buffer_st1(top_blob_data, vv_offset.g, v[1].g);
+-            buffer_st1(top_blob_data, vv_offset.b, v[1].b);
+-            buffer_st1(top_blob_data, vv_offset.a, v[1].a);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8to4.comp b/src/layer/vulkan/shader/packing_pack8to4.comp
+--- a/src/layer/vulkan/shader/packing_pack8to4.comp
++++ b/src/layer/vulkan/shader/packing_pack8to4.comp
+@@ -1,6 +1,6 @@
+ // Tencent is pleased to support the open source community by making ncnn available.
+ //
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
++// Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+ //
+ // Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+ // in compliance with the License. You may obtain a copy of the License at
+@@ -14,106 +14,64 @@
+ 
+ #version 450
+ 
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
++layout (constant_id = 0) const int cast_type_from = 0;
++layout (constant_id = 1) const int cast_type_to = 1;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
++layout (constant_id = shape_constant_id_offset + 1) const uint c = 0;
++layout (constant_id = shape_constant_id_offset + 2) const uint stride = 0;
+ 
+ layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 1) readonly buffer bottom_blob_fp32 { mat2x4 bottom_blob_fp32_data[]; };
++layout (binding = 2) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
++layout (binding = 3) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
++    uint n;
++    uint c;
++    uint stride;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gx = gl_GlobalInvocationID.x;
++    const uint gy = gl_GlobalInvocationID.y;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gx >= psc(n) || gy >= psc(c))
+         return;
+ 
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
++    const uint gi = gy * psc(n) + gx;
+ 
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
++    const uvec2 gi2 = (gy * 2 + uvec2(0, 1)) * psc(stride) + gx;
+ 
+-            ivec2 v_offset = x2;
++    if (cast_type_from == cast_type_to)
++    {
++        buffer_cp8to4(top_blob_data, gi2, bottom_blob_data, gi);
++        return;
++    }
+ 
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
++    afpvec8 v;
++    if (cast_type_from == 1)
++    {
++        mat2x4 vf = bottom_blob_fp32_data[gi];
++        v[0] = afpvec4(vf[0]);
++        v[1] = afpvec4(vf[1]);
+     }
+-    else if (psc(dims) == 2)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(outw) + gx;
++        v = buffer_ld8(bottom_blob_data, gi);
++    }
+ 
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
++    if (cast_type_to == 1)
++    {
++        top_blob_fp32_data[gi2.r] = vec4(v[0]);
++        top_blob_fp32_data[gi2.g] = vec4(v[1]);
+     }
+-    else // if (psc(dims) == 3)
++    else
+     {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(outcstep) + ivec2(gy * psc(outw) + gx);
+-
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
++        buffer_st4(top_blob_data, gi2.r, v[0]);
++        buffer_st4(top_blob_data, gi2.g, v[1]);
+     }
+ }
+diff --git a/src/layer/vulkan/shader/packing_pack8to4_fp16_to_fp32.comp b/src/layer/vulkan/shader/packing_pack8to4_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/packing_pack8to4_fp16_to_fp32.comp
++++ /dev/null
+@@ -1,119 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob { sfpvec8 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob_fp32 { vec4 top_blob_fp32_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = x2;
+-
+-            top_blob_fp32_data[v_offset.r] = vec4(v[0]);
+-            top_blob_fp32_data[v_offset.g] = vec4(v[1]);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(outw) + gx;
+-
+-            top_blob_fp32_data[v_offset.r] = vec4(v[0]);
+-            top_blob_fp32_data[v_offset.g] = vec4(v[1]);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = buffer_ld8(bottom_blob_data, gi);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(outcstep) + ivec2(gy * psc(outw) + gx);
+-
+-            top_blob_fp32_data[v_offset.r] = vec4(v[0]);
+-            top_blob_fp32_data[v_offset.g] = vec4(v[1]);
+-        }
+-    }
+-}
+diff --git a/src/layer/vulkan/shader/packing_pack8to4_fp32_to_fp16.comp b/src/layer/vulkan/shader/packing_pack8to4_fp32_to_fp16.comp
+--- a/src/layer/vulkan/shader/packing_pack8to4_fp32_to_fp16.comp
++++ /dev/null
+@@ -1,119 +0,0 @@
+-// Tencent is pleased to support the open source community by making ncnn available.
+-//
+-// Copyright (C) 2020 THL A29 Limited, a Tencent company. All rights reserved.
+-//
+-// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+-// in compliance with the License. You may obtain a copy of the License at
+-//
+-// https://opensource.org/licenses/BSD-3-Clause
+-//
+-// Unless required by applicable law or agreed to in writing, software distributed
+-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+-// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+-// specific language governing permissions and limitations under the License.
+-
+-#version 450
+-
+-layout (constant_id = 0) const int storage_type_from = 0;
+-layout (constant_id = 1) const int storage_type_to = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (constant_id = shape_constant_id_offset + 5) const int outdims = 0;
+-layout (constant_id = shape_constant_id_offset + 6) const int outw = 0;
+-layout (constant_id = shape_constant_id_offset + 7) const int outh = 0;
+-layout (constant_id = shape_constant_id_offset + 8) const int outc = 0;
+-layout (constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+-
+-layout (binding = 0) readonly buffer bottom_blob_fp32 { mat2x4 bottom_blob_fp32_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-
+-    int outdims;
+-    int outw;
+-    int outh;
+-    int outc;
+-    int outcstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    afpvec8 v;
+-
+-    if (psc(dims) == 1)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 x2 = ivec2(gx * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = x2;
+-
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
+-    }
+-    else if (psc(dims) == 2)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 y2 = ivec2(gy * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = y2 * psc(outw) + gx;
+-
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
+-    }
+-    else // if (psc(dims) == 3)
+-    {
+-        if (storage_type_from == 0)
+-        {
+-            int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-            v = afpvec8(bottom_blob_fp32_data[gi]);
+-        }
+-
+-        if (storage_type_to == 0)
+-        {
+-            ivec2 z2 = ivec2(gz * 2) + ivec2(0, 1);
+-
+-            ivec2 v_offset = z2 * psc(outcstep) + ivec2(gy * psc(outw) + gx);
+-
+-            buffer_st4(top_blob_data, v_offset.r, v[0]);
+-            buffer_st4(top_blob_data, v_offset.g, v[1]);
+-        }
+-    }
+-}

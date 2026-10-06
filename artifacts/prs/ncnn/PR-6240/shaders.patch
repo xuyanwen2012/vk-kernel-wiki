@@ -1,0 +1,680 @@
+diff --git a/src/layer/vulkan/shader/layernorm_coeffs.comp b/src/layer/vulkan/shader/layernorm_coeffs.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_coeffs.comp
+@@ -0,0 +1,38 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const float eps = 0;
++
++layout (binding = 0) writeonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout (binding = 1) readonly buffer mean_blob { float mean_data[]; };
++layout (binding = 2) readonly buffer var_blob { float var_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int num_groups_per_channel;
++    int c;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++    if (gx >= 1 || gy >= p.num_groups_per_channel || gz >= p.c)
++        return;
++
++    int group_id = gz * p.num_groups_per_channel + gy;
++
++    float mean = mean_data[group_id];
++    float var = var_data[group_id];
++
++    // a = 1 / sqrt(var + eps)
++    float a = 1.f / (sqrt(var + eps));
++    // b = -mean * a
++    float b = -mean * a;
++
++    buffer_st1(coeffs_blob_data, group_id * 2, afp(a));
++    buffer_st1(coeffs_blob_data, group_id * 2 + 1, afp(b));
++}
+diff --git a/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp b/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
+@@ -0,0 +1,36 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const float eps = 0;
++
++layout (binding = 0) writeonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout (binding = 1) readonly buffer mean_blob { vec4 mean_data[]; };
++layout (binding = 2) readonly buffer var_blob { vec4 var_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int num_groups_per_channel;
++    int c;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++    if (gx >= 1 || gy >= p.num_groups_per_channel || gz >= p.c)
++        return;
++
++    int group_id = gz * p.num_groups_per_channel + gy;
++
++    vec4 mean = mean_data[group_id];
++    vec4 var = var_data[group_id];
++
++    vec4 a = 1.f / (sqrt(var + eps));
++    vec4 b = -mean * a;
++
++    buffer_st4(coeffs_blob_data, group_id * 2, afpvec4(a));
++    buffer_st4(coeffs_blob_data, group_id * 2 + 1, afpvec4(b));
++}
+diff --git a/src/layer/vulkan/shader/layernorm_norm.comp b/src/layer/vulkan/shader/layernorm_norm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_norm.comp
+@@ -0,0 +1,62 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const int affine = 0;
++layout (constant_id = 1) const int affine_size = 0;
++
++layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout (binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
++layout (binding = 3) readonly buffer beta_blob { sfp beta_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    int group_id;
++    int inner_id;
++
++    if (affine_size == p.w)
++    {
++        group_id = gz * p.h + gy;
++        inner_id = gx;
++    }
++    else // if (affine_size == p.w * p.h)
++    {
++        group_id = gz;
++        inner_id = gy * p.w + gx;
++    }
++
++    afp a = buffer_ld1(coeffs_blob_data, group_id * 2);
++    afp b = buffer_ld1(coeffs_blob_data, group_id * 2 + 1);
++
++    int linear_index = gz * p.cstep + gy * p.w + gx;
++    afp v = buffer_ld1(bottom_top_blob_data, linear_index);
++
++    // (x - mean) / sqrt(var + eps)
++    v = v * a + b;
++
++    if (affine == 1)
++    {
++        afp gamma = buffer_ld1(gamma_data, inner_id);
++        afp beta  = buffer_ld1(beta_data, inner_id);
++        v = v * gamma + beta;
++    }
++
++    buffer_st1(bottom_top_blob_data, linear_index, v);
++}
+diff --git a/src/layer/vulkan/shader/layernorm_norm_pack4.comp b/src/layer/vulkan/shader/layernorm_norm_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_norm_pack4.comp
+@@ -0,0 +1,61 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const int affine = 0;
++layout (constant_id = 1) const int affine_size = 0;
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout (binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
++layout (binding = 3) readonly buffer beta_blob { sfp beta_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    int group_id;
++    int inner_id;
++
++    if (affine_size == p.w)
++    {
++        group_id = gz * p.h + gy;
++        inner_id = gx;
++    }
++    else // if (affine_size == p.w * p.h)
++    {
++        group_id = gz;
++        inner_id = gy * p.w + gx;
++    }
++
++    afpvec4 a = buffer_ld4(coeffs_blob_data, group_id * 2);
++    afpvec4 b = buffer_ld4(coeffs_blob_data, group_id * 2 + 1);
++
++    int linear_index = gz * p.cstep + gy * p.w + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, linear_index);
++
++    v = v * a + b;
++
++    if (affine == 1)
++    {
++        afp gamma = buffer_ld1(gamma_data, inner_id);
++        afp beta  = buffer_ld1(beta_data, inner_id);
++        v = v * afpvec4(gamma) + afpvec4(beta);
++    }
++
++    buffer_st4(bottom_top_blob_data, linear_index, v);
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_mean.comp b/src/layer/vulkan/shader/layernorm_reduce_mean.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_mean.comp
+@@ -0,0 +1,35 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer sum_blob { float sum_blob_data[]; };
++layout (binding = 1) writeonly buffer mean_blob { float mean_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++    float group_size;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++    if (gx >= 1 || gy >= p.h || gz >= p.c)
++        return;
++
++    float sum = 0.f;
++    int v_offset = gz * p.cstep + gy * p.w;
++    for (int i = 0; i < p.w; i++)
++    {
++        sum += sum_blob_data[v_offset + i];
++    }
++
++    int group_id = gz * p.h + gy;
++    mean_data[group_id] = sum / p.group_size;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
+@@ -0,0 +1,35 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer sum_blob { vec4 sum_blob_data[]; };
++layout (binding = 1) writeonly buffer mean_blob { vec4 mean_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++    float group_size;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++    if (gx >= 1 || gy >= p.h || gz >= p.c)
++        return;
++
++    vec4 sum = vec4(0.f);
++    int v_offset = gz * p.cstep + gy * p.w;
++    for (int i = 0; i < p.w; i++)
++    {
++        sum += sum_blob_data[v_offset + i];
++    }
++
++    int group_id = gz * p.h + gy;
++    mean_data[group_id] = sum / p.group_size;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
+@@ -0,0 +1,70 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer sum_blob { float sum_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float sum;
++
++    int sx = gx * 4;
++
++    int v_offset = gz * p.cstep + gy * p.w + sx;
++
++    if (sx == p.w - 1)
++    {
++        float v0 = float(buffer_ld1(bottom_top_blob_data, v_offset));
++
++        sum = v0;
++    }
++    else if (sx == p.w - 2)
++    {
++        float v0 = float(buffer_ld1(bottom_top_blob_data, v_offset));
++        float v1 = float(buffer_ld1(bottom_top_blob_data, v_offset + 1));
++
++        sum = v0 + v1;
++    }
++    else if (sx == p.w - 3)
++    {
++        float v0 = float(buffer_ld1(bottom_top_blob_data, v_offset));
++        float v1 = float(buffer_ld1(bottom_top_blob_data, v_offset + 1));
++        float v2 = float(buffer_ld1(bottom_top_blob_data, v_offset + 2));
++
++        sum = v0 + v1 + v2;
++    }
++    else
++    {
++        float v0 = float(buffer_ld1(bottom_top_blob_data, v_offset));
++        float v1 = float(buffer_ld1(bottom_top_blob_data, v_offset + 1));
++        float v2 = float(buffer_ld1(bottom_top_blob_data, v_offset + 2));
++        float v3 = float(buffer_ld1(bottom_top_blob_data, v_offset + 3));
++
++        sum = v0 + v1 + v2 + v3;
++    }
++
++    int gi = gz * p.outcstep + gy * p.outw + gx;
++    sum_blob_data[gi] = sum;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
+@@ -0,0 +1,65 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer sum_blob { vec4 sum_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    vec4 sum;
++
++    int sx = gx * 4;
++
++    int v_offset = gz * p.cstep + gy * p.w + sx;
++
++    if (sx == p.w - 1)
++    {
++        sum = vec4(buffer_ld4(bottom_top_blob_data, v_offset));
++    }
++    else if (sx == p.w - 2)
++    {
++        vec4 v0 = vec4(buffer_ld4(bottom_top_blob_data, v_offset));
++        vec4 v1 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 1));
++        sum = v0 + v1;
++    }
++    else if (sx == p.w - 3)
++    {
++        vec4 v0 = vec4(buffer_ld4(bottom_top_blob_data, v_offset));
++        vec4 v1 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 1));
++        vec4 v2 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 2));
++        sum = v0 + v1 + v2;
++    }
++    else
++    {
++        vec4 v0 = vec4(buffer_ld4(bottom_top_blob_data, v_offset));
++        vec4 v1 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 1));
++        vec4 v2 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 2));
++        vec4 v3 = vec4(buffer_ld4(bottom_top_blob_data, v_offset + 3));
++        sum = v0 + v1 + v2 + v3;
++    }
++
++    int gi = gz * p.outcstep + gy * p.outw + gx;
++    sum_blob_data[gi] = sum;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
+@@ -0,0 +1,66 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { float bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer sum_blob { float sum_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    float sum;
++
++    int sx = gx * 4;
++
++    int v_offset = gz * p.cstep + gy * p.w + sx;
++
++    if (sx == p.w - 1)
++    {
++        float v0 = bottom_top_blob_data[v_offset];
++        sum = v0;
++    }
++    else if (sx == p.w - 2)
++    {
++        float v0 = bottom_top_blob_data[v_offset];
++        float v1 = bottom_top_blob_data[v_offset + 1];
++        sum = v0 + v1;
++    }
++    else if (sx == p.w - 3)
++    {
++        float v0 = bottom_top_blob_data[v_offset];
++        float v1 = bottom_top_blob_data[v_offset + 1];
++        float v2 = bottom_top_blob_data[v_offset + 2];
++        sum = v0 + v1 + v2;
++    }
++    else
++    {
++        float v0 = bottom_top_blob_data[v_offset];
++        float v1 = bottom_top_blob_data[v_offset + 1];
++        float v2 = bottom_top_blob_data[v_offset + 2];
++        float v3 = bottom_top_blob_data[v_offset + 3];
++        sum = v0 + v1 + v2 + v3;
++    }
++
++    int gi = gz * p.outcstep + gy * p.outw + gx;
++    sum_blob_data[gi] = sum;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
+@@ -0,0 +1,66 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (binding = 0) readonly buffer bottom_top_blob { vec4 bottom_top_blob_data[]; };
++layout (binding = 1) writeonly buffer sum_blob { vec4 sum_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outw;
++    int outh;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.outw || gy >= p.outh || gz >= p.outc)
++        return;
++
++    vec4 sum;
++
++    int sx = gx * 4;
++
++    int v_offset = gz * p.cstep + gy * p.w + sx;
++
++    if (sx == p.w - 1)
++    {
++        vec4 v0 = bottom_top_blob_data[v_offset];
++        sum = v0;
++    }
++    else if (sx == p.w - 2)
++    {
++        vec4 v0 = bottom_top_blob_data[v_offset];
++        vec4 v1 = bottom_top_blob_data[v_offset + 1];
++        sum = v0 + v1;
++    }
++    else if (sx == p.w - 3)
++    {
++        vec4 v0 = bottom_top_blob_data[v_offset];
++        vec4 v1 = bottom_top_blob_data[v_offset + 1];
++        vec4 v2 = bottom_top_blob_data[v_offset + 2];
++        sum = v0 + v1 + v2;
++    }
++    else
++    {
++        vec4 v0 = bottom_top_blob_data[v_offset];
++        vec4 v1 = bottom_top_blob_data[v_offset + 1];
++        vec4 v2 = bottom_top_blob_data[v_offset + 2];
++        vec4 v3 = bottom_top_blob_data[v_offset + 3];
++        sum = v0 + v1 + v2 + v3;
++    }
++
++    int gi = gz * p.outcstep + gy * p.outw + gx;
++    sum_blob_data[gi] = sum;
++}
+diff --git a/src/layer/vulkan/shader/layernorm_sub_mean_square.comp b/src/layer/vulkan/shader/layernorm_sub_mean_square.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_sub_mean_square.comp
+@@ -0,0 +1,50 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const int affine_size = 0;
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer mean_blob { float mean_data[]; };
++layout (binding = 2) writeonly buffer square_blob { sfp square_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    int group_id;
++    if (affine_size == p.w)
++    {
++        // group_id corresponds to the row index across all channels
++        group_id = gz * p.h + gy;
++    }
++    else // if (affine_size == p.w * p.h)
++    {
++        // group_id corresponds to the channel index
++        group_id = gz;
++    }
++
++    float mean = mean_data[group_id];
++
++    int linear_index = gz * p.cstep + gy * p.w + gx;
++
++    float v = float(buffer_ld1(bottom_top_blob_data, linear_index));
++
++    v = v - mean;
++
++    buffer_st1(square_blob_data, linear_index, afp(v * v));
++}
+diff --git a/src/layer/vulkan/shader/layernorm_sub_mean_square_pack4.comp b/src/layer/vulkan/shader/layernorm_sub_mean_square_pack4.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/layernorm_sub_mean_square_pack4.comp
+@@ -0,0 +1,48 @@
++// Copyright 2025 Futz12 <pchar.cn>
++// SPDX-License-Identifier: BSD-3-Clause
++
++#version 450
++
++layout (constant_id = 0) const int affine_size = 0;
++
++layout (binding = 0) readonly buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
++layout (binding = 1) readonly buffer mean_blob { vec4 mean_data[]; };
++layout (binding = 2) writeonly buffer square_blob { sfpvec4 square_blob_data[]; };
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= p.w || gy >= p.h || gz >= p.c)
++        return;
++
++    int group_id;
++    if (affine_size == p.w)
++    {
++        group_id = gz * p.h + gy;
++    }
++    else // if (affine_size == p.w * p.h)
++    {
++        group_id = gz;
++    }
++
++    vec4 mean = mean_data[group_id];
++
++    int linear_index = gz * p.cstep + gy * p.w + gx;
++
++    vec4 v = vec4(buffer_ld4(bottom_top_blob_data, linear_index));
++
++    v = v - mean;
++
++    buffer_st4(square_blob_data, linear_index, afpvec4(v * v));
++}

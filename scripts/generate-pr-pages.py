@@ -67,7 +67,8 @@ def build_page(repo: str, slug: str, row: dict, evidence: dict, vocab: dict, led
 
     metadata = pr_policy.derive_metadata(title, files, vocab, pr_policy.PathConfig.from_ledger(ledger))
     architectures, architecture_evidence = pr_policy.derive_architectures(
-        title, files, ledger.get("architecture_code_markers") or {}
+        title, files, ledger.get("architecture_code_markers") or {},
+        path_markers=ledger.get("architecture_path_markers") or {},
     )
 
     paths = [f["filename"] for f in pr_policy.normalize_files(files)]
@@ -105,7 +106,8 @@ def build_page(repo: str, slug: str, row: dict, evidence: dict, vocab: dict, led
     )
     return (
         "---\n" + pr_evidence.dump_yaml(frontmatter) + "---\n\n"
-        + pr_policy.render_body(title, frontmatter["url"], excerpt, total_chars, excerpt_of)
+        + pr_policy.render_body(title, frontmatter["url"], excerpt, total_chars, excerpt_of,
+                                pr_evidence.request_noun(ledger))
     )
 
 
@@ -139,7 +141,7 @@ def process(path: Path, vocab: dict, skipped: dict, args) -> tuple:
         if args.max is not None and written >= args.max:
             break
         try:
-            evidence = pr_evidence.get(repo, slug, number, args.cache_dir, args.offline)
+            evidence = pr_evidence.get(ledger, slug, number, args.cache_dir, args.offline)
             content = build_page(repo, slug, row, evidence, vocab, ledger)
         except (Skip, pr_evidence.EvidenceError) as exc:
             skipped[(repo, number)] = {"repo": repo, "pr": number, "id": f"pr-{slug}-{number}", "reason": str(exc)}

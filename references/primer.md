@@ -2,7 +2,7 @@
 
 A map of the knowledge base, organised by the controlled vocabulary in `data/tags.yaml` and the architecture tree in `data/architectures.yaml`. Use it when a question is broad: find the area, then query by the term shown.
 
-**Current corpus: 423 pages. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`; the other 405 are generated pull-request pages from `ggml-org/llama.cpp`.** The tables below list measurement and wiki pages by id. Pull-request pages are not listed by id; where a term or node has only pull-request pages the table says so and names the generated index. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
+**Current corpus: 590 pages. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`; the other 572 are generated pull-request pages from `ggml-org/llama.cpp`, `Tencent/ncnn` and `mesa/mesa`.** The tables below list measurement and wiki pages by id. Pull-request pages are not listed by id; where a term or node has only pull-request pages the table says so and names the generated index. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
 
 Query any term with `python3 scripts/query.py --tag <term>`, and any node with `python3 scripts/query.py --architecture <node>`. Aliases for each are in `data/aliases.yaml`.
 
@@ -28,7 +28,7 @@ Any node name is a valid value of the `architectures` field. Asking for a node r
 | `jetson-orin` | device | `nvidia` | no pages yet |
 | `qualcomm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
 | `adreno-840` | device | `qualcomm` | no pages yet |
-| `arm` | vendor | | no pages yet |
+| `arm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
 | `mali-g1` | device | `arm` | no pages yet |
 | `samsung` | vendor | | reserved, no devices |
 
@@ -209,6 +209,7 @@ Pages live in `wiki/languages/` (id prefix `lang-`). Index: `queries/by-language
 | `glsl` | `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `spirv` | no pages yet |
 | `cpp` | pull-request pages only; list: `queries/by-language.md` |
+| `c` | pull-request pages only; list: `queries/by-language.md` |
 | `python` | pull-request pages only; list: `queries/by-language.md` |
 
 ---
@@ -228,7 +229,7 @@ Migration pages describe porting a kernel from one architecture node to another 
 | Source type | Directory | `source_category` values | Pages |
 |---|---|---|---|
 | First-party measurement | `sources/measurements/` | `measurement` | `meas-780m-vulkaninfo`, `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-e2e-prefill` |
-| Upstream pull request | `sources/prs/` | `upstream-code` | 405 generated pages in `sources/prs/llama-cpp/`; list: `queries/by-repo.md` |
+| Upstream pull request | `sources/prs/` | `upstream-code` | 572 generated pages in `sources/prs/llama-cpp/`, `sources/prs/ncnn/` and `sources/prs/mesa/`; list: `queries/by-repo.md` |
 | Documentation and papers | `sources/docs/` | `official-doc`, `paper` | no pages yet |
 | Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | no pages yet |
 

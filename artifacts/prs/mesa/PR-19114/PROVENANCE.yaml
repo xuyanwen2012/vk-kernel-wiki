@@ -1,0 +1,35 @@
+repo: mesa/mesa
+pr: 19114
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/19114
+merge_sha: a0c52ee8271b5898dfeb5f8d74b1428ed7f811f5
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/19114/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/compiler/aco_instruction_selection.cpp
+  status: modified
+  sha256: 177d3a6c5fb2924c6622c1a407dcfc0b03076d9d3937ba72f0418f4f369fa85a
+- path: src/amd/compiler/aco_instruction_selection_setup.cpp
+  status: modified
+  sha256: fe8d97a45669aafbf33f174618756f37916c770918aec804b5ab4062ff1ded10
+- path: src/amd/compiler/aco_optimizer.cpp
+  status: modified
+  sha256: 24e5f4d165a649d5fab8c468482cf0d448fd1fba3a65db2b13510f78c2ab2b0d
+- path: src/amd/llvm/ac_llvm_build.c
+  status: modified
+  sha256: d3ac56de83ab20a37bd337ddbd34df7660e1c8ea2e0e5012330ae22737985770
+- path: src/amd/llvm/ac_llvm_build.h
+  status: modified
+  sha256: 9f7e4c22cfdb05f2bdc6ccc3901eacab862e14c2db77fc78015f6886f501c380
+- path: src/amd/llvm/ac_nir_to_llvm.c
+  status: modified
+  sha256: e218f54004d5c8698eee33d995a193c8dec5599b9af37a86e4b482afdcd1cfc9
+- path: src/amd/vulkan/radv_device.c
+  status: modified
+  sha256: 79b006734bacf03933174b59c319814aef2f739c304821a3961d843494c6a837
+- path: src/amd/vulkan/radv_shader.c
+  status: modified
+  sha256: 35e7416e3c8443703e5b1fb0ccb96465b95a0e88be6f3d042cee4a7166aa3c60

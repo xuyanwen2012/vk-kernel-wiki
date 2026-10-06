@@ -1,0 +1,119 @@
+repo: Tencent/ncnn
+pr: 6175
+url: https://github.com/Tencent/ncnn/pull/6175
+merge_sha: e2d93a482e8535cd258c178e91c1f2884e8e30b7
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6175/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/celu.comp
+  status: modified
+  sha256: eb5a16cff25bd9a74ce014bf845ac0c811a42eeab7b166123b4d9957dd2188af
+- path: src/layer/vulkan/shader/celu_pack4.comp
+  status: removed
+  sha256: 75644945b540ba474354c10502f6fdd32369f1985ce7962e87dbb282211c0de6
+- path: src/layer/vulkan/shader/celu_pack8.comp
+  status: removed
+  sha256: 573bad32459769168da3a816e275c1f3052f69d533004082b1ca677fcdbb681b
+- path: src/layer/vulkan/shader/clip.comp
+  status: modified
+  sha256: bae841b9c3a4fbbba963737f7face17b7fb9406f584f7c78acb7f1562f0adb73
+- path: src/layer/vulkan/shader/clip_pack4.comp
+  status: removed
+  sha256: 3b4ac137a2e060bd96457d7d41680fd2db2427ae994378dccab094f75ca192ab
+- path: src/layer/vulkan/shader/clip_pack8.comp
+  status: removed
+  sha256: 7066c434433bf6b28a81fcead41b918365b78bb0356709133fd4cb114106d76f
+- path: src/layer/vulkan/shader/dropout.comp
+  status: modified
+  sha256: 1c722dae087d469845716bc77e52dd5837f12d825989a5ef4f144fbc024d3679
+- path: src/layer/vulkan/shader/dropout_pack4.comp
+  status: removed
+  sha256: bace9a1752076eacbeef6ae28b1ff11452c6b77a766ede436eaae3a100e03b74
+- path: src/layer/vulkan/shader/dropout_pack8.comp
+  status: removed
+  sha256: e09b57881d7c92184f4a79261f3e8417e40a81b0fae64e514ede5f1473db009f
+- path: src/layer/vulkan/shader/elu.comp
+  status: modified
+  sha256: da687cd318f24f60dda0335a61dd283412bad7c073ab4c2ce51b99dfc40d20ee
+- path: src/layer/vulkan/shader/elu_pack4.comp
+  status: removed
+  sha256: c976820c41480a77bcbe81e4a3c070b8ee00ea09fd85493042d4fd61e80ba8eb
+- path: src/layer/vulkan/shader/elu_pack8.comp
+  status: removed
+  sha256: 385ab0f14205aaabdf8cf1a8b80ed18d7827fd9cff150a5883306fc1d87da878
+- path: src/layer/vulkan/shader/erf.comp
+  status: modified
+  sha256: 734b1a66c682dfb8165601229a191be22c9caa63c69d721fbd8ee1f4663e1aa2
+- path: src/layer/vulkan/shader/erf_pack4.comp
+  status: removed
+  sha256: da7c47071ebf533c4e74b2aba4b9252b161d3e07418a86a4948d73f5bb1c3663
+- path: src/layer/vulkan/shader/erf_pack8.comp
+  status: removed
+  sha256: d86c22fcacd9116440157aa4d2e93797780bd6f35c04e849a0f64dab6c606645
+- path: src/layer/vulkan/shader/gelu.comp
+  status: modified
+  sha256: 5ce8e2a126138c06801375738e6aec7d37f2130823bb93c68a8ba71d6ab90f37
+- path: src/layer/vulkan/shader/gelu_pack4.comp
+  status: removed
+  sha256: 80fbe75427cadbdbb268c02e85c1e4b7989f39cc86584d01a4082625a928aead
+- path: src/layer/vulkan/shader/gelu_pack8.comp
+  status: removed
+  sha256: e1db12fc1925bf627c1c0e08418b44c25685b6fdbec2f56b6ac7491a5b034c7c
+- path: src/layer/vulkan/shader/hardsigmoid.comp
+  status: modified
+  sha256: e6b3329803e478616452ad4c91eb544c0b842b487238a2ed66f6fa56e8683c94
+- path: src/layer/vulkan/shader/hardsigmoid_pack4.comp
+  status: removed
+  sha256: e27389bc1c5b4690e1eea488b98760c75c72c56c80b02e22e7a88f331121ad65
+- path: src/layer/vulkan/shader/hardsigmoid_pack8.comp
+  status: removed
+  sha256: 0a60980c5d62565a4eb55d52775aeb6381a6c35eebf4aab2b8ee650ba7edb444
+- path: src/layer/vulkan/shader/hardswish.comp
+  status: modified
+  sha256: a203eb23a2eb82cbfd46ba31224fccc2b4214a276f64f5c65845f242c3e53751
+- path: src/layer/vulkan/shader/hardswish_pack4.comp
+  status: removed
+  sha256: 9fcbe7da11f2a7b227056ac00d395f54194feaee7caf006c43b12707c6f0ce01
+- path: src/layer/vulkan/shader/hardswish_pack8.comp
+  status: removed
+  sha256: d8bd4a377bbab534b4f3e53a88f748df232b8d889058977f197a1fcc1d33b3cd
+- path: src/layer/vulkan/shader/mish.comp
+  status: modified
+  sha256: d5e832b290dca75e1dd17c0ae24d8bc747e73731eabf6639448e8285dc96e374
+- path: src/layer/vulkan/shader/mish_pack4.comp
+  status: removed
+  sha256: 2461fd3b3babb1f8623405b2962c94be04de0a4636482e9d755fb6b872c2a497
+- path: src/layer/vulkan/shader/mish_pack8.comp
+  status: removed
+  sha256: b0b721c52dbe86e31b00288b0002774c5d48c6dcfa8077a7f421e01bb0841b36
+- path: src/layer/vulkan/shader/relu.comp
+  status: modified
+  sha256: a0d945a0b8b5a3814885ac6dde3a33953daaf5cf80f6280f7caa1bb3c6183654
+- path: src/layer/vulkan/shader/relu_pack4.comp
+  status: removed
+  sha256: 692edb6b9b39869012edf1d6ee125bc33c84267b880306ae4c92dede584922c9
+- path: src/layer/vulkan/shader/relu_pack8.comp
+  status: removed
+  sha256: 814b7b8183e95705f389ea4c26474037edb28e13f1dac1b615a3b1641b25b1c8
+- path: src/layer/vulkan/shader/swish.comp
+  status: modified
+  sha256: a5c25b408034c9b3a6e03f7a75019495696c6ca5e13b78b4a036b9dd4a4bc0aa
+- path: src/layer/vulkan/shader/swish_pack4.comp
+  status: removed
+  sha256: 72dce842b64fdb355d9cbd309e560516d00bfda99b8826a6ec57c3c1fe1fa552
+- path: src/layer/vulkan/shader/swish_pack8.comp
+  status: removed
+  sha256: 783d27793595a3356a65e9d764541b82e96e2255bc02340dc13f560bf0a0d3e4
+- path: src/layer/vulkan/shader/tanh.comp
+  status: modified
+  sha256: fc448b377f0006222bba7ae0cc7fc5a4e70419df2c46de6133fbdd2d69c183fa
+- path: src/layer/vulkan/shader/tanh_pack4.comp
+  status: removed
+  sha256: 738248754394c67eb8bbf0592e91f3ef3ae81937f7e3a1892b14991d6197dc4b
+- path: src/layer/vulkan/shader/tanh_pack8.comp
+  status: removed
+  sha256: 01472ee5cadd4e11cc4cc3695640c894aca0b376f9b4778cda85639e505b58ce

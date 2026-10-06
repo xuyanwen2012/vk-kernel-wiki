@@ -1,0 +1,47 @@
+repo: Tencent/ncnn
+pr: 5931
+url: https://github.com/Tencent/ncnn/pull/5931
+merge_sha: 07267f26180b7b0a2d75e08d9fa82be93fc79168
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/5931/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/softmax_div_sum.comp
+  status: modified
+  sha256: d1b25b599e11ac4ab1d35853825763802da26cbed8e616c6b58f81c762c5dad9
+- path: src/layer/vulkan/shader/softmax_div_sum_pack4.comp
+  status: modified
+  sha256: 128f9fec4d0dffaf9faf331d78e7b4901b165f5e9673145d86e8ea91125b805d
+- path: src/layer/vulkan/shader/softmax_div_sum_pack8.comp
+  status: modified
+  sha256: b98ac08c4bcdaa351de12b3e55463146f5426ac7e8fb6d25a7eae86305de83a3
+- path: src/layer/vulkan/shader/softmax_exp_sub_max.comp
+  status: modified
+  sha256: b03741d9e53bc11b097835207be41a29407bee8d3806e56cdbc4425214d438da
+- path: src/layer/vulkan/shader/softmax_exp_sub_max_pack4.comp
+  status: modified
+  sha256: 77f720ac8e72dd701c3a1a68bc815ffcbc3da69e3e77ab56640037cb7eae590e
+- path: src/layer/vulkan/shader/softmax_exp_sub_max_pack8.comp
+  status: modified
+  sha256: e341a1cd72fcf7075da40b1cc773976d7819b720200247e0f09048f6efcc2ff8
+- path: src/layer/vulkan/shader/softmax_reduce_max.comp
+  status: modified
+  sha256: 4eb39853122a1cd91cf1beef05b41f43f5a12d280f726222f4610dd3e665db3c
+- path: src/layer/vulkan/shader/softmax_reduce_max_pack4.comp
+  status: modified
+  sha256: c8bb4eb320f4f2f41fef8e0a1afef337357160c0709d6ef69637377a6f61e85a
+- path: src/layer/vulkan/shader/softmax_reduce_max_pack8.comp
+  status: modified
+  sha256: 8a8edca0e89080c0c29f97d235bc0e04cc13dfe7f0c3b1ef9cf4703cc8b383c5
+- path: src/layer/vulkan/shader/softmax_reduce_sum.comp
+  status: modified
+  sha256: 9a6bc5f3a3dd6de0e7d0b50f9113b28e8c48f1c43c3f722008eaefc18d0a5a4e
+- path: src/layer/vulkan/shader/softmax_reduce_sum_pack4.comp
+  status: modified
+  sha256: eef114c539a07f4dbf04cbd3684fe0309ea1efbd67f7d9e4ac937124bcb9b1c6
+- path: src/layer/vulkan/shader/softmax_reduce_sum_pack8.comp
+  status: modified
+  sha256: 1a3fb5a62cb6302ebffdcd5392a62258cda5262696e4dc438b6da7aceba15159

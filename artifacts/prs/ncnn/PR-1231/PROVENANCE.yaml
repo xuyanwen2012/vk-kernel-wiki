@@ -1,0 +1,32 @@
+repo: Tencent/ncnn
+pr: 1231
+url: https://github.com/Tencent/ncnn/pull/1231
+merge_sha: d11c4c1d42571d118f19a57317908762f5ee779f
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/1231/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/pooling.comp
+  status: modified
+  sha256: 3552156f79e83dbc1a3f67825f401b1e05278c97bf76b6f8edae604b39281028
+- path: src/layer/vulkan/shader/pooling_global.comp
+  status: modified
+  sha256: 648f6fd4075555bdc4045ed6aec709d9be6fc4030a592459f934fbd6165ae642
+- path: src/layer/vulkan/shader/pooling_global_pack4.comp
+  status: modified
+  sha256: 06d6b5df160dbaf60ea50991b3e2fd5f260980a0d2432bf55fabfa3fdd7a46be
+- path: src/layer/vulkan/shader/pooling_pack4.comp
+  status: modified
+  sha256: 3cfa532c33c6411d71ddd7179b565fa9ca1135a4669b73d0eafdd9a3c6d2d50c
+- path: src/layer/vulkan/shader/priorbox_mxnet.comp
+  status: modified
+  sha256: 023367cb02c7c67150cd3bb1e97ac9c6f4af841bfb7a3956d10543a1c32b9c7f
+- path: src/layer/vulkan/shader/softmax_reduce_max.comp
+  status: modified
+  sha256: 358908eaaf6099eb268c91f06e144829102b9a19734d011ed6fb4df34502df20
+- path: src/layer/vulkan/shader/softmax_reduce_max_pack4.comp
+  status: modified
+  sha256: 809cedf92b9782b2d5c4d776930f98b6da85138c565bab4a290354d4e114adc6

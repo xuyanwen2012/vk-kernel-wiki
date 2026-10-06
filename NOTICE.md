@@ -20,6 +20,8 @@ The derived files have been modified for this repository: the subject matter, co
 | Directory | Upstream | Licence | Licence text |
 |---|---|---|---|
 | `sources/prs/llama-cpp/`, `artifacts/prs/llama-cpp/` | https://github.com/ggml-org/llama.cpp | MIT, Copyright (c) 2023-2026 The ggml authors | `artifacts/prs/llama-cpp/LICENSE` |
+| `sources/prs/ncnn/`, `artifacts/prs/ncnn/` | https://github.com/Tencent/ncnn | BSD-3-Clause, Copyright (C) 2017 Tencent; the saved files are ncnn's own shader sources, not the third-party components its licence file lists | `artifacts/prs/ncnn/LICENSE` (upstream `LICENSE.txt`) |
+| `sources/prs/mesa/`, `artifacts/prs/mesa/` | https://gitlab.freedesktop.org/mesa/mesa | MIT; copyright notices are in the headers of the upstream files | `artifacts/prs/mesa/LICENSE` (upstream `licenses/MIT`) |
 
 Each `artifacts/prs/<slug>/PR-<number>/PROVENANCE.yaml` records the pull request, its merge commit, the retrieval date and a sha256 per file.
 

@@ -1,0 +1,20 @@
+repo: Tencent/ncnn
+pr: 6154
+url: https://github.com/Tencent/ncnn/pull/6154
+merge_sha: d395000edc2e320ba6962a5a1c3b83ce10f99c8a
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6154/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+  status: added
+  sha256: 70ff1dd1bfce6d3b613faceb75666ccdfeb1a8c59d2feb98c45fe5b7c6b5b07a
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_cm_16_16_16.comp
+  status: removed
+  sha256: 471a3f320df499c4b639bdf683c1b898cddb3e02a6b5f32053d165d504a82c1c
+- path: src/layer/vulkan/shader/convolution_pack4_1x1s1d1_cm_16_8_8.comp
+  status: removed
+  sha256: b498ad9d3226bf02e7ee89e6896c27e39c6bc22c7acb031850a49fa20d26f43a

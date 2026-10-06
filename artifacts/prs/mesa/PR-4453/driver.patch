@@ -1,0 +1,119 @@
+diff --git a/src/amd/common/ac_gpu_info.c b/src/amd/common/ac_gpu_info.c
+--- a/src/amd/common/ac_gpu_info.c
++++ b/src/amd/common/ac_gpu_info.c
+@@ -590,6 +590,9 @@ bool ac_query_gpu_info(int fd, void *dev_p,
+ 	info->has_out_of_order_rast = info->chip_class >= GFX8 &&
+ 				      info->max_se >= 2;
+ 
++	/* Whether chips support double rate packed math instructions. */
++	info->has_double_rate_fp16 = info->chip_class >= GFX9;
++
+ 	/* TODO: Figure out how to use LOAD_CONTEXT_REG on GFX6-GFX7. */
+ 	info->has_load_ctx_reg_pkt = info->chip_class >= GFX9 ||
+ 				     (info->chip_class >= GFX8 &&
+diff --git a/src/amd/common/ac_gpu_info.h b/src/amd/common/ac_gpu_info.h
+--- a/src/amd/common/ac_gpu_info.h
++++ b/src/amd/common/ac_gpu_info.h
+@@ -66,6 +66,7 @@ struct radeon_info {
+ 	bool                        rbplus_allowed; /* if RB+ is allowed */
+ 	bool                        has_load_ctx_reg_pkt;
+ 	bool                        has_out_of_order_rast;
++	bool                        has_double_rate_fp16;
+ 	bool                        cpdma_prefetch_writes_memory;
+ 	bool                        has_gfx9_scissor_bug;
+ 	bool                        has_tc_compat_zrange_bug;
+diff --git a/src/amd/vulkan/radv_device.c b/src/amd/vulkan/radv_device.c
+--- a/src/amd/vulkan/radv_device.c
++++ b/src/amd/vulkan/radv_device.c
+@@ -1000,7 +1000,7 @@ void radv_GetPhysicalDeviceFeatures2(
+ 			features->storageBuffer16BitAccess = !pdevice->use_aco;
+ 			features->uniformAndStorageBuffer16BitAccess = !pdevice->use_aco;
+ 			features->storagePushConstant16 = !pdevice->use_aco;
+-			features->storageInputOutput16 = pdevice->rad_info.chip_class >= GFX8 && !pdevice->use_aco && LLVM_VERSION_MAJOR >= 9;
++			features->storageInputOutput16 = pdevice->rad_info.has_double_rate_fp16 && !pdevice->use_aco && LLVM_VERSION_MAJOR >= 9;
+ 			break;
+ 		}
+ 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES: {
+@@ -1106,7 +1106,7 @@ void radv_GetPhysicalDeviceFeatures2(
+ 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES: {
+ 			VkPhysicalDeviceShaderFloat16Int8Features *features =
+ 				(VkPhysicalDeviceShaderFloat16Int8Features*)ext;
+-			features->shaderFloat16 = pdevice->rad_info.chip_class >= GFX8 && !pdevice->use_aco;
++			features->shaderFloat16 = pdevice->rad_info.has_double_rate_fp16 && !pdevice->use_aco;
+ 			features->shaderInt8 = !pdevice->use_aco;
+ 			break;
+ 		}
+@@ -1218,7 +1218,7 @@ void radv_GetPhysicalDeviceFeatures2(
+ 			features->storageBuffer16BitAccess = !pdevice->use_aco;
+ 			features->uniformAndStorageBuffer16BitAccess = !pdevice->use_aco;
+ 			features->storagePushConstant16 = !pdevice->use_aco;
+-			features->storageInputOutput16 = pdevice->rad_info.chip_class >= GFX8 && !pdevice->use_aco && LLVM_VERSION_MAJOR >= 9;
++			features->storageInputOutput16 = pdevice->rad_info.has_double_rate_fp16 && !pdevice->use_aco && LLVM_VERSION_MAJOR >= 9;
+ 			features->multiview = true;
+ 			features->multiviewGeometryShader = true;
+ 			features->multiviewTessellationShader = true;
+@@ -1239,7 +1239,7 @@ void radv_GetPhysicalDeviceFeatures2(
+ 			features->storagePushConstant8 = !pdevice->use_aco;
+ 			features->shaderBufferInt64Atomics = LLVM_VERSION_MAJOR >= 9;
+ 			features->shaderSharedInt64Atomics = LLVM_VERSION_MAJOR >= 9;
+-			features->shaderFloat16 = pdevice->rad_info.chip_class >= GFX8 && !pdevice->use_aco;
++			features->shaderFloat16 = pdevice->rad_info.has_double_rate_fp16 && !pdevice->use_aco;
+ 			features->shaderInt8 = !pdevice->use_aco;
+ 			features->descriptorIndexing = true;
+ 			features->shaderInputAttachmentArrayDynamicIndexing = true;
+@@ -1512,8 +1512,13 @@ radv_get_physical_device_properties_1_2(struct radv_physical_device *pdevice,
+ 	/* On AMD hardware, denormals and rounding modes for fp16/fp64 are
+ 	 * controlled by the same config register.
+ 	 */
+-	p->denormBehaviorIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR;
+-	p->roundingModeIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR;
++	if (pdevice->rad_info.has_double_rate_fp16) {
++		p->denormBehaviorIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR;
++		p->roundingModeIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR;
++	} else {
++		p->denormBehaviorIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL_KHR;
++		p->roundingModeIndependence = VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL_KHR;
++	}
+ 
+ 	/* Do not allow both preserving and flushing denorms because different
+ 	 * shaders in the same pipeline can have different settings and this
+@@ -1530,10 +1535,10 @@ radv_get_physical_device_properties_1_2(struct radv_physical_device *pdevice,
+ 	p->shaderSignedZeroInfNanPreserveFloat32 = true;
+ 
+ 	p->shaderDenormFlushToZeroFloat16 = false;
+-	p->shaderDenormPreserveFloat16 = pdevice->rad_info.chip_class >= GFX8;
+-	p->shaderRoundingModeRTEFloat16 = pdevice->rad_info.chip_class >= GFX8;
++	p->shaderDenormPreserveFloat16 = pdevice->rad_info.has_double_rate_fp16;
++	p->shaderRoundingModeRTEFloat16 = pdevice->rad_info.has_double_rate_fp16;
+ 	p->shaderRoundingModeRTZFloat16 = false;
+-	p->shaderSignedZeroInfNanPreserveFloat16 = pdevice->rad_info.chip_class >= GFX8;
++	p->shaderSignedZeroInfNanPreserveFloat16 = pdevice->rad_info.has_double_rate_fp16;
+ 
+ 	p->shaderDenormFlushToZeroFloat64 = false;
+ 	p->shaderDenormPreserveFloat64 = pdevice->rad_info.chip_class >= GFX8;
+diff --git a/src/amd/vulkan/radv_extensions.py b/src/amd/vulkan/radv_extensions.py
+--- a/src/amd/vulkan/radv_extensions.py
++++ b/src/amd/vulkan/radv_extensions.py
+@@ -155,8 +155,8 @@ EXTENSIONS = [
+     Extension('VK_AMD_device_coherent_memory',            1, True),
+     Extension('VK_AMD_draw_indirect_count',               1, True),
+     Extension('VK_AMD_gcn_shader',                        1, True),
+-    Extension('VK_AMD_gpu_shader_half_float',             1, '!device->use_aco && device->rad_info.chip_class >= GFX9'),
+-    Extension('VK_AMD_gpu_shader_int16',                  1, '!device->use_aco && device->rad_info.chip_class >= GFX9'),
++    Extension('VK_AMD_gpu_shader_half_float',             1, '!device->use_aco && device->rad_info.has_double_rate_fp16'),
++    Extension('VK_AMD_gpu_shader_int16',                  1, '!device->use_aco && device->rad_info.has_double_rate_fp16'),
+     # Disable mixed attachment samples on GFX6-GFX7 until the CTS failures have been resolved.
+     Extension('VK_AMD_mixed_attachment_samples',          1, 'device->rad_info.chip_class >= GFX8'),
+     Extension('VK_AMD_rasterization_order',               1, 'device->rad_info.has_out_of_order_rast'),
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -350,7 +350,7 @@ radv_shader_compile_to_nir(struct radv_device *device,
+ 				.device_group = true,
+ 				.draw_parameters = true,
+ 				.float_controls = true,
+-				.float16 = !device->physical_device->use_aco,
++				.float16 = device->physical_device->rad_info.has_double_rate_fp16 && !device->physical_device->use_aco,
+ 				.float64 = true,
+ 				.geometry_streams = true,
+ 				.image_ms_array = true,

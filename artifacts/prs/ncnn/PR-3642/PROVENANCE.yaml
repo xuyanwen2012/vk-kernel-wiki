@@ -1,0 +1,47 @@
+repo: Tencent/ncnn
+pr: 3642
+url: https://github.com/Tencent/ncnn/pull/3642
+merge_sha: 9e3cc1c5df3b2a2634372b95f972370d02247815
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/3642/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/innerproduct_reduce_sum8.comp
+  status: added
+  sha256: b59c9e99b59a715ba483b1883a20b39db801b2de7ad5f05a0612d4f4a62fd564
+- path: src/layer/vulkan/shader/innerproduct_reduce_sum8_pack4.comp
+  status: added
+  sha256: 6e1a3519679d71e7bb1aade32bb22cc6d68e33eb0f5bf4417a4b0ed525059f32
+- path: src/layer/vulkan/shader/innerproduct_reduce_sum8_pack8.comp
+  status: added
+  sha256: 8f8b38e1773db03eb1f5544f1366655b07da4c415d67d9873527c95d4b61f711
+- path: src/layer/vulkan/shader/innerproduct_sum8.comp
+  status: added
+  sha256: aa212c6ff0a085ec5e357c873e3075af46e0dd47ecd1e8f7b7340fd35384bb74
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack1to4.comp
+  status: added
+  sha256: 5ddb6fcf86dc897cc9a23ffe8719b875821fc80fdb1b470a1c856b01130fa6fb
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack1to8.comp
+  status: added
+  sha256: b8ffb158861b7dc037f7e08d1db5eb362ecf104611145f40737a31b19a9484bd
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack4.comp
+  status: added
+  sha256: aa4f665566e3da9b1df56bf2bf2bbfe4a73499208cb41a193938588c027b578e
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack4to1.comp
+  status: added
+  sha256: 1f44b82dd6c94eada9586b582f0a15d7c3e67b75e8afb6b28bc1161964291dbc
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack4to8.comp
+  status: added
+  sha256: 4c3ca790c4b87f64826af51d04e4abcb21bc6717579c5def793e0406ab632afa
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack8.comp
+  status: added
+  sha256: fd00453449c9c7c7111d90cf2161746b138083bc972eb4a18060f45cef92b4b3
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack8to1.comp
+  status: added
+  sha256: 9d7ed3af18a6ef8b682fb864e5f5b8fa860aca755387d33c00059eab9fcc7ec3
+- path: src/layer/vulkan/shader/innerproduct_sum8_pack8to4.comp
+  status: added
+  sha256: 4c39c0d599805884cb8b2d1410c518434ee15183aa2defac997e89dd06df510b

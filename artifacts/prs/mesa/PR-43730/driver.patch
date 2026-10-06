@@ -1,0 +1,366 @@
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -800,7 +800,7 @@ lower_cmat_convert_transpose(nir_builder *b, nir_intrinsic_instr *intr, const lo
+    struct glsl_cmat_description src_desc = *glsl_get_cmat_description(src_deref->type);
+    nir_def *src = radv_nir_load_cmat(b, params, intr->src[1].ssa);
+ 
+-   bool sat = false;
++   bool sat = nir_intrinsic_saturate(intr);
+    const bool transpose = intr->intrinsic == nir_intrinsic_cmat_transpose;
+ 
+    enum glsl_cmat_use dst_use = dst_desc.use;
+@@ -809,8 +809,14 @@ lower_cmat_convert_transpose(nir_builder *b, nir_intrinsic_instr *intr, const lo
+    enum glsl_base_type dst_element_type = dst_desc.element_type;
+    enum glsl_base_type src_element_type = src_desc.element_type;
+ 
++   nir_cmat_signed cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr);
++
++   dst_element_type =
++      glsl_apply_signedness_to_base_type(dst_element_type, cmat_signed_mask & NIR_CMAT_RESULT_SIGNED);
++   src_element_type = glsl_apply_signedness_to_base_type(src_element_type, cmat_signed_mask & NIR_CMAT_A_SIGNED);
++
+    if (transpose) {
+-      /* NV_cmat2 only support acc -> b transpose, but we can handle any transpose except acc -> acc. */
++      /* SPIR-V supports acc -> b/a and a/b -> acc transposes */
+       if (dst_use == GLSL_CMAT_USE_A) {
+          dst_use = GLSL_CMAT_USE_B;
+       } else if (dst_use == GLSL_CMAT_USE_B) {
+@@ -823,13 +829,6 @@ lower_cmat_convert_transpose(nir_builder *b, nir_intrinsic_instr *intr, const lo
+          else
+             UNREACHABLE("unsupported transpose");
+       }
+-   } else {
+-      sat = nir_intrinsic_saturate(intr);
+-      nir_cmat_signed cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr);
+-
+-      dst_element_type =
+-         glsl_apply_signedness_to_base_type(dst_element_type, cmat_signed_mask & NIR_CMAT_RESULT_SIGNED);
+-      src_element_type = glsl_apply_signedness_to_base_type(src_element_type, cmat_signed_mask & NIR_CMAT_A_SIGNED);
+    }
+ 
+    unsigned dst_mul = radv_nir_cmat_length_mul(dst_desc, params);
+@@ -1248,6 +1247,28 @@ lower_cmat_per_element_op(nir_builder *b, nir_cmat_call_instr *call, const lower
+    return true;
+ }
+ 
++static bool
++lower_cmat_get_coordinate(nir_builder *b, nir_intrinsic_instr *intr, const lower_cmat_params *params)
++{
++   struct glsl_cmat_description desc = nir_intrinsic_cmat_desc(intr);
++
++   nir_def *comps[2];
++   nir_def *local_idx = nir_load_subgroup_invocation(b);
++   nir_def *inner_idx = nir_iand_imm(b, local_idx, 15);
++   nir_def *base_row = radv_get_base_row(b, desc, params, local_idx);
++   uint32_t row_increase = params->gfx_level < GFX11_7 && desc.use == GLSL_CMAT_USE_ACCUMULATOR ? params->wave_size / 16 : 1;
++
++   comps[0] = nir_iadd(b, base_row, nir_imul_imm(b, intr->src[0].ssa, row_increase));
++   comps[1] = inner_idx;
++
++   if (desc.use == GLSL_CMAT_USE_A) {
++      SWAP(comps[0], comps[1]);
++   }
++   nir_def *val = nir_vec(b, comps, 2);
++   nir_def_replace(&intr->def, val);
++   return true;
++}
++
+ bool
+ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size)
+ {
+@@ -1329,6 +1350,9 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+             case nir_intrinsic_cmat_copy:
+                progress |= lower_cmat_copy(&b, intr);
+                break;
++            case nir_intrinsic_cmat_get_coordinate:
++               progress |= lower_cmat_get_coordinate(&b, intr, &params);
++               break;
+             default:
+                continue;
+             }
+diff --git a/src/amd/vulkan/radv_physical_device.c b/src/amd/vulkan/radv_physical_device.c
+--- a/src/amd/vulkan/radv_physical_device.c
++++ b/src/amd/vulkan/radv_physical_device.c
+@@ -832,6 +832,7 @@ radv_physical_device_get_supported_extensions(const struct radv_physical_device
+       .EXT_color_write_enable = true,
+       .EXT_conditional_rendering = true,
+       .EXT_conservative_rasterization = pdev->info.gfx_level >= GFX9,
++      .EXT_cooperative_matrix_maintenance1 = radv_cooperative_matrix_enabled(pdev),
+       .EXT_custom_border_color = true,
+       .EXT_custom_resolve = true,
+       .EXT_debug_marker = instance->vk.trace_mode & RADV_TRACE_MODE_RGP,
+@@ -1461,6 +1462,13 @@ radv_physical_device_get_features(const struct radv_physical_device *pdev, struc
+       .cooperativeMatrix = radv_cooperative_matrix_enabled(pdev),
+       .cooperativeMatrixRobustBufferAccess = false,
+ 
++      /* VK_EXT_cooperative_matrix_maintenance1 */
++      .cooperativeMatrixProperties2 = true,
++      .cooperativeMatrixReductions = true,
++      .cooperativeMatrixConversions = true,
++      .cooperativeMatrixPerElementOperations = true,
++      .cooperativeMatrixGetCoordinate = true,
++
+       /* VK_EXT_image_compression_control */
+       .imageCompressionControl = radv_compression_control_enabled(pdev),
+ 
+@@ -3564,7 +3572,7 @@ struct matrix_prop {
+ };
+ 
+ static void
+-fill_matrix_prop_khr(struct __vk_outarray *base, struct matrix_prop *prop)
++fill_matrix_prop_khr(struct __vk_outarray *base, struct matrix_prop *prop, void *fill_data)
+ {
+    vk_outarray(VkCooperativeMatrixPropertiesKHR) *out = (void *)base;
+ 
+@@ -3584,7 +3592,33 @@ fill_matrix_prop_khr(struct __vk_outarray *base, struct matrix_prop *prop)
+ }
+ 
+ static void
+-fill_flexible_matrix_prop_nv(struct __vk_outarray *base, struct matrix_prop *prop)
++fill_matrix_prop2_ext(struct __vk_outarray *base, struct matrix_prop *prop, void *fill_data)
++{
++   vk_outarray(VkCooperativeMatrixProperties2EXT) *out = (void *)base;
++   bool saturate_flag = *(bool *)fill_data;
++
++   if (prop->saturate && !saturate_flag)
++      return;
++   if (!prop->saturate && saturate_flag)
++      return;
++
++   vk_outarray_append_typed(VkCooperativeMatrixProperties2EXT, out, p)
++   {
++      *p = (struct VkCooperativeMatrixProperties2EXT){
++         .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_2_EXT,
++         .MGranularity = 16,
++         .NGranularity = 16,
++         .KGranularity = 16,
++         .AType = prop->a_type,
++         .BType = prop->b_type,
++         .CType = prop->c_type,
++         .ResultType = prop->r_type
++      };
++   }
++}
++
++static void
++fill_flexible_matrix_prop_nv(struct __vk_outarray *base, struct matrix_prop *prop, void *fill_data)
+ {
+    vk_outarray(VkCooperativeMatrixFlexibleDimensionsPropertiesNV) *out = (void *)base;
+ 
+@@ -3606,7 +3640,8 @@ fill_flexible_matrix_prop_nv(struct __vk_outarray *base, struct matrix_prop *pro
+ 
+ static void
+ fill_array_sizes_structs(const struct radv_physical_device *pdev, struct __vk_outarray *base,
+-                         void (*array_size_cb)(struct __vk_outarray *base, struct matrix_prop *prop))
++                         void (*array_size_cb)(struct __vk_outarray *base, struct matrix_prop *prop, void *fill_data),
++                         void *fill_data)
+ {
+    /* The Vulkan spec says:
+     * If some types are preferred over other types (e.g. for performance),
+@@ -3622,7 +3657,7 @@ fill_array_sizes_structs(const struct radv_physical_device *pdev, struct __vk_ou
+             prop.a_type = e5m2_a ? VK_COMPONENT_TYPE_FLOAT8_E5M2_EXT : VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+             prop.b_type = e5m2_b ? VK_COMPONENT_TYPE_FLOAT8_E5M2_EXT : VK_COMPONENT_TYPE_FLOAT8_E4M3_EXT;
+             prop.c_type = prop.r_type = VK_COMPONENT_TYPE_FLOAT32_KHR;
+-            (*array_size_cb)(base, &prop);
++            (*array_size_cb)(base, &prop, fill_data);
+          }
+       }
+    }
+@@ -3639,7 +3674,7 @@ fill_array_sizes_structs(const struct radv_physical_device *pdev, struct __vk_ou
+                prop.b_type = bsigned ? VK_COMPONENT_TYPE_SINT8_KHR : VK_COMPONENT_TYPE_UINT8_KHR;
+                prop.c_type = prop.r_type = csigned ? VK_COMPONENT_TYPE_SINT32_KHR : VK_COMPONENT_TYPE_UINT32_KHR;
+ 
+-               (*array_size_cb)(base, &prop);
++               (*array_size_cb)(base, &prop, fill_data);
+             }
+          }
+       }
+@@ -3654,7 +3689,7 @@ fill_array_sizes_structs(const struct radv_physical_device *pdev, struct __vk_ou
+          if (!radv_bfloat16_enabled(pdev) && bfloat)
+             continue;
+ 
+-         (*array_size_cb)(base, &prop);
++         (*array_size_cb)(base, &prop, fill_data);
+       }
+    }
+ }
+@@ -3665,7 +3700,21 @@ radv_GetPhysicalDeviceCooperativeMatrixPropertiesKHR(VkPhysicalDevice physicalDe
+ {
+    VK_FROM_HANDLE(radv_physical_device, pdev, physicalDevice);
+    VK_OUTARRAY_MAKE_TYPED(VkCooperativeMatrixPropertiesKHR, out, pProperties, pPropertyCount);
+-   fill_array_sizes_structs(pdev, &out.base, fill_matrix_prop_khr);
++   fill_array_sizes_structs(pdev, &out.base, fill_matrix_prop_khr, NULL);
++   return vk_outarray_status(&out);
++}
++
++VKAPI_ATTR VkResult VKAPI_CALL
++radv_GetPhysicalDeviceCooperativeMatrixProperties2EXT(VkPhysicalDevice physicalDevice,
++                                                      const VkPhysicalDeviceCooperativeMatrixInfo2EXT *info,
++                                                      uint32_t *pPropertyCount,
++                                                      VkCooperativeMatrixProperties2EXT *pProperties)
++{
++   VK_FROM_HANDLE(radv_physical_device, pdev, physicalDevice);
++   VK_OUTARRAY_MAKE_TYPED(VkCooperativeMatrixProperties2EXT, out, pProperties, pPropertyCount);
++   bool saturate_flag = !!(info->flags & VK_COOPERATIVE_MATRIX_SATURATING_ACCUMULATION_BIT_EXT);
++   if (info->scope == VK_SCOPE_SUBGROUP_KHR)
++      fill_array_sizes_structs(pdev, &out.base, fill_matrix_prop2_ext, (void *)&saturate_flag);
+    return vk_outarray_status(&out);
+ }
+ 
+@@ -3676,7 +3725,7 @@ radv_GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
+ {
+    VK_FROM_HANDLE(radv_physical_device, pdev, physicalDevice);
+    VK_OUTARRAY_MAKE_TYPED(VkCooperativeMatrixFlexibleDimensionsPropertiesNV, out, pProperties, pPropertyCount);
+-   fill_array_sizes_structs(pdev, &out.base, fill_flexible_matrix_prop_nv);
++   fill_array_sizes_structs(pdev, &out.base, fill_flexible_matrix_prop_nv, NULL);
+    return vk_outarray_status(&out);
+ }
+ 
+diff --git a/src/compiler/nir/nir_lower_cooperative_matrix.c b/src/compiler/nir/nir_lower_cooperative_matrix.c
+--- a/src/compiler/nir/nir_lower_cooperative_matrix.c
++++ b/src/compiler/nir/nir_lower_cooperative_matrix.c
+@@ -364,7 +364,9 @@ split_cmat_transpose(nir_builder *b,
+       nir_deref_instr *dst_deref = recreate_derefs(b, &intr->src[0], dst_split->split_vars[out_idx]);
+       nir_deref_instr *src_deref = recreate_derefs(b, &intr->src[1], src_split->split_vars[i]);
+       b->cursor = nir_before_instr(instr);
+-      nir_cmat_transpose(b, &dst_deref->def, &src_deref->def, .fp_math_ctrl = nir_intrinsic_fp_math_ctrl(intr));
++      nir_cmat_transpose(b, &dst_deref->def, &src_deref->def, .saturate = nir_intrinsic_saturate(intr),
++                         .cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr),
++                         .fp_math_ctrl = nir_intrinsic_fp_math_ctrl(intr));
+    }
+    nir_instr_remove(instr);
+    return true;
+@@ -554,6 +556,34 @@ split_cmat_muladd(nir_builder *b,
+    return true;
+ }
+ 
++static bool
++split_cmat_get_coordinate(nir_builder *b,
++                          nir_intrinsic_instr *intr,
++                          struct split_info *info)
++{
++   struct glsl_cmat_description desc = nir_intrinsic_cmat_desc(intr);
++   struct split_box box;
++
++   if (!split_desc(&desc, info, &box))
++      return false;
++
++   nir_def *length = nir_cmat_length(b, .cmat_desc = desc);
++   nir_def *rem_def = nir_umod(b, intr->src[0].ssa, length);
++   nir_def *split_idx = nir_udiv(b, intr->src[0].ssa, length);
++
++   nir_def *adds[2];
++   adds[0] = nir_udiv_imm(b, split_idx, box.outer_cols);
++   adds[1] = nir_umod_imm(b, split_idx, box.outer_cols);
++   nir_def *def = nir_cmat_get_coordinate(b, rem_def, .cmat_desc = desc);
++
++   adds[0] = nir_imul_imm(b, adds[0], desc.cols);
++   adds[1] = nir_imul_imm(b, adds[1], desc.cols);
++   nir_def *add_vec = nir_vec(b, adds, 2);
++   def = nir_iadd(b, def, add_vec);
++   nir_def_replace(&intr->def, def);
++   return true;
++}
++
+ static void
+ call_reduce(nir_builder *b,
+             nir_cmat_call_instr *call,
+@@ -927,6 +957,9 @@ split_matrix_impl(nir_function_impl *impl, struct split_info *info)
+             case nir_intrinsic_cmat_store:
+                progress |= split_cmat_load_store(&b, intr, info);
+                break;
++            case nir_intrinsic_cmat_get_coordinate:
++               progress |= split_cmat_get_coordinate(&b, intr, info);
++               break;
+             default:
+                break;
+             }
+diff --git a/src/compiler/spirv/vtn_cmat.c b/src/compiler/spirv/vtn_cmat.c
+--- a/src/compiler/spirv/vtn_cmat.c
++++ b/src/compiler/spirv/vtn_cmat.c
+@@ -98,6 +98,16 @@ vtn_cast_pointer_to_byte_pointer(struct vtn_builder *b, struct vtn_pointer *p)
+    return vtn_cast_pointer(b, p, t);
+ }
+ 
++static bool
++desc_type_is_signed(const struct glsl_type *type)
++{
++   if (type->cmat_desc.element_type == GLSL_TYPE_INT8 ||
++       type->cmat_desc.element_type == GLSL_TYPE_INT16 ||
++       type->cmat_desc.element_type == GLSL_TYPE_INT)
++      return true;
++   return false;
++}
++
+ void
+ vtn_handle_cooperative_instruction(struct vtn_builder *b, SpvOp opcode,
+                                    const uint32_t *w, unsigned count)
+@@ -202,12 +212,32 @@ vtn_handle_cooperative_instruction(struct vtn_builder *b, SpvOp opcode,
+       break;
+    }
+ 
++   case SpvOpCooperativeMatrixGetCoordinateEXT: {
++      nir_deref_instr *src = vtn_get_cmat_deref(b, w[3]);
++      nir_def *coord = vtn_get_nir_ssa(b, w[4]);
++      nir_def *def = nir_cmat_get_coordinate(&b->nb, coord, .cmat_desc = src->type->cmat_desc);
++      vtn_push_nir_ssa(b, w[2], def);
++      break;
++   }
++
+    case SpvOpCooperativeMatrixConvertNV: {
++      struct vtn_value *val = vtn_untyped_value(b, w[2]);
+       struct vtn_type *dst_type = vtn_get_type(b, w[1]);
+       nir_deref_instr *src = vtn_get_cmat_deref(b, w[3]);
++      const bool transpose = vtn_has_decoration(b, val, SpvDecorationCooperativeMatrixTransposeEXT);
++      unsigned signed_mask = 0;
++
++      if (desc_type_is_signed(dst_type->type))
++         signed_mask |= NIR_CMAT_RESULT_SIGNED;
++
++      if (desc_type_is_signed(src->type))
++         signed_mask |= NIR_CMAT_A_SIGNED;
+ 
+       nir_deref_instr *dst = vtn_create_cmat_temporary(b, dst_type->type, "cmat_convert_nv");
+-      nir_cmat_convert(&b->nb, &dst->def, &src->def);
++      if (transpose)
++         nir_cmat_transpose(&b->nb, &dst->def, &src->def, .cmat_signed_mask = signed_mask);
++      else
++         nir_cmat_convert(&b->nb, &dst->def, &src->def, .cmat_signed_mask = signed_mask);
+       vtn_push_var_ssa(b, w[2], dst->var);
+       break;
+    }
+@@ -215,9 +245,16 @@ vtn_handle_cooperative_instruction(struct vtn_builder *b, SpvOp opcode,
+    case SpvOpCooperativeMatrixTransposeNV: {
+       struct vtn_type *dst_type = vtn_get_type(b, w[1]);
+       nir_deref_instr *src = vtn_get_cmat_deref(b, w[3]);
++      unsigned signed_mask = 0;
++
++      if (desc_type_is_signed(dst_type->type))
++         signed_mask |= NIR_CMAT_RESULT_SIGNED;
++
++      if (desc_type_is_signed(src->type))
++         signed_mask |= NIR_CMAT_A_SIGNED;
+ 
+       nir_deref_instr *dst = vtn_create_cmat_temporary(b, dst_type->type, "cmat_transpose_nv");
+-      nir_cmat_transpose(&b->nb, &dst->def, &src->def);
++      nir_cmat_transpose(&b->nb, &dst->def, &src->def, .cmat_signed_mask = signed_mask);
+       vtn_push_var_ssa(b, w[2], dst->var);
+       break;
+    }
+@@ -430,9 +467,14 @@ vtn_handle_cooperative_alu(struct vtn_builder *b, struct vtn_value *dest_val,
+             (vtn_convert_op_dst_type(opcode) == nir_type_int ? NIR_CMAT_RESULT_SIGNED : 0);
+ 
+          const bool saturate = vtn_has_decoration(b, dest_val, SpvDecorationSaturatedToLargestFloat8NormalConversionEXT);
++         const bool transpose = vtn_has_decoration(b, dest_val, SpvDecorationCooperativeMatrixTransposeEXT);
+ 
+          nir_deref_instr *dst = vtn_create_cmat_temporary(b, dst_type->type, "cmat_convert");
+-         nir_cmat_convert(&b->nb, &dst->def, &src->def, .saturate = saturate, .cmat_signed_mask = signed_mask);
++
++         if (transpose)
++            nir_cmat_transpose(&b->nb, &dst->def, &src->def, .saturate = saturate, .cmat_signed_mask = signed_mask);
++         else
++            nir_cmat_convert(&b->nb, &dst->def, &src->def, .saturate = saturate, .cmat_signed_mask = signed_mask);
+          vtn_push_var_ssa(b, w[2], dst->var);
+ 
+          break;

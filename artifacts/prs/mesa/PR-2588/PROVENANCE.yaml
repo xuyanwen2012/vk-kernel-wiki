@@ -1,0 +1,41 @@
+repo: mesa/mesa
+pr: 2588
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/2588
+merge_sha: fb07fd4e6cb9feb8c9a812dd5f859f165f213465
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/2588/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/compiler/aco_instruction_selection.cpp
+  status: modified
+  sha256: b0ea847610b7dc76cea9850f8ead6be18f11d80124ed47bc1f0fe2dc4e16d706
+- path: src/amd/compiler/aco_instruction_selection_setup.cpp
+  status: modified
+  sha256: e54d774c5952ee06feaa121dd2aafe5c1c6866d33ce805325ffd20a88980b448
+- path: src/amd/vulkan/radv_cmd_buffer.c
+  status: modified
+  sha256: 3e93bc46398c64e23497a679bc408f0f98acb1eb04c03a5d254c8a001fab1c8b
+- path: src/amd/vulkan/radv_device.c
+  status: modified
+  sha256: 296b2c9a6708bcd3cfc3a814fbafaa881523fe46a89913a4f17e948c5146db87
+- path: src/amd/vulkan/radv_extensions.py
+  status: modified
+  sha256: a3a54d7f17bfa75f5b69ccd6cecf3dc8c5514f9b0be30046256deda189c8a755
+- path: src/amd/vulkan/radv_nir_to_llvm.c
+  status: modified
+  sha256: 56955eb1abb0a880535776ec16885288170543235e6b7f138a707f230833162d
+- path: src/amd/vulkan/radv_pipeline.c
+  status: modified
+  sha256: 312141b9e760a256f924061a573aca0b08c915d4b1fa94d2623e1e3df454dd98
+- path: src/amd/vulkan/radv_private.h
+  status: modified
+  sha256: d037704f5daefeab18533ff68ddfdbc2dd5f729fb6e84d122506e615b8f25152
+- path: src/amd/vulkan/radv_shader.c
+  status: modified
+  sha256: 2ab4176635fb892cb9bc7bdb07ab47e22be0c41c6295f7daf11128fb79169e8b
+- path: src/amd/vulkan/radv_shader.h
+  status: modified
+  sha256: ecf8bf83d008fd48b6d8469e6223586c1e85171fa487c55e99b89567a342e07e

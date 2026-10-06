@@ -1,0 +1,14 @@
+repo: Tencent/ncnn
+pr: 6473
+url: https://github.com/Tencent/ncnn/pull/6473
+merge_sha: 66dce5698a9f4306f1b3670ba57fe7343c259e65
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6473/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/selu.comp
+  status: added
+  sha256: d5454e375ddc7c339380ad1043325b33f295b0317dc6e32c8d7ee814a7ce97de

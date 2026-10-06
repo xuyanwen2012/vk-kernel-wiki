@@ -1,0 +1,213 @@
+diff --git a/src/amd/compiler/aco_instruction_selection.cpp b/src/amd/compiler/aco_instruction_selection.cpp
+--- a/src/amd/compiler/aco_instruction_selection.cpp
++++ b/src/amd/compiler/aco_instruction_selection.cpp
+@@ -991,7 +991,8 @@ emit_vop3p_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, T
+ }
+ 
+ void
+-emit_idot_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, Temp dst, bool clamp)
++emit_idot_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, Temp dst, bool clamp,
++                      unsigned neg_lo = 0)
+ {
+    Temp src[3] = {Temp(0, v1), Temp(0, v1), Temp(0, v1)};
+    bool has_sgpr = false;
+@@ -1005,7 +1006,11 @@ emit_idot_instruction(isel_context* ctx, nir_alu_instr* instr, aco_opcode op, Te
+ 
+    Builder bld(ctx->program, ctx->block);
+    bld.is_precise = instr->exact;
+-   bld.vop3p(op, Definition(dst), src[0], src[1], src[2], 0x0, 0x7).instr->vop3p().clamp = clamp;
++   VOP3P_instruction& vop3p =
++      bld.vop3p(op, Definition(dst), src[0], src[1], src[2], 0x0, 0x7).instr->vop3p();
++   vop3p.clamp = clamp;
++   u_foreach_bit (i, neg_lo)
++      vop3p.neg_lo[i] = true;
+ }
+ 
+ void
+@@ -2459,11 +2464,25 @@ visit_alu_instr(isel_context* ctx, nir_alu_instr* instr)
+       break;
+    }
+    case nir_op_sdot_4x8_iadd: {
+-      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, false);
++      if (ctx->options->gfx_level >= GFX11)
++         emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_iu8, dst, false, 0x3);
++      else
++         emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, false);
+       break;
+    }
+    case nir_op_sdot_4x8_iadd_sat: {
+-      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, true);
++      if (ctx->options->gfx_level >= GFX11)
++         emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_iu8, dst, true, 0x3);
++      else
++         emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_i8, dst, true);
++      break;
++   }
++   case nir_op_sudot_4x8_iadd: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_iu8, dst, false, 0x1);
++      break;
++   }
++   case nir_op_sudot_4x8_iadd_sat: {
++      emit_idot_instruction(ctx, instr, aco_opcode::v_dot4_i32_iu8, dst, true, 0x1);
+       break;
+    }
+    case nir_op_udot_4x8_uadd: {
+diff --git a/src/amd/compiler/aco_instruction_selection_setup.cpp b/src/amd/compiler/aco_instruction_selection_setup.cpp
+--- a/src/amd/compiler/aco_instruction_selection_setup.cpp
++++ b/src/amd/compiler/aco_instruction_selection_setup.cpp
+@@ -523,8 +523,10 @@ init_context(isel_context* ctx, nir_shader* shader)
+                case nir_op_sad_u8x4:
+                case nir_op_udot_4x8_uadd:
+                case nir_op_sdot_4x8_iadd:
++               case nir_op_sudot_4x8_iadd:
+                case nir_op_udot_4x8_uadd_sat:
+                case nir_op_sdot_4x8_iadd_sat:
++               case nir_op_sudot_4x8_iadd_sat:
+                case nir_op_udot_2x16_uadd:
+                case nir_op_sdot_2x16_iadd:
+                case nir_op_udot_2x16_uadd_sat:
+diff --git a/src/amd/compiler/aco_optimizer.cpp b/src/amd/compiler/aco_optimizer.cpp
+--- a/src/amd/compiler/aco_optimizer.cpp
++++ b/src/amd/compiler/aco_optimizer.cpp
+@@ -931,7 +931,8 @@ propagate_constants_vop3p(opt_ctx& ctx, aco_ptr<Instruction>& instr, ssa_info& i
+    /* The accumulation operand of dot product instructions ignores opsel. */
+    bool cannot_use_opsel =
+       (instr->opcode == aco_opcode::v_dot4_i32_i8 || instr->opcode == aco_opcode::v_dot2_i32_i16 ||
+-       instr->opcode == aco_opcode::v_dot4_u32_u8 || instr->opcode == aco_opcode::v_dot2_u32_u16) &&
++       instr->opcode == aco_opcode::v_dot4_i32_iu8 || instr->opcode == aco_opcode::v_dot4_u32_u8 ||
++       instr->opcode == aco_opcode::v_dot2_u32_u16) &&
+       i == 2;
+    if (cannot_use_opsel)
+       return;
+diff --git a/src/amd/llvm/ac_llvm_build.c b/src/amd/llvm/ac_llvm_build.c
+--- a/src/amd/llvm/ac_llvm_build.c
++++ b/src/amd/llvm/ac_llvm_build.c
+@@ -2762,6 +2762,22 @@ LLVMValueRef ac_build_bitfield_reverse(struct ac_llvm_context *ctx, LLVMValueRef
+    return result;
+ }
+ 
++LLVMValueRef ac_build_sudot_4x8(struct ac_llvm_context *ctx, LLVMValueRef s0, LLVMValueRef s1,
++                                LLVMValueRef s2, bool clamp, unsigned neg_lo)
++{
++   const char *name = "llvm.amdgcn.sudot4";
++   LLVMValueRef src[6];
++
++   src[0] = LLVMConstInt(ctx->i1, !!(neg_lo & 0x1), false);
++   src[1] = s0;
++   src[2] = LLVMConstInt(ctx->i1, !!(neg_lo & 0x2), false);
++   src[3] = s1;
++   src[4] = s2;
++   src[5] = LLVMConstInt(ctx->i1, clamp, false);
++
++   return ac_build_intrinsic(ctx, name, ctx->i32, src, 6, AC_FUNC_ATTR_READNONE);
++}
++
+ void ac_init_exec_full_mask(struct ac_llvm_context *ctx)
+ {
+    LLVMValueRef full_mask = LLVMConstInt(ctx->i64, ~0ull, 0);
+diff --git a/src/amd/llvm/ac_llvm_build.h b/src/amd/llvm/ac_llvm_build.h
+--- a/src/amd/llvm/ac_llvm_build.h
++++ b/src/amd/llvm/ac_llvm_build.h
+@@ -463,6 +463,9 @@ LLVMValueRef ac_build_fsat(struct ac_llvm_context *ctx, LLVMValueRef src,
+ 
+ LLVMValueRef ac_build_bitfield_reverse(struct ac_llvm_context *ctx, LLVMValueRef src0);
+ 
++LLVMValueRef ac_build_sudot_4x8(struct ac_llvm_context *ctx, LLVMValueRef s0, LLVMValueRef s1,
++                                LLVMValueRef s2, bool clamp, unsigned neg_lo);
++
+ void ac_init_exec_full_mask(struct ac_llvm_context *ctx);
+ 
+ void ac_declare_lds_as_pointer(struct ac_llvm_context *ac);
+diff --git a/src/amd/llvm/ac_nir_to_llvm.c b/src/amd/llvm/ac_nir_to_llvm.c
+--- a/src/amd/llvm/ac_nir_to_llvm.c
++++ b/src/amd/llvm/ac_nir_to_llvm.c
+@@ -1312,14 +1312,27 @@ static bool visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
+    }
+ 
+    case nir_op_sdot_4x8_iadd:
++   case nir_op_sdot_4x8_iadd_sat: {
++      if (ctx->ac.gfx_level >= GFX11) {
++         result = ac_build_sudot_4x8(&ctx->ac, src[0], src[1], src[2],
++                                     instr->op == nir_op_sdot_4x8_iadd_sat, 0x3);
++      } else {
++         const char *name = "llvm.amdgcn.sdot4";
++         src[3] = LLVMConstInt(ctx->ac.i1, instr->op == nir_op_sdot_4x8_iadd_sat, false);
++         result = ac_build_intrinsic(&ctx->ac, name, def_type, src, 4, AC_FUNC_ATTR_READNONE);
++      }
++      break;
++   }
++   case nir_op_sudot_4x8_iadd:
++   case nir_op_sudot_4x8_iadd_sat: {
++      result = ac_build_sudot_4x8(&ctx->ac, src[0], src[1], src[2],
++                                  instr->op == nir_op_sudot_4x8_iadd_sat, 0x1);
++      break;
++   }
+    case nir_op_udot_4x8_uadd:
+-   case nir_op_sdot_4x8_iadd_sat:
+    case nir_op_udot_4x8_uadd_sat: {
+-      const char *name = instr->op == nir_op_sdot_4x8_iadd ||
+-                         instr->op == nir_op_sdot_4x8_iadd_sat
+-                         ? "llvm.amdgcn.sdot4" : "llvm.amdgcn.udot4";
+-      src[3] = LLVMConstInt(ctx->ac.i1, instr->op == nir_op_sdot_4x8_iadd_sat ||
+-                                        instr->op == nir_op_udot_4x8_uadd_sat, false);
++      const char *name = "llvm.amdgcn.udot4";
++      src[3] = LLVMConstInt(ctx->ac.i1, instr->op == nir_op_udot_4x8_uadd_sat, false);
+       result = ac_build_intrinsic(&ctx->ac, name, def_type, src, 4, AC_FUNC_ATTR_READNONE);
+       break;
+    }
+diff --git a/src/amd/vulkan/radv_device.c b/src/amd/vulkan/radv_device.c
+--- a/src/amd/vulkan/radv_device.c
++++ b/src/amd/vulkan/radv_device.c
+@@ -2269,14 +2269,15 @@ radv_get_physical_device_properties_1_3(struct radv_physical_device *pdevice,
+    p->maxInlineUniformTotalSize = UINT16_MAX;
+ 
+    bool accel = pdevice->rad_info.has_accelerated_dot_product;
++   bool gfx11plus = pdevice->rad_info.gfx_level >= GFX11;
+    p->integerDotProduct8BitUnsignedAccelerated = accel;
+    p->integerDotProduct8BitSignedAccelerated = accel;
+-   p->integerDotProduct8BitMixedSignednessAccelerated = false;
++   p->integerDotProduct8BitMixedSignednessAccelerated = accel && gfx11plus;
+    p->integerDotProduct4x8BitPackedUnsignedAccelerated = accel;
+    p->integerDotProduct4x8BitPackedSignedAccelerated = accel;
+-   p->integerDotProduct4x8BitPackedMixedSignednessAccelerated = false;
+-   p->integerDotProduct16BitUnsignedAccelerated = accel;
+-   p->integerDotProduct16BitSignedAccelerated = accel;
++   p->integerDotProduct4x8BitPackedMixedSignednessAccelerated = accel && gfx11plus;
++   p->integerDotProduct16BitUnsignedAccelerated = accel && !gfx11plus;
++   p->integerDotProduct16BitSignedAccelerated = accel && !gfx11plus;
+    p->integerDotProduct16BitMixedSignednessAccelerated = false;
+    p->integerDotProduct32BitUnsignedAccelerated = false;
+    p->integerDotProduct32BitSignedAccelerated = false;
+@@ -2286,12 +2287,12 @@ radv_get_physical_device_properties_1_3(struct radv_physical_device *pdevice,
+    p->integerDotProduct64BitMixedSignednessAccelerated = false;
+    p->integerDotProductAccumulatingSaturating8BitUnsignedAccelerated = accel;
+    p->integerDotProductAccumulatingSaturating8BitSignedAccelerated = accel;
+-   p->integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated = false;
++   p->integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated = accel && gfx11plus;
+    p->integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated = accel;
+    p->integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated = accel;
+-   p->integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated = false;
+-   p->integerDotProductAccumulatingSaturating16BitUnsignedAccelerated = accel;
+-   p->integerDotProductAccumulatingSaturating16BitSignedAccelerated = accel;
++   p->integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated = accel && gfx11plus;
++   p->integerDotProductAccumulatingSaturating16BitUnsignedAccelerated = accel && !gfx11plus;
++   p->integerDotProductAccumulatingSaturating16BitSignedAccelerated = accel && !gfx11plus;
+    p->integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated = false;
+    p->integerDotProductAccumulatingSaturating32BitUnsignedAccelerated = false;
+    p->integerDotProductAccumulatingSaturating32BitSignedAccelerated = false;
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -95,8 +95,11 @@ get_nir_options_for_stage(struct radv_physical_device *device, gl_shader_stage s
+       .has_fsub = true,
+       .has_isub = true,
+       .has_sdot_4x8 = device->rad_info.has_accelerated_dot_product,
++      .has_sudot_4x8 =
++         device->rad_info.has_accelerated_dot_product && device->rad_info.gfx_level >= GFX11,
+       .has_udot_4x8 = device->rad_info.has_accelerated_dot_product,
+-      .has_dot_2x16 = device->rad_info.has_accelerated_dot_product,
++      .has_dot_2x16 =
++         device->rad_info.has_accelerated_dot_product && device->rad_info.gfx_level < GFX11,
+       .has_find_msb_rev = true,
+       .use_scoped_barrier = true,
+ #ifdef LLVM_AVAILABLE

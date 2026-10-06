@@ -1,0 +1,212 @@
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -983,6 +983,78 @@ lower_cmat_deref(nir_deref_instr *deref, struct hash_table *type_map, const lowe
+    return false;
+ }
+ 
++static bool
++lower_cmat_per_element_op(nir_builder *b, nir_cmat_call_instr *call, const lower_cmat_params *params)
++{
++   nir_def *src = radv_nir_load_cmat(b, params, call->params[3].ssa);
++   nir_deref_instr *dst_deref = nir_src_as_deref(call->params[0]);
++   nir_function *fnptr = call->callee;
++
++   struct glsl_cmat_description desc = *glsl_get_cmat_description(dst_deref->type);
++
++   nir_variable *elem_tmp = nir_local_variable_create(b->impl, glsl_get_cmat_element(dst_deref->type), "elemtmp");
++   nir_deref_instr *elem_deref = nir_build_deref_var(b, elem_tmp);
++   nir_def *local_idx = nir_load_subgroup_invocation(b);
++   nir_def *inner_idx = nir_iand_imm(b, local_idx, 15);
++   unsigned length = radv_nir_cmat_length(desc, params);
++   unsigned mul = radv_nir_cmat_length_mul(desc, params);
++   unsigned lanes_per_iter = desc.use == GLSL_CMAT_USE_ACCUMULATOR ? params->wave_size : 16;
++   nir_def *base_row = radv_get_base_row(b, desc, params, local_idx);
++   nir_def *vars[16];
++
++   if (mul > 1) {
++      for (unsigned i = 0; i < length; ++i)
++         if (i % mul != 0)
++            vars[i] = nir_undef(b, 1, radv_nir_cmat_bits(desc));
++   }
++
++   for (unsigned i = 0; i < length / mul; i++) {
++      nir_def *src_elem = nir_channel(b, src, i * mul);
++      nir_call_instr *new_call = nir_call_instr_create(b->shader, fnptr);
++      uint32_t row_iter;
++
++      if (params->gfx_level >= GFX12) {
++         row_iter = i;
++      } else {
++         row_iter = i * lanes_per_iter / 16;
++      }
++
++      nir_def *row_val = nir_iadd_imm(b, base_row, row_iter);
++      nir_def *col_val = inner_idx;
++
++      if (desc.use == GLSL_CMAT_USE_A)
++         SWAP(col_val, row_val);
++
++      row_val = nir_iadd(b, call->params[1].ssa, row_val);
++      col_val = nir_iadd(b, call->params[2].ssa, col_val);
++
++      new_call->params[0] = nir_src_for_ssa(&elem_deref->def);
++      new_call->params[1] = nir_src_for_ssa(row_val);
++      new_call->params[2] = nir_src_for_ssa(col_val);
++      new_call->params[3] = nir_src_for_ssa(src_elem);
++
++      for (unsigned p = 4; p < call->num_params; p++) {
++         nir_deref_instr *deref = nir_src_as_deref(call->params[p]);
++         nir_def *def = call->params[p].ssa;
++         if (deref) {
++            if (glsl_type_is_cmat(deref->type)) {
++               def = nir_build_load_deref(b, radv_nir_cmat_length(desc, params), radv_nir_cmat_bits(desc), def);
++               def = nir_channel(b, def, i * mul);
++            }
++         }
++         new_call->params[p] = nir_src_for_ssa(def);
++      }
++      nir_builder_instr_insert(b, &new_call->instr);
++      vars[i * mul] = nir_build_load_deref(b, 1, radv_nir_cmat_bits(desc), &elem_deref->def, 0);
++   }
++
++   nir_def *mat = nir_vec(b, vars, length);
++   nir_store_deref(b, dst_deref, mat, nir_component_mask(src->num_components));
++
++   nir_instr_remove(&call->instr);
++   return true;
++}
++
+ bool
+ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size)
+ {
+@@ -1084,6 +1156,9 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+             case nir_cmat_call_op_reduce_2x2:
+                progress |= lower_cmat_reduce_2x2_call(&b, call, &params);
+                break;
++            case nir_cmat_call_op_per_element_op:
++               progress |= lower_cmat_per_element_op(&b, call, &params);
++               break;
+             default:
+                break;
+             }
+diff --git a/src/amd/vulkan/radv_physical_device.c b/src/amd/vulkan/radv_physical_device.c
+--- a/src/amd/vulkan/radv_physical_device.c
++++ b/src/amd/vulkan/radv_physical_device.c
+@@ -1403,6 +1403,7 @@ radv_physical_device_get_features(const struct radv_physical_device *pdev, struc
+       .cooperativeMatrixConversions = true,
+       .cooperativeMatrixFlexibleDimensions = true,
+       .cooperativeMatrixReductions = true,
++      .cooperativeMatrixPerElementOperations = true,
+ 
+       /* VK_KHR_video_encode_av1 */
+       .videoEncodeAV1 = true,
+diff --git a/src/compiler/nir/nir_lower_cooperative_matrix.c b/src/compiler/nir/nir_lower_cooperative_matrix.c
+--- a/src/compiler/nir/nir_lower_cooperative_matrix.c
++++ b/src/compiler/nir/nir_lower_cooperative_matrix.c
+@@ -724,6 +724,50 @@ split_cmat_load_store(nir_builder *b,
+    return true;
+ }
+ 
++static bool
++split_cmat_call_per_element_op(nir_builder *b,
++                               nir_cmat_call_instr *call,
++                               struct split_info *info)
++{
++   nir_instr *instr = &call->instr;
++   struct split_mat *dst_split = find_call_split(info->split_mats, call, 0);
++   struct split_mat *src_split = find_call_split(info->split_mats, call, 3);
++   if (!dst_split)
++      return false;
++
++   assert(src_split);
++   int splits = dst_split->num_col_splits * dst_split->num_row_splits;
++   if (splits <= 1)
++      return false;
++
++   for (unsigned r = 0; r < dst_split->num_row_splits; r++) {
++      for (unsigned c = 0; c < dst_split->num_col_splits; c++) {
++         int idx = r * dst_split->num_col_splits + c;
++         nir_deref_instr *dst_deref = recreate_derefs(b, &call->params[0], dst_split->split_vars[idx]);
++         nir_deref_instr *src_deref = recreate_derefs(b, &call->params[3], src_split->split_vars[idx]);
++         struct glsl_cmat_description cmat_desc = *glsl_get_cmat_description(src_split->split_vars[0]->type);
++         nir_cmat_call_instr *new_call = nir_cmat_call_instr_create(b->shader, nir_cmat_call_op_per_element_op, call->callee);
++         new_call->params[0] = nir_src_for_ssa(&dst_deref->def);
++         new_call->params[1] = nir_src_for_ssa(nir_imm_int(b, cmat_desc.rows * r));
++         new_call->params[2] = nir_src_for_ssa(nir_imm_int(b, cmat_desc.cols * c));
++         new_call->params[3] = nir_src_for_ssa(&src_deref->def);
++
++         for (unsigned i = 4; i < call->num_params; i++) {
++            if (nir_src_as_deref(call->params[i])) {
++               struct split_mat *src1_split = find_call_split(info->split_mats, call, i);
++               nir_deref_instr *src1_deref = src1_split ? recreate_derefs(b, &call->params[i], src1_split->split_vars[idx]) : nir_src_as_deref(call->params[i]);
++               new_call->params[i] = src1_deref ? nir_src_for_ssa(&src1_deref->def) : call->params[i];
++            } else
++               new_call->params[i] = call->params[i];
++         }
++         b->cursor = nir_before_instr(instr);
++         nir_builder_instr_insert(b, &new_call->instr);
++      }
++   }
++   nir_instr_remove(instr);
++   return true;
++}
++
+ static bool
+ split_matrix_impl(nir_function_impl *impl, struct split_info *info)
+ {
+@@ -787,6 +831,9 @@ split_matrix_impl(nir_function_impl *impl, struct split_info *info)
+             case nir_cmat_call_op_reduce:
+                progress |= split_cmat_call_reduce(&b, impl, cmat_call, info);
+                break;
++            case nir_cmat_call_op_per_element_op:
++               progress |= split_cmat_call_per_element_op(&b, cmat_call, info);
++               break;
+             default:
+                break;
+             }
+diff --git a/src/compiler/spirv/vtn_cmat.c b/src/compiler/spirv/vtn_cmat.c
+--- a/src/compiler/spirv/vtn_cmat.c
++++ b/src/compiler/spirv/vtn_cmat.c
+@@ -238,6 +238,41 @@ vtn_handle_cooperative_instruction(struct vtn_builder *b, SpvOp opcode,
+       break;
+    }
+ 
++   case SpvOpCooperativeMatrixPerElementOpNV: {
++      struct vtn_type *dst_type = vtn_get_type(b, w[1]);
++      nir_deref_instr *src = vtn_get_cmat_deref(b, w[3]);
++
++      struct vtn_function *per_element_fn = vtn_value(b, w[4], vtn_value_type_function)->func;
++
++      per_element_fn->referenced = true;
++      per_element_fn->nir_func->cmat_call = true;
++      nir_deref_instr *dst = vtn_create_cmat_temporary(b, dst_type->type, "cmat_per_element_nv");
++
++      nir_cmat_call_instr *call = nir_cmat_call_instr_create(b->nb.shader, nir_cmat_call_op_per_element_op, per_element_fn->nir_func);
++      call->params[0] = nir_src_for_ssa(&dst->def);
++      call->params[1] = nir_src_for_ssa(nir_imm_zero(&b->nb, 1, 32));
++      call->params[2] = nir_src_for_ssa(nir_imm_zero(&b->nb, 1, 32));
++      call->params[3] = nir_src_for_ssa(&src->def);
++
++      for (unsigned i = 0; i < count - 5; i++) {
++         struct vtn_ssa_value *ssa = vtn_ssa_value(b, w[5 + i]);
++         nir_def *def;
++         nir_deref_instr *deref = NULL;
++
++         if (ssa->is_variable) {
++            deref = nir_build_deref_var(&b->nb, ssa->var);
++            def = &deref->def;
++         } else if (glsl_type_is_vector_or_scalar(ssa->type)) {
++            def = ssa->def;
++         } else
++            def = ssa->elems[0]->def;
++
++         call->params[4 + i] = nir_src_for_ssa(def);
++      }
++      nir_builder_instr_insert(&b->nb, &call->instr);
++      vtn_push_var_ssa(b, w[2], dst->var);
++      break;
++   }
+    default:
+       UNREACHABLE("Unexpected opcode for cooperative matrix instruction");
+    }

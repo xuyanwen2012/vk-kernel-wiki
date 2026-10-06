@@ -1,0 +1,258 @@
+diff --git a/src/amd/compiler/aco_insert_NOPs.cpp b/src/amd/compiler/aco_insert_NOPs.cpp
+--- a/src/amd/compiler/aco_insert_NOPs.cpp
++++ b/src/amd/compiler/aco_insert_NOPs.cpp
+@@ -1688,7 +1688,8 @@ handle_instruction_gfx11(State& state, NOP_ctx_gfx11& ctx, aco_ptr<Instruction>&
+ 
+    /* WMMA Hazards */
+    if (instr_info.classes[(int)instr->opcode] == instr_class::wmma) {
+-      assert(instr->operands.back().regClass() == instr->definitions[0].regClass());
++      assert(instr->operands.back().isConstant() ||
++             instr->operands.back().regClass() == instr->definitions[0].regClass());
+ 
+       bool is_swmma = instr->operands.size() == 4;
+       if (test_vgpr_bitset(ctx.vgpr_written_by_wmma, instr->operands[0]) ||
+diff --git a/src/amd/compiler/aco_instruction_selection.cpp b/src/amd/compiler/aco_instruction_selection.cpp
+--- a/src/amd/compiler/aco_instruction_selection.cpp
++++ b/src/amd/compiler/aco_instruction_selection.cpp
+@@ -7960,12 +7960,30 @@ create_fs_dual_src_export_gfx11(isel_context* ctx, const struct aco_export_mrt*
+    ctx->program->has_color_exports = true;
+ }
+ 
++static bool
++get_replicated_constant(nir_def* def, unsigned stride, uint32_t* constant)
++{
++   nir_scalar comp = nir_scalar_resolved(def, 0);
++   if (!nir_scalar_is_const(comp))
++      return false;
++
++   *constant = nir_scalar_as_uint(comp);
++
++   for (unsigned i = stride; i < def->num_components; i += stride) {
++      comp = nir_scalar_resolved(def, i);
++      if (!nir_scalar_is_const(comp) || nir_scalar_as_uint(comp) != *constant)
++         return false;
++   }
++   return true;
++}
++
+ static void
+ visit_cmat_muladd(isel_context* ctx, nir_intrinsic_instr* instr)
+ {
+    aco_opcode opcode = aco_opcode::num_opcodes;
+-   unsigned signed_mask = 0;
+-   bool clamp = false;
++
++   bitarray8 neg_lo = nir_intrinsic_neg_lo_amd(instr);
++   bitarray8 neg_hi = nir_intrinsic_neg_hi_amd(instr);
+ 
+    switch (instr->src[0].ssa->bit_size) {
+    case 16:
+@@ -7974,12 +7992,14 @@ visit_cmat_muladd(isel_context* ctx, nir_intrinsic_instr* instr)
+       case 16: opcode = aco_opcode::v_wmma_f16_16x16x16_f16; break;
+       }
+       break;
+-   case 8:
++   case 8: {
+       opcode = aco_opcode::v_wmma_i32_16x16x16_iu8;
+-      signed_mask = nir_intrinsic_cmat_signed_mask(instr);
+-      clamp = nir_intrinsic_saturate(instr);
++      unsigned signed_mask = nir_intrinsic_cmat_signed_mask(instr);
++      neg_lo[0] = signed_mask & NIR_CMAT_A_SIGNED;
++      neg_lo[1] = signed_mask & NIR_CMAT_B_SIGNED;
+       break;
+    }
++   }
+ 
+    if (opcode == aco_opcode::num_opcodes)
+       unreachable("visit_cmat_muladd: invalid bit size combination");
+@@ -7991,10 +8011,27 @@ visit_cmat_muladd(isel_context* ctx, nir_intrinsic_instr* instr)
+    Operand B(as_vgpr(ctx, get_ssa_temp(ctx, instr->src[1].ssa)));
+    Operand C(as_vgpr(ctx, get_ssa_temp(ctx, instr->src[2].ssa)));
+ 
+-   VALU_instruction& vop3p = bld.vop3p(opcode, Definition(dst), A, B, C, 0, 0)->valu();
+-   vop3p.neg_lo[0] = (signed_mask & 0x1) != 0;
+-   vop3p.neg_lo[1] = (signed_mask & 0x2) != 0;
+-   vop3p.clamp = clamp;
++   uint32_t constant;
++   uint32_t acc_stride = ctx->program->gfx_level < GFX12 && instr->def.bit_size == 16 ? 2 : 1;
++   if (get_replicated_constant(instr->src[2].ssa, acc_stride, &constant)) {
++      Operand constC =
++         Operand::get_const(ctx->program->gfx_level, constant, instr->def.bit_size / 8);
++      if (!constC.isLiteral()) {
++         C = constC;
++      } else if (opcode != aco_opcode::v_wmma_i32_16x16x16_iu8) {
++         constant ^= 1 << (instr->def.bit_size - 1);
++         constC = Operand::get_const(ctx->program->gfx_level, constant, instr->def.bit_size / 8);
++         if (!constC.isLiteral()) {
++            C = constC;
++            neg_lo[2] ^= !neg_hi[2];
++         }
++      }
++   }
++
++   VALU_instruction& vop3p = bld.vop3p(opcode, Definition(dst), A, B, C, 0, 0x7)->valu();
++   vop3p.neg_lo = neg_lo;
++   vop3p.neg_hi = neg_hi;
++   vop3p.clamp = nir_intrinsic_saturate(instr);
+ 
+    emit_split_vector(ctx, dst, instr->def.num_components);
+ }
+diff --git a/src/amd/vulkan/nir/radv_nir.h b/src/amd/vulkan/nir/radv_nir.h
+--- a/src/amd/vulkan/nir/radv_nir.h
++++ b/src/amd/vulkan/nir/radv_nir.h
+@@ -71,6 +71,8 @@ bool radv_nir_lower_io_to_mem(struct radv_device *device, struct radv_shader_sta
+ 
+ bool radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size);
+ 
++bool radv_nir_opt_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level);
++
+ bool radv_nir_lower_draw_id_to_zero(nir_shader *shader);
+ 
+ bool radv_nir_remap_color_attachment(nir_shader *shader, const struct radv_graphics_state_key *gfx_state);
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -419,13 +419,13 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+                nir_def *A = radv_nir_load_cmat(&b, &params, intr->src[1].ssa);
+                nir_def *B = radv_nir_load_cmat(&b, &params, intr->src[2].ssa);
+                nir_def *C = radv_nir_load_cmat(&b, &params, intr->src[3].ssa);
+-               nir_def *ret;
+ 
+-               ret = nir_cmat_muladd_amd(&b, A, B, C, .saturate = nir_intrinsic_saturate(intr),
+-                                         .cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr));
++               nir_deref_instr *dst_deref = nir_instr_as_deref(intr->src[0].ssa->parent_instr);
+ 
+-               nir_store_deref(&b, nir_instr_as_deref(intr->src[0].ssa->parent_instr), ret,
+-                               nir_component_mask(ret->num_components));
++               nir_def *ret = nir_cmat_muladd_amd(&b, A, B, C, .saturate = nir_intrinsic_saturate(intr),
++                                                  .cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr));
++
++               nir_store_deref(&b, dst_deref, ret, nir_component_mask(ret->num_components));
+                nir_instr_remove(instr);
+                progress = true;
+                break;
+@@ -543,3 +543,111 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+ 
+    return nir_progress(progress, func->impl, 0);
+ }
++
++static bool
++apply_component_mods(nir_scalar *comp, unsigned num_comps, unsigned stride, nir_op alu_op)
++{
++   for (unsigned i = 0; i < num_comps; i++) {
++      nir_scalar s = comp[i * stride];
++      if (!nir_scalar_is_alu(s) || nir_scalar_alu_op(s) != alu_op)
++         return false;
++   }
++
++   for (unsigned i = 0; i < num_comps; i++)
++      comp[i * stride] = nir_scalar_chase_alu_src(comp[i * stride], 0);
++
++   return true;
++}
++
++/* Apply neg_lo/neg_hi modifiers to A/B and neg/abs to C. */
++static bool
++opt_cmat_modifiers(nir_builder *b, nir_intrinsic_instr *intrin, enum amd_gfx_level gfx_level, unsigned src_idx)
++{
++   unsigned length_mul = src_idx == 2 && intrin->src[2].ssa->bit_size == 16 && gfx_level < GFX12 ? 2 : 1;
++   nir_scalar comp[NIR_MAX_VEC_COMPONENTS] = {0};
++   nir_def *src = intrin->src[src_idx].ssa;
++
++   for (unsigned i = 0; i < src->num_components; i += length_mul)
++      comp[i] = nir_scalar_resolved(src, i);
++
++   unsigned neg_lo = nir_intrinsic_neg_lo_amd(intrin);
++   unsigned neg_hi = nir_intrinsic_neg_hi_amd(intrin);
++
++   bool progress = false;
++   if (src_idx == 2) {
++      unsigned num_comp = src->num_components / length_mul;
++      if (apply_component_mods(comp, num_comp, length_mul, nir_op_fneg)) {
++         neg_lo ^= (~neg_hi) & BITFIELD_BIT(src_idx);
++         progress = true;
++      }
++      if (apply_component_mods(comp, num_comp, length_mul, nir_op_fabs)) {
++         neg_hi |= BITFIELD_BIT(src_idx);
++         progress = true;
++      }
++   } else {
++      unsigned num_comp = src->num_components / 2;
++      if (apply_component_mods(comp, num_comp, 2, nir_op_fneg)) {
++         neg_lo ^= BITFIELD_BIT(src_idx);
++         progress = true;
++      }
++      if (apply_component_mods(comp + 1, num_comp, 2, nir_op_fneg)) {
++         neg_hi ^= BITFIELD_BIT(src_idx);
++         progress = true;
++      }
++   }
++
++   if (!progress)
++      return false;
++
++   nir_intrinsic_set_neg_lo_amd(intrin, neg_lo);
++   nir_intrinsic_set_neg_hi_amd(intrin, neg_hi);
++
++   /* Avoid creating a new vec if we don't have to. */
++   nir_def *new_src = comp[0].def;
++   for (unsigned i = 0; i < src->num_components; i += length_mul) {
++      if (comp[i].def != new_src || comp[i].comp != i) {
++         new_src = NULL;
++         break;
++      }
++   }
++
++   if (!new_src) {
++      b->cursor = nir_before_instr(&intrin->instr);
++      if (length_mul > 1) {
++         nir_scalar undef = nir_get_scalar(nir_undef(b, 1, src->bit_size), 0);
++         for (unsigned i = 0; i < src->num_components; i += length_mul) {
++            for (unsigned j = 1; j < length_mul; j++)
++               comp[i + j] = undef;
++         }
++      }
++
++      new_src = nir_vec_scalars(b, comp, src->num_components);
++   }
++
++   nir_src_rewrite(&intrin->src[src_idx], new_src);
++   return true;
++}
++
++static bool
++opt_cmat(nir_builder *b, nir_intrinsic_instr *intrin, void *data)
++{
++   enum amd_gfx_level gfx_level = *(enum amd_gfx_level *)data;
++
++   if (intrin->intrinsic != nir_intrinsic_cmat_muladd_amd)
++      return false;
++
++   bool progress = false;
++
++   if (intrin->src[0].ssa->bit_size != 8) {
++      for (unsigned i = 0; i < 3; i++)
++         progress |= opt_cmat_modifiers(b, intrin, gfx_level, i);
++   }
++
++   return progress;
++}
++
++bool
++radv_nir_opt_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level)
++{
++   return nir_shader_intrinsics_pass(shader, opt_cmat, nir_metadata_control_flow, &gfx_level);
++}
+diff --git a/src/amd/vulkan/radv_pipeline.c b/src/amd/vulkan/radv_pipeline.c
+--- a/src/amd/vulkan/radv_pipeline.c
++++ b/src/amd/vulkan/radv_pipeline.c
+@@ -539,6 +539,9 @@ radv_postprocess_nir(struct radv_device *device, const struct radv_graphics_stat
+       stage->nir, io_to_mem || lowered_ngg || stage->stage == MESA_SHADER_COMPUTE || stage->stage == MESA_SHADER_TASK,
+       gfx_level >= GFX8);
+ 
++   if (stage->nir->info.cs.has_cooperative_matrix)
++      NIR_PASS(_, stage->nir, radv_nir_opt_cooperative_matrix, gfx_level);
++
+    NIR_PASS(_, stage->nir, nir_lower_fp16_casts, nir_lower_fp16_split_fp64);
+ 
+    if (ac_nir_might_lower_bit_size(stage->nir)) {

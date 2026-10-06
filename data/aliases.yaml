@@ -28,6 +28,7 @@ arm:
 rdna3:
   - "RDNA 3"
   - RDNA3
+  - GFX11
 
 xe2:
   - Xe2

@@ -1,0 +1,2473 @@
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_input.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_input.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_input.comp
+@@ -0,0 +1,202 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++#define shape_constant_id_offset 0
++layout (constant_id = shape_constant_id_offset + 0) const int w = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int h = 0;
++layout (constant_id = shape_constant_id_offset + 2) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 5) const int block_x = 0;
++layout (constant_id = shape_constant_id_offset + 6) const int block_y = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D bottom_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer bottom_tm_blob { sfp bottom_tm_blob_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outcstep;
++
++    int block_x;
++    int block_y;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(block_x) || gy >= psc(block_y) || gz >= psc(c))
++        return;
++
++    // load 4x4
++    int sx = gx * 2;
++    int sy = gy * 2;
++
++#if NCNN_image_shader
++    afp v00 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 0, gz));
++    afp v01 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 0, gz));
++    afp v02 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 0, gz));
++    afp v03 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 0, gz));
++
++    afp v10 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 1, gz));
++    afp v11 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 1, gz));
++    afp v12 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 1, gz));
++    afp v13 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 1, gz));
++
++    afp v20 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 2, gz));
++    afp v21 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 2, gz));
++    afp v22 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 2, gz));
++    afp v23 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 2, gz));
++
++    afp v30 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 3, gz));
++    afp v31 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 3, gz));
++    afp v32 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 3, gz));
++    afp v33 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 3, gz));
++#else
++    int v_offset_0 = gz * psc(cstep) + sy * psc(w) + sx;
++    ivec4 v_offset = v_offset_0 + ivec4(0, 1, 2, 3) * psc(w);
++
++    afp v00 = buffer_ld1(bottom_blob_data, v_offset.r + 0);
++    afp v01 = sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 1) : afp(0.f);
++    afp v02 = sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 2) : afp(0.f);
++    afp v03 = sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 3) : afp(0.f);
++
++    afp v10 = sy + 1 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.g + 0) : afp(0.f);
++    afp v11 = sy + 1 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 1) : afp(0.f);
++    afp v12 = sy + 1 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 2) : afp(0.f);
++    afp v13 = sy + 1 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 3) : afp(0.f);
++
++    afp v20 = sy + 2 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.b + 0) : afp(0.f);
++    afp v21 = sy + 2 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 1) : afp(0.f);
++    afp v22 = sy + 2 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 2) : afp(0.f);
++    afp v23 = sy + 2 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 3) : afp(0.f);
++
++    afp v30 = sy + 3 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.a + 0) : afp(0.f);
++    afp v31 = sy + 3 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 1) : afp(0.f);
++    afp v32 = sy + 3 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 2) : afp(0.f);
++    afp v33 = sy + 3 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 3) : afp(0.f);
++#endif
++
++    // const float itm[4][4] = {
++    //     {1.0f,  0.0f, -1.0f,  0.0f},
++    //     {0.0f,  1.0f,  1.0f,  0.0f},
++    //     {0.0f, -1.0f,  1.0f,  0.0f},
++    //     {0.0f, -1.0f,  0.0f,  1.0f}
++    // };
++
++    // implicit transpose
++    afp m00 = v00 - v02;
++    afp m01 = v10 - v12;
++    afp m02 = v20 - v22;
++    afp m03 = v30 - v32;
++
++    afp m10 = v02 + v01;
++    afp m11 = v12 + v11;
++    afp m12 = v22 + v21;
++    afp m13 = v32 + v31;
++
++    afp m20 = v02 - v01;
++    afp m21 = v12 - v11;
++    afp m22 = v22 - v21;
++    afp m23 = v32 - v31;
++
++    afp m30 = v03 - v01;
++    afp m31 = v13 - v11;
++    afp m32 = v23 - v21;
++    afp m33 = v33 - v31;
++
++    v00 = m00 - m02;
++    v10 = m10 - m12;
++    v20 = m20 - m22;
++    v30 = m30 - m32;
++
++    v01 = m02 + m01;
++    v11 = m12 + m11;
++    v21 = m22 + m21;
++    v31 = m32 + m31;
++
++    v02 = m02 - m01;
++    v12 = m12 - m11;
++    v22 = m22 - m21;
++    v32 = m32 - m31;
++
++    v03 = m03 - m01;
++    v13 = m13 - m11;
++    v23 = m23 - m21;
++    v33 = m33 - m31;
++
++    // store 16
++#if NCNN_image_shader
++    int x = gy * psc(block_x) + gx;
++
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 0), v00);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 1), v01);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 2), v02);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 3), v03);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 4), v10);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 5), v11);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 6), v12);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 7), v13);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 8), v20);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 9), v21);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 10), v22);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 11), v23);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 12), v30);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 13), v31);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 14), v32);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 15), v33);
++#else
++    int v_tm_offset = gz * psc(block_x) * psc(block_y) + gy * psc(block_x) + gx;
++
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 0 * psc(outcstep), v00);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 1 * psc(outcstep), v01);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 2 * psc(outcstep), v02);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 3 * psc(outcstep), v03);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 4 * psc(outcstep), v10);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 5 * psc(outcstep), v11);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 6 * psc(outcstep), v12);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 7 * psc(outcstep), v13);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 8 * psc(outcstep), v20);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 9 * psc(outcstep), v21);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 10 * psc(outcstep), v22);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 11 * psc(outcstep), v23);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 12 * psc(outcstep), v30);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 13 * psc(outcstep), v31);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 14 * psc(outcstep), v32);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 15 * psc(outcstep), v33);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_output.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_output.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd23_transform_output.comp
+@@ -0,0 +1,218 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int bias_term = 0;
++layout (constant_id = 1) const int activation_type = 0;
++layout (constant_id = 2) const float activation_param_0 = 0;
++layout (constant_id = 3) const float activation_param_1 = 0;
++
++#define shape_constant_id_offset 4
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int block_x = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int block_y = 0;
++
++layout (constant_id = shape_constant_id_offset + 4) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 5) const int outh = 0;
++layout (constant_id = shape_constant_id_offset + 6) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D top_tm_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D top_blob;
++layout (binding = 2) uniform unfp sampler3D bias_blob;
++#else
++layout (binding = 0) readonly buffer top_tm_blob { sfp top_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 2) readonly buffer bias_blob { sfp bias_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int block_x;
++    int block_y;
++
++    int outw;
++    int outh;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(block_x) || gy >= psc(block_y) || gz >= psc(c))
++        return;
++
++    // load 16
++#if NCNN_image_shader
++    int sx = gy * psc(block_x) + gx;
++
++    afp v00 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 0));
++    afp v01 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 1));
++    afp v02 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 2));
++    afp v03 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 3));
++    afp v10 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 4));
++    afp v11 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 5));
++    afp v12 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 6));
++    afp v13 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 7));
++    afp v20 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 8));
++    afp v21 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 9));
++    afp v22 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 10));
++    afp v23 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 11));
++    afp v30 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 12));
++    afp v31 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 13));
++    afp v32 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 14));
++    afp v33 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 15));
++#else
++    int v_tm_offset = gz * psc(block_x) * psc(block_y) + gy * psc(block_x) + gx;
++
++    afp v00 = buffer_ld1(top_tm_blob_data, v_tm_offset + 0 * psc(cstep));
++    afp v01 = buffer_ld1(top_tm_blob_data, v_tm_offset + 1 * psc(cstep));
++    afp v02 = buffer_ld1(top_tm_blob_data, v_tm_offset + 2 * psc(cstep));
++    afp v03 = buffer_ld1(top_tm_blob_data, v_tm_offset + 3 * psc(cstep));
++    afp v10 = buffer_ld1(top_tm_blob_data, v_tm_offset + 4 * psc(cstep));
++    afp v11 = buffer_ld1(top_tm_blob_data, v_tm_offset + 5 * psc(cstep));
++    afp v12 = buffer_ld1(top_tm_blob_data, v_tm_offset + 6 * psc(cstep));
++    afp v13 = buffer_ld1(top_tm_blob_data, v_tm_offset + 7 * psc(cstep));
++    afp v20 = buffer_ld1(top_tm_blob_data, v_tm_offset + 8 * psc(cstep));
++    afp v21 = buffer_ld1(top_tm_blob_data, v_tm_offset + 9 * psc(cstep));
++    afp v22 = buffer_ld1(top_tm_blob_data, v_tm_offset + 10 * psc(cstep));
++    afp v23 = buffer_ld1(top_tm_blob_data, v_tm_offset + 11 * psc(cstep));
++    afp v30 = buffer_ld1(top_tm_blob_data, v_tm_offset + 12 * psc(cstep));
++    afp v31 = buffer_ld1(top_tm_blob_data, v_tm_offset + 13 * psc(cstep));
++    afp v32 = buffer_ld1(top_tm_blob_data, v_tm_offset + 14 * psc(cstep));
++    afp v33 = buffer_ld1(top_tm_blob_data, v_tm_offset + 15 * psc(cstep));
++#endif
++
++    // const float itm[2][4] = {
++    //     {1.0f,  1.0f,  1.0f,  0.0f},
++    //     {0.0f,  1.0f, -1.0f,  1.0f}
++    // };
++
++    // implicit transpose
++    afp m00 = v00 + v01 + v02;
++    afp m01 = v10 + v11 + v12;
++    afp m02 = v20 + v21 + v22;
++    afp m03 = v30 + v31 + v32;
++
++    afp m10 = v01 - v02 + v03;
++    afp m11 = v11 - v12 + v13;
++    afp m12 = v21 - v22 + v23;
++    afp m13 = v31 - v32 + v33;
++
++    if (bias_term == 1)
++    {
++#if NCNN_image_shader
++        const afp bias_value = image3d_ld1(bias_blob, ivec3(gz, 0, 0));
++#else
++        const afp bias_value = buffer_ld1(bias_data, gz);
++#endif
++
++        v00 = bias_value + m00 + m01 + m02;
++        v10 = bias_value + m10 + m11 + m12;
++
++        v01 = bias_value + m01 - m02 + m03;
++        v11 = bias_value + m11 - m12 + m13;
++    }
++    else
++    {
++        v00 = m00 + m01 + m02;
++        v10 = m10 + m11 + m12;
++
++        v01 = m01 - m02 + m03;
++        v11 = m11 - m12 + m13;
++    }
++
++    if (activation_type == 1)
++    {
++        v00 = max(v00, afp(0.f));
++        v10 = max(v10, afp(0.f));
++        v01 = max(v01, afp(0.f));
++        v11 = max(v11, afp(0.f));
++    }
++    if (activation_type == 2)
++    {
++        const afp slope = afp(activation_param_0);
++        v00 = v00 < afp(0.f) ? v00 * slope : v00;
++        v10 = v10 < afp(0.f) ? v10 * slope : v10;
++        v01 = v01 < afp(0.f) ? v01 * slope : v01;
++        v11 = v11 < afp(0.f) ? v11 * slope : v11;
++    }
++    if (activation_type == 3)
++    {
++        const afp const_min = afp(activation_param_0);
++        const afp const_max = afp(activation_param_1);
++        v00 = clamp(v00, const_min, const_max);
++        v10 = clamp(v10, const_min, const_max);
++        v01 = clamp(v01, const_min, const_max);
++        v11 = clamp(v11, const_min, const_max);
++    }
++    if (activation_type == 4)
++    {
++        v00 = afp(1.f) / (afp(1.f) + exp(-v00));
++        v10 = afp(1.f) / (afp(1.f) + exp(-v10));
++        v01 = afp(1.f) / (afp(1.f) + exp(-v01));
++        v11 = afp(1.f) / (afp(1.f) + exp(-v11));
++    }
++    if (activation_type == 5)
++    {
++        v00 = v00 * tanh(log(exp(v00) + afp(1.f)));
++        v01 = v01 * tanh(log(exp(v01) + afp(1.f)));
++        v10 = v10 * tanh(log(exp(v10) + afp(1.f)));
++        v11 = v11 * tanh(log(exp(v11) + afp(1.f)));
++    }
++    if (activation_type == 6)
++    {
++        const afp alpha = afp(activation_param_0);
++        const afp beta = afp(activation_param_1);
++        v00 = v00 * clamp(v00 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v01 = v01 * clamp(v01 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v10 = v10 * clamp(v10 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v11 = v11 * clamp(v11 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++    }
++
++    // store 2x2
++    int x = gx * 2;
++    int y = gy * 2;
++
++#if NCNN_image_shader
++    image3d_st1(top_blob, ivec3(x, y, gz), v00);
++    image3d_st1(top_blob, ivec3(x + 1, y, gz), v01);
++    image3d_st1(top_blob, ivec3(x, y + 1, gz), v10);
++    image3d_st1(top_blob, ivec3(x + 1, y + 1, gz), v11);
++#else
++    int v_offset_0 = gz * psc(outcstep) + y * psc(outw) + x;
++    int v_offset_1 = v_offset_0 + psc(outw);
++
++    buffer_st1(top_blob_data, v_offset_0 + 0, v00);
++    if (x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset_0 + 1, v01);
++    if (y + 1 < psc(outh)) buffer_st1(top_blob_data, v_offset_1 + 0, v10);
++    if (y + 1 < psc(outh) && x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset_1 + 1, v11);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_input.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_input.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_input.comp
+@@ -0,0 +1,340 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++#define shape_constant_id_offset 0
++layout (constant_id = shape_constant_id_offset + 0) const int w = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int h = 0;
++layout (constant_id = shape_constant_id_offset + 2) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 5) const int block_x = 0;
++layout (constant_id = shape_constant_id_offset + 6) const int block_y = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D bottom_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
++layout (binding = 1) writeonly buffer bottom_tm_blob { sfp bottom_tm_blob_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int w;
++    int h;
++    int c;
++    int cstep;
++
++    int outcstep;
++
++    int block_x;
++    int block_y;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(block_x) || gy >= psc(block_y) || gz >= psc(c))
++        return;
++
++    // load 6x6
++    int sx = gx * 4;
++    int sy = gy * 4;
++
++#if NCNN_image_shader
++    afp v00 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 0, gz));
++    afp v01 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 0, gz));
++    afp v02 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 0, gz));
++    afp v03 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 0, gz));
++    afp v04 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 0, gz));
++    afp v05 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 0, gz));
++
++    afp v10 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 1, gz));
++    afp v11 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 1, gz));
++    afp v12 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 1, gz));
++    afp v13 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 1, gz));
++    afp v14 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 1, gz));
++    afp v15 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 1, gz));
++
++    afp v20 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 2, gz));
++    afp v21 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 2, gz));
++    afp v22 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 2, gz));
++    afp v23 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 2, gz));
++    afp v24 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 2, gz));
++    afp v25 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 2, gz));
++
++    afp v30 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 3, gz));
++    afp v31 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 3, gz));
++    afp v32 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 3, gz));
++    afp v33 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 3, gz));
++    afp v34 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 3, gz));
++    afp v35 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 3, gz));
++
++    afp v40 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 4, gz));
++    afp v41 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 4, gz));
++    afp v42 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 4, gz));
++    afp v43 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 4, gz));
++    afp v44 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 4, gz));
++    afp v45 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 4, gz));
++
++    afp v50 = image3d_ld1(bottom_blob, ivec3(sx + 0, sy + 5, gz));
++    afp v51 = image3d_ld1(bottom_blob, ivec3(sx + 1, sy + 5, gz));
++    afp v52 = image3d_ld1(bottom_blob, ivec3(sx + 2, sy + 5, gz));
++    afp v53 = image3d_ld1(bottom_blob, ivec3(sx + 3, sy + 5, gz));
++    afp v54 = image3d_ld1(bottom_blob, ivec3(sx + 4, sy + 5, gz));
++    afp v55 = image3d_ld1(bottom_blob, ivec3(sx + 5, sy + 5, gz));
++#else
++    int v_offset_0 = gz * psc(cstep) + sy * psc(w) + sx;
++    ivec4 v_offset = v_offset_0 + ivec4(0, 1, 2, 3) * psc(w);
++    ivec2 v_offset45 = v_offset_0 + ivec2(4, 5) * psc(w);
++
++    afp v00 = buffer_ld1(bottom_blob_data, v_offset.r + 0);
++    afp v01 = sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 1) : afp(0.f);
++    afp v02 = sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 2) : afp(0.f);
++    afp v03 = sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 3) : afp(0.f);
++    afp v04 = sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 4) : afp(0.f);
++    afp v05 = sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.r + 5) : afp(0.f);
++
++    afp v10 = sy + 1 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.g + 0) : afp(0.f);
++    afp v11 = sy + 1 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 1) : afp(0.f);
++    afp v12 = sy + 1 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 2) : afp(0.f);
++    afp v13 = sy + 1 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 3) : afp(0.f);
++    afp v14 = sy + 1 < psc(h) && sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 4) : afp(0.f);
++    afp v15 = sy + 1 < psc(h) && sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.g + 5) : afp(0.f);
++
++    afp v20 = sy + 2 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.b + 0) : afp(0.f);
++    afp v21 = sy + 2 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 1) : afp(0.f);
++    afp v22 = sy + 2 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 2) : afp(0.f);
++    afp v23 = sy + 2 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 3) : afp(0.f);
++    afp v24 = sy + 2 < psc(h) && sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 4) : afp(0.f);
++    afp v25 = sy + 2 < psc(h) && sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.b + 5) : afp(0.f);
++
++    afp v30 = sy + 3 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset.a + 0) : afp(0.f);
++    afp v31 = sy + 3 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 1) : afp(0.f);
++    afp v32 = sy + 3 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 2) : afp(0.f);
++    afp v33 = sy + 3 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 3) : afp(0.f);
++    afp v34 = sy + 3 < psc(h) && sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 4) : afp(0.f);
++    afp v35 = sy + 3 < psc(h) && sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset.a + 5) : afp(0.f);
++
++    afp v40 = sy + 4 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset45.x + 0) : afp(0.f);
++    afp v41 = sy + 4 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.x + 1) : afp(0.f);
++    afp v42 = sy + 4 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.x + 2) : afp(0.f);
++    afp v43 = sy + 4 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.x + 3) : afp(0.f);
++    afp v44 = sy + 4 < psc(h) && sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.x + 4) : afp(0.f);
++    afp v45 = sy + 4 < psc(h) && sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.x + 5) : afp(0.f);
++
++    afp v50 = sy + 5 < psc(h) ? buffer_ld1(bottom_blob_data, v_offset45.y + 0) : afp(0.f);
++    afp v51 = sy + 5 < psc(h) && sx + 1 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.y + 1) : afp(0.f);
++    afp v52 = sy + 5 < psc(h) && sx + 2 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.y + 2) : afp(0.f);
++    afp v53 = sy + 5 < psc(h) && sx + 3 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.y + 3) : afp(0.f);
++    afp v54 = sy + 5 < psc(h) && sx + 4 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.y + 4) : afp(0.f);
++    afp v55 = sy + 5 < psc(h) && sx + 5 < psc(w) ? buffer_ld1(bottom_blob_data, v_offset45.y + 5) : afp(0.f);
++#endif
++
++    // const float itm[6][6] = {
++    //     {1.0f, 0.0f, -1.25f, 0.0f, 0.25f, 0.0f},
++    //     {0.0f,-1.0f, -1.0f, 0.25f, 0.25f, 0.0f},
++    //     {0.0f, 1.0f, -1.0f,-0.25f, 0.25f, 0.0f},
++    //     {0.0f,-0.5f, -0.25f, 0.5f, 0.25f, 0.0f},
++    //     {0.0f, 0.5f, -0.25f,-0.5f, 0.25f, 0.0f},
++    //     {0.0f, 1.0f,  0.0f,-1.25f, 0.0f, 0.25f}
++    // };
++
++    // 0 =  1 * r00 - 1.25 * r02 + 0.25 * r04
++    // 1 = -1 * (r01 + r02) + 0.25 * (r04 + r03)
++    // 2 =  1 * (r01 - r02) + 0.25 * (r04 - r03)
++    // 3 = -0.5 * (r01 - r03) + 0.25 * (r04 - r02)
++    // 4 =  0.5 * (r01 - r03) + 0.25 * (r04 - r02)
++    // 5 =  1 * r01 - 1.25 * r03 + 0.25 * r05
++
++    // implicit transpose
++    afp m00 = v00 - v02 * afp(1.25) + v04 * afp(0.25);
++    afp m01 = v10 - v12 * afp(1.25) + v14 * afp(0.25);
++    afp m02 = v20 - v22 * afp(1.25) + v24 * afp(0.25);
++    afp m03 = v30 - v32 * afp(1.25) + v34 * afp(0.25);
++    afp m04 = v40 - v42 * afp(1.25) + v44 * afp(0.25);
++    afp m05 = v50 - v52 * afp(1.25) + v54 * afp(0.25);
++
++    afp m10 = (v04 + v03) * afp(0.25) - (v01 + v02);
++    afp m11 = (v14 + v13) * afp(0.25) - (v11 + v12);
++    afp m12 = (v24 + v23) * afp(0.25) - (v21 + v22);
++    afp m13 = (v34 + v33) * afp(0.25) - (v31 + v32);
++    afp m14 = (v44 + v43) * afp(0.25) - (v41 + v42);
++    afp m15 = (v54 + v53) * afp(0.25) - (v51 + v52);
++
++    afp m20 = (v04 - v03) * afp(0.25) + (v01 - v02);
++    afp m21 = (v14 - v13) * afp(0.25) + (v11 - v12);
++    afp m22 = (v24 - v23) * afp(0.25) + (v21 - v22);
++    afp m23 = (v34 - v33) * afp(0.25) + (v31 - v32);
++    afp m24 = (v44 - v43) * afp(0.25) + (v41 - v42);
++    afp m25 = (v54 - v53) * afp(0.25) + (v51 - v52);
++
++    afp m30 = (v04 - v02) * afp(0.25) - (v01 - v03) * afp(0.5);
++    afp m31 = (v14 - v12) * afp(0.25) - (v11 - v13) * afp(0.5);
++    afp m32 = (v24 - v22) * afp(0.25) - (v21 - v23) * afp(0.5);
++    afp m33 = (v34 - v32) * afp(0.25) - (v31 - v33) * afp(0.5);
++    afp m34 = (v44 - v42) * afp(0.25) - (v41 - v43) * afp(0.5);
++    afp m35 = (v54 - v52) * afp(0.25) - (v51 - v53) * afp(0.5);
++
++    afp m40 = (v04 - v02) * afp(0.25) + (v01 - v03) * afp(0.5);
++    afp m41 = (v14 - v12) * afp(0.25) + (v11 - v13) * afp(0.5);
++    afp m42 = (v24 - v22) * afp(0.25) + (v21 - v23) * afp(0.5);
++    afp m43 = (v34 - v32) * afp(0.25) + (v31 - v33) * afp(0.5);
++    afp m44 = (v44 - v42) * afp(0.25) + (v41 - v43) * afp(0.5);
++    afp m45 = (v54 - v52) * afp(0.25) + (v51 - v53) * afp(0.5);
++
++    afp m50 = v01 - v03 * afp(1.25) + v05 * afp(0.25);
++    afp m51 = v11 - v13 * afp(1.25) + v15 * afp(0.25);
++    afp m52 = v21 - v23 * afp(1.25) + v25 * afp(0.25);
++    afp m53 = v31 - v33 * afp(1.25) + v35 * afp(0.25);
++    afp m54 = v41 - v43 * afp(1.25) + v45 * afp(0.25);
++    afp m55 = v51 - v53 * afp(1.25) + v55 * afp(0.25);
++
++    v00 = m00 - m02 * afp(1.25) + m04 * afp(0.25);
++    v10 = m10 - m12 * afp(1.25) + m14 * afp(0.25);
++    v20 = m20 - m22 * afp(1.25) + m24 * afp(0.25);
++    v30 = m30 - m32 * afp(1.25) + m34 * afp(0.25);
++    v40 = m40 - m42 * afp(1.25) + m44 * afp(0.25);
++    v50 = m50 - m52 * afp(1.25) + m54 * afp(0.25);
++
++    v01 = (m04 + m03) * afp(0.25) - (m01 + m02);
++    v11 = (m14 + m13) * afp(0.25) - (m11 + m12);
++    v21 = (m24 + m23) * afp(0.25) - (m21 + m22);
++    v31 = (m34 + m33) * afp(0.25) - (m31 + m32);
++    v41 = (m44 + m43) * afp(0.25) - (m41 + m42);
++    v51 = (m54 + m53) * afp(0.25) - (m51 + m52);
++
++    v02 = (m04 - m03) * afp(0.25) + (m01 - m02);
++    v12 = (m14 - m13) * afp(0.25) + (m11 - m12);
++    v22 = (m24 - m23) * afp(0.25) + (m21 - m22);
++    v32 = (m34 - m33) * afp(0.25) + (m31 - m32);
++    v42 = (m44 - m43) * afp(0.25) + (m41 - m42);
++    v52 = (m54 - m53) * afp(0.25) + (m51 - m52);
++
++    v03 = (m04 - m02) * afp(0.25) - (m01 - m03) * afp(0.5);
++    v13 = (m14 - m12) * afp(0.25) - (m11 - m13) * afp(0.5);
++    v23 = (m24 - m22) * afp(0.25) - (m21 - m23) * afp(0.5);
++    v33 = (m34 - m32) * afp(0.25) - (m31 - m33) * afp(0.5);
++    v43 = (m44 - m42) * afp(0.25) - (m41 - m43) * afp(0.5);
++    v53 = (m54 - m52) * afp(0.25) - (m51 - m53) * afp(0.5);
++
++    v04 = (m04 - m02) * afp(0.25) + (m01 - m03) * afp(0.5);
++    v14 = (m14 - m12) * afp(0.25) + (m11 - m13) * afp(0.5);
++    v24 = (m24 - m22) * afp(0.25) + (m21 - m23) * afp(0.5);
++    v34 = (m34 - m32) * afp(0.25) + (m31 - m33) * afp(0.5);
++    v44 = (m44 - m42) * afp(0.25) + (m41 - m43) * afp(0.5);
++    v54 = (m54 - m52) * afp(0.25) + (m51 - m53) * afp(0.5);
++
++    v05 = m01 - m03 * afp(1.25) + m05 * afp(0.25);
++    v15 = m11 - m13 * afp(1.25) + m15 * afp(0.25);
++    v25 = m21 - m23 * afp(1.25) + m25 * afp(0.25);
++    v35 = m31 - m33 * afp(1.25) + m35 * afp(0.25);
++    v45 = m41 - m43 * afp(1.25) + m45 * afp(0.25);
++    v55 = m51 - m53 * afp(1.25) + m55 * afp(0.25);
++
++    // store 36
++#if NCNN_image_shader
++    int x = gy * psc(block_x) + gx;
++
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 0), v00);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 1), v01);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 2), v02);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 3), v03);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 4), v04);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 5), v05);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 6), v10);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 7), v11);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 8), v12);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 9), v13);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 10), v14);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 11), v15);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 12), v20);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 13), v21);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 14), v22);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 15), v23);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 16), v24);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 17), v25);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 18), v30);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 19), v31);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 20), v32);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 21), v33);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 22), v34);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 23), v35);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 24), v40);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 25), v41);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 26), v42);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 27), v43);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 28), v44);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 29), v45);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 30), v50);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 31), v51);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 32), v52);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 33), v53);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 34), v54);
++    image3d_st1(bottom_tm_blob, ivec3(x, gz, 35), v55);
++#else
++    int v_tm_offset = gz * psc(block_x) * psc(block_y) + gy * psc(block_x) + gx;
++
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 0 * psc(outcstep), v00);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 1 * psc(outcstep), v01);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 2 * psc(outcstep), v02);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 3 * psc(outcstep), v03);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 4 * psc(outcstep), v04);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 5 * psc(outcstep), v05);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 6 * psc(outcstep), v10);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 7 * psc(outcstep), v11);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 8 * psc(outcstep), v12);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 9 * psc(outcstep), v13);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 10 * psc(outcstep), v14);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 11 * psc(outcstep), v15);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 12 * psc(outcstep), v20);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 13 * psc(outcstep), v21);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 14 * psc(outcstep), v22);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 15 * psc(outcstep), v23);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 16 * psc(outcstep), v24);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 17 * psc(outcstep), v25);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 18 * psc(outcstep), v30);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 19 * psc(outcstep), v31);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 20 * psc(outcstep), v32);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 21 * psc(outcstep), v33);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 22 * psc(outcstep), v34);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 23 * psc(outcstep), v35);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 24 * psc(outcstep), v40);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 25 * psc(outcstep), v41);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 26 * psc(outcstep), v42);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 27 * psc(outcstep), v43);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 28 * psc(outcstep), v44);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 29 * psc(outcstep), v45);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 30 * psc(outcstep), v50);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 31 * psc(outcstep), v51);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 32 * psc(outcstep), v52);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 33 * psc(outcstep), v53);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 34 * psc(outcstep), v54);
++    buffer_st1(bottom_tm_blob_data, v_tm_offset + 35 * psc(outcstep), v55);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_output.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_output.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd43_transform_output.comp
+@@ -0,0 +1,401 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int bias_term = 0;
++layout (constant_id = 1) const int activation_type = 0;
++layout (constant_id = 2) const float activation_param_0 = 0;
++layout (constant_id = 3) const float activation_param_1 = 0;
++
++#define shape_constant_id_offset 4
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int block_x = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int block_y = 0;
++
++layout (constant_id = shape_constant_id_offset + 4) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 5) const int outh = 0;
++layout (constant_id = shape_constant_id_offset + 6) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D top_tm_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D top_blob;
++layout (binding = 2) uniform unfp sampler3D bias_blob;
++#else
++layout (binding = 0) readonly buffer top_tm_blob { sfp top_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
++layout (binding = 2) readonly buffer bias_blob { sfp bias_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int block_x;
++    int block_y;
++
++    int outw;
++    int outh;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x);
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(block_x) || gy >= psc(block_y) || gz >= psc(c))
++        return;
++
++    // load 36
++#if NCNN_image_shader
++    int sx = gy * psc(block_x) + gx;
++
++    afp v00 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 0));
++    afp v01 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 1));
++    afp v02 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 2));
++    afp v03 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 3));
++    afp v04 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 4));
++    afp v05 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 5));
++    afp v10 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 6));
++    afp v11 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 7));
++    afp v12 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 8));
++    afp v13 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 9));
++    afp v14 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 10));
++    afp v15 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 11));
++    afp v20 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 12));
++    afp v21 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 13));
++    afp v22 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 14));
++    afp v23 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 15));
++    afp v24 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 16));
++    afp v25 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 17));
++    afp v30 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 18));
++    afp v31 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 19));
++    afp v32 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 20));
++    afp v33 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 21));
++    afp v34 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 22));
++    afp v35 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 23));
++    afp v40 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 24));
++    afp v41 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 25));
++    afp v42 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 26));
++    afp v43 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 27));
++    afp v44 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 28));
++    afp v45 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 29));
++    afp v50 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 30));
++    afp v51 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 31));
++    afp v52 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 32));
++    afp v53 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 33));
++    afp v54 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 34));
++    afp v55 = image3d_ld1(top_tm_blob, ivec3(sx, gz, 35));
++#else
++    int v_tm_offset = gz * psc(block_x) * psc(block_y) + gy * psc(block_x) + gx;
++
++    afp v00 = buffer_ld1(top_tm_blob_data, v_tm_offset + 0 * psc(cstep));
++    afp v01 = buffer_ld1(top_tm_blob_data, v_tm_offset + 1 * psc(cstep));
++    afp v02 = buffer_ld1(top_tm_blob_data, v_tm_offset + 2 * psc(cstep));
++    afp v03 = buffer_ld1(top_tm_blob_data, v_tm_offset + 3 * psc(cstep));
++    afp v04 = buffer_ld1(top_tm_blob_data, v_tm_offset + 4 * psc(cstep));
++    afp v05 = buffer_ld1(top_tm_blob_data, v_tm_offset + 5 * psc(cstep));
++    afp v10 = buffer_ld1(top_tm_blob_data, v_tm_offset + 6 * psc(cstep));
++    afp v11 = buffer_ld1(top_tm_blob_data, v_tm_offset + 7 * psc(cstep));
++    afp v12 = buffer_ld1(top_tm_blob_data, v_tm_offset + 8 * psc(cstep));
++    afp v13 = buffer_ld1(top_tm_blob_data, v_tm_offset + 9 * psc(cstep));
++    afp v14 = buffer_ld1(top_tm_blob_data, v_tm_offset + 10 * psc(cstep));
++    afp v15 = buffer_ld1(top_tm_blob_data, v_tm_offset + 11 * psc(cstep));
++    afp v20 = buffer_ld1(top_tm_blob_data, v_tm_offset + 12 * psc(cstep));
++    afp v21 = buffer_ld1(top_tm_blob_data, v_tm_offset + 13 * psc(cstep));
++    afp v22 = buffer_ld1(top_tm_blob_data, v_tm_offset + 14 * psc(cstep));
++    afp v23 = buffer_ld1(top_tm_blob_data, v_tm_offset + 15 * psc(cstep));
++    afp v24 = buffer_ld1(top_tm_blob_data, v_tm_offset + 16 * psc(cstep));
++    afp v25 = buffer_ld1(top_tm_blob_data, v_tm_offset + 17 * psc(cstep));
++    afp v30 = buffer_ld1(top_tm_blob_data, v_tm_offset + 18 * psc(cstep));
++    afp v31 = buffer_ld1(top_tm_blob_data, v_tm_offset + 19 * psc(cstep));
++    afp v32 = buffer_ld1(top_tm_blob_data, v_tm_offset + 20 * psc(cstep));
++    afp v33 = buffer_ld1(top_tm_blob_data, v_tm_offset + 21 * psc(cstep));
++    afp v34 = buffer_ld1(top_tm_blob_data, v_tm_offset + 22 * psc(cstep));
++    afp v35 = buffer_ld1(top_tm_blob_data, v_tm_offset + 23 * psc(cstep));
++    afp v40 = buffer_ld1(top_tm_blob_data, v_tm_offset + 24 * psc(cstep));
++    afp v41 = buffer_ld1(top_tm_blob_data, v_tm_offset + 25 * psc(cstep));
++    afp v42 = buffer_ld1(top_tm_blob_data, v_tm_offset + 26 * psc(cstep));
++    afp v43 = buffer_ld1(top_tm_blob_data, v_tm_offset + 27 * psc(cstep));
++    afp v44 = buffer_ld1(top_tm_blob_data, v_tm_offset + 28 * psc(cstep));
++    afp v45 = buffer_ld1(top_tm_blob_data, v_tm_offset + 29 * psc(cstep));
++    afp v50 = buffer_ld1(top_tm_blob_data, v_tm_offset + 30 * psc(cstep));
++    afp v51 = buffer_ld1(top_tm_blob_data, v_tm_offset + 31 * psc(cstep));
++    afp v52 = buffer_ld1(top_tm_blob_data, v_tm_offset + 32 * psc(cstep));
++    afp v53 = buffer_ld1(top_tm_blob_data, v_tm_offset + 33 * psc(cstep));
++    afp v54 = buffer_ld1(top_tm_blob_data, v_tm_offset + 34 * psc(cstep));
++    afp v55 = buffer_ld1(top_tm_blob_data, v_tm_offset + 35 * psc(cstep));
++#endif
++
++    // const float otm[4][6] = {
++    //     {1.0f, 1.0f,  1.0f, 1.0f,  1.0f, 0.0f},
++    //     {0.0f, 1.0f, -1.0f, 2.0f, -2.0f, 0.0f},
++    //     {0.0f, 1.0f,  1.0f, 4.0f,  4.0f, 0.0f},
++    //     {0.0f, 1.0f, -1.0f, 8.0f, -8.0f, 1.0f}
++    // };
++
++    // 0 = r00 + (r01 + r02) + (r03 + r04)
++    // 1 =       (r01 - r02) + (r03 - r04) * 2
++    // 2 =       (r01 + r02) + (r03 + r04) * 4
++    // 3 = r05 + (r01 - r02) + (r03 - r04) * 8
++
++    // implicit transpose
++    afp m00 = v00 + (v01 + v02) + (v03 + v04);
++    afp m01 = v10 + (v11 + v12) + (v13 + v14);
++    afp m02 = v20 + (v21 + v22) + (v23 + v24);
++    afp m03 = v30 + (v31 + v32) + (v33 + v34);
++    afp m04 = v40 + (v41 + v42) + (v43 + v44);
++    afp m05 = v50 + (v51 + v52) + (v53 + v54);
++
++    afp m10 = (v01 - v02) + (v03 - v04) * afp(2);
++    afp m11 = (v11 - v12) + (v13 - v14) * afp(2);
++    afp m12 = (v21 - v22) + (v23 - v24) * afp(2);
++    afp m13 = (v31 - v32) + (v33 - v34) * afp(2);
++    afp m14 = (v41 - v42) + (v43 - v44) * afp(2);
++    afp m15 = (v51 - v52) + (v53 - v54) * afp(2);
++
++    afp m20 = (v01 + v02) + (v03 + v04) * afp(4);
++    afp m21 = (v11 + v12) + (v13 + v14) * afp(4);
++    afp m22 = (v21 + v22) + (v23 + v24) * afp(4);
++    afp m23 = (v31 + v32) + (v33 + v34) * afp(4);
++    afp m24 = (v41 + v42) + (v43 + v44) * afp(4);
++    afp m25 = (v51 + v52) + (v53 + v54) * afp(4);
++
++    afp m30 = v05 + (v01 - v02) + (v03 - v04) * afp(8);
++    afp m31 = v15 + (v11 - v12) + (v13 - v14) * afp(8);
++    afp m32 = v25 + (v21 - v22) + (v23 - v24) * afp(8);
++    afp m33 = v35 + (v31 - v32) + (v33 - v34) * afp(8);
++    afp m34 = v45 + (v41 - v42) + (v43 - v44) * afp(8);
++    afp m35 = v55 + (v51 - v52) + (v53 - v54) * afp(8);
++
++    v00 = m00 + (m01 + m02) + (m03 + m04);
++    v10 = m10 + (m11 + m12) + (m13 + m14);
++    v20 = m20 + (m21 + m22) + (m23 + m24);
++    v30 = m30 + (m31 + m32) + (m33 + m34);
++
++    v01 = (m01 - m02) + (m03 - m04) * afp(2);
++    v11 = (m11 - m12) + (m13 - m14) * afp(2);
++    v21 = (m21 - m22) + (m23 - m24) * afp(2);
++    v31 = (m31 - m32) + (m33 - m34) * afp(2);
++
++    v02 = (m01 + m02) + (m03 + m04) * afp(4);
++    v12 = (m11 + m12) + (m13 + m14) * afp(4);
++    v22 = (m21 + m22) + (m23 + m24) * afp(4);
++    v32 = (m31 + m32) + (m33 + m34) * afp(4);
++
++    v03 = m05 + (m01 - m02) + (m03 - m04) * afp(8);
++    v13 = m15 + (m11 - m12) + (m13 - m14) * afp(8);
++    v23 = m25 + (m21 - m22) + (m23 - m24) * afp(8);
++    v33 = m35 + (m31 - m32) + (m33 - m34) * afp(8);
++
++    if (bias_term == 1)
++    {
++#if NCNN_image_shader
++        const afp bias_value = image3d_ld1(bias_blob, ivec3(gz, 0, 0));
++#else
++        const afp bias_value = buffer_ld1(bias_data, gz);
++#endif
++
++        v00 = bias_value + v00;
++        v01 = bias_value + v01;
++        v02 = bias_value + v02;
++        v03 = bias_value + v03;
++        v10 = bias_value + v10;
++        v11 = bias_value + v11;
++        v12 = bias_value + v12;
++        v13 = bias_value + v13;
++        v20 = bias_value + v20;
++        v21 = bias_value + v21;
++        v22 = bias_value + v22;
++        v23 = bias_value + v23;
++        v30 = bias_value + v30;
++        v31 = bias_value + v31;
++        v32 = bias_value + v32;
++        v33 = bias_value + v33;
++    }
++
++    if (activation_type == 1)
++    {
++        v00 = max(v00, afp(0.f));
++        v01 = max(v01, afp(0.f));
++        v02 = max(v02, afp(0.f));
++        v03 = max(v03, afp(0.f));
++        v10 = max(v10, afp(0.f));
++        v11 = max(v11, afp(0.f));
++        v12 = max(v12, afp(0.f));
++        v13 = max(v13, afp(0.f));
++        v20 = max(v20, afp(0.f));
++        v21 = max(v21, afp(0.f));
++        v22 = max(v22, afp(0.f));
++        v23 = max(v23, afp(0.f));
++        v30 = max(v30, afp(0.f));
++        v31 = max(v31, afp(0.f));
++        v32 = max(v32, afp(0.f));
++        v33 = max(v33, afp(0.f));
++    }
++    if (activation_type == 2)
++    {
++        const afp slope = afp(activation_param_0);
++        v00 = v00 < afp(0.f) ? v00 * slope : v00;
++        v01 = v01 < afp(0.f) ? v01 * slope : v01;
++        v02 = v02 < afp(0.f) ? v02 * slope : v02;
++        v03 = v03 < afp(0.f) ? v03 * slope : v03;
++        v10 = v10 < afp(0.f) ? v10 * slope : v10;
++        v11 = v11 < afp(0.f) ? v11 * slope : v11;
++        v12 = v12 < afp(0.f) ? v12 * slope : v12;
++        v13 = v13 < afp(0.f) ? v13 * slope : v13;
++        v20 = v20 < afp(0.f) ? v20 * slope : v20;
++        v21 = v21 < afp(0.f) ? v21 * slope : v21;
++        v22 = v22 < afp(0.f) ? v22 * slope : v22;
++        v23 = v23 < afp(0.f) ? v23 * slope : v23;
++        v30 = v30 < afp(0.f) ? v30 * slope : v30;
++        v31 = v31 < afp(0.f) ? v31 * slope : v31;
++        v32 = v32 < afp(0.f) ? v32 * slope : v32;
++        v33 = v33 < afp(0.f) ? v33 * slope : v33;
++    }
++    if (activation_type == 3)
++    {
++        const afp const_min = afp(activation_param_0);
++        const afp const_max = afp(activation_param_1);
++        v00 = clamp(v00, const_min, const_max);
++        v01 = clamp(v01, const_min, const_max);
++        v02 = clamp(v02, const_min, const_max);
++        v03 = clamp(v03, const_min, const_max);
++        v10 = clamp(v10, const_min, const_max);
++        v11 = clamp(v11, const_min, const_max);
++        v12 = clamp(v12, const_min, const_max);
++        v13 = clamp(v13, const_min, const_max);
++        v20 = clamp(v20, const_min, const_max);
++        v21 = clamp(v21, const_min, const_max);
++        v22 = clamp(v22, const_min, const_max);
++        v23 = clamp(v23, const_min, const_max);
++        v30 = clamp(v30, const_min, const_max);
++        v31 = clamp(v31, const_min, const_max);
++        v32 = clamp(v32, const_min, const_max);
++        v33 = clamp(v33, const_min, const_max);
++    }
++    if (activation_type == 4)
++    {
++        v00 = afp(1.f) / (afp(1.f) + exp(-v00));
++        v01 = afp(1.f) / (afp(1.f) + exp(-v01));
++        v02 = afp(1.f) / (afp(1.f) + exp(-v02));
++        v03 = afp(1.f) / (afp(1.f) + exp(-v03));
++        v10 = afp(1.f) / (afp(1.f) + exp(-v10));
++        v11 = afp(1.f) / (afp(1.f) + exp(-v11));
++        v12 = afp(1.f) / (afp(1.f) + exp(-v12));
++        v13 = afp(1.f) / (afp(1.f) + exp(-v13));
++        v20 = afp(1.f) / (afp(1.f) + exp(-v20));
++        v21 = afp(1.f) / (afp(1.f) + exp(-v21));
++        v22 = afp(1.f) / (afp(1.f) + exp(-v22));
++        v23 = afp(1.f) / (afp(1.f) + exp(-v23));
++        v30 = afp(1.f) / (afp(1.f) + exp(-v30));
++        v31 = afp(1.f) / (afp(1.f) + exp(-v31));
++        v32 = afp(1.f) / (afp(1.f) + exp(-v32));
++        v33 = afp(1.f) / (afp(1.f) + exp(-v33));
++    }
++    if (activation_type == 5)
++    {
++        v00 = v00 * tanh(log(exp(v00) + afp(1.f)));
++        v01 = v01 * tanh(log(exp(v01) + afp(1.f)));
++        v02 = v02 * tanh(log(exp(v02) + afp(1.f)));
++        v03 = v03 * tanh(log(exp(v03) + afp(1.f)));
++        v10 = v10 * tanh(log(exp(v10) + afp(1.f)));
++        v11 = v11 * tanh(log(exp(v11) + afp(1.f)));
++        v12 = v12 * tanh(log(exp(v12) + afp(1.f)));
++        v13 = v13 * tanh(log(exp(v13) + afp(1.f)));
++        v20 = v20 * tanh(log(exp(v20) + afp(1.f)));
++        v21 = v21 * tanh(log(exp(v21) + afp(1.f)));
++        v22 = v22 * tanh(log(exp(v22) + afp(1.f)));
++        v23 = v23 * tanh(log(exp(v23) + afp(1.f)));
++        v30 = v30 * tanh(log(exp(v30) + afp(1.f)));
++        v31 = v31 * tanh(log(exp(v31) + afp(1.f)));
++        v32 = v32 * tanh(log(exp(v32) + afp(1.f)));
++        v33 = v33 * tanh(log(exp(v33) + afp(1.f)));
++    }
++    if (activation_type == 6)
++    {
++        const afp alpha = afp(activation_param_0);
++        const afp beta = afp(activation_param_1);
++        v00 = v00 * clamp(v00 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v01 = v01 * clamp(v01 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v02 = v02 * clamp(v02 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v03 = v03 * clamp(v03 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v10 = v10 * clamp(v10 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v11 = v11 * clamp(v11 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v12 = v12 * clamp(v12 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v13 = v13 * clamp(v13 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v20 = v20 * clamp(v20 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v21 = v21 * clamp(v21 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v22 = v22 * clamp(v22 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v23 = v23 * clamp(v23 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v30 = v30 * clamp(v30 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v31 = v31 * clamp(v31 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v32 = v32 * clamp(v32 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++        v33 = v33 * clamp(v33 * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
++    }
++
++    // store 4x4
++    int x = gx * 4;
++    int y = gy * 4;
++
++#if NCNN_image_shader
++    image3d_st1(top_blob, ivec3(x, y, gz), v00);
++    image3d_st1(top_blob, ivec3(x + 1, y, gz), v01);
++    image3d_st1(top_blob, ivec3(x + 2, y, gz), v02);
++    image3d_st1(top_blob, ivec3(x + 3, y, gz), v03);
++    image3d_st1(top_blob, ivec3(x, y + 1, gz), v10);
++    image3d_st1(top_blob, ivec3(x + 1, y + 1, gz), v11);
++    image3d_st1(top_blob, ivec3(x + 2, y + 1, gz), v12);
++    image3d_st1(top_blob, ivec3(x + 3, y + 1, gz), v13);
++    image3d_st1(top_blob, ivec3(x, y + 2, gz), v20);
++    image3d_st1(top_blob, ivec3(x + 1, y + 2, gz), v21);
++    image3d_st1(top_blob, ivec3(x + 2, y + 2, gz), v22);
++    image3d_st1(top_blob, ivec3(x + 3, y + 2, gz), v23);
++    image3d_st1(top_blob, ivec3(x, y + 3, gz), v30);
++    image3d_st1(top_blob, ivec3(x + 1, y + 3, gz), v31);
++    image3d_st1(top_blob, ivec3(x + 2, y + 3, gz), v32);
++    image3d_st1(top_blob, ivec3(x + 3, y + 3, gz), v33);
++#else
++    ivec4 v_offset = gz * psc(outcstep) + y * psc(outw) + x + ivec4(0, 1, 2, 3) * psc(outw);
++
++    buffer_st1(top_blob_data, v_offset.r + 0, v00);
++    if (x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset.r + 1, v01);
++    if (x + 2 < psc(outw)) buffer_st1(top_blob_data, v_offset.r + 2, v02);
++    if (x + 3 < psc(outw)) buffer_st1(top_blob_data, v_offset.r + 3, v03);
++    if (y + 1 < psc(outh)) buffer_st1(top_blob_data, v_offset.g + 0, v10);
++    if (y + 1 < psc(outh) && x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset.g + 1, v11);
++    if (y + 1 < psc(outh) && x + 2 < psc(outw)) buffer_st1(top_blob_data, v_offset.g + 2, v12);
++    if (y + 1 < psc(outh) && x + 3 < psc(outw)) buffer_st1(top_blob_data, v_offset.g + 3, v13);
++    if (y + 2 < psc(outh)) buffer_st1(top_blob_data, v_offset.b + 0, v20);
++    if (y + 2 < psc(outh) && x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset.b + 1, v21);
++    if (y + 2 < psc(outh) && x + 2 < psc(outw)) buffer_st1(top_blob_data, v_offset.b + 2, v22);
++    if (y + 2 < psc(outh) && x + 3 < psc(outw)) buffer_st1(top_blob_data, v_offset.b + 3, v23);
++    if (y + 3 < psc(outh)) buffer_st1(top_blob_data, v_offset.a + 0, v30);
++    if (y + 3 < psc(outh) && x + 1 < psc(outw)) buffer_st1(top_blob_data, v_offset.a + 1, v31);
++    if (y + 3 < psc(outh) && x + 2 < psc(outw)) buffer_st1(top_blob_data, v_offset.a + 2, v32);
++    if (y + 3 < psc(outh) && x + 3 < psc(outw)) buffer_st1(top_blob_data, v_offset.a + 3, v33);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,218 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++#define LOCAL_MEMORY_UNROLL_INCH 8
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfp bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfp top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfp weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++#if NCNN_shader_local_memory
++shared lfp tmp_v[8][LOCAL_MEMORY_UNROLL_INCH][4];
++shared lfp tmp_k[8][LOCAL_MEMORY_UNROLL_INCH];
++#endif
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++#if !NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++    afp sum0 = afp(0.f);
++    afp sum1 = afp(0.f);
++    afp sum2 = afp(0.f);
++    afp sum3 = afp(0.f);
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = image3d_ld1(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afp v1 = image3d_ld1(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afp v2 = image3d_ld1(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afp v3 = image3d_ld1(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afp k = image3d_ld1(weight_tm_blob, ivec3(z, gy, gz));
++
++        sum0 += v0 * k;
++        sum1 += v1 * k;
++        sum2 += v2 * k;
++        sum3 += v3 * k;
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = gz * psc(c) * psc(outc) + gy * psc(c);
++
++#if NCNN_shader_local_memory
++    const int lx = int(gl_LocalInvocationID.x);
++    const int ly = int(gl_LocalInvocationID.y);
++
++    int z = 0;
++    for (; z + (LOCAL_MEMORY_UNROLL_INCH - 1) < psc(c); z += LOCAL_MEMORY_UNROLL_INCH)
++    {
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfp(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++        {
++            afp v0 = lfp2afp(tmp_v[lx][z4][0]);
++            afp v1 = lfp2afp(tmp_v[lx][z4][1]);
++            afp v2 = lfp2afp(tmp_v[lx][z4][2]);
++            afp v3 = lfp2afp(tmp_v[lx][z4][3]);
++
++            afp k = lfp2afp(tmp_k[ly][z4]);
++
++            sum0 += v0 * k;
++            sum1 += v1 * k;
++            sum2 += v2 * k;
++            sum3 += v3 * k;
++        }
++
++        v_offset += LOCAL_MEMORY_UNROLL_INCH * psc(outw);
++        w_offset += LOCAL_MEMORY_UNROLL_INCH;
++
++        barrier();
++    }
++
++    if (z < psc(c))
++    {
++        const int remain = psc(c) - z;
++
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfp(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < remain; z4++)
++        {
++            afp v0 = lfp2afp(tmp_v[lx][z4][0]);
++            afp v1 = lfp2afp(tmp_v[lx][z4][1]);
++            afp v2 = lfp2afp(tmp_v[lx][z4][2]);
++            afp v3 = lfp2afp(tmp_v[lx][z4][3]);
++
++            afp k = lfp2afp(tmp_k[ly][z4]);
++
++            sum0 += v0 * k;
++            sum1 += v1 * k;
++            sum2 += v2 * k;
++            sum3 += v3 * k;
++        }
++    }
++#else
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = buffer_ld1(bottom_tm_blob_data, v_offset + 0);
++        afp v1 = buffer_ld1(bottom_tm_blob_data, v_offset + 1);
++        afp v2 = buffer_ld1(bottom_tm_blob_data, v_offset + 2);
++        afp v3 = buffer_ld1(bottom_tm_blob_data, v_offset + 3);
++
++        afp k = buffer_ld1(weight_tm_data, w_offset);
++
++        sum0 += v0 * k;
++        sum1 += v1 * k;
++        sum2 += v2 * k;
++        sum3 += v3 * k;
++
++        v_offset += psc(outw);
++        w_offset += 1;
++    }
++#endif
++#endif
++
++#if NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++#if NCNN_image_shader
++    image3d_st1(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st1(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st1(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st1(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st1(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,218 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++#define LOCAL_MEMORY_UNROLL_INCH 8
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc4) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfp bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfpvec4 top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec4 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++#if NCNN_shader_local_memory
++shared lfp tmp_v[8][LOCAL_MEMORY_UNROLL_INCH][4];
++shared lfpvec4 tmp_k[8][LOCAL_MEMORY_UNROLL_INCH];
++#endif
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++#if !NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++    afpvec4 sum0 = afpvec4(0.f);
++    afpvec4 sum1 = afpvec4(0.f);
++    afpvec4 sum2 = afpvec4(0.f);
++    afpvec4 sum3 = afpvec4(0.f);
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = image3d_ld1(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afp v1 = image3d_ld1(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afp v2 = image3d_ld1(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afp v3 = image3d_ld1(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec4 k = image3d_ld4(weight_tm_blob, ivec3(z, gy, gz));
++
++        sum0 += v0 * k;
++        sum1 += v1 * k;
++        sum2 += v2 * k;
++        sum3 += v3 * k;
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = gz * psc(c) * psc(outc) + gy * psc(c);
++
++#if NCNN_shader_local_memory
++    const int lx = int(gl_LocalInvocationID.x);
++    const int ly = int(gl_LocalInvocationID.y);
++
++    int z = 0;
++    for (; z + (LOCAL_MEMORY_UNROLL_INCH - 1) < psc(c); z += LOCAL_MEMORY_UNROLL_INCH)
++    {
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++        {
++            afp v0 = lfp2afp(tmp_v[lx][z4][0]);
++            afp v1 = lfp2afp(tmp_v[lx][z4][1]);
++            afp v2 = lfp2afp(tmp_v[lx][z4][2]);
++            afp v3 = lfp2afp(tmp_v[lx][z4][3]);
++
++            afpvec4 k = lfp2afpvec4(tmp_k[ly][z4]);
++
++            sum0 += v0 * k;
++            sum1 += v1 * k;
++            sum2 += v2 * k;
++            sum3 += v3 * k;
++        }
++
++        v_offset += LOCAL_MEMORY_UNROLL_INCH * psc(outw);
++        w_offset += LOCAL_MEMORY_UNROLL_INCH;
++
++        barrier();
++    }
++
++    if (z < psc(c))
++    {
++        const int remain = psc(c) - z;
++
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < remain; z4++)
++        {
++            afp v0 = lfp2afp(tmp_v[lx][z4][0]);
++            afp v1 = lfp2afp(tmp_v[lx][z4][1]);
++            afp v2 = lfp2afp(tmp_v[lx][z4][2]);
++            afp v3 = lfp2afp(tmp_v[lx][z4][3]);
++
++            afpvec4 k = lfp2afpvec4(tmp_k[ly][z4]);
++
++            sum0 += v0 * k;
++            sum1 += v1 * k;
++            sum2 += v2 * k;
++            sum3 += v3 * k;
++        }
++    }
++#else
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = buffer_ld1(bottom_tm_blob_data, v_offset + 0);
++        afp v1 = buffer_ld1(bottom_tm_blob_data, v_offset + 1);
++        afp v2 = buffer_ld1(bottom_tm_blob_data, v_offset + 2);
++        afp v3 = buffer_ld1(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec4 k = buffer_ld4(weight_tm_data, w_offset);
++
++        sum0 += v0 * k;
++        sum1 += v1 * k;
++        sum2 += v2 * k;
++        sum3 += v3 * k;
++
++        v_offset += psc(outw);
++        w_offset += 1;
++    }
++#endif
++#endif
++
++#if NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++#if NCNN_image_shader
++    image3d_st4(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st4(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st4(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st4(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st4(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack1to8_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to8_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack1to8_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,136 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++struct sfpvec8 { f16vec4 abcd; f16vec4 efgh; };
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc4) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfp bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfpvec8 top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec8 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++
++    afpvec8 sum0 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum1 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum2 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum3 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = image3d_ld1(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afp v1 = image3d_ld1(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afp v2 = image3d_ld1(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afp v3 = image3d_ld1(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec8 k = image3d_ld8(weight_tm_blob, ivec3(z, gy, gz));
++
++        // sum += v * k;
++        sum0[0] += v0 * k[0];
++        sum0[1] += v0 * k[1];
++
++        sum1[0] += v1 * k[0];
++        sum1[1] += v1 * k[1];
++
++        sum2[0] += v2 * k[0];
++        sum2[1] += v2 * k[1];
++
++        sum3[0] += v3 * k[0];
++        sum3[1] += v3 * k[1];
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = gz * psc(c) * psc(outc) + gy * psc(c);
++
++    for (int z = 0; z < psc(c); z++)
++    {
++        afp v0 = buffer_ld1(bottom_tm_blob_data, v_offset + 0);
++        afp v1 = buffer_ld1(bottom_tm_blob_data, v_offset + 1);
++        afp v2 = buffer_ld1(bottom_tm_blob_data, v_offset + 2);
++        afp v3 = buffer_ld1(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec8 k = buffer_ld8(weight_tm_data, w_offset);
++
++        // sum += v * k;
++        sum0[0] += v0 * k[0];
++        sum0[1] += v0 * k[1];
++
++        sum1[0] += v1 * k[0];
++        sum1[1] += v1 * k[1];
++
++        sum2[0] += v2 * k[0];
++        sum2[1] += v2 * k[1];
++
++        sum3[0] += v3 * k[0];
++        sum3[1] += v3 * k[1];
++
++        v_offset += psc(outw);
++        w_offset += 1;
++    }
++#endif
++
++#if NCNN_image_shader
++    image3d_st8(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st8(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st8(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st8(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st8(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,218 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++#define LOCAL_MEMORY_UNROLL_INCH 8
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfpvec4 bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfp top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec4 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++#if NCNN_shader_local_memory
++shared lfpvec4 tmp_v[8][LOCAL_MEMORY_UNROLL_INCH][4];
++shared lfpvec4 tmp_k[8][LOCAL_MEMORY_UNROLL_INCH];
++#endif
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++#if !NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++    afp sum0 = afp(0.f);
++    afp sum1 = afp(0.f);
++    afp sum2 = afp(0.f);
++    afp sum3 = afp(0.f);
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec4 v0 = image3d_ld4(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afpvec4 v1 = image3d_ld4(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afpvec4 v2 = image3d_ld4(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afpvec4 v3 = image3d_ld4(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec4 k = image3d_ld4(weight_tm_blob, ivec3(z, gy, gz));
++
++        sum0 += dot(v0, k);
++        sum1 += dot(v1, k);
++        sum2 += dot(v2, k);
++        sum3 += dot(v3, k);
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = gz * psc(c) * psc(outc) + gy * psc(c);
++
++#if NCNN_shader_local_memory
++    const int lx = int(gl_LocalInvocationID.x);
++    const int ly = int(gl_LocalInvocationID.y);
++
++    int z = 0;
++    for (; z + (LOCAL_MEMORY_UNROLL_INCH - 1) < psc(c); z += LOCAL_MEMORY_UNROLL_INCH)
++    {
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
++        {
++            afpvec4 v0 = lfp2afpvec4(tmp_v[lx][z4][0]);
++            afpvec4 v1 = lfp2afpvec4(tmp_v[lx][z4][1]);
++            afpvec4 v2 = lfp2afpvec4(tmp_v[lx][z4][2]);
++            afpvec4 v3 = lfp2afpvec4(tmp_v[lx][z4][3]);
++
++            afpvec4 k = lfp2afpvec4(tmp_k[ly][z4]);
++
++            sum0 += dot(v0, k);
++            sum1 += dot(v1, k);
++            sum2 += dot(v2, k);
++            sum3 += dot(v3, k);
++        }
++
++        v_offset += LOCAL_MEMORY_UNROLL_INCH * psc(outw);
++        w_offset += LOCAL_MEMORY_UNROLL_INCH;
++
++        barrier();
++    }
++
++    if (z < psc(c))
++    {
++        const int remain = psc(c) - z;
++
++        if (ly < 4)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++            }
++        }
++
++        if (lx == 0)
++        {
++            for (int z4 = 0; z4 < remain; z4++)
++            {
++                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++            }
++        }
++
++        barrier();
++
++        for (int z4 = 0; z4 < remain; z4++)
++        {
++            afpvec4 v0 = lfp2afpvec4(tmp_v[lx][z4][0]);
++            afpvec4 v1 = lfp2afpvec4(tmp_v[lx][z4][1]);
++            afpvec4 v2 = lfp2afpvec4(tmp_v[lx][z4][2]);
++            afpvec4 v3 = lfp2afpvec4(tmp_v[lx][z4][3]);
++
++            afpvec4 k = lfp2afpvec4(tmp_k[ly][z4]);
++
++            sum0 += dot(v0, k);
++            sum1 += dot(v1, k);
++            sum2 += dot(v2, k);
++            sum3 += dot(v3, k);
++        }
++    }
++#else
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec4 v0 = buffer_ld4(bottom_tm_blob_data, v_offset + 0);
++        afpvec4 v1 = buffer_ld4(bottom_tm_blob_data, v_offset + 1);
++        afpvec4 v2 = buffer_ld4(bottom_tm_blob_data, v_offset + 2);
++        afpvec4 v3 = buffer_ld4(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec4 k = buffer_ld4(weight_tm_data, w_offset);
++
++        sum0 += dot(v0, k);
++        sum1 += dot(v1, k);
++        sum2 += dot(v2, k);
++        sum3 += dot(v3, k);
++
++        v_offset += psc(outw);
++        w_offset += 1;
++    }
++#endif
++#endif
++
++#if NCNN_shader_local_memory
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++#endif
++
++#if NCNN_image_shader
++    image3d_st1(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st1(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st1(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st1(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st1(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack4to8_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack4to8_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack4to8_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,198 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++struct sfpvec8 { f16vec4 abcd; f16vec4 efgh; };
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc4) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfpvec4 bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfpvec8 top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec4 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++
++    afpvec8 sum0 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum1 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum2 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++    afpvec8 sum3 = afpvec8(afpvec4(0.f), afpvec4(0.f));
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec4 v0 = image3d_ld4(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afpvec4 v1 = image3d_ld4(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afpvec4 v2 = image3d_ld4(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afpvec4 v3 = image3d_ld4(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec4 k0 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 0, gy, gz));
++        afpvec4 k1 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 1, gy, gz));
++        afpvec4 k2 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 2, gy, gz));
++        afpvec4 k3 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 3, gy, gz));
++        afpvec4 k4 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 4, gy, gz));
++        afpvec4 k5 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 5, gy, gz));
++        afpvec4 k6 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 6, gy, gz));
++        afpvec4 k7 = image3d_ld4(weight_tm_blob, ivec3(z * 8 + 7, gy, gz));
++
++        // sum += v * k;
++        sum0[0].r += dot(v0, k0);
++        sum0[0].g += dot(v0, k1);
++        sum0[0].b += dot(v0, k2);
++        sum0[0].a += dot(v0, k3);
++        sum0[1].r += dot(v0, k4);
++        sum0[1].g += dot(v0, k5);
++        sum0[1].b += dot(v0, k6);
++        sum0[1].a += dot(v0, k7);
++
++        sum1[0].r += dot(v1, k0);
++        sum1[0].g += dot(v1, k1);
++        sum1[0].b += dot(v1, k2);
++        sum1[0].a += dot(v1, k3);
++        sum1[1].r += dot(v1, k4);
++        sum1[1].g += dot(v1, k5);
++        sum1[1].b += dot(v1, k6);
++        sum1[1].a += dot(v1, k7);
++
++        sum2[0].r += dot(v2, k0);
++        sum2[0].g += dot(v2, k1);
++        sum2[0].b += dot(v2, k2);
++        sum2[0].a += dot(v2, k3);
++        sum2[1].r += dot(v2, k4);
++        sum2[1].g += dot(v2, k5);
++        sum2[1].b += dot(v2, k6);
++        sum2[1].a += dot(v2, k7);
++
++        sum3[0].r += dot(v3, k0);
++        sum3[0].g += dot(v3, k1);
++        sum3[0].b += dot(v3, k2);
++        sum3[0].a += dot(v3, k3);
++        sum3[1].r += dot(v3, k4);
++        sum3[1].g += dot(v3, k5);
++        sum3[1].b += dot(v3, k6);
++        sum3[1].a += dot(v3, k7);
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = (gz * psc(c) * psc(outc) + gy * psc(c)) * 8;
++
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec4 v0 = buffer_ld4(bottom_tm_blob_data, v_offset + 0);
++        afpvec4 v1 = buffer_ld4(bottom_tm_blob_data, v_offset + 1);
++        afpvec4 v2 = buffer_ld4(bottom_tm_blob_data, v_offset + 2);
++        afpvec4 v3 = buffer_ld4(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec4 k0 = buffer_ld4(weight_tm_data, w_offset + 0);
++        afpvec4 k1 = buffer_ld4(weight_tm_data, w_offset + 1);
++        afpvec4 k2 = buffer_ld4(weight_tm_data, w_offset + 2);
++        afpvec4 k3 = buffer_ld4(weight_tm_data, w_offset + 3);
++        afpvec4 k4 = buffer_ld4(weight_tm_data, w_offset + 4);
++        afpvec4 k5 = buffer_ld4(weight_tm_data, w_offset + 5);
++        afpvec4 k6 = buffer_ld4(weight_tm_data, w_offset + 6);
++        afpvec4 k7 = buffer_ld4(weight_tm_data, w_offset + 7);
++
++        // sum += v * k;
++        sum0[0].r += dot(v0, k0);
++        sum0[0].g += dot(v0, k1);
++        sum0[0].b += dot(v0, k2);
++        sum0[0].a += dot(v0, k3);
++        sum0[1].r += dot(v0, k4);
++        sum0[1].g += dot(v0, k5);
++        sum0[1].b += dot(v0, k6);
++        sum0[1].a += dot(v0, k7);
++
++        sum1[0].r += dot(v1, k0);
++        sum1[0].g += dot(v1, k1);
++        sum1[0].b += dot(v1, k2);
++        sum1[0].a += dot(v1, k3);
++        sum1[1].r += dot(v1, k4);
++        sum1[1].g += dot(v1, k5);
++        sum1[1].b += dot(v1, k6);
++        sum1[1].a += dot(v1, k7);
++
++        sum2[0].r += dot(v2, k0);
++        sum2[0].g += dot(v2, k1);
++        sum2[0].b += dot(v2, k2);
++        sum2[0].a += dot(v2, k3);
++        sum2[1].r += dot(v2, k4);
++        sum2[1].g += dot(v2, k5);
++        sum2[1].b += dot(v2, k6);
++        sum2[1].a += dot(v2, k7);
++
++        sum3[0].r += dot(v3, k0);
++        sum3[0].g += dot(v3, k1);
++        sum3[0].b += dot(v3, k2);
++        sum3[0].a += dot(v3, k3);
++        sum3[1].r += dot(v3, k4);
++        sum3[1].g += dot(v3, k5);
++        sum3[1].b += dot(v3, k6);
++        sum3[1].a += dot(v3, k7);
++
++        v_offset += psc(outw);
++        w_offset += 8;
++    }
++#endif
++
++#if NCNN_image_shader
++    image3d_st8(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st8(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st8(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st8(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st8(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st8(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack8to1_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack8to1_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack8to1_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,122 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++struct sfpvec8 { f16vec4 abcd; f16vec4 efgh; };
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc1) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfpvec8 bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfp top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec8 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++
++    afp sum0 = afp(0.f);
++    afp sum1 = afp(0.f);
++    afp sum2 = afp(0.f);
++    afp sum3 = afp(0.f);
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec8 v0 = image3d_ld8(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afpvec8 v1 = image3d_ld8(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afpvec8 v2 = image3d_ld8(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afpvec8 v3 = image3d_ld8(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec8 k = image3d_ld8(weight_tm_blob, ivec3(z, gy, gz));
++
++        // sum += dot(v, k);
++        sum0 += dot(v0[0], k[0]) + dot(v0[1], k[1]);
++        sum1 += dot(v1[0], k[0]) + dot(v1[1], k[1]);
++        sum2 += dot(v2[0], k[0]) + dot(v2[1], k[1]);
++        sum3 += dot(v3[0], k[0]) + dot(v3[1], k[1]);
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = gz * psc(c) * psc(outc) + gy * psc(c);
++
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec8 v0 = buffer_ld8(bottom_tm_blob_data, v_offset + 0);
++        afpvec8 v1 = buffer_ld8(bottom_tm_blob_data, v_offset + 1);
++        afpvec8 v2 = buffer_ld8(bottom_tm_blob_data, v_offset + 2);
++        afpvec8 v3 = buffer_ld8(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec8 k = buffer_ld8(weight_tm_data, w_offset);
++
++        // sum += dot(v, k);
++        sum0 += dot(v0[0], k[0]) + dot(v0[1], k[1]);
++        sum1 += dot(v1[0], k[0]) + dot(v1[1], k[1]);
++        sum2 += dot(v2[0], k[0]) + dot(v2[1], k[1]);
++        sum3 += dot(v3[0], k[0]) + dot(v3[1], k[1]);
++
++        v_offset += psc(outw);
++        w_offset += 1;
++    }
++#endif
++
++#if NCNN_image_shader
++    image3d_st1(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st1(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st1(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st1(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st1(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st1(top_tm_blob_data, gi + 3, sum3);
++#endif
++}
+diff --git a/src/layer/vulkan/shader/convolution_pack8to4_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack8to4_3x3s1d1_winograd_gemm.comp
+--- /dev/null
++++ b/src/layer/vulkan/shader/convolution_pack8to4_3x3s1d1_winograd_gemm.comp
+@@ -0,0 +1,158 @@
++// Tencent is pleased to support the open source community by making ncnn available.
++//
++// Copyright (C) 2022 THL A29 Limited, a Tencent company. All rights reserved.
++//
++// Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
++// in compliance with the License. You may obtain a copy of the License at
++//
++// https://opensource.org/licenses/BSD-3-Clause
++//
++// Unless required by applicable law or agreed to in writing, software distributed
++// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
++// CONDITIONS OF ANY KIND, either express or implied. See the License for the
++// specific language governing permissions and limitations under the License.
++
++#version 450
++
++#if NCNN_fp16_storage
++#extension GL_EXT_shader_16bit_storage: require
++struct sfpvec8 { f16vec4 abcd; f16vec4 efgh; };
++#endif
++#if NCNN_fp16_arithmetic
++#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
++#endif
++
++layout (constant_id = 0) const int batch = 1;
++
++#define shape_constant_id_offset 1
++layout (constant_id = shape_constant_id_offset + 0) const int c = 0;
++layout (constant_id = shape_constant_id_offset + 1) const int cstep = 0;
++
++layout (constant_id = shape_constant_id_offset + 2) const int outw = 0;
++layout (constant_id = shape_constant_id_offset + 3) const int outc = 0;
++layout (constant_id = shape_constant_id_offset + 4) const int outcstep = 0;
++
++#if NCNN_image_shader
++layout (binding = 0) uniform unfp sampler3D bottom_tm_blob;
++layout (binding = 1, imfmtc4) writeonly uniform unfp image3D top_tm_blob;
++layout (binding = 2) uniform unfp sampler3D weight_tm_blob;
++#else
++layout (binding = 0) readonly buffer bottom_tm_blob { sfpvec8 bottom_tm_blob_data[]; };
++layout (binding = 1) writeonly buffer top_tm_blob { sfpvec4 top_tm_blob_data[]; };
++layout (binding = 2) readonly buffer weight_tm_blob { sfpvec8 weight_tm_data[]; };
++#endif
++
++layout (push_constant) uniform parameter
++{
++    int c;
++    int cstep;
++
++    int outw;
++    int outc;
++    int outcstep;
++} p;
++
++void main()
++{
++    int gx = int(gl_GlobalInvocationID.x) * 4;
++    int gy = int(gl_GlobalInvocationID.y);
++    int gz = int(gl_GlobalInvocationID.z);
++
++    if (gx >= psc(outw) || gy >= psc(outc) || gz >= batch)
++        return;
++
++    afpvec4 sum0 = afpvec4(0.f);
++    afpvec4 sum1 = afpvec4(0.f);
++    afpvec4 sum2 = afpvec4(0.f);
++    afpvec4 sum3 = afpvec4(0.f);
++
++#if NCNN_image_shader
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec8 v0 = image3d_ld8(bottom_tm_blob, ivec3(gx + 0, z, gz));
++        afpvec8 v1 = image3d_ld8(bottom_tm_blob, ivec3(gx + 1, z, gz));
++        afpvec8 v2 = image3d_ld8(bottom_tm_blob, ivec3(gx + 2, z, gz));
++        afpvec8 v3 = image3d_ld8(bottom_tm_blob, ivec3(gx + 3, z, gz));
++
++        afpvec8 k0 = image3d_ld8(weight_tm_blob, ivec3(z * 4 + 0, gy, gz));
++        afpvec8 k1 = image3d_ld8(weight_tm_blob, ivec3(z * 4 + 1, gy, gz));
++        afpvec8 k2 = image3d_ld8(weight_tm_blob, ivec3(z * 4 + 2, gy, gz));
++        afpvec8 k3 = image3d_ld8(weight_tm_blob, ivec3(z * 4 + 3, gy, gz));
++
++        // sum += v * k;
++        sum0.r += dot(v0[0], k0[0]) + dot(v0[1], k0[1]);
++        sum0.g += dot(v0[0], k1[0]) + dot(v0[1], k1[1]);
++        sum0.b += dot(v0[0], k2[0]) + dot(v0[1], k2[1]);
++        sum0.a += dot(v0[0], k3[0]) + dot(v0[1], k3[1]);
++
++        sum1.r += dot(v1[0], k0[0]) + dot(v1[1], k0[1]);
++        sum1.g += dot(v1[0], k1[0]) + dot(v1[1], k1[1]);
++        sum1.b += dot(v1[0], k2[0]) + dot(v1[1], k2[1]);
++        sum1.a += dot(v1[0], k3[0]) + dot(v1[1], k3[1]);
++
++        sum2.r += dot(v2[0], k0[0]) + dot(v2[1], k0[1]);
++        sum2.g += dot(v2[0], k1[0]) + dot(v2[1], k1[1]);
++        sum2.b += dot(v2[0], k2[0]) + dot(v2[1], k2[1]);
++        sum2.a += dot(v2[0], k3[0]) + dot(v2[1], k3[1]);
++
++        sum3.r += dot(v3[0], k0[0]) + dot(v3[1], k0[1]);
++        sum3.g += dot(v3[0], k1[0]) + dot(v3[1], k1[1]);
++        sum3.b += dot(v3[0], k2[0]) + dot(v3[1], k2[1]);
++        sum3.a += dot(v3[0], k3[0]) + dot(v3[1], k3[1]);
++    }
++#else
++    int v_offset = gz * psc(cstep) + gx;
++    int w_offset = (gz * psc(c) * psc(outc) + gy * psc(c)) * 4;
++
++    for (int z = 0; z < psc(c); z++)
++    {
++        afpvec8 v0 = buffer_ld8(bottom_tm_blob_data, v_offset + 0);
++        afpvec8 v1 = buffer_ld8(bottom_tm_blob_data, v_offset + 1);
++        afpvec8 v2 = buffer_ld8(bottom_tm_blob_data, v_offset + 2);
++        afpvec8 v3 = buffer_ld8(bottom_tm_blob_data, v_offset + 3);
++
++        afpvec8 k0 = buffer_ld8(weight_tm_data, w_offset + 0);
++        afpvec8 k1 = buffer_ld8(weight_tm_data, w_offset + 1);
++        afpvec8 k2 = buffer_ld8(weight_tm_data, w_offset + 2);
++        afpvec8 k3 = buffer_ld8(weight_tm_data, w_offset + 3);
++
++        // sum += v * k;
++        sum0.r += dot(v0[0], k0[0]) + dot(v0[1], k0[1]);
++        sum0.g += dot(v0[0], k1[0]) + dot(v0[1], k1[1]);
++        sum0.b += dot(v0[0], k2[0]) + dot(v0[1], k2[1]);
++        sum0.a += dot(v0[0], k3[0]) + dot(v0[1], k3[1]);
++
++        sum1.r += dot(v1[0], k0[0]) + dot(v1[1], k0[1]);
++        sum1.g += dot(v1[0], k1[0]) + dot(v1[1], k1[1]);
++        sum1.b += dot(v1[0], k2[0]) + dot(v1[1], k2[1]);
++        sum1.a += dot(v1[0], k3[0]) + dot(v1[1], k3[1]);
++
++        sum2.r += dot(v2[0], k0[0]) + dot(v2[1], k0[1]);
++        sum2.g += dot(v2[0], k1[0]) + dot(v2[1], k1[1]);
++        sum2.b += dot(v2[0], k2[0]) + dot(v2[1], k2[1]);
++        sum2.a += dot(v2[0], k3[0]) + dot(v2[1], k3[1]);
++
++        sum3.r += dot(v3[0], k0[0]) + dot(v3[1], k0[1]);
++        sum3.g += dot(v3[0], k1[0]) + dot(v3[1], k1[1]);
++        sum3.b += dot(v3[0], k2[0]) + dot(v3[1], k2[1]);
++        sum3.a += dot(v3[0], k3[0]) + dot(v3[1], k3[1]);
++
++        v_offset += psc(outw);
++        w_offset += 4;
++    }
++#endif
++
++#if NCNN_image_shader
++    image3d_st4(top_tm_blob, ivec3(gx + 0, gy, gz), sum0);
++    image3d_st4(top_tm_blob, ivec3(gx + 1, gy, gz), sum1);
++    image3d_st4(top_tm_blob, ivec3(gx + 2, gy, gz), sum2);
++    image3d_st4(top_tm_blob, ivec3(gx + 3, gy, gz), sum3);
++#else
++    int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
++
++    buffer_st4(top_tm_blob_data, gi + 0, sum0);
++    if (gx + 1 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 1, sum1);
++    if (gx + 2 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 2, sum2);
++    if (gx + 3 < psc(outw)) buffer_st4(top_tm_blob_data, gi + 3, sum3);
++#endif
++}

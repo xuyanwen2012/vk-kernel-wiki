@@ -1,0 +1,38 @@
+repo: Tencent/ncnn
+pr: 5955
+url: https://github.com/Tencent/ncnn/pull/5955
+merge_sha: b284dbd0f4f77efc2334c44d924bfefa2b96f376
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/5955/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/convolution.comp
+  status: modified
+  sha256: b195bd8f2285d8a05ca4c345c614722733de0d0bc4d9d15939f8e22d4d1e4e0c
+- path: src/layer/vulkan/shader/convolution_pack1to4.comp
+  status: modified
+  sha256: 394aff0852914a472af0d5e80b7bf3491b3c172452073cb6e887a8ccd7d14cf7
+- path: src/layer/vulkan/shader/convolution_pack1to8.comp
+  status: modified
+  sha256: acd09c3ee6331dab43896d24d59e4c311e944f67cecfee44fbd6f03e9142fdd8
+- path: src/layer/vulkan/shader/convolution_pack4.comp
+  status: modified
+  sha256: 07cdd60cf260f6b479dc68d81b4f62e0e412acf144ca4f655539099f336d4778
+- path: src/layer/vulkan/shader/convolution_pack4to1.comp
+  status: modified
+  sha256: b195bd8f2285d8a05ca4c345c614722733de0d0bc4d9d15939f8e22d4d1e4e0c
+- path: src/layer/vulkan/shader/convolution_pack4to8.comp
+  status: modified
+  sha256: c8d8af6bb1a8848f54c68e91e9cd87f2fca62beb98414eb5eafae8a2c38b78a4
+- path: src/layer/vulkan/shader/convolution_pack8.comp
+  status: modified
+  sha256: c8d8af6bb1a8848f54c68e91e9cd87f2fca62beb98414eb5eafae8a2c38b78a4
+- path: src/layer/vulkan/shader/convolution_pack8to1.comp
+  status: modified
+  sha256: db902b9840e0c94b8fb612e713ac2600fda7b32b958ee01c2afa7b06bd94c89d
+- path: src/layer/vulkan/shader/convolution_pack8to4.comp
+  status: modified
+  sha256: f35651ad36ba659968b88d570167f3d5956edd56b0777ac5e589a2118985174f

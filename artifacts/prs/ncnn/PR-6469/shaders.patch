@@ -1,0 +1,1281 @@
+diff --git a/src/layer/vulkan/shader/convolution1d_pack4.comp b/src/layer/vulkan/shader/convolution1d_pack4.comp
+--- a/src/layer/vulkan/shader/convolution1d_pack4.comp
++++ b/src/layer/vulkan/shader/convolution1d_pack4.comp
+@@ -23,7 +23,7 @@ layout(constant_id = shape_constant_id_offset + 3) const int outh = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -74,7 +74,7 @@ void main()
+             afpvec4 v0 = buffer_ld4(bottom_blob_data, v_offset.x + x * dilation_w);
+             afpvec4 v1 = buffer_ld4(bottom_blob_data, v_offset.y + x * dilation_w);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+             // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+             afpmat4 k0 = afpmat4(
+                 buffer_ld4(weight_data, (w_offset.x + x) * 4 + 0),
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+@@ -60,15 +60,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_tm_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+@@ -103,15 +103,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_tm_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_gemm.comp b/src/layer/vulkan/shader/convolution_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_gemm.comp
+@@ -117,15 +117,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -167,15 +167,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp b/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
+@@ -92,15 +92,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -135,15 +135,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+@@ -60,15 +60,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+@@ -103,15 +103,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
+@@ -117,15 +117,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -167,15 +167,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4.comp b/src/layer/vulkan/shader/convolution_pack4.comp
+--- a/src/layer/vulkan/shader/convolution_pack4.comp
++++ b/src/layer/vulkan/shader/convolution_pack4.comp
+@@ -32,7 +32,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -117,7 +117,7 @@ void main()
+                 afpvec4 v2 = buffer_ld4(bottom_blob_data, v_offset.b + x * dilation_w);
+                 afpvec4 v3 = buffer_ld4(bottom_blob_data, v_offset.a + x * dilation_w);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+                 // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+                 afpmat4 k0 = afpmat4(
+                     buffer_ld4(weight_data, (w_offset.x + x) * 4 + 0),
+diff --git a/src/layer/vulkan/shader/convolution_pack4_1x1s1d1.comp b/src/layer/vulkan/shader/convolution_pack4_1x1s1d1.comp
+--- a/src/layer/vulkan/shader/convolution_pack4_1x1s1d1.comp
++++ b/src/layer/vulkan/shader/convolution_pack4_1x1s1d1.comp
+@@ -92,15 +92,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+@@ -140,15 +140,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack4_3x3s1d1_winograd_gemm.comp
+@@ -60,15 +60,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_tm_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_tm_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+@@ -108,15 +108,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_tm_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_tm_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4_gemm.comp b/src/layer/vulkan/shader/convolution_pack4_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack4_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack4_gemm.comp
+@@ -117,15 +117,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+@@ -172,15 +172,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4to1_1x1s1d1.comp b/src/layer/vulkan/shader/convolution_pack4to1_1x1s1d1.comp
+--- a/src/layer/vulkan/shader/convolution_pack4to1_1x1s1d1.comp
++++ b/src/layer/vulkan/shader/convolution_pack4to1_1x1s1d1.comp
+@@ -92,15 +92,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -135,15 +135,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack4to1_3x3s1d1_winograd_gemm.comp
+@@ -60,15 +60,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+@@ -103,15 +103,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_tm_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_tm_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_tm_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack4to1_gemm.comp b/src/layer/vulkan/shader/convolution_pack4to1_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack4to1_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack4to1_gemm.comp
+@@ -117,15 +117,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -167,15 +167,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolutiondepthwise_group_pack4.comp b/src/layer/vulkan/shader/convolutiondepthwise_group_pack4.comp
+--- a/src/layer/vulkan/shader/convolutiondepthwise_group_pack4.comp
++++ b/src/layer/vulkan/shader/convolutiondepthwise_group_pack4.comp
+@@ -33,7 +33,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -96,7 +96,7 @@ void main()
+             {
+                 afpvec4 v = buffer_ld4(bottom_blob_data, v_offset + x * dilation_w);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+                 // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+                 afpmat4 k = afpmat4(
+                     buffer_ld4(weight_data, (w_offset + x) * 4 + 0),
+diff --git a/src/layer/vulkan/shader/crop_pack4to1.comp b/src/layer/vulkan/shader/crop_pack4to1.comp
+--- a/src/layer/vulkan/shader/crop_pack4to1.comp
++++ b/src/layer/vulkan/shader/crop_pack4to1.comp
+@@ -20,7 +20,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outd = 0;
+ layout(constant_id = shape_constant_id_offset + 10) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 11) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -62,7 +62,7 @@ void main()
+     {
+         int x = gx + p.woffset;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         int v_offset = (x / 4) * 2 + (x % 4) / 2;
+         int lane2 = x % 2;
+ 
+@@ -82,7 +82,7 @@ void main()
+ 
+         int gi = gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         int v_offset = ((y / 4) * psc(w) + x) * 2 + (y % 4) / 2;
+         int lane2 = y % 2;
+ 
+@@ -103,7 +103,7 @@ void main()
+ 
+         int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         int v_offset = ((z / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z % 4) / 2;
+         int lane2 = z % 2;
+ 
+@@ -127,7 +127,7 @@ void main()
+ 
+         int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         int v_offset = ((z / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z % 4) / 2;
+         int lane2 = z % 2;
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_gemm.comp b/src/layer/vulkan/shader/deconvolution_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_gemm.comp
+@@ -65,15 +65,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -108,15 +108,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
++                tmp_k[ly][z4] = buffer_sm1(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp b/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
+@@ -65,15 +65,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -108,15 +108,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
++                tmp_v[lx][z4][ly] = buffer_sm1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_pack4.comp b/src/layer/vulkan/shader/deconvolution_pack4.comp
+--- a/src/layer/vulkan/shader/deconvolution_pack4.comp
++++ b/src/layer/vulkan/shader/deconvolution_pack4.comp
+@@ -32,7 +32,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -107,7 +107,7 @@ void main()
+             {
+                 afpvec4 v = buffer_ld4(bottom_blob_data, v_offset);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+                 // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+                 afpmat4 k = afpmat4(
+                     buffer_ld4(weight_data, w_offset * 4 + 0),
+diff --git a/src/layer/vulkan/shader/deconvolution_pack4_gemm.comp b/src/layer/vulkan/shader/deconvolution_pack4_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_pack4_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_pack4_gemm.comp
+@@ -65,15 +65,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+@@ -113,15 +113,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx < 4)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4][lx] = sfp2lfpvec4(weight_data[w_offset + z4 * 4 + lx]);
++                tmp_k[ly][z4][lx] = buffer_sm4(weight_data, w_offset + z4 * 4 + lx);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_pack4to1_gemm.comp b/src/layer/vulkan/shader/deconvolution_pack4to1_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_pack4to1_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_pack4to1_gemm.comp
+@@ -65,15 +65,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+@@ -108,15 +108,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfpvec4(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = buffer_sm4(bottom_blob_data, v_offset + z4 * psc(cstep) + ly);
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfpvec4(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = buffer_sm4(weight_data, w_offset + z4);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolutiondepthwise_group_pack4.comp b/src/layer/vulkan/shader/deconvolutiondepthwise_group_pack4.comp
+--- a/src/layer/vulkan/shader/deconvolutiondepthwise_group_pack4.comp
++++ b/src/layer/vulkan/shader/deconvolutiondepthwise_group_pack4.comp
+@@ -33,7 +33,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -116,7 +116,7 @@ void main()
+             {
+                 afpvec4 v = buffer_ld4(bottom_blob_data, v_offset);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+                 // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+                 afpmat4 k = afpmat4(
+                     buffer_ld4(weight_data, w_offset * 4 + 0),
+diff --git a/src/layer/vulkan/shader/flatten_pack4.comp b/src/layer/vulkan/shader/flatten_pack4.comp
+--- a/src/layer/vulkan/shader/flatten_pack4.comp
++++ b/src/layer/vulkan/shader/flatten_pack4.comp
+@@ -16,7 +16,7 @@ layout(constant_id = shape_constant_id_offset + 7) const int outh = 0;
+ layout(constant_id = shape_constant_id_offset + 8) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -49,7 +49,7 @@ void main()
+ 
+     ivec4 i4 = gx * 4 + ivec4(0, 1, 2, 3);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     ivec4 v_offset;
+     ivec4 lane2;
+ 
+diff --git a/src/layer/vulkan/shader/gemm.comp b/src/layer/vulkan/shader/gemm.comp
+--- a/src/layer/vulkan/shader/gemm.comp
++++ b/src/layer/vulkan/shader/gemm.comp
+@@ -113,27 +113,27 @@ void main()
+             if (transA == 1)
+             {
+                 const int ai = (k + lx) * p.A_hstep + gy;
+-                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
+-                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + 1));
++                tmp_a[ly][lx][0] = buffer_sm1(A_blob_data, ai);
++                tmp_a[ly][lx][1] = buffer_sm1(A_blob_data, ai + 1);
+             }
+             else
+             {
+                 const int ai = gy * p.A_hstep + (k + lx);
+-                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
+-                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + p.A_hstep));
++                tmp_a[ly][lx][0] = buffer_sm1(A_blob_data, ai);
++                tmp_a[ly][lx][1] = buffer_sm1(A_blob_data, ai + p.A_hstep);
+             }
+ 
+             if (transB == 1)
+             {
+                 const int bi = gx * p.B_hstep + (k + ly);
+-                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
+-                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + p.B_hstep));
++                tmp_b[lx][ly][0] = buffer_sm1(B_blob_data, bi);
++                tmp_b[lx][ly][1] = buffer_sm1(B_blob_data, bi + p.B_hstep);
+             }
+             else
+             {
+                 const int bi = (k + ly) * p.B_hstep + gx;
+-                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
+-                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + 1));
++                tmp_b[lx][ly][0] = buffer_sm1(B_blob_data, bi);
++                tmp_b[lx][ly][1] = buffer_sm1(B_blob_data, bi + 1);
+             }
+         }
+ 
+@@ -165,14 +165,14 @@ void main()
+             if (transA == 1)
+             {
+                 const int ai = (k + lx) * p.A_hstep + gy;
+-                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
+-                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + 1));
++                tmp_a[ly][lx][0] = buffer_sm1(A_blob_data, ai);
++                tmp_a[ly][lx][1] = buffer_sm1(A_blob_data, ai + 1);
+             }
+             else
+             {
+                 const int ai = gy * p.A_hstep + (k + lx);
+-                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
+-                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + p.A_hstep));
++                tmp_a[ly][lx][0] = buffer_sm1(A_blob_data, ai);
++                tmp_a[ly][lx][1] = buffer_sm1(A_blob_data, ai + p.A_hstep);
+             }
+         }
+ 
+@@ -181,14 +181,14 @@ void main()
+             if (transB == 1)
+             {
+                 const int bi = gx * p.B_hstep + (k + ly);
+-                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
+-                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + p.B_hstep));
++                tmp_b[lx][ly][0] = buffer_sm1(B_blob_data, bi);
++                tmp_b[lx][ly][1] = buffer_sm1(B_blob_data, bi + p.B_hstep);
+             }
+             else
+             {
+                 const int bi = (k + ly) * p.B_hstep + gx;
+-                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
+-                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + 1));
++                tmp_b[lx][ly][0] = buffer_sm1(B_blob_data, bi);
++                tmp_b[lx][ly][1] = buffer_sm1(B_blob_data, bi + 1);
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/innerproduct_gemm_wp4.comp b/src/layer/vulkan/shader/innerproduct_gemm_wp4.comp
+--- a/src/layer/vulkan/shader/innerproduct_gemm_wp4.comp
++++ b/src/layer/vulkan/shader/innerproduct_gemm_wp4.comp
+@@ -26,7 +26,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfp top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -80,7 +80,7 @@ void main()
+         v.b = buffer_ld1(bottom_blob_data, v_offset + i * 4 + 2);
+         v.a = buffer_ld1(bottom_blob_data, v_offset + i * 4 + 3);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+         // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+         afpmat4 k = afpmat4(
+             buffer_ld4(weight_data, (w_offset + i) * 4 + 0),
+diff --git a/src/layer/vulkan/shader/innerproduct_pack4.comp b/src/layer/vulkan/shader/innerproduct_pack4.comp
+--- a/src/layer/vulkan/shader/innerproduct_pack4.comp
++++ b/src/layer/vulkan/shader/innerproduct_pack4.comp
+@@ -26,7 +26,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -75,7 +75,7 @@ void main()
+     {
+         afpvec4 v = buffer_ld4(bottom_blob_data, i);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+         // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+         afpmat4 k = afpmat4(
+             buffer_ld4(weight_data, (w_offset + i) * 4 + 0),
+diff --git a/src/layer/vulkan/shader/innerproduct_sum8_pack4.comp b/src/layer/vulkan/shader/innerproduct_sum8_pack4.comp
+--- a/src/layer/vulkan/shader/innerproduct_sum8_pack4.comp
++++ b/src/layer/vulkan/shader/innerproduct_sum8_pack4.comp
+@@ -11,7 +11,7 @@ layout(constant_id = shape_constant_id_offset + 2) const int outh = 0;
+ 
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout(binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+ // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+ layout(binding = 2) readonly buffer weight_blob { sfpvec4 weight_data[]; };
+ #else
+@@ -46,7 +46,7 @@ void main()
+     {
+         afpvec4 v = buffer_ld4(bottom_blob_data, i);
+ 
+-#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic)
++#if NCNN_fp16_packed || (NCNN_fp16_storage && !NCNN_fp16_arithmetic) || NCNN_bf16_packed || NCNN_bf16_storage
+         // GL_EXT_shader_16bit_storage does not define f16mat4 type :(
+         afpmat4 k = afpmat4(
+             buffer_ld4(weight_data, w_offset * 4 + 0),
+diff --git a/src/layer/vulkan/shader/multiheadattention_qk_cross_pack4.comp b/src/layer/vulkan/shader/multiheadattention_qk_cross_pack4.comp
+--- a/src/layer/vulkan/shader/multiheadattention_qk_cross_pack4.comp
++++ b/src/layer/vulkan/shader/multiheadattention_qk_cross_pack4.comp
+@@ -71,14 +71,14 @@ void main()
+     for (; k + (LOCAL_MEMORY_UNROLL_INCH - 1) < NN; k += LOCAL_MEMORY_UNROLL_INCH)
+     {
+         {
+-            tmp_q[ly][lx][0] = sfp2lfpvec4(q_blob_data[ai]);
+-            tmp_q[ly][lx][1] = sfp2lfpvec4(q_blob_data[ai + 1]);
+-            tmp_q[ly][lx][2] = sfp2lfpvec4(q_blob_data[ai + 2]);
+-            tmp_q[ly][lx][3] = sfp2lfpvec4(q_blob_data[ai + 3]);
++            tmp_q[ly][lx][0] = buffer_sm4(q_blob_data, ai);
++            tmp_q[ly][lx][1] = buffer_sm4(q_blob_data, ai + 1);
++            tmp_q[ly][lx][2] = buffer_sm4(q_blob_data, ai + 2);
++            tmp_q[ly][lx][3] = buffer_sm4(q_blob_data, ai + 3);
+         }
+ 
+         {
+-            tmp_k[lx][ly] = sfp2lfpvec4(k_blob_data[bi]);
++            tmp_k[lx][ly] = buffer_sm4(k_blob_data, bi);
+         }
+ 
+         barrier();
+@@ -110,15 +110,15 @@ void main()
+ 
+         if (lx < remain)
+         {
+-            tmp_q[ly][lx][0] = sfp2lfpvec4(q_blob_data[ai]);
+-            tmp_q[ly][lx][1] = sfp2lfpvec4(q_blob_data[ai + 1]);
+-            tmp_q[ly][lx][2] = sfp2lfpvec4(q_blob_data[ai + 2]);
+-            tmp_q[ly][lx][3] = sfp2lfpvec4(q_blob_data[ai + 3]);
++            tmp_q[ly][lx][0] = buffer_sm4(q_blob_data, ai);
++            tmp_q[ly][lx][1] = buffer_sm4(q_blob_data, ai + 1);
++            tmp_q[ly][lx][2] = buffer_sm4(q_blob_data, ai + 2);
++            tmp_q[ly][lx][3] = buffer_sm4(q_blob_data, ai + 3);
+         }
+ 
+         if (ly < remain)
+         {
+-            tmp_k[lx][ly] = sfp2lfpvec4(k_blob_data[bi]);
++            tmp_k[lx][ly] = buffer_sm4(k_blob_data, bi);
+         }
+ 
+         barrier();
+diff --git a/src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4.comp b/src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4.comp
+--- a/src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4.comp
++++ b/src/layer/vulkan/shader/multiheadattention_qkv_cross_pack4.comp
+@@ -56,11 +56,11 @@ void main()
+     for (; k + (LOCAL_MEMORY_UNROLL_INCH - 1) < NN; k += LOCAL_MEMORY_UNROLL_INCH)
+     {
+         {
+-            tmp_qk[ly][lx] = sfp2lfpvec4(qkcross_blob_data[ai]);
++            tmp_qk[ly][lx] = buffer_sm4(qkcross_blob_data, ai);
+         }
+ 
+         {
+-            tmp_v[lx][ly] = sfp2lfpvec4(v_blob_data[bi]);
++            tmp_v[lx][ly] = buffer_sm4(v_blob_data, bi);
+         }
+ 
+         barrier();
+@@ -89,12 +89,12 @@ void main()
+ 
+         if (lx < remain)
+         {
+-            tmp_qk[ly][lx] = sfp2lfpvec4(qkcross_blob_data[ai]);
++            tmp_qk[ly][lx] = buffer_sm4(qkcross_blob_data, ai);
+         }
+ 
+         if (ly < remain)
+         {
+-            tmp_v[lx][ly] = sfp2lfpvec4(v_blob_data[bi]);
++            tmp_v[lx][ly] = buffer_sm4(v_blob_data, bi);
+         }
+ 
+         barrier();
+diff --git a/src/layer/vulkan/shader/padding_pack4to1.comp b/src/layer/vulkan/shader/padding_pack4to1.comp
+--- a/src/layer/vulkan/shader/padding_pack4to1.comp
++++ b/src/layer/vulkan/shader/padding_pack4to1.comp
+@@ -20,7 +20,7 @@ layout(constant_id = shape_constant_id_offset + 7) const int outh = 0;
+ layout(constant_id = shape_constant_id_offset + 8) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -64,7 +64,7 @@ void main()
+         {
+             if (x >= 0 && x < psc(w) * 4)
+             {
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+                 int v_offset = (x / 4) * 2 + (x % 4) / 2;
+                 int lane2 = x % 2;
+ 
+@@ -87,7 +87,7 @@ void main()
+         {
+             x = clamp(x, 0, psc(w) * 4 - 1);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = (x / 4) * 2 + (x % 4) / 2;
+             int lane2 = x % 2;
+ 
+@@ -108,7 +108,7 @@ void main()
+             x = (p.w * 4 - 1) - abs(x - (p.w * 4 - 1));
+             //             x = (psc(w) * 4 - 1) - abs(x - (psc(w) * 4 - 1));
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = (x / 4) * 2 + (x % 4) / 2;
+             int lane2 = x % 2;
+ 
+@@ -133,7 +133,7 @@ void main()
+         {
+             if (x >= 0 && x < psc(w) && y >= 0 && y < psc(h) * 4)
+             {
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+                 int v_offset = ((y / 4) * psc(w) + x) * 2 + (y % 4) / 2;
+                 int lane2 = y % 2;
+ 
+@@ -157,7 +157,7 @@ void main()
+             x = clamp(x, 0, psc(w) - 1);
+             y = clamp(y, 0, psc(h) * 4 - 1);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = ((y / 4) * psc(w) + x) * 2 + (y % 4) / 2;
+             int lane2 = y % 2;
+ 
+@@ -181,7 +181,7 @@ void main()
+             //             x = (psc(w) - 1) - abs(x - (psc(w) - 1));
+             //             y = (psc(h) * 4 - 1) - abs(y - (psc(h) * 4 - 1));
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = ((y / 4) * psc(w) + x) * 2 + (y % 4) / 2;
+             int lane2 = y % 2;
+ 
+@@ -207,7 +207,7 @@ void main()
+         {
+             if (x >= 0 && x < psc(w) && y >= 0 && y < psc(h) && z >= 0 && z < psc(c) * 4)
+             {
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+                 int v_offset = ((z / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z % 4) / 2;
+                 int lane2 = z % 2;
+ 
+@@ -236,7 +236,7 @@ void main()
+             y = clamp(y, 0, psc(h) - 1);
+             z = clamp(z, 0, psc(c) * 4 - 1);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = ((z / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z % 4) / 2;
+             int lane2 = z % 2;
+ 
+@@ -263,7 +263,7 @@ void main()
+             //             y = (psc(h) - 1) - abs(y - (psc(h) - 1));
+             //             z = (psc(c) * 4 - 1) - abs(z - (psc(c) * 4 - 1));
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             int v_offset = ((z / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z % 4) / 2;
+             int lane2 = z % 2;
+ 
+diff --git a/src/layer/vulkan/shader/permute_pack4.comp b/src/layer/vulkan/shader/permute_pack4.comp
+--- a/src/layer/vulkan/shader/permute_pack4.comp
++++ b/src/layer/vulkan/shader/permute_pack4.comp
+@@ -21,7 +21,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outd = 0;
+ layout(constant_id = shape_constant_id_offset + 10) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 11) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -304,7 +304,7 @@ void main()
+ 
+     ivec4 i4 = z4 * psc(cstep) + y4 * psc(w) + x4;
+     ivec4 v_offset;
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     ivec4 lane2;
+ #endif
+ 
+@@ -313,7 +313,7 @@ void main()
+         y4 = i4 / psc(w);
+         x4 = i4 % psc(w);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((y4 / 4) * psc(w) + x4) * 2 + (y4 % 4) / 2;
+         lane2 = y4 % 2;
+ #else
+@@ -328,7 +328,7 @@ void main()
+         y4 = i4 % size / psc(w);
+         x4 = i4 % size % psc(w);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+         lane2 = z4 % 2;
+ #else
+@@ -347,7 +347,7 @@ void main()
+ 
+         y4 = yd4 * psc(h) + yh4;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+         lane2 = z4 % 2;
+ #else
+@@ -357,7 +357,7 @@ void main()
+ 
+     int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     afpvec2 vr = buffer_ld2(bottom_blob_data, v_offset.r);
+     afpvec2 vg = buffer_ld2(bottom_blob_data, v_offset.g);
+     afpvec2 vb = buffer_ld2(bottom_blob_data, v_offset.b);
+diff --git a/src/layer/vulkan/shader/pixelshuffle_pack4.comp b/src/layer/vulkan/shader/pixelshuffle_pack4.comp
+--- a/src/layer/vulkan/shader/pixelshuffle_pack4.comp
++++ b/src/layer/vulkan/shader/pixelshuffle_pack4.comp
+@@ -19,7 +19,7 @@ layout(constant_id = shape_constant_id_offset + 7) const int outh = 0;
+ layout(constant_id = shape_constant_id_offset + 8) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -66,7 +66,7 @@ void main()
+ 
+     int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     ivec4 v_offset = ((z4 / 4) * psc(cstep) + y * psc(w) + x) * 2 + (z4 % 4) / 2;
+     ivec4 lane2 = z4 % 2;
+ 
+diff --git a/src/layer/vulkan/shader/priorbox.comp b/src/layer/vulkan/shader/priorbox.comp
+--- a/src/layer/vulkan/shader/priorbox.comp
++++ b/src/layer/vulkan/shader/priorbox.comp
+@@ -19,7 +19,7 @@ layout(constant_id = 10) const int num_prior = 0;
+ layout(constant_id = shape_constant_id_offset + 0) const int w = 0;
+ layout(constant_id = shape_constant_id_offset + 1) const int h = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) writeonly buffer top_blob { vec4 top_blob_data[]; };
+ #else
+ layout(binding = 0) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+@@ -73,7 +73,7 @@ void main()
+     box = (center + afpvec4(-box_w, -box_h, box_w, box_h) * afp(0.5f)) * image_norm;
+     box = clip == 1 ? clamp(box, afp(0.f), afp(1.f)) : box;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     top_blob_data[v_offset] = vec4(box);
+     top_blob_data[var_offset] = vec4(variances);
+ #else
+@@ -94,7 +94,7 @@ void main()
+         box = (center + afpvec4(-box_w, -box_h, box_w, box_h) * afp(0.5f)) * image_norm;
+         box = clip == 1 ? clamp(box, afp(0.f), afp(1.f)) : box;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         top_blob_data[v_offset] = vec4(box);
+         top_blob_data[var_offset] = vec4(variances);
+ #else
+@@ -117,7 +117,7 @@ void main()
+         box = (center + afpvec4(-box_w, -box_h, box_w, box_h) * afp(0.5f)) * image_norm;
+         box = clip == 1 ? clamp(box, afp(0.f), afp(1.f)) : box;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         top_blob_data[v_offset] = vec4(box);
+         top_blob_data[var_offset] = vec4(variances);
+ #else
+@@ -133,7 +133,7 @@ void main()
+             box = (center + afpvec4(-box_h, -box_w, box_h, box_w) * afp(0.5f)) * image_norm;
+             box = clip == 1 ? clamp(box, afp(0.f), afp(1.f)) : box;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+             top_blob_data[v_offset] = vec4(box);
+             top_blob_data[var_offset] = vec4(variances);
+ #else
+diff --git a/src/layer/vulkan/shader/reorg_pack4.comp b/src/layer/vulkan/shader/reorg_pack4.comp
+--- a/src/layer/vulkan/shader/reorg_pack4.comp
++++ b/src/layer/vulkan/shader/reorg_pack4.comp
+@@ -19,7 +19,7 @@ layout(constant_id = shape_constant_id_offset + 7) const int outh = 0;
+ layout(constant_id = shape_constant_id_offset + 8) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 9) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -69,7 +69,7 @@ void main()
+ 
+     int gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     ivec4 v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+     ivec4 lane2 = z4 % 2;
+ 
+diff --git a/src/layer/vulkan/shader/reshape_pack4.comp b/src/layer/vulkan/shader/reshape_pack4.comp
+--- a/src/layer/vulkan/shader/reshape_pack4.comp
++++ b/src/layer/vulkan/shader/reshape_pack4.comp
+@@ -20,7 +20,7 @@ layout(constant_id = shape_constant_id_offset + 9) const int outd = 0;
+ layout(constant_id = shape_constant_id_offset + 10) const int outc = 0;
+ layout(constant_id = shape_constant_id_offset + 11) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+ layout(binding = 0) readonly buffer bottom_blob { sfpvec2 bottom_blob_data[]; };
+ #else
+ layout(binding = 0) readonly buffer bottom_blob { sfp bottom_blob_data[]; };
+@@ -64,7 +64,7 @@ void main()
+     ivec4 z4;
+ 
+     ivec4 v_offset;
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     ivec4 lane2;
+ #endif
+ 
+@@ -74,7 +74,7 @@ void main()
+         y4 = ivec4(0);
+         x4 = i4;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = i4 / 2;
+         lane2 = i4 % 2;
+ #else
+@@ -87,7 +87,7 @@ void main()
+         y4 = i4 / psc(w);
+         x4 = i4 % psc(w);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((y4 / 4) * psc(w) + x4) * 2 + (y4 % 4) / 2;
+         lane2 = y4 % 2;
+ #else
+@@ -102,7 +102,7 @@ void main()
+         y4 = i4 % size / psc(w);
+         x4 = i4 % size % psc(w);
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+         lane2 = z4 % 2;
+ #else
+@@ -121,7 +121,7 @@ void main()
+ 
+         y4 = yd4 * psc(h) + yh4;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+         v_offset = ((z4 / 4) * psc(cstep) + y4 * psc(w) + x4) * 2 + (z4 % 4) / 2;
+         lane2 = z4 % 2;
+ #else
+@@ -134,7 +134,7 @@ void main()
+     if (ndim == 2) gi = gy * psc(outw) + gx;
+     if (ndim == 3 || ndim == 4) gi = gz * psc(outcstep) + gy * psc(outw) + gx;
+ 
+-#if NCNN_fp16_packed
++#if NCNN_fp16_packed || NCNN_bf16_packed
+     afpvec2 vr = buffer_ld2(bottom_blob_data, v_offset.r);
+     afpvec2 vg = buffer_ld2(bottom_blob_data, v_offset.g);
+     afpvec2 vb = buffer_ld2(bottom_blob_data, v_offset.b);

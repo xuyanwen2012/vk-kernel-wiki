@@ -1,0 +1,336 @@
+diff --git a/src/amd/common/nir/ac_nir_lower_global_access.c b/src/amd/common/nir/ac_nir_lower_global_access.c
+--- a/src/amd/common/nir/ac_nir_lower_global_access.c
++++ b/src/amd/common/nir/ac_nir_lower_global_access.c
+@@ -99,6 +99,9 @@ process_instr(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
+    case nir_intrinsic_load_global:
+       op = nir_intrinsic_load_global_amd;
+       break;
++   case nir_intrinsic_load_global_transpose_amd:
++      op = nir_intrinsic_load_global_tr_amd;
++      break;
+    case nir_intrinsic_global_atomic:
+       op = nir_intrinsic_global_atomic_amd;
+       break;
+diff --git a/src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c b/src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c
+--- a/src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c
++++ b/src/amd/common/nir/ac_nir_opt_flip_if_for_mem_loads.c
+@@ -91,6 +91,8 @@ is_vmem_or_lds_load(nir_def *def, unsigned depth, unsigned begin, unsigned end)
+       case nir_intrinsic_load_global:
+       case nir_intrinsic_load_global_constant:
+       case nir_intrinsic_load_global_amd:
++      case nir_intrinsic_load_global_transpose_amd:
++      case nir_intrinsic_load_global_tr_amd:
+       case nir_intrinsic_load_scratch:
+       case nir_intrinsic_load_shared:
+       case nir_intrinsic_load_shared2_amd:
+diff --git a/src/amd/compiler/instruction_selection/aco_isel_setup.cpp b/src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+--- a/src/amd/compiler/instruction_selection/aco_isel_setup.cpp
++++ b/src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+@@ -632,7 +632,8 @@ init_context(isel_context* ctx, nir_shader* shader)
+                case nir_intrinsic_ddy_fine:
+                case nir_intrinsic_ddx_coarse:
+                case nir_intrinsic_ddy_coarse:
+-               case nir_intrinsic_load_return_param_amd: {
++               case nir_intrinsic_load_return_param_amd:
++               case nir_intrinsic_load_global_tr_amd: {
+                   type = RegType::vgpr;
+                   break;
+                }
+diff --git a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+--- a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
++++ b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+@@ -2412,6 +2412,43 @@ visit_load_global(isel_context* ctx, nir_intrinsic_instr* instr)
+    }
+ }
+ 
++void
++visit_load_global_tr(isel_context* ctx, nir_intrinsic_instr* instr)
++{
++   Builder bld(ctx->program, ctx->block);
++   unsigned access = nir_intrinsic_access(instr);
++   memory_sync_info sync = get_memory_sync_info(instr, storage_buffer, 0);
++
++   Temp addr, offset;
++   uint32_t const_offset;
++   parse_global(ctx, instr, &addr, &const_offset, &offset);
++   Format format = lower_global_address(ctx, bld, 0, &addr, &const_offset, &offset, &instr->src[1]);
++   assert(format == Format::GLOBAL);
++
++   Temp dst = get_ssa_temp(ctx, &instr->def);
++   /* Note that _b128/_b64 relates to the bit size, not the number of VGPRs written. */
++   aco_opcode op =
++      instr->def.bit_size == 16 ? aco_opcode::global_load_tr_b128 : aco_opcode::global_load_tr_b64;
++   aco_ptr<Instruction> load{create_instruction(op, format, 2, 1)};
++   load->definitions[0] = Definition(dst);
++   if (addr.regClass() == s2) {
++      assert(offset.id() && offset.type() == RegType::vgpr);
++      load->operands[0] = Operand(offset);
++      load->operands[1] = Operand(addr);
++   } else {
++      assert(addr.type() == RegType::vgpr && !offset.id());
++      load->operands[0] = Operand(addr);
++      load->operands[1] = Operand(s1);
++   }
++   load->flatlike().offset = const_offset;
++   load->flatlike().cache = get_cache_flags(ctx, access, ac_access_type_load);
++   load->flatlike().sync = sync;
++   bld.insert(std::move(load));
++   set_wqm(ctx);
++
++   emit_split_vector(ctx, dst, instr->def.num_components);
++}
++
+ void
+ visit_store_global(isel_context* ctx, nir_intrinsic_instr* instr)
+ {
+@@ -4005,6 +4042,7 @@ visit_intrinsic(isel_context* ctx, nir_intrinsic_instr* instr)
+    case nir_intrinsic_load_buffer_amd: visit_load_buffer(ctx, instr); break;
+    case nir_intrinsic_store_buffer_amd: visit_store_buffer(ctx, instr); break;
+    case nir_intrinsic_load_global_amd: visit_load_global(ctx, instr); break;
++   case nir_intrinsic_load_global_tr_amd: visit_load_global_tr(ctx, instr); break;
+    case nir_intrinsic_store_global_amd: visit_store_global(ctx, instr); break;
+    case nir_intrinsic_global_atomic_amd:
+    case nir_intrinsic_global_atomic_swap_amd: visit_global_atomic(ctx, instr); break;
+diff --git a/src/amd/vulkan/nir/radv_nir.h b/src/amd/vulkan/nir/radv_nir.h
+--- a/src/amd/vulkan/nir/radv_nir.h
++++ b/src/amd/vulkan/nir/radv_nir.h
+@@ -66,7 +66,8 @@ void radv_nir_lower_io(nir_shader *nir);
+ 
+ bool radv_nir_lower_io_to_mem(const struct radv_compiler_info *compiler_info, struct radv_shader_stage *stage);
+ 
+-bool radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size);
++bool radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level,
++                                       struct radv_shader_stage *stage, unsigned wave_size);
+ 
+ bool radv_nir_opt_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level);
+ 
+diff --git a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+--- a/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
++++ b/src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+@@ -6,6 +6,7 @@
+ 
+ #include "nir_builder.h"
+ #include "radv_nir.h"
++#include "radv_shader.h"
+ 
+ /* This pass lowers cooperative matrix.
+  *
+@@ -43,6 +44,8 @@
+ typedef struct {
+    enum amd_gfx_level gfx_level;
+    unsigned wave_size;
++   bool ubo_robustness;
++   bool ssbo_robustness;
+ } lower_cmat_params;
+ 
+ static unsigned
+@@ -241,6 +244,39 @@ lower_cmat_construct(nir_builder *b, nir_intrinsic_instr *intr, const lower_cmat
+    return true;
+ }
+ 
++static void
++get_load_tr_row_col(nir_builder *b, unsigned bit_size, nir_def **row, nir_def **col)
++{
++   nir_def *lane_id = nir_load_subgroup_invocation(b);
++
++   /* In wave64, the instruction only cares about the address for lanes 0-31. */
++   if (bit_size == 16) {
++      /*
++       * lane:   0..7   | 8..15  | 16..23 | 24..31
++       * row:    0..7   | 0..7   | 8..15  | 8..15
++       * column: 0      | 8      | 0      | 8
++       */
++      *row = nir_imul_imm(b, nir_udiv_imm(b, lane_id, 16), 8);
++      *row = nir_iadd(b, *row, nir_iand_imm(b, lane_id, 7));
++
++      nir_def *odd8 = nir_inverse_ballot_imm(b, UINT64_C(0xff00ff00ff00ff00), b->shader->info.api_subgroup_size);
++      *col = nir_bcsel(b, odd8, nir_imm_int(b, 8), nir_imm_int(b, 0));
++   } else {
++      /*
++       * lane:   0..3   | 4..7   | 8..11  | 12..15 | 16..19 | 20..23 | 24..27 | 28..31
++       * row:    0..3   | 0..3   | 4..7   | 4..7   | 8..11  | 8..11  | 12..15 | 12..15
++       * column: 0      | 8      | 0      | 8      | 0      | 8      | 0      | 8
++       */
++      assert(bit_size == 8);
++
++      *row = nir_imul_imm(b, nir_udiv_imm(b, lane_id, 8), 4);
++      *row = nir_iadd(b, *row, nir_iand_imm(b, lane_id, 3));
++
++      nir_def *odd4 = nir_inverse_ballot_imm(b, UINT64_C(0xf0f0f0f0f0f0f0f0), b->shader->info.api_subgroup_size);
++      *col = nir_bcsel(b, odd4, nir_imm_int(b, 8), nir_imm_int(b, 0));
++   }
++}
++
+ static bool
+ lower_cmat_load_store(nir_builder *b, nir_intrinsic_instr *intr, const lower_cmat_params *params)
+ {
+@@ -249,16 +285,15 @@ lower_cmat_load_store(nir_builder *b, nir_intrinsic_instr *intr, const lower_cma
+    nir_deref_instr *cmat_deref = nir_src_as_deref(intr->src[!is_load]);
+    struct glsl_cmat_description desc = *glsl_get_cmat_description(cmat_deref->type);
+    enum glsl_matrix_layout layout = nir_intrinsic_matrix_layout(intr);
++   unsigned length = radv_nir_cmat_length(desc, params);
+ 
+    nir_deref_instr *deref = nir_src_as_deref(intr->src[is_load]);
+    nir_def *stride = intr->src[2].ssa;
+ 
+    const uint32_t ptr_stride = glsl_get_bit_size(deref->type) / 8 * glsl_get_vector_elements(deref->type);
++   const unsigned idx_bits = deref->def.bit_size;
+    deref = nir_build_deref_cast(b, &deref->def, deref->modes, deref->type, ptr_stride);
+ 
+-   nir_def *local_idx = nir_load_subgroup_invocation(b);
+-   nir_def *inner_idx = nir_iand_imm(b, local_idx, 15);
+-
+    bool load_acc_as_b = is_load && params->gfx_level < GFX11_7 && desc.use == GLSL_CMAT_USE_ACCUMULATOR &&
+                         radv_nir_cmat_bits(desc) == 8 && params->wave_size == 32 &&
+                         layout == GLSL_MATRIX_LAYOUT_COLUMN_MAJOR;
+@@ -270,7 +305,46 @@ lower_cmat_load_store(nir_builder *b, nir_intrinsic_instr *intr, const lower_cma
+       layout =
+          layout == GLSL_MATRIX_LAYOUT_COLUMN_MAJOR ? GLSL_MATRIX_LAYOUT_ROW_MAJOR : GLSL_MATRIX_LAYOUT_COLUMN_MAJOR;
+ 
+-   unsigned length = radv_nir_cmat_length(desc, params);
++   bool use_tr_load = params->gfx_level >= GFX12 && layout == GLSL_MATRIX_LAYOUT_ROW_MAJOR && is_load &&
++                      radv_nir_cmat_bits(desc) < 32 &&
++                      (nir_deref_mode_is(deref, nir_var_mem_global) ||
++                       (nir_deref_mode_is(deref, nir_var_mem_ubo) && !params->ubo_robustness) ||
++                       (nir_deref_mode_is(deref, nir_var_mem_ssbo) && !params->ssbo_robustness));
++
++   if (use_tr_load) {
++      assert(!load_acc_as_b);
++
++      const unsigned elem_bits = radv_nir_cmat_bits(desc);
++      nir_def *row, *col;
++      get_load_tr_row_col(b, elem_bits, &row, &col);
++      col = nir_u2uN(b, col, idx_bits);
++      row = nir_u2uN(b, nir_imul(b, row, stride), idx_bits);
++
++      deref = nir_build_deref_ptr_as_array(b, deref, row);
++      deref = nir_build_deref_cast(b, &deref->def, deref->modes, glsl_scalar_type(desc.element_type), elem_bits / 8);
++      deref = nir_build_deref_ptr_as_array(b, deref, col);
++
++      /* Convert buffer deref to a global one. */
++      if (nir_deref_mode_is_one_of(deref, nir_var_mem_ssbo | nir_var_mem_ubo)) {
++         nir_def *descriptor = nir_ssbo_descriptor_amd(b, &deref->def);
++         nir_def *addr_lo = nir_channel(b, descriptor, 0);
++         nir_def *addr_hi = nir_extract_i16(b, nir_channel(b, descriptor, 1), nir_imm_int(b, 0));
++         nir_def *addr = nir_pack_64_2x32_split(b, addr_lo, addr_hi);
++
++         nir_def *offset = nir_channel(b, &deref->def, 2);
++         addr = nir_iadd_nuw(b, addr, nir_u2u64(b, offset));
++         deref = nir_build_deref_cast(b, addr, nir_var_mem_global, deref->type, elem_bits / 8);
++      }
++
++      nir_def *mat = nir_load_deref_transpose_amd(b, length, elem_bits, &deref->def);
++      nir_store_deref(b, cmat_deref, mat, nir_component_mask(mat->num_components));
++      nir_instr_remove(&intr->instr);
++      return true;
++   }
++
++   nir_def *local_idx = nir_load_subgroup_invocation(b);
++   nir_def *inner_idx = nir_iand_imm(b, local_idx, 15);
++
+    unsigned mul = radv_nir_cmat_length_mul(desc, params);
+    unsigned lanes_per_iter = desc.use == GLSL_CMAT_USE_ACCUMULATOR ? params->wave_size : 16;
+    nir_def *vars[16];
+@@ -289,7 +363,6 @@ lower_cmat_load_store(nir_builder *b, nir_intrinsic_instr *intr, const lower_cma
+          vars[i] = nir_channel(b, src, i);
+    }
+ 
+-   unsigned idx_bits = deref->def.bit_size;
+    nir_def *base_row = radv_get_base_row(b, desc, params, local_idx);
+ 
+    /* VUID-RuntimeSpirv-OpCooperativeMatrixLoadKHR-08986:
+@@ -1064,7 +1137,8 @@ lower_cmat_per_element_op(nir_builder *b, nir_cmat_call_instr *call, const lower
+ }
+ 
+ bool
+-radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, unsigned wave_size)
++radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_level, struct radv_shader_stage *stage,
++                                  unsigned wave_size)
+ {
+    bool progress = false;
+ 
+@@ -1074,6 +1148,8 @@ radv_nir_lower_cooperative_matrix(nir_shader *shader, enum amd_gfx_level gfx_lev
+    const lower_cmat_params params = {
+       .gfx_level = gfx_level,
+       .wave_size = wave_size,
++      .ubo_robustness = stage->key.coop_matrix_uniform_robustness,
++      .ssbo_robustness = stage->key.coop_matrix_storage_robustness,
+    };
+ 
+    struct nir_function *func = (struct nir_function *)exec_list_get_head_const(&shader->functions);
+diff --git a/src/amd/vulkan/radv_device.c b/src/amd/vulkan/radv_device.c
+--- a/src/amd/vulkan/radv_device.c
++++ b/src/amd/vulkan/radv_device.c
+@@ -1169,6 +1169,7 @@ radv_device_init_compiler_info(struct radv_device *device)
+             .force_64_byte_sampled_image = pdev->force_64_byte_sampled_image,
+             .robust_buffer_access = pdev->use_llvm && (device->vk.enabled_features.robustBufferAccess2 ||
+                                                        device->vk.enabled_features.robustBufferAccess),
++            .coop_matrix_robust_buffer_access = device->vk.enabled_features.cooperativeMatrixRobustBufferAccess,
+             .mitigate_smem_oob = pdev->info.compiler_info.has_smem_oob_access_bug &&
+                                  !(instance->debug_flags & RADV_DEBUG_NO_SMEM_MITIGATION),
+             .mitigate_smem_with_null_prt =
+diff --git a/src/amd/vulkan/radv_pipeline.c b/src/amd/vulkan/radv_pipeline.c
+--- a/src/amd/vulkan/radv_pipeline.c
++++ b/src/amd/vulkan/radv_pipeline.c
+@@ -143,6 +143,11 @@ radv_pipeline_get_shader_key(const struct radv_compiler_info *compiler_info,
+ 
+    radv_set_stage_key_robustness(&rs, s, &key);
+ 
++   if (compiler_info->key.coop_matrix_robust_buffer_access) {
++      key.coop_matrix_storage_robustness = rs.storage_buffers != VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_DISABLED;
++      key.coop_matrix_uniform_robustness = rs.uniform_buffers != VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_DISABLED;
++   }
++
+    const VkPipelineShaderStageRequiredSubgroupSizeCreateInfo *const subgroup_size =
+       vk_find_struct_const(stage->pNext, PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO);
+ 
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -579,7 +579,7 @@ radv_shader_spirv_to_nir(const struct radv_compiler_info *compiler_info, struct
+          NIR_PASS(_, nir, nir_remove_dead_variables, nir_var_function_temp | nir_var_shader_temp, NULL);
+       }
+ 
+-      NIR_PASS(progress, nir, radv_nir_lower_cooperative_matrix, compiler_info->ac->gfx_level,
++      NIR_PASS(progress, nir, radv_nir_lower_cooperative_matrix, compiler_info->ac->gfx_level, stage,
+                nir->info.max_subgroup_size);
+       if (progress) {
+          NIR_PASS(_, nir, nir_opt_dce);
+diff --git a/src/amd/vulkan/radv_shader.h b/src/amd/vulkan/radv_shader.h
+--- a/src/amd/vulkan/radv_shader.h
++++ b/src/amd/vulkan/radv_shader.h
+@@ -81,6 +81,8 @@ struct radv_shader_stage_key {
+    uint8_t storage_robustness2 : 1;
+    uint8_t uniform_robustness2 : 1;
+    uint8_t vertex_robustness1 : 1;
++   uint8_t coop_matrix_storage_robustness : 1;
++   uint8_t coop_matrix_uniform_robustness : 1;
+ 
+    uint8_t optimisations_disabled : 1;
+    uint8_t keep_statistic_info : 1;
+@@ -97,7 +99,7 @@ struct radv_shader_stage_key {
+    /* Whether the shader is used with indirect pipeline binds. */
+    uint8_t indirect_bindable : 1;
+ 
+-   uint32_t reserved : 17;
++   uint32_t reserved : 15;
+ };
+ 
+ struct radv_ps_epilog_key {
+@@ -530,6 +532,7 @@ struct radv_compiler_info {
+       uint32_t use_fmask : 1;
+       uint32_t force_64_byte_sampled_image : 1;
+       uint32_t robust_buffer_access : 1; /* Only used by LLVM. */
++      uint32_t coop_matrix_robust_buffer_access : 1;
+       uint32_t mitigate_smem_oob : 1;
+       uint32_t mitigate_smem_with_null_prt : 1;
+       uint32_t bvh8 : 1;
+@@ -548,7 +551,7 @@ struct radv_compiler_info {
+       uint32_t tex_non_uniform : 1;
+       uint32_t lower_terminate_to_discard : 1;
+       uint32_t no_implicit_varying_subgroup_size : 1;
+-      uint32_t padding : 30;
++      uint32_t padding : 29;
+ 
+       int32_t force_aniso;
+ 

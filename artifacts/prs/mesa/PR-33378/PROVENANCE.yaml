@@ -1,0 +1,23 @@
+repo: mesa/mesa
+pr: 33378
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33378
+merge_sha: 76dcac9d47e3a46734601248f573ee4e66da7cb1
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/33378/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/vulkan/nir/radv_nir.h
+  status: modified
+  sha256: f5725b11b9fbf112da54d81ac2ab18a2c21ac957c647ec4187d0d1675fda2476
+- path: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: 91ce8da48adbfa36952d27ee5e690a1686826fb517181812a23d3611f6b4069d
+- path: src/amd/vulkan/radv_physical_device.c
+  status: modified
+  sha256: f99f566106c95010a317bb40c1af7ffbb6f650a65cd11e848d7265207adb1e62
+- path: src/amd/vulkan/radv_shader.c
+  status: modified
+  sha256: 92d9eafb95bd711c5c826b0aa482dd3ad5ed591cab4d5779b244e8bfc4ee5405

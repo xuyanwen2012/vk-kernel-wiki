@@ -1,0 +1,222 @@
+diff --git a/src/layer/vulkan/shader/layernorm_coeffs.comp b/src/layer/vulkan/shader/layernorm_coeffs.comp
+--- a/src/layer/vulkan/shader/layernorm_coeffs.comp
++++ b/src/layer/vulkan/shader/layernorm_coeffs.comp
+@@ -5,7 +5,7 @@
+ 
+ layout(constant_id = 0) const float eps = 0;
+ 
+-layout(binding = 0) writeonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout(binding = 0) writeonly buffer coeffs_blob { float coeffs_blob_data[]; };
+ layout(binding = 1) readonly buffer mean_blob { float mean_data[]; };
+ layout(binding = 2) readonly buffer var_blob { float var_data[]; };
+ 
+@@ -33,6 +33,6 @@ void main()
+     // b = -mean * a
+     float b = -mean * a;
+ 
+-    buffer_st1(coeffs_blob_data, group_id * 2, afp(a));
+-    buffer_st1(coeffs_blob_data, group_id * 2 + 1, afp(b));
++    coeffs_blob_data[group_id * 2] = a;
++    coeffs_blob_data[group_id * 2 + 1] = b;
+ }
+diff --git a/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp b/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
+--- a/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
++++ b/src/layer/vulkan/shader/layernorm_coeffs_pack4.comp
+@@ -5,7 +5,7 @@
+ 
+ layout(constant_id = 0) const float eps = 0;
+ 
+-layout(binding = 0) writeonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout(binding = 0) writeonly buffer coeffs_blob { vec4 coeffs_blob_data[]; };
+ layout(binding = 1) readonly buffer mean_blob { vec4 mean_data[]; };
+ layout(binding = 2) readonly buffer var_blob { vec4 var_data[]; };
+ 
+@@ -31,6 +31,6 @@ void main()
+     vec4 a = 1.f / (sqrt(var + eps));
+     vec4 b = -mean * a;
+ 
+-    buffer_st4(coeffs_blob_data, group_id * 2, afpvec4(a));
+-    buffer_st4(coeffs_blob_data, group_id * 2 + 1, afpvec4(b));
++    coeffs_blob_data[group_id * 2] = a;
++    coeffs_blob_data[group_id * 2 + 1] = b;
+ }
+diff --git a/src/layer/vulkan/shader/layernorm_norm.comp b/src/layer/vulkan/shader/layernorm_norm.comp
+--- a/src/layer/vulkan/shader/layernorm_norm.comp
++++ b/src/layer/vulkan/shader/layernorm_norm.comp
+@@ -7,7 +7,7 @@ layout(constant_id = 0) const int affine = 0;
+ layout(constant_id = 1) const int affine_size = 0;
+ 
+ layout(binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
+-layout(binding = 1) readonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout(binding = 1) readonly buffer coeffs_blob { float coeffs_blob_data[]; };
+ layout(binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
+ layout(binding = 3) readonly buffer beta_blob { sfp beta_data[]; };
+ 
+@@ -33,20 +33,20 @@ void main()
+     const int group_id = gz * (p.w * p.h / affine_size) + q / affine_size;
+     const int inner_id = q % affine_size;
+ 
+-    afp a = buffer_ld1(coeffs_blob_data, group_id * 2);
+-    afp b = buffer_ld1(coeffs_blob_data, group_id * 2 + 1);
++    float a = coeffs_blob_data[group_id * 2];
++    float b = coeffs_blob_data[group_id * 2 + 1];
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    float v = float(buffer_ld1(bottom_top_blob_data, gi));
+ 
+     // (x - mean) / sqrt(var + eps)
+     v = v * a + b;
+ 
+     if (affine == 1)
+     {
+-        afp gamma = buffer_ld1(gamma_data, inner_id);
+-        afp beta = buffer_ld1(beta_data, inner_id);
++        float gamma = float(buffer_ld1(gamma_data, inner_id));
++        float beta = float(buffer_ld1(beta_data, inner_id));
+         v = v * gamma + beta;
+     }
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st1(bottom_top_blob_data, gi, afp(v));
+ }
+diff --git a/src/layer/vulkan/shader/layernorm_norm_pack4.comp b/src/layer/vulkan/shader/layernorm_norm_pack4.comp
+--- a/src/layer/vulkan/shader/layernorm_norm_pack4.comp
++++ b/src/layer/vulkan/shader/layernorm_norm_pack4.comp
+@@ -7,7 +7,7 @@ layout(constant_id = 0) const int affine = 0;
+ layout(constant_id = 1) const int affine_size = 0;
+ 
+ layout(binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-layout(binding = 1) readonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout(binding = 1) readonly buffer coeffs_blob { vec4 coeffs_blob_data[]; };
+ layout(binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
+ layout(binding = 3) readonly buffer beta_blob { sfp beta_data[]; };
+ 
+@@ -33,19 +33,19 @@ void main()
+     const int group_id = gz * (p.w * p.h / affine_size) + q / affine_size;
+     const int inner_id = q % affine_size;
+ 
+-    afpvec4 a = buffer_ld4(coeffs_blob_data, group_id * 2);
+-    afpvec4 b = buffer_ld4(coeffs_blob_data, group_id * 2 + 1);
++    vec4 a = coeffs_blob_data[group_id * 2];
++    vec4 b = coeffs_blob_data[group_id * 2 + 1];
+ 
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
++    vec4 v = vec4(buffer_ld4(bottom_top_blob_data, gi));
+ 
+     v = v * a + b;
+ 
+     if (affine == 1)
+     {
+-        afp gamma = buffer_ld1(gamma_data, inner_id);
+-        afp beta = buffer_ld1(beta_data, inner_id);
+-        v = v * afpvec4(gamma) + afpvec4(beta);
++        float gamma = float(buffer_ld1(gamma_data, inner_id));
++        float beta = float(buffer_ld1(beta_data, inner_id));
++        v = v * vec4(gamma) + vec4(beta);
+     }
+ 
+-    buffer_st4(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, afpvec4(v));
+ }
+diff --git a/src/layer/vulkan/shader/rmsnorm_coeffs.comp b/src/layer/vulkan/shader/rmsnorm_coeffs.comp
+--- a/src/layer/vulkan/shader/rmsnorm_coeffs.comp
++++ b/src/layer/vulkan/shader/rmsnorm_coeffs.comp
+@@ -5,7 +5,7 @@
+ 
+ layout(constant_id = 0) const float eps = 0;
+ 
+-layout(binding = 0) writeonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout(binding = 0) writeonly buffer coeffs_blob { float coeffs_blob_data[]; };
+ layout(binding = 1) readonly buffer rms_blob { float rms_data[]; };
+ 
+ layout(push_constant) uniform parameter
+@@ -25,5 +25,5 @@ void main()
+     int group_id = gz * p.num_groups_per_channel + gy;
+     float rms = rms_data[group_id];
+     float a = 1.0 / sqrt(rms + eps);
+-    buffer_st1(coeffs_blob_data, group_id, afp(a));
++    coeffs_blob_data[group_id] = a;
+ }
+diff --git a/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp b/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+--- a/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
++++ b/src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+@@ -5,7 +5,7 @@
+ 
+ layout(constant_id = 0) const float eps = 0;
+ 
+-layout(binding = 0) writeonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout(binding = 0) writeonly buffer coeffs_blob { vec4 coeffs_blob_data[]; };
+ layout(binding = 1) readonly buffer rms_blob { vec4 rms_data[]; };
+ 
+ layout(push_constant) uniform parameter
+@@ -25,5 +25,5 @@ void main()
+     int group_id = gz * p.num_groups_per_channel + gy;
+     vec4 rms = rms_data[group_id];
+     vec4 a = inversesqrt(rms + vec4(eps));
+-    buffer_st4(coeffs_blob_data, group_id, afpvec4(a));
++    coeffs_blob_data[group_id] = a;
+ }
+diff --git a/src/layer/vulkan/shader/rmsnorm_norm.comp b/src/layer/vulkan/shader/rmsnorm_norm.comp
+--- a/src/layer/vulkan/shader/rmsnorm_norm.comp
++++ b/src/layer/vulkan/shader/rmsnorm_norm.comp
+@@ -6,7 +6,7 @@ layout(constant_id = 0) const int affine = 0;
+ layout(constant_id = 1) const int affine_size = 0;
+ 
+ layout(binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
+-layout(binding = 1) readonly buffer coeffs_blob { sfp coeffs_blob_data[]; };
++layout(binding = 1) readonly buffer coeffs_blob { float coeffs_blob_data[]; };
+ layout(binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
+ 
+ layout(push_constant) uniform parameter
+@@ -30,15 +30,15 @@ void main()
+     const int group_id = gz * (p.w * p.h / affine_size) + q / affine_size;
+     const int inner_id = q % affine_size;
+ 
+-    afp a = buffer_ld1(coeffs_blob_data, group_id);
++    float a = coeffs_blob_data[group_id];
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    float v = float(buffer_ld1(bottom_top_blob_data, gi));
+     v = v * a; // v = v / sqrt(rms+eps)
+ 
+     if (affine == 1)
+     {
+-        afp gamma = buffer_ld1(gamma_data, inner_id);
++        float gamma = float(buffer_ld1(gamma_data, inner_id));
+         v = v * gamma;
+     }
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st1(bottom_top_blob_data, gi, afp(v));
+ }
+diff --git a/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp b/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+--- a/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
++++ b/src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+@@ -6,7 +6,7 @@ layout(constant_id = 0) const int affine = 0;
+ layout(constant_id = 1) const int affine_size = 0;
+ 
+ layout(binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-layout(binding = 1) readonly buffer coeffs_blob { sfpvec4 coeffs_blob_data[]; };
++layout(binding = 1) readonly buffer coeffs_blob { vec4 coeffs_blob_data[]; };
+ layout(binding = 2) readonly buffer gamma_blob { sfp gamma_data[]; };
+ 
+ layout(push_constant) uniform parameter
+@@ -27,14 +27,14 @@ void main()
+     const int group_id = gz * (p.w * p.h / affine_size) + q / affine_size;
+     const int inner_id = q % affine_size;
+ 
+-    afpvec4 a = buffer_ld4(coeffs_blob_data, group_id);
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
++    vec4 a = coeffs_blob_data[group_id];
++    vec4 v = vec4(buffer_ld4(bottom_top_blob_data, gi));
+     v = v * a;
+ 
+     if (affine == 1)
+     {
+-        afp gamma = buffer_ld1(gamma_data, inner_id);
+-        v = v * afpvec4(gamma);
++        float gamma = float(buffer_ld1(gamma_data, inner_id));
++        v = v * vec4(gamma);
+     }
+-    buffer_st4(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, afpvec4(v));
+ }

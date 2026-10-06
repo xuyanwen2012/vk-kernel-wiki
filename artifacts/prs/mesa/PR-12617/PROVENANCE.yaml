@@ -1,0 +1,47 @@
+repo: mesa/mesa
+pr: 12617
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12617
+merge_sha: 522f135d06c3f3e18f8dce1cdf7af001dbc105de
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/12617/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/common/ac_gpu_info.c
+  status: modified
+  sha256: 329d3b73f9534e5c9f3f73602275a9df07f277a58e3eb85a04dd0f24a8207a42
+- path: src/amd/common/ac_gpu_info.h
+  status: modified
+  sha256: 9eaf6f004039e94bdd74b132bae3785412236185340459256abf650a988335cd
+- path: src/amd/compiler/aco_instruction_selection.cpp
+  status: modified
+  sha256: 80412515b61db2cadaed2a4921bea3dbdfc3c7ac1d600a16613234193aff858b
+- path: src/amd/compiler/aco_instruction_selection_setup.cpp
+  status: modified
+  sha256: a28a15700b9b4a275971260efc6ad24b6786621f44f4bb4647dfef3d32fbe5cd
+- path: src/amd/compiler/aco_opcodes.py
+  status: modified
+  sha256: 306cb6bf4701e224959a32891c76f746904c9594c5cd4cb4e24874e32a07f649
+- path: src/amd/compiler/aco_register_allocation.cpp
+  status: modified
+  sha256: 7f5194085d5d8ae1637991f8054a05dc7854e98292052a9fc64a2db865507293
+- path: src/amd/llvm/ac_nir_to_llvm.c
+  status: modified
+  sha256: 6ad02e7b117b7e295359478003d68508d64d78b91082e6f58e7d5f8bf1aab8e2
+- path: src/amd/vulkan/radv_device.c
+  status: modified
+  sha256: bbcd22727c3a6124e6b4a89e26de8c20cd59810ff8ce94c8afc69fb23d1d3c5e
+- path: src/amd/vulkan/radv_pipeline.c
+  status: modified
+  sha256: 3ad531dc9b6314a337c7383c0dc6a202609a540802ea7027cac5c10afddffde2
+- path: src/amd/vulkan/radv_private.h
+  status: modified
+  sha256: 0d6da84d888503ce736adf5c1c685856f148762fab9e61d406a010156990930e
+- path: src/amd/vulkan/radv_shader.c
+  status: modified
+  sha256: 5c165bdcd885f26863b69e4972d900b81c9a7887f4f096578fb8f0f708829e2d
+- path: src/amd/vulkan/radv_shader.h
+  status: modified
+  sha256: 9e7516c09915daaec5307750ddebe6eb9b4ff9e9538d56c7dd1bc48b61fec3cc

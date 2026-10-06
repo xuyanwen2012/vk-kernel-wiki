@@ -1,0 +1,32 @@
+repo: mesa/mesa
+pr: 40003
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/40003
+merge_sha: c6e1c23fafdce4b5982d492bd92b5913b811e7ca
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/40003/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/compiler/instruction_selection/aco_isel_setup.cpp
+  status: modified
+  sha256: e80053613781deba8e8430a43c5609a2dc8a7134c3e78b3c8c6b11a29e7359f6
+- path: src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp
+  status: modified
+  sha256: 33b0a4dcccd0c232318bcb6d8bf4ccce53acce57e6bd66b6725a351091f83b73
+- path: src/amd/compiler/aco_ir.cpp
+  status: modified
+  sha256: 4c846950edc2dbbc04e5208f78dae1d78b18d1f2359d940abed9babed924742a
+- path: src/amd/compiler/aco_opcodes.py
+  status: modified
+  sha256: 8e4dcb86626b9f653be1bf7faaa34579a538739f7f127ee14171ca82b0b2f9e9
+- path: src/amd/compiler/aco_register_allocation.cpp
+  status: modified
+  sha256: ceb75afe2c0d899b75d0f8e96ce83606bdcb9ec8865d3942f1c87646bdc7136f
+- path: src/amd/llvm/ac_nir_to_llvm.c
+  status: modified
+  sha256: 90efd91419a3ffafe2eb8454891c682240450f37c3a4f707cd9734e2d7abb7df
+- path: src/amd/vulkan/radv_physical_device.c
+  status: modified
+  sha256: 1243356ef231f0568eb7ce553724567ec32153d30ac5644a56444233a3b21f75

@@ -1,0 +1,280 @@
+diff --git a/src/layer/vulkan/shader/unaryop.comp b/src/layer/vulkan/shader/unaryop.comp
+--- a/src/layer/vulkan/shader/unaryop.comp
++++ b/src/layer/vulkan/shader/unaryop.comp
+@@ -4,39 +4,25 @@
+ #version 450
+ 
+ layout (constant_id = 0) const int op_type = 0;
++layout (constant_id = 1) const uint n = 0;
+ 
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    afp res;
++    afpvec4 res;
+ 
+     if (op_type == 0) res = abs(v);
+     if (op_type == 1) res = -v;
+@@ -63,5 +49,5 @@ void main()
+     if (op_type == 18) res = round(v);
+     if (op_type == 19) res = trunc(v);
+ 
+-    buffer_st1(bottom_top_blob_data, gi, res);
++    buffer_st4(bottom_top_blob_data, gi, res);
+ }
+diff --git a/src/layer/vulkan/shader/unaryop_pack4.comp b/src/layer/vulkan/shader/unaryop_pack4.comp
+--- a/src/layer/vulkan/shader/unaryop_pack4.comp
++++ /dev/null
+@@ -1,67 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const int op_type = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    afpvec4 res;
+-
+-    if (op_type == 0) res = abs(v);
+-    if (op_type == 1) res = -v;
+-    if (op_type == 2) res = floor(v);
+-    if (op_type == 3) res = ceil(v);
+-    if (op_type == 4) res = v * v;
+-    if (op_type == 5) res = sqrt(v);
+-    if (op_type == 6) res = inversesqrt(v);
+-    if (op_type == 7) res = exp(v);
+-    if (op_type == 8) res = log(v);
+-    if (op_type == 9) res = sin(v);
+-    if (op_type == 10) res = cos(v);
+-    if (op_type == 11) res = tan(v);
+-    if (op_type == 12) res = asin(v);
+-    if (op_type == 13) res = acos(v);
+-    if (op_type == 14) res = atan(v);
+-    if (op_type == 15) res = afp(1.f) / v;
+-#if NCNN_moltenvk
+-    if (op_type == 16) res = afpvec4(tanh(vec4(v)));
+-#else
+-    if (op_type == 16) res = tanh(v);
+-#endif
+-    if (op_type == 17) res = log(v) * afp(0.434294481903);
+-    if (op_type == 18) res = round(v);
+-    if (op_type == 19) res = trunc(v);
+-
+-    buffer_st4(bottom_top_blob_data, gi, res);
+-}
+diff --git a/src/layer/vulkan/shader/unaryop_pack8.comp b/src/layer/vulkan/shader/unaryop_pack8.comp
+--- a/src/layer/vulkan/shader/unaryop_pack8.comp
++++ /dev/null
+@@ -1,148 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const int op_type = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    afpvec8 res;
+-
+-    if (op_type == 0)
+-    {
+-        res[0] = abs(v[0]);
+-        res[1] = abs(v[1]);
+-    }
+-    if (op_type == 1)
+-    {
+-        res[0] = -v[0];
+-        res[1] = -v[1];
+-    }
+-    if (op_type == 2)
+-    {
+-        res[0] = floor(v[0]);
+-        res[1] = floor(v[1]);
+-    }
+-    if (op_type == 3)
+-    {
+-        res[0] = ceil(v[0]);
+-        res[1] = ceil(v[1]);
+-    }
+-    if (op_type == 4)
+-    {
+-        res[0] = v[0] * v[0];
+-        res[1] = v[1] * v[1];
+-    }
+-    if (op_type == 5)
+-    {
+-        res[0] = sqrt(v[0]);
+-        res[1] = sqrt(v[1]);
+-    }
+-    if (op_type == 6)
+-    {
+-        res[0] = inversesqrt(v[0]);
+-        res[1] = inversesqrt(v[1]);
+-    }
+-    if (op_type == 7)
+-    {
+-        res[0] = exp(v[0]);
+-        res[1] = exp(v[1]);
+-    }
+-    if (op_type == 8)
+-    {
+-        res[0] = log(v[0]);
+-        res[1] = log(v[1]);
+-    }
+-    if (op_type == 9)
+-    {
+-        res[0] = sin(v[0]);
+-        res[1] = sin(v[1]);
+-    }
+-    if (op_type == 10)
+-    {
+-        res[0] = cos(v[0]);
+-        res[1] = cos(v[1]);
+-    }
+-    if (op_type == 11)
+-    {
+-        res[0] = tan(v[0]);
+-        res[1] = tan(v[1]);
+-    }
+-    if (op_type == 12)
+-    {
+-        res[0] = asin(v[0]);
+-        res[1] = asin(v[1]);
+-    }
+-    if (op_type == 13)
+-    {
+-        res[0] = acos(v[0]);
+-        res[1] = acos(v[1]);
+-    }
+-    if (op_type == 14)
+-    {
+-        res[0] = atan(v[0]);
+-        res[1] = atan(v[1]);
+-    }
+-    if (op_type == 15)
+-    {
+-        res[0] = afp(1.f) / v[0];
+-        res[1] = afp(1.f) / v[1];
+-    }
+-    if (op_type == 16)
+-    {
+-#if NCNN_moltenvk
+-        res[0] = afpvec4(tanh(vec4(v[0])));
+-        res[1] = afpvec4(tanh(vec4(v[1])));
+-#else
+-        res[0] = tanh(v[0]);
+-        res[1] = tanh(v[1]);
+-#endif
+-    }
+-    if (op_type == 17)
+-    {
+-        res[0] = log(v[0]) * afp(0.434294481903);
+-        res[1] = log(v[1]) * afp(0.434294481903);
+-    }
+-    if (op_type == 18)
+-    {
+-        res[0] = round(v[0]);
+-        res[1] = round(v[1]);
+-    }
+-    if (op_type == 19)
+-    {
+-        res[0] = trunc(v[0]);
+-        res[1] = trunc(v[1]);
+-    }
+-
+-    buffer_st8(bottom_top_blob_data, gi, res);
+-}

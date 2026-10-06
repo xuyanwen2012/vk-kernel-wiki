@@ -1,0 +1,446 @@
+diff --git a/src/layer/vulkan/shader/convolution_1x1s1d1.comp b/src/layer/vulkan/shader/convolution_1x1s1d1.comp
+--- a/src/layer/vulkan/shader/convolution_1x1s1d1.comp
++++ b/src/layer/vulkan/shader/convolution_1x1s1d1.comp
+@@ -33,13 +33,8 @@ layout (constant_id = shape_constant_id_offset + 5) const int outh = 0;
+ layout (constant_id = shape_constant_id_offset + 6) const int outc = 0;
+ layout (constant_id = shape_constant_id_offset + 7) const int outcstep = 0;
+ 
+-#if NCNN_fp16_packed
+-layout (binding = 0) readonly buffer bottom_blob { vec4 bottom_blob_data[]; };
+-layout (binding = 1) writeonly buffer top_blob { vec4 top_blob_data[]; };
+-#else
+ layout (binding = 0) readonly buffer bottom_blob { sfpvec4 bottom_blob_data[]; };
+ layout (binding = 1) writeonly buffer top_blob { sfpvec4 top_blob_data[]; };
+-#endif
+ layout (binding = 2) readonly buffer weight_blob { sfp weight_data[]; };
+ layout (binding = 3) readonly buffer bias_blob { sfp bias_data[]; };
+ 
+@@ -80,11 +75,7 @@ void main()
+ 
+     for (int z = 0; z < psc(c); z++)
+     {
+-#if NCNN_fp16_packed
+-        sum += afp(weight_data[w_offset]) * afpvec4(bottom_blob_data[v_offset]);
+-#else
+         sum += buffer_ld1(weight_data, w_offset) * buffer_ld4(bottom_blob_data, v_offset);
+-#endif
+ 
+         w_offset += 1;
+         v_offset += psc(cstep) / 4;
+@@ -94,9 +85,5 @@ void main()
+ 
+     const int gi = gy * psc(outcstep) / 4 + gx;
+ 
+-#if NCNN_fp16_packed
+-    top_blob_data[gi] = sum;
+-#else
+     buffer_st4(top_blob_data, gi, sum);
+-#endif
+ }
+diff --git a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_3x3s1d1_winograd_gemm.comp
+@@ -75,15 +75,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(outw) + ly));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_tm_data, w_offset + z4));
+             }
+         }
+ 
+@@ -118,15 +118,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(outw) + ly));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_tm_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_tm_data, w_offset + z4));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_gemm.comp b/src/layer/vulkan/shader/convolution_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_gemm.comp
+@@ -128,15 +128,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
+             }
+         }
+ 
+@@ -178,15 +178,15 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp b/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_1x1s1d1.comp
+@@ -103,7 +103,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+@@ -146,7 +146,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_3x3s1d1_winograd_gemm.comp
+@@ -75,7 +75,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(outw) + ly));
+             }
+         }
+ 
+@@ -118,7 +118,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_tm_blob_data[v_offset + z4 * psc(outw) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_tm_blob_data, v_offset + z4 * psc(outw) + ly));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp b/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
+--- a/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
++++ b/src/layer/vulkan/shader/convolution_pack1to4_gemm.comp
+@@ -128,7 +128,7 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
+             }
+         }
+ 
+@@ -178,7 +178,7 @@ void main()
+ 
+                 const int v_offset = sz * psc(cstep) + (sys4[ly] + ky * dilation_h) * psc(w) + sxs4[ly] + kx * dilation_w;
+ 
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_gemm.comp b/src/layer/vulkan/shader/deconvolution_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_gemm.comp
+@@ -76,15 +76,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
+             }
+         }
+ 
+@@ -119,15 +119,15 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+         if (lx == 0)
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_k[ly][z4] = sfp2lfp(weight_data[w_offset + z4]);
++                tmp_k[ly][z4] = sfp2lfp(buffer_ld1(weight_data, w_offset + z4));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp b/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
+--- a/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
++++ b/src/layer/vulkan/shader/deconvolution_pack1to4_gemm.comp
+@@ -76,7 +76,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < LOCAL_MEMORY_UNROLL_INCH; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+@@ -119,7 +119,7 @@ void main()
+         {
+             for (int z4 = 0; z4 < remain; z4++)
+             {
+-                tmp_v[lx][z4][ly] = sfp2lfp(bottom_blob_data[v_offset + z4 * psc(cstep) + ly]);
++                tmp_v[lx][z4][ly] = sfp2lfp(buffer_ld1(bottom_blob_data, v_offset + z4 * psc(cstep) + ly));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/gemm.comp b/src/layer/vulkan/shader/gemm.comp
+--- a/src/layer/vulkan/shader/gemm.comp
++++ b/src/layer/vulkan/shader/gemm.comp
+@@ -124,27 +124,27 @@ void main()
+             if (transA == 1)
+             {
+                 const int ai = (k + lx) * p.A_hstep + gy;
+-                tmp_a[ly][lx][0] = sfp2lfp(A_blob_data[ai]);
+-                tmp_a[ly][lx][1] = sfp2lfp(A_blob_data[ai + 1]);
++                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
++                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + 1));
+             }
+             else
+             {
+                 const int ai = gy * p.A_hstep + (k + lx);
+-                tmp_a[ly][lx][0] = sfp2lfp(A_blob_data[ai]);
+-                tmp_a[ly][lx][1] = sfp2lfp(A_blob_data[ai + p.A_hstep]);
++                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
++                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + p.A_hstep));
+             }
+ 
+             if (transB == 1)
+             {
+                 const int bi = gx * p.B_hstep + (k + ly);
+-                tmp_b[lx][ly][0] = sfp2lfp(B_blob_data[bi]);
+-                tmp_b[lx][ly][1] = sfp2lfp(B_blob_data[bi + p.B_hstep]);
++                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
++                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + p.B_hstep));
+             }
+             else
+             {
+                 const int bi = (k + ly) * p.B_hstep + gx;
+-                tmp_b[lx][ly][0] = sfp2lfp(B_blob_data[bi]);
+-                tmp_b[lx][ly][1] = sfp2lfp(B_blob_data[bi + 1]);
++                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
++                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + 1));
+             }
+         }
+ 
+@@ -176,14 +176,14 @@ void main()
+             if (transA == 1)
+             {
+                 const int ai = (k + lx) * p.A_hstep + gy;
+-                tmp_a[ly][lx][0] = sfp2lfp(A_blob_data[ai]);
+-                tmp_a[ly][lx][1] = sfp2lfp(A_blob_data[ai + 1]);
++                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
++                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + 1));
+             }
+             else
+             {
+                 const int ai = gy * p.A_hstep + (k + lx);
+-                tmp_a[ly][lx][0] = sfp2lfp(A_blob_data[ai]);
+-                tmp_a[ly][lx][1] = sfp2lfp(A_blob_data[ai + p.A_hstep]);
++                tmp_a[ly][lx][0] = sfp2lfp(buffer_ld1(A_blob_data, ai));
++                tmp_a[ly][lx][1] = sfp2lfp(buffer_ld1(A_blob_data, ai + p.A_hstep));
+             }
+         }
+ 
+@@ -192,14 +192,14 @@ void main()
+             if (transB == 1)
+             {
+                 const int bi = gx * p.B_hstep + (k + ly);
+-                tmp_b[lx][ly][0] = sfp2lfp(B_blob_data[bi]);
+-                tmp_b[lx][ly][1] = sfp2lfp(B_blob_data[bi + p.B_hstep]);
++                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
++                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + p.B_hstep));
+             }
+             else
+             {
+                 const int bi = (k + ly) * p.B_hstep + gx;
+-                tmp_b[lx][ly][0] = sfp2lfp(B_blob_data[bi]);
+-                tmp_b[lx][ly][1] = sfp2lfp(B_blob_data[bi + 1]);
++                tmp_b[lx][ly][0] = sfp2lfp(buffer_ld1(B_blob_data, bi));
++                tmp_b[lx][ly][1] = sfp2lfp(buffer_ld1(B_blob_data, bi + 1));
+             }
+         }
+ 
+diff --git a/src/layer/vulkan/shader/normalize_reduce_sum4_fp16_to_fp32.comp b/src/layer/vulkan/shader/normalize_reduce_sum4_fp16_to_fp32.comp
+--- a/src/layer/vulkan/shader/normalize_reduce_sum4_fp16_to_fp32.comp
++++ b/src/layer/vulkan/shader/normalize_reduce_sum4_fp16_to_fp32.comp
+@@ -58,14 +58,14 @@ void main()
+         {
+             if (sx == p.w - 1)
+             {
+-                float v0 = sfp2float(bottom_top_blob_data[v_offset0.r]);
++                float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.r));
+ 
+                 sqsum = v0 * v0;
+             }
+             else
+             {
+-                float v0 = sfp2float(bottom_top_blob_data[v_offset0.r]);
+-                float v1 = sfp2float(bottom_top_blob_data[v_offset0.g]);
++                float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.r));
++                float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.g));
+ 
+                 sqsum = v0 * v0 + v1 * v1;
+             }
+@@ -74,17 +74,17 @@ void main()
+         {
+             if (sx == p.w - 1)
+             {
+-                float v0 = sfp2float(bottom_top_blob_data[v_offset0.r]);
+-                float v2 = sfp2float(bottom_top_blob_data[v_offset1.r]);
++                float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.r));
++                float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset1.r));
+ 
+                 sqsum = v0 * v0 + v2 * v2;
+             }
+             else
+             {
+-                float v0 = sfp2float(bottom_top_blob_data[v_offset0.r]);
+-                float v1 = sfp2float(bottom_top_blob_data[v_offset0.g]);
+-                float v2 = sfp2float(bottom_top_blob_data[v_offset1.r]);
+-                float v3 = sfp2float(bottom_top_blob_data[v_offset1.g]);
++                float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.r));
++                float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset0.g));
++                float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset1.r));
++                float v3 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset1.g));
+ 
+                 sqsum = v0 * v0 + v1 * v1 + v2 * v2 + v3 * v3;
+             }
+@@ -100,31 +100,31 @@ void main()
+ 
+         if (sx == p.w - 1)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
+ 
+             sqsum = v0 * v0;
+         }
+         else if (sx == p.w - 2)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
+ 
+             sqsum = v0 * v0 + v1 * v1;
+         }
+         else if (sx == p.w - 3)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
+-            float v2 = sfp2float(bottom_top_blob_data[v_offset.b]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
++            float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.b));
+ 
+             sqsum = v0 * v0 + v1 * v1 + v2 * v2;
+         }
+         else
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
+-            float v2 = sfp2float(bottom_top_blob_data[v_offset.b]);
+-            float v3 = sfp2float(bottom_top_blob_data[v_offset.a]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
++            float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.b));
++            float v3 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.a));
+ 
+             sqsum = v0 * v0 + v1 * v1 + v2 * v2 + v3 * v3;
+         }
+@@ -139,31 +139,31 @@ void main()
+ 
+         if (sz == p.c - 1)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
+ 
+             sqsum = v0 * v0;
+         }
+         else if (sz == p.c - 2)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
+ 
+             sqsum = v0 * v0 + v1 * v1;
+         }
+         else if (sz == p.c - 3)
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
+-            float v2 = sfp2float(bottom_top_blob_data[v_offset.b]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
++            float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.b));
+ 
+             sqsum = v0 * v0 + v1 * v1 + v2 * v2;
+         }
+         else
+         {
+-            float v0 = sfp2float(bottom_top_blob_data[v_offset.r]);
+-            float v1 = sfp2float(bottom_top_blob_data[v_offset.g]);
+-            float v2 = sfp2float(bottom_top_blob_data[v_offset.b]);
+-            float v3 = sfp2float(bottom_top_blob_data[v_offset.a]);
++            float v0 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.r));
++            float v1 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.g));
++            float v2 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.b));
++            float v3 = sfp2float(buffer_ld1(bottom_top_blob_data, v_offset.a));
+ 
+             sqsum = v0 * v0 + v1 * v1 + v2 * v2 + v3 * v3;
+         }

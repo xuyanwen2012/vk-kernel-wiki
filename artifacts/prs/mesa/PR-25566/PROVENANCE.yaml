@@ -1,0 +1,17 @@
+repo: mesa/mesa
+pr: 25566
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25566
+merge_sha: f695a9fed2b0eac39acdaca132f5fc8c43c9f7d7
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/25566/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/compiler/aco_instruction_selection.cpp
+  status: modified
+  sha256: 75a9dfe8289e0700be48516453a620728ebdb366d3ebd1f3ae15c61a83800610
+- path: src/amd/vulkan/radv_pipeline.c
+  status: modified
+  sha256: f4add5ed14bbd5e1374f45d5cd1ce143cc3171b373296fda6622a03994d5a738

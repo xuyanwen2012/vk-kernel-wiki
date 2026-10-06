@@ -1,0 +1,20 @@
+repo: Tencent/ncnn
+pr: 6170
+url: https://github.com/Tencent/ncnn/pull/6170
+merge_sha: 11b6990a9eeea553ad2cdd2da4f0c7a6e85202c9
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6170/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/sigmoid.comp
+  status: modified
+  sha256: 0a33d3f86a834f1fda3431caf6e822ba2c31ec114604d71a31f7b090a51de373
+- path: src/layer/vulkan/shader/sigmoid_pack4.comp
+  status: removed
+  sha256: 40bf25a54d97e3404450cfc466291b75a331f2cd239367f323a852edef494529
+- path: src/layer/vulkan/shader/sigmoid_pack8.comp
+  status: removed
+  sha256: 8fe932d84e3ba94e470b19f283edcf53e218edb3748a015595fdfdf072c4e9fe

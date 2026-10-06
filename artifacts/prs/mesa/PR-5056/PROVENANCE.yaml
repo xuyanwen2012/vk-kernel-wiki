@@ -1,0 +1,14 @@
+repo: mesa/mesa
+pr: 5056
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/5056
+merge_sha: 7503863fe2a48d155ec9c1778206f1e9a2dc5987
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/5056/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/vulkan/radv_extensions.py
+  status: modified
+  sha256: 83f4d6e72c82d5b01630a1dbd3eb200e6ccecf90a012432bc7bf0d9d30751cc8

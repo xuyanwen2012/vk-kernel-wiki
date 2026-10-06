@@ -1,0 +1,61 @@
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -588,7 +588,12 @@ radv_shader_spirv_to_nir(const struct radv_compiler_info *compiler_info, struct
+       radv_shader_choose_subgroup_size(compiler_info, nir, &stage->key, vk_spirv_version(spirv, stage->spirv.size));
+ 
+       progress = false;
+-      NIR_PASS(progress, nir, nir_lower_cooperative_matrix_flexible_dimensions, 16, 16, 16);
++      struct nir_lower_coopmat_args coopmat_args = {
++         .m_gran = 16,
++         .n_gran = 16,
++         .k_gran = 16,
++      };
++      NIR_PASS(progress, nir, nir_lower_cooperative_matrix_flexible_dimensions, &coopmat_args);
+       if (progress) {
+          NIR_PASS(_, nir, nir_opt_deref);
+          NIR_PASS(_, nir, nir_opt_dce);
+diff --git a/src/compiler/nir/nir_lower_cooperative_matrix.c b/src/compiler/nir/nir_lower_cooperative_matrix.c
+--- a/src/compiler/nir/nir_lower_cooperative_matrix.c
++++ b/src/compiler/nir/nir_lower_cooperative_matrix.c
+@@ -941,7 +941,7 @@ split_var(nir_shader *shader,
+ 
+ static bool
+ lower_dimensions(nir_shader *shader, nir_function_impl *impl,
+-                 unsigned m_gran, unsigned n_gran, unsigned k_gran)
++                 const struct nir_lower_coopmat_args *args)
+ {
+    void *mem_ctx = ralloc_context(NULL);
+    struct hash_table *split_mats = _mesa_pointer_hash_table_create(mem_ctx);
+@@ -950,9 +950,9 @@ lower_dimensions(nir_shader *shader, nir_function_impl *impl,
+ 
+    struct split_info split_info = {
+       .split_mats = split_mats,
+-      .m_gran = m_gran,
+-      .n_gran = n_gran,
+-      .k_gran = k_gran,
++      .m_gran = args->m_gran,
++      .n_gran = args->n_gran,
++      .k_gran = args->k_gran,
+    };
+ 
+    nir_foreach_variable_in_shader(var, shader) {
+@@ -969,7 +969,8 @@ lower_dimensions(nir_shader *shader, nir_function_impl *impl,
+ }
+ 
+ bool
+-nir_lower_cooperative_matrix_flexible_dimensions(nir_shader *shader, unsigned m_gran, unsigned n_gran, unsigned k_gran)
++nir_lower_cooperative_matrix_flexible_dimensions(nir_shader *shader,
++                                                 const struct nir_lower_coopmat_args *args)
+ {
+    bool progress = false;
+ 
+@@ -978,7 +979,7 @@ nir_lower_cooperative_matrix_flexible_dimensions(nir_shader *shader, unsigned m_
+ 
+    nir_function_impl *impl = nir_shader_get_entrypoint(shader);
+ 
+-   progress |= lower_dimensions(shader, impl, m_gran, n_gran, k_gran);
++   progress |= lower_dimensions(shader, impl, args);
+ 
+    nir_foreach_function_impl(fnim, shader)
+       nir_progress(progress, fnim, 0);

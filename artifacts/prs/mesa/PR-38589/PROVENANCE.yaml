@@ -1,0 +1,26 @@
+repo: mesa/mesa
+pr: 38589
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38589
+merge_sha: 0409984f27a183d833c6633b0981f1d99208400f
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/38589/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/ci/radv-gfx1201-fails.txt
+  status: modified
+  sha256: 07de00c93d0477fe6f316bcde70ef8cda9b715d5a43912ec2eca379e963e73b7
+- path: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: 06ef0bcbcdcbf5a2748294ece73717a3714504e2c9b84c622b3f3ce91977937e
+- path: src/amd/vulkan/radv_physical_device.c
+  status: modified
+  sha256: 6802138af9a9c76475a4e47f8e64b4a90e1d739204d459722ab0bff974021788
+- path: src/compiler/nir/nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: 9bb0c598f084682d2929d131ad93a931af8a78a3c1ead9a41129071a6696f372
+- path: src/compiler/spirv/vtn_cmat.c
+  status: modified
+  sha256: 790f4cea4dedbab2f02052c01fa5b0476ead52598d1967278fbc2714e77b7219

@@ -1,0 +1,20 @@
+repo: Tencent/ncnn
+pr: 5001
+url: https://github.com/Tencent/ncnn/pull/5001
+merge_sha: cc54b889d5c1cdcb3bad7e78e503b9995ee19870
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/5001/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/gelu.comp
+  status: added
+  sha256: debf68957d2dfc3764c511c1a42487da03e5bf3eacdef0ebef4bb6e9959cedfe
+- path: src/layer/vulkan/shader/gelu_pack4.comp
+  status: added
+  sha256: 4630cd247ea9037704bcb99bc20ca1b49ea96cc38384c72a9e9757e7dfca547e
+- path: src/layer/vulkan/shader/gelu_pack8.comp
+  status: added
+  sha256: 3af97f94b888eb671dd023ea8e4a94de8d9ce55ee6222caf3b5195b92d08f1c6

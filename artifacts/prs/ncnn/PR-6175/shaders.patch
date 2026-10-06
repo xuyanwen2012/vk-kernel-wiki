@@ -1,0 +1,1843 @@
+diff --git a/src/layer/vulkan/shader/celu.comp b/src/layer/vulkan/shader/celu.comp
+--- a/src/layer/vulkan/shader/celu.comp
++++ b/src/layer/vulkan/shader/celu.comp
+@@ -6,37 +6,25 @@
+ layout (constant_id = 0) const float alpha = 0;
+ 
+ #define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    v = max(v, afpvec4(0.0f)) + min(alpha * (exp(v / afpvec4(alpha)) - afpvec4(1.0f)), afpvec4(0.0f));
+ 
+-    v = max(v, afp(0.0f)) + min(alpha * (exp(v / alpha) - 1.0f), afp(0.0f));
+-
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/celu_pack4.comp b/src/layer/vulkan/shader/celu_pack4.comp
+--- a/src/layer/vulkan/shader/celu_pack4.comp
++++ /dev/null
+@@ -1,42 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = max(v, afp(0.0f)) + min(alpha * (exp(v / alpha) - 1.0f), afp(0.0f));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/celu_pack8.comp b/src/layer/vulkan/shader/celu_pack8.comp
+--- a/src/layer/vulkan/shader/celu_pack8.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = max(v[0], afp(0.0f)) + min(alpha * (exp(v[0] / alpha) - 1.0f), afp(0.0f));
+-    v[1] = max(v[1], afp(0.0f)) + min(alpha*(exp(v[1]/alpha)-1), afp(0.0f));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/clip.comp b/src/layer/vulkan/shader/clip.comp
+--- a/src/layer/vulkan/shader/clip.comp
++++ b/src/layer/vulkan/shader/clip.comp
+@@ -7,37 +7,25 @@ layout (constant_id = 0) const float const_min = 0;
+ layout (constant_id = 1) const float const_max = 0;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
++    if (gi >= psc(n))
++    return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    v = clamp(v, afpvec4(const_min), afpvec4(const_max));
+ 
+-    v = clamp(v, afp(const_min), afp(const_max));
+-
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/clip_pack4.comp b/src/layer/vulkan/shader/clip_pack4.comp
+--- a/src/layer/vulkan/shader/clip_pack4.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float const_min = 0;
+-layout (constant_id = 1) const float const_max = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = clamp(v, afp(const_min), afp(const_max));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/clip_pack8.comp b/src/layer/vulkan/shader/clip_pack8.comp
+--- a/src/layer/vulkan/shader/clip_pack8.comp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float const_min = 0;
+-layout (constant_id = 1) const float const_max = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = clamp(v[0], afp(const_min), afp(const_max));
+-    v[1] = clamp(v[1], afp(const_min), afp(const_max));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/dropout.comp b/src/layer/vulkan/shader/dropout.comp
+--- a/src/layer/vulkan/shader/dropout.comp
++++ b/src/layer/vulkan/shader/dropout.comp
+@@ -1,42 +1,31 @@
+-// Copyright 2018 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+ 
+ layout (constant_id = 0) const float scale = 1;
+ 
+ #define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     v *= afp(scale);
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/dropout_pack4.comp b/src/layer/vulkan/shader/dropout_pack4.comp
+--- a/src/layer/vulkan/shader/dropout_pack4.comp
++++ /dev/null
+@@ -1,42 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float scale = 1;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v *= afp(scale);
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/dropout_pack8.comp b/src/layer/vulkan/shader/dropout_pack8.comp
+--- a/src/layer/vulkan/shader/dropout_pack8.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float scale = 1;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = v[0] * afp(scale);
+-    v[1] = v[1] * afp(scale);
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/elu.comp b/src/layer/vulkan/shader/elu.comp
+--- a/src/layer/vulkan/shader/elu.comp
++++ b/src/layer/vulkan/shader/elu.comp
+@@ -6,37 +6,25 @@
+ layout (constant_id = 0) const float alpha = 0;
+ 
+ #define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    v = mix(afpvec4(alpha) * afpvec4(exp(v) - afpvec4(1.0f)), v, greaterThan(v, afpvec4(0.0f)));
+ 
+-    v = v > afp(0.0f) ? v : afp(alpha * (exp(v) - 1.0f));
+-
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/elu_pack4.comp b/src/layer/vulkan/shader/elu_pack4.comp
+--- a/src/layer/vulkan/shader/elu_pack4.comp
++++ /dev/null
+@@ -1,42 +0,0 @@
+-// Copyright 2022 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = mix(afpvec4(alpha) * afpvec4(exp(v) - afpvec4(1.0f)), v, greaterThan(v, afpvec4(0.0f)));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/elu_pack8.comp b/src/layer/vulkan/shader/elu_pack8.comp
+--- a/src/layer/vulkan/shader/elu_pack8.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2022 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = mix(afpvec4(alpha) * afpvec4(exp(v[0]) - afpvec4(1.0f)), v[0], greaterThan(v[0], afpvec4(0.0f)));
+-    v[1] = mix(afpvec4(alpha) * afpvec4(exp(v[1]) - afpvec4(1.0f)), v[1], greaterThan(v[1], afpvec4(0.0f)));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/erf.comp b/src/layer/vulkan/shader/erf.comp
+--- a/src/layer/vulkan/shader/erf.comp
++++ b/src/layer/vulkan/shader/erf.comp
+@@ -3,53 +3,41 @@
+ 
+ #version 450
+ 
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+-float erf(float x)
++afpvec4 erf(afpvec4 x)
+ {
+-    float a1 =  0.254829592f;
+-    float a2 = -0.284496736f;
+-    float a3 =  1.421413741f;
+-    float a4 = -1.453152027f;
+-    float a5 =  1.061405429f;
+-    float p  =  0.3275911f;
+-    float s = sign(x);
+-    float x_abs = abs(x);
+-    float t = 1.0f/(1.0f + p*x_abs);
+-    float y = 1.0f - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*exp(-x_abs*x_abs);
++    afpvec4 a1 = afpvec4(0.254829592f);
++    afpvec4 a2 = afpvec4(-0.284496736f);
++    afpvec4 a3 = afpvec4(1.421413741f);
++    afpvec4 a4 = afpvec4(-1.453152027f);
++    afpvec4 a5 = afpvec4(1.061405429f);
++    afpvec4 p = afpvec4(0.3275911f);
++    afpvec4 s = sign(x);
++    afpvec4 x_abs = abs(x);
++    afpvec4 t = 1.0f / (1.0f + p * x_abs);
++    afpvec4 y = 1.0f - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-x_abs * x_abs);
+     return s * y;
+ }
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    const uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     v = erf(v);
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/erf_pack4.comp b/src/layer/vulkan/shader/erf_pack4.comp
+--- a/src/layer/vulkan/shader/erf_pack4.comp
++++ /dev/null
+@@ -1,55 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-afpvec4 erf(afpvec4 x)
+-{
+-    afpvec4 a1 = afpvec4(0.254829592f);
+-    afpvec4 a2 = afpvec4(-0.284496736f);
+-    afpvec4 a3 = afpvec4(1.421413741f);
+-    afpvec4 a4 = afpvec4(-1.453152027f);
+-    afpvec4 a5 = afpvec4(1.061405429f);
+-    afpvec4 p = afpvec4(0.3275911f);
+-    afpvec4 s = sign(x);
+-    afpvec4 x_abs = abs(x);
+-    afpvec4 t = 1.0f / (1.0f + p * x_abs);
+-    afpvec4 y = 1.0f - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-x_abs * x_abs);
+-    return s * y;
+-}
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = erf(v);
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/erf_pack8.comp b/src/layer/vulkan/shader/erf_pack8.comp
+--- a/src/layer/vulkan/shader/erf_pack8.comp
++++ /dev/null
+@@ -1,56 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-afpvec4 erf(afpvec4 x)
+-{
+-    afpvec4 a1 = afpvec4(0.254829592f);
+-    afpvec4 a2 = afpvec4(-0.284496736f);
+-    afpvec4 a3 = afpvec4(1.421413741f);
+-    afpvec4 a4 = afpvec4(-1.453152027f);
+-    afpvec4 a5 = afpvec4(1.061405429f);
+-    afpvec4 p = afpvec4(0.3275911f);
+-    afpvec4 s = sign(x);
+-    afpvec4 x_abs = abs(x);
+-    afpvec4 t = 1.0f / (1.0f + p * x_abs);
+-    afpvec4 y = 1.0f - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-x_abs * x_abs);
+-    return s * y;
+-}
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = erf(v[0]);
+-    v[1] = erf(v[1]);
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/gelu.comp b/src/layer/vulkan/shader/gelu.comp
+--- a/src/layer/vulkan/shader/gelu.comp
++++ b/src/layer/vulkan/shader/gelu.comp
+@@ -4,43 +4,32 @@
+ #version 450
+ 
+ #define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     // y = 0.5x * (1 + tanh(sqrt(2/Pi) * (x + 0.044715x^3)))
+ 
+ #if NCNN_moltenvk
+-    v = afp(0.5f) * v * (afp(1.0f) + afp(tanh(float(afp(0.79788452f) * (v + afp(0.044715f) * v * v * v)))));
++    v = afpvec4(0.5f) * v * (afpvec4(1.0f) + afpvec4(tanh(vec4(afpvec4(0.79788452f) * (v + afpvec4(0.044715f) * v * v * v)))));
+ #else
+-    v = afp(0.5f) * v * (afp(1.0f) + tanh(afp(0.79788452f) * (v + afp(0.044715f) * v * v * v)));
++    v = afpvec4(0.5f) * v * (afpvec4(1.0f) + tanh(afpvec4(0.79788452f) * (v + afpvec4(0.044715f) * v * v * v)));
+ #endif
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/gelu_pack4.comp b/src/layer/vulkan/shader/gelu_pack4.comp
+--- a/src/layer/vulkan/shader/gelu_pack4.comp
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// Copyright 2023 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    // y = 0.5x * (1 + tanh(sqrt(2/Pi) * (x + 0.044715x^3)))
+-
+-#if NCNN_moltenvk
+-    v = afpvec4(0.5f) * v * (afpvec4(1.0f) + afpvec4(tanh(vec4(afpvec4(0.79788452f) * (v + afpvec4(0.044715f) * v * v * v)))));
+-#else
+-    v = afpvec4(0.5f) * v * (afpvec4(1.0f) + tanh(afpvec4(0.79788452f) * (v + afpvec4(0.044715f) * v * v * v)));
+-#endif
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/gelu_pack8.comp b/src/layer/vulkan/shader/gelu_pack8.comp
+--- a/src/layer/vulkan/shader/gelu_pack8.comp
++++ /dev/null
+@@ -1,48 +0,0 @@
+-// Copyright 2023 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    // y = 0.5x * (1 + tanh(sqrt(2/Pi) * (x + 0.044715x^3)))
+-    
+-#if NCNN_moltenvk
+-    v[0] = afpvec4(0.5f) * v[0] * (afpvec4(1.0f) + afpvec4(tanh(vec4(afpvec4(0.79788452f) * (v[0] + afpvec4(0.044715f) * v[0] * v[0] * v[0])))));
+-    v[1] = afpvec4(0.5f) * v[1] * (afpvec4(1.0f) + afpvec4(tanh(vec4(afpvec4(0.79788452f) * (v[1] + afpvec4(0.044715f) * v[1] * v[1] * v[1])))));
+-#else
+-    v[0] = afpvec4(0.5f) * v[0] * (afpvec4(1.0f) + tanh(afpvec4(0.79788452f) * (v[0] + afpvec4(0.044715f) * v[0] * v[0] * v[0])));
+-    v[1] = afpvec4(0.5f) * v[1] * (afpvec4(1.0f) + tanh(afpvec4(0.79788452f) * (v[1] + afpvec4(0.044715f) * v[1] * v[1] * v[1])));
+-#endif
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/hardsigmoid.comp b/src/layer/vulkan/shader/hardsigmoid.comp
+--- a/src/layer/vulkan/shader/hardsigmoid.comp
++++ b/src/layer/vulkan/shader/hardsigmoid.comp
+@@ -1,4 +1,4 @@
+-// Copyright 2018 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+@@ -7,37 +7,26 @@ layout (constant_id = 0) const float alpha = 0;
+ layout (constant_id = 1) const float beta = 0;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     v = clamp(v * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/hardsigmoid_pack4.comp b/src/layer/vulkan/shader/hardsigmoid_pack4.comp
+--- a/src/layer/vulkan/shader/hardsigmoid_pack4.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-layout (constant_id = 1) const float beta = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = clamp(v * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/hardsigmoid_pack8.comp b/src/layer/vulkan/shader/hardsigmoid_pack8.comp
+--- a/src/layer/vulkan/shader/hardsigmoid_pack8.comp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-layout (constant_id = 1) const float beta = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = clamp(v[0] * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-    v[1] = clamp(v[1] * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/hardswish.comp b/src/layer/vulkan/shader/hardswish.comp
+--- a/src/layer/vulkan/shader/hardswish.comp
++++ b/src/layer/vulkan/shader/hardswish.comp
+@@ -1,4 +1,4 @@
+-// Copyright 2018 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+@@ -7,37 +7,25 @@ layout (constant_id = 0) const float alpha = 0;
+ layout (constant_id = 1) const float beta = 0;
+ 
+ #define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     v = v * clamp(v * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/hardswish_pack4.comp b/src/layer/vulkan/shader/hardswish_pack4.comp
+--- a/src/layer/vulkan/shader/hardswish_pack4.comp
++++ /dev/null
+@@ -1,43 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-layout (constant_id = 1) const float beta = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = v * clamp(v * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/hardswish_pack8.comp b/src/layer/vulkan/shader/hardswish_pack8.comp
+--- a/src/layer/vulkan/shader/hardswish_pack8.comp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float alpha = 0;
+-layout (constant_id = 1) const float beta = 0;
+-
+-#define shape_constant_id_offset 2
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = v[0] * clamp(v[0] * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-    v[1] = v[1] * clamp(v[1] * afp(alpha) + afp(beta), afp(0.f), afp(1.f));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/mish.comp b/src/layer/vulkan/shader/mish.comp
+--- a/src/layer/vulkan/shader/mish.comp
++++ b/src/layer/vulkan/shader/mish.comp
+@@ -1,44 +1,32 @@
+-// Copyright 2020 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+ 
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+ #if NCNN_moltenvk
+-    v = v * afp(tanh(float(log(exp(v) + afp(1.f)))));
++    v = v * afpvec4(tanh(vec4(log(exp(v) + afpvec4(1.f)))));
+ #else
+-    v = v * tanh(log(exp(v) + afp(1.f)));
++    v = v * tanh(log(exp(v) + afpvec4(1.f)));
+ #endif
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/mish_pack4.comp b/src/layer/vulkan/shader/mish_pack4.comp
+--- a/src/layer/vulkan/shader/mish_pack4.comp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-#if NCNN_moltenvk
+-    v = v * afpvec4(tanh(vec4(log(exp(v) + afpvec4(1.f)))));
+-#else
+-    v = v * tanh(log(exp(v) + afpvec4(1.f)));
+-#endif
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/mish_pack8.comp b/src/layer/vulkan/shader/mish_pack8.comp
+--- a/src/layer/vulkan/shader/mish_pack8.comp
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-#if NCNN_moltenvk
+-    v[0] = v[0] * afpvec4(tanh(vec4(log(exp(v[0]) + afpvec4(1.f)))));
+-    v[1] = v[1] * afpvec4(tanh(vec4(log(exp(v[1]) + afpvec4(1.f)))));
+-#else
+-    v[0] = v[0] * tanh(log(exp(v[0]) + afpvec4(1.f)));
+-    v[1] = v[1] * tanh(log(exp(v[1]) + afpvec4(1.f)));
+-#endif
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/relu.comp b/src/layer/vulkan/shader/relu.comp
+--- a/src/layer/vulkan/shader/relu.comp
++++ b/src/layer/vulkan/shader/relu.comp
+@@ -1,45 +1,34 @@
+-// Copyright 2018 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+ 
+ layout (constant_id = 0) const float slope = 0;
+ 
+ #define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = shape_constant_id_offset + 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+     if (slope == 0)
+         v = max(v, afp(0.f));
+     else
+-        v = v < afp(0.f) ? v * afp(slope) : v;
++        v = mix(v, v * afp(slope), lessThan(v, afpvec4(0.f)));
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/relu_pack4.comp b/src/layer/vulkan/shader/relu_pack4.comp
+--- a/src/layer/vulkan/shader/relu_pack4.comp
++++ /dev/null
+@@ -1,45 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float slope = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    if (slope == 0)
+-        v = max(v, afp(0.f));
+-    else
+-        v = mix(v, v * afp(slope), lessThan(v, afpvec4(0.f)));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/relu_pack8.comp b/src/layer/vulkan/shader/relu_pack8.comp
+--- a/src/layer/vulkan/shader/relu_pack8.comp
++++ /dev/null
+@@ -1,51 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-layout (constant_id = 0) const float slope = 0;
+-
+-#define shape_constant_id_offset 1
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    if (slope == 0)
+-    {
+-        v[0] = max(v[0], afp(0.f));
+-        v[1] = max(v[1], afp(0.f));
+-    }
+-    else
+-    {
+-        v[0] = mix(v[0], v[0] * afp(slope), lessThan(v[0], afpvec4(0.f)));
+-        v[1] = mix(v[1], v[1] * afp(slope), lessThan(v[1], afpvec4(0.f)));
+-    }
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/swish.comp b/src/layer/vulkan/shader/swish.comp
+--- a/src/layer/vulkan/shader/swish.comp
++++ b/src/layer/vulkan/shader/swish.comp
+@@ -1,40 +1,27 @@
+-// Copyright 2020 Tencent
++// Copyright 2019 Tencent
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #version 450
+ 
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    v = v / (afpvec4(1.f) + exp(-v));
+ 
+-    v = v / (afp(1.f) + exp(-v));
+-
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/swish_pack4.comp b/src/layer/vulkan/shader/swish_pack4.comp
+--- a/src/layer/vulkan/shader/swish_pack4.comp
++++ /dev/null
+@@ -1,40 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-    v = v / (afpvec4(1.f) + exp(-v));
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/swish_pack8.comp b/src/layer/vulkan/shader/swish_pack8.comp
+--- a/src/layer/vulkan/shader/swish_pack8.comp
++++ /dev/null
+@@ -1,41 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-    v[0] = v[0] / (afpvec4(1.f) + exp(-v[0]));
+-    v[1] = v[1] / (afpvec4(1.f) + exp(-v[1]));
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/tanh.comp b/src/layer/vulkan/shader/tanh.comp
+--- a/src/layer/vulkan/shader/tanh.comp
++++ b/src/layer/vulkan/shader/tanh.comp
+@@ -3,42 +3,30 @@
+ 
+ #version 450
+ 
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
++layout (constant_id = 0) const uint n = 0;
+ 
+-layout (binding = 0) buffer bottom_top_blob { sfp bottom_top_blob_data[]; };
++
++layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+ 
+ layout (push_constant) uniform parameter
+ {
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
++    uint n;
+ } p;
+ 
+ void main()
+ {
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
++    uint gi = gl_GlobalInvocationID.x;
+ 
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
++    if (gi >= psc(n))
+         return;
+ 
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afp v = buffer_ld1(bottom_top_blob_data, gi);
++    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+ #if NCNN_moltenvk
+-    v = afp(tanh(float(v)));
++    v = afpvec4(tanh(vec4(v)));
+ #else
+     v = tanh(v);
+ #endif
+ 
+-    buffer_st1(bottom_top_blob_data, gi, v);
++    buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/tanh_pack4.comp b/src/layer/vulkan/shader/tanh_pack4.comp
+--- a/src/layer/vulkan/shader/tanh_pack4.comp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// Copyright 2019 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec4 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+-
+-#if NCNN_moltenvk
+-    v = afpvec4(tanh(vec4(v)));
+-#else
+-    v = tanh(v);
+-#endif
+-
+-    buffer_st4(bottom_top_blob_data, gi, v);
+-}
+diff --git a/src/layer/vulkan/shader/tanh_pack8.comp b/src/layer/vulkan/shader/tanh_pack8.comp
+--- a/src/layer/vulkan/shader/tanh_pack8.comp
++++ /dev/null
+@@ -1,46 +0,0 @@
+-// Copyright 2020 Tencent
+-// SPDX-License-Identifier: BSD-3-Clause
+-
+-#version 450
+-
+-#define shape_constant_id_offset 0
+-layout (constant_id = shape_constant_id_offset + 0) const int dims = 0;
+-layout (constant_id = shape_constant_id_offset + 1) const int w = 0;
+-layout (constant_id = shape_constant_id_offset + 2) const int h = 0;
+-layout (constant_id = shape_constant_id_offset + 3) const int c = 0;
+-layout (constant_id = shape_constant_id_offset + 4) const int cstep = 0;
+-
+-layout (binding = 0) buffer bottom_top_blob { sfpvec8 bottom_top_blob_data[]; };
+-
+-layout (push_constant) uniform parameter
+-{
+-    int dims;
+-    int w;
+-    int h;
+-    int c;
+-    int cstep;
+-} p;
+-
+-void main()
+-{
+-    int gx = int(gl_GlobalInvocationID.x);
+-    int gy = int(gl_GlobalInvocationID.y);
+-    int gz = int(gl_GlobalInvocationID.z);
+-
+-    if (gx >= psc(w) || gy >= psc(h) || gz >= psc(c))
+-        return;
+-
+-    const int gi = gz * psc(cstep) + gy * psc(w) + gx;
+-
+-    afpvec8 v = buffer_ld8(bottom_top_blob_data, gi);
+-
+-#if NCNN_moltenvk
+-    v[0] = afpvec4(tanh(vec4(v[0])));
+-    v[1] = afpvec4(tanh(vec4(v[1])));
+-#else
+-    v[0] = tanh(v[0]);
+-    v[1] = tanh(v[1]);
+-#endif
+-
+-    buffer_st8(bottom_top_blob_data, gi, v);
+-}

@@ -1,0 +1,26 @@
+diff --git a/src/layer/vulkan/shader/celu.comp b/src/layer/vulkan/shader/celu.comp
+--- a/src/layer/vulkan/shader/celu.comp
++++ b/src/layer/vulkan/shader/celu.comp
+@@ -24,7 +24,7 @@ void main()
+ 
+     afpvec4 v = buffer_ld4(bottom_top_blob_data, gi);
+ 
+-    v = max(v, afpvec4(0.0f)) + min(alpha * (exp(v / afpvec4(alpha)) - afpvec4(1.0f)), afpvec4(0.0f));
++    v = max(v, afpvec4(0.0f)) + min(afpvec4(alpha) * (exp(v / afpvec4(alpha)) - afpvec4(1.0f)), afpvec4(0.0f));
+ 
+     buffer_st4(bottom_top_blob_data, gi, v);
+ }
+diff --git a/src/layer/vulkan/shader/erf.comp b/src/layer/vulkan/shader/erf.comp
+--- a/src/layer/vulkan/shader/erf.comp
++++ b/src/layer/vulkan/shader/erf.comp
+@@ -22,8 +22,8 @@ afpvec4 erf(afpvec4 x)
+     afpvec4 p = afpvec4(0.3275911f);
+     afpvec4 s = sign(x);
+     afpvec4 x_abs = abs(x);
+-    afpvec4 t = 1.0f / (1.0f + p * x_abs);
+-    afpvec4 y = 1.0f - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-x_abs * x_abs);
++    afpvec4 t = afpvec4(1.0f) / (afpvec4(1.0f) + p * x_abs);
++    afpvec4 y = afpvec4(1.0f) - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-x_abs * x_abs);
+     return s * y;
+ }
+ 

@@ -1,0 +1,29 @@
+repo: mesa/mesa
+pr: 34793
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34793
+merge_sha: a61b564cf57639c82cd2ab604d78daeb8a17f83d
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/34793/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/amd/ci/gitlab-ci-inc.yml
+  status: modified
+  sha256: c09df6d58c4add0844a3a371fd98b8f0973e2a4b427ce7c7a6afd5a0ac578bc3
+- path: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: a9e7c7ad835e9e22f23a5ef35b65039abdedeab844f3720088837ad5beeb7787
+- path: src/amd/vulkan/radv_instance.c
+  status: modified
+  sha256: 1ef01d45325692e837cc6d14ef9a5e4253415c83f96a43db757e4e04feb15a5e
+- path: src/amd/vulkan/radv_instance.h
+  status: modified
+  sha256: 5c5f4eb035770875cf35d98edea971ed52ece3cceb0db34a98a3c817cc9160c2
+- path: src/amd/vulkan/radv_physical_device.c
+  status: modified
+  sha256: f8b0ad75a9a08dd8e556d9bc26fa26007eba5060790c306744306b4b351ad50e
+- path: src/compiler/spirv/vtn_cmat.c
+  status: modified
+  sha256: c6a260b95847bb43d8865a45330450fbcf43dc631750e19eeb10b1baf382f7dd

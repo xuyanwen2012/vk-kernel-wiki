@@ -1,0 +1,47 @@
+repo: Tencent/ncnn
+pr: 6365
+url: https://github.com/Tencent/ncnn/pull/6365
+merge_sha: 8621c8e48e4d1fe7436f9b1bbcf6602c1bd1aaa5
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/Tencent/ncnn/pulls/6365/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/layer/vulkan/shader/layernorm_reduce_mean.comp
+  status: modified
+  sha256: aec55ba921cf05b0b5208200fae21515259cbbc5cd84f5a35fe07cd392e2ef92
+- path: src/layer/vulkan/shader/layernorm_reduce_mean_pack4.comp
+  status: modified
+  sha256: dc82f10546f1551bc0478e80c749a0d2f576b6e1e13f593505619854f6695f39
+- path: src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32.comp
+  status: modified
+  sha256: 85aae855043479b86d99b63f11cb850384a977442b084a6b3dfb0daa9dbdb8a6
+- path: src/layer/vulkan/shader/layernorm_reduce_sum4_fp16_to_fp32_pack4.comp
+  status: modified
+  sha256: 0bd7df01923e2044125e092418848ba8801bcd809dea0d60af486d1d660f32bb
+- path: src/layer/vulkan/shader/layernorm_reduce_sum4_fp32.comp
+  status: modified
+  sha256: a82f6222d6f1f0d26e48951f44c7a3d56bc131d7b5e13171bd973127387f1fbc
+- path: src/layer/vulkan/shader/layernorm_reduce_sum4_fp32_pack4.comp
+  status: modified
+  sha256: 40dc3fe12f5cdc9c5136b89f2b45f1d797ad9b53341f0fa83dfb4ab99dde5b3f
+- path: src/layer/vulkan/shader/rmsnorm_coeffs.comp
+  status: added
+  sha256: 2d49c3b748387f350ca1dc6ef056349b0e7be3af27a9cf0bbb05bfc89c2ccfd9
+- path: src/layer/vulkan/shader/rmsnorm_coeffs_pack4.comp
+  status: added
+  sha256: 25242d3c7671a9dfe7c446907aff5473e658f36375aaf5ab79d70313cd4204a6
+- path: src/layer/vulkan/shader/rmsnorm_norm.comp
+  status: added
+  sha256: 3356d12cc82713ce419df5bb87b93f5357f1224d0df6022e67db3dff96e83790
+- path: src/layer/vulkan/shader/rmsnorm_norm_pack4.comp
+  status: added
+  sha256: 845fc71aba462dd0860a3cecb63a8f8cc2e6d788e08027835df80c229b7fea54
+- path: src/layer/vulkan/shader/rmsnorm_square.comp
+  status: added
+  sha256: 0ce9c65dc4688609a314d5862d9b7cf7b9e7068145e5c2b8aae936c3725a21e4
+- path: src/layer/vulkan/shader/rmsnorm_square_pack4.comp
+  status: added
+  sha256: cbcc8bb524cfe061e1942feefe0741347a12c41c0666aebd90cf9ff8fc6022b4

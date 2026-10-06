@@ -17,6 +17,11 @@ Policy
   layout is hardcoded here. An embedded-shader path is a file of another
   language that carries GLSL source as text (a generator script, for example);
   it counts as shader source.
+- A ledger with `scope_mode: driver` describes a repository of driver or
+  compiler source rather than shaders. There a pull request is included when
+  its title matches one of the ledger's `topic_patterns` (regular
+  expressions) and it changes a path containing one of `driver_path_markers`;
+  everything else is excluded.
 - Frontmatter is derived from positive evidence only. A term is emitted when
   a pattern matches the PR title or a changed shader path; nothing is guessed
   from the description. `techniques` is always left empty: the technique
@@ -27,7 +32,8 @@ Policy
   data/aliases.yaml. The patches are matched against the ledger's
   `architecture_code_markers` (identifier -> node): a marker counts when the
   pull request adds it on more lines than it removes, so code that is only
-  moved does not count. An ancestor is dropped when one of its descendants
+  moved does not count. `architecture_path_markers` (path substring -> node)
+  count when the pull request changes a path containing the substring. An ancestor is dropped when one of its descendants
   also matched. Reserved vendor nodes (vendors without children) and names
   that are not nodes are never emitted.
 """
@@ -43,9 +49,13 @@ import arch_policy
 
 SHADER_SUFFIXES = (".comp", ".glsl")
 HOST_LANGUAGE_SUFFIXES = {
-    ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".h": "cpp", ".hpp": "cpp",
+    ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
+    ".c": "c",
     ".py": "python",
 }
+# A .h file belongs to whichever of these the pull request also changes;
+# on its own it counts as C++ (the only case before C was in the vocabulary).
+HEADER_SUFFIX = ".h"
 UPSTREAM_EXCERPT_LIMIT = 1200
 EXCERPT_START = "<!-- upstream-excerpt-start -->"
 EXCERPT_END = "<!-- upstream-excerpt-end -->"
@@ -86,13 +96,22 @@ class PathConfig:
     shader: tuple = ()
     embedded: tuple = ()
     host: tuple = ()
+    mode: str = "shader"
+    driver: tuple = ()
+    topics: tuple = ()
 
     @classmethod
     def from_ledger(cls, ledger: dict) -> "PathConfig":
+        mode = str(ledger.get("scope_mode") or "shader")
+        if mode not in ("shader", "driver"):
+            raise ValueError(f"unknown scope_mode {mode!r} (expected shader or driver)")
         return cls(
             tuple(ledger.get("shader_path_markers") or ()),
             tuple(ledger.get("embedded_shader_path_markers") or ()),
             tuple(ledger.get("host_path_markers") or ()),
+            mode,
+            tuple(ledger.get("driver_path_markers") or ()),
+            tuple(ledger.get("topic_patterns") or ()),
         )
 
 
@@ -103,13 +122,38 @@ def is_shader_path(path: str, config: PathConfig) -> bool:
 
 
 def shader_files(files: Iterable[Any], config: PathConfig) -> list:
-    """The changed-file records that carry shader source, removals included."""
+    """The changed-file records worth saving, removals included: shader source,
+    or in driver mode the files under the driver paths."""
+    if config.mode == "driver":
+        return [f for f in normalize_files(files) if any(m in f["filename"] for m in config.driver)]
     return [f for f in normalize_files(files) if is_shader_path(f["filename"], config)]
 
 
-def classify_scope(files: Iterable[Any], config: PathConfig = PathConfig()) -> ScopeDecision:
-    """Decide include / defer / exclude from the changed files."""
+def _classify_driver(normalized: list, config: PathConfig, title: str) -> ScopeDecision:
+    topic = next((p for p in config.topics if re.search(p, title or "", re.IGNORECASE)), None)
+    paths = tuple(sorted({
+        f["filename"] for f in normalized
+        if f["status"] not in {"removed", "deleted"} and any(m in f["filename"] for m in config.driver)
+    }))
+    if topic is None:
+        return ScopeDecision("exclude", "no-topic-in-title", (), "exclude: the title matches no topic pattern")
+    if not paths:
+        return ScopeDecision(
+            "exclude", "no-driver-path", (),
+            f"exclude: title matches /{topic}/ but none of the {len(normalized)} changed file(s) is under a driver path",
+        )
+    return ScopeDecision(
+        "include", "driver-source-on-topic", paths,
+        f"include: title matches /{topic}/ and driver source changed: " + ", ".join(paths),
+    )
+
+
+def classify_scope(files: Iterable[Any], config: PathConfig = PathConfig(), title: str = "") -> ScopeDecision:
+    """Decide include / defer / exclude from the changed files (and, in
+    driver mode, the title)."""
     normalized = normalize_files(files)
+    if config.mode == "driver":
+        return _classify_driver(normalized, config, title)
     host_markers = config.host
     shader_paths, host_paths = [], []
     for item in normalized:
@@ -169,7 +213,7 @@ def _marker_hits(files: Iterable[Any], markers: dict) -> dict:
 
 
 def derive_architectures(title: str, files: Iterable[Any] = (), code_markers: Optional[dict] = None,
-                         root: Optional[Path] = None) -> tuple:
+                         root: Optional[Path] = None, path_markers: Optional[dict] = None) -> tuple:
     """Return (nodes in tree order, evidence rows) for a pull request."""
     nodes = set(arch_policy.all_nodes(root))
     reserved = {
@@ -191,6 +235,11 @@ def derive_architectures(title: str, files: Iterable[Any] = (), code_markers: Op
         matched.setdefault(usable[marker], {
             "node": usable[marker], "locator": f"added-patch:{path}", "matched": marker,
         })
+    live = [f["filename"] for f in normalize_files(files) if f["status"] not in {"removed", "deleted"}]
+    for marker, node in sorted((path_markers or {}).items()):
+        path = next((p for p in live if str(marker) in p), None)
+        if path and node in nodes and node not in reserved:
+            matched.setdefault(node, {"node": node, "locator": f"changed-path:{path}", "matched": str(marker)})
     for node in list(matched):
         if any(d in matched for d in arch_policy.descendants(node, root)):
             del matched[node]
@@ -205,12 +254,15 @@ def derive_architectures(title: str, files: Iterable[Any] = (), code_markers: Op
 _TOKEN = r"(?<![A-Za-z0-9]){}(?![A-Za-z0-9])"
 
 _HARDWARE_PATTERNS = {
-    "cooperative-matrix": r"coop[\s_-]?mat|cooperative[\s_-]matri|" + _TOKEN.format(r"cm[12]"),
+    "cooperative-matrix": r"coop[\s_-]?mat|cooperative[\s_-]matri|wmma|" + _TOKEN.format(r"cm[12]|cmat"),
     "cooperative-matrix2": r"coop[\s_-]?mat[\s_-]?2|cooperative[\s_-]matrix[\s_-]?2|" + _TOKEN.format("cm2"),
     "bfloat16-arithmetic": _TOKEN.format(r"bf16|bfloat16"),
     "int8-cooperative-matrix": r"int8[\s_-]coop[\s_-]?mat",
     "integer-dot-product": _TOKEN.format("dp4a") + r"|integer[\s_-]dot[\s_-]product|dotPacked",
     "subgroup-size": r"subgroup[\s_-]size",
+    "subgroup-size-control": r"subgroup[\s_-]size[\s_-]control",
+    "wave64": _TOKEN.format("wave64"),
+    "8bit-storage": r"8[\s_-]?bit[\s_-]storage",
     "shared-memory-limit": _TOKEN.format("shmem") + r"|shared[\s_-]memory",
     "fp16-arithmetic": _TOKEN.format(r"fp16|f16|float16"),
     "specialization-constants": r"spec(?:ialization)?[\s_-]constant",
@@ -254,7 +306,9 @@ def derive_metadata(title: str, files: Iterable[Any], vocab: dict,
     vocabulary is ignored, so the output always validates.
     """
     normalized = [f for f in normalize_files(files) if f["status"] not in {"removed", "deleted"}]
-    shader_paths = [f["filename"] for f in normalized if is_shader_path(f["filename"], config)]
+    shader_paths = [
+        f["filename"] for f in normalized if config.mode == "shader" and is_shader_path(f["filename"], config)
+    ]
     text = "\n".join([title or "", *(PurePosixPath(p).name for p in shader_paths)])
 
     hardware = _matching_terms(_HARDWARE_PATTERNS, text, set(vocab.get("hardware_features") or []))
@@ -266,10 +320,13 @@ def derive_metadata(title: str, files: Iterable[Any], vocab: dict,
     languages = []
     if shader_paths and "glsl" in allowed_languages:
         languages.append("glsl")
-    for item in normalized:
-        language = HOST_LANGUAGE_SUFFIXES.get(PurePosixPath(item["filename"]).suffix.lower())
+    suffixes = [PurePosixPath(item["filename"]).suffix.lower() for item in normalized]
+    for suffix in suffixes:
+        language = HOST_LANGUAGE_SUFFIXES.get(suffix)
         if language and language in allowed_languages and language not in languages:
             languages.append(language)
+    if HEADER_SUFFIX in suffixes and not {"c", "cpp"} & set(languages) and "cpp" in allowed_languages:
+        languages.append("cpp")
 
     return {
         "tags": [*hardware, *kernel_types, *languages],
@@ -312,7 +369,8 @@ def excerpt_is_empty(excerpt: str) -> bool:
     return not text.strip()
 
 
-def render_body(title: str, url: str, excerpt: str, total_chars: int, what: str = "description") -> str:
+def render_body(title: str, url: str, excerpt: str, total_chars: int, what: str = "description",
+                noun: str = "pull request") -> str:
     """Render the only body a generated source-pr page may have.
 
     `what` names the upstream text the excerpt was taken from: the
@@ -321,11 +379,11 @@ def render_body(title: str, url: str, excerpt: str, total_chars: int, what: str 
     shown = len(excerpt)
     scope = "complete" if shown >= total_chars else f"first {shown} of {total_chars} characters"
     if what != "description":
-        scope += "; the pull request description is empty"
+        scope += f"; the {noun} description is empty"
     return "\n".join([
         f"# {title}",
         "",
-        f"Locator: {url} (pull request {what}, {scope})",
+        f"Locator: {url} ({noun} {what}, {scope})",
         "",
         EXCERPT_START,
         excerpt,
