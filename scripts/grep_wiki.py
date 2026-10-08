@@ -36,7 +36,7 @@ def iter_files(scope, exts=None):
         "artifacts": ["artifacts"],
     }
     sub_list = dirs.get(scope, ["wiki", "sources"])
-    search_exts = ({".patch"} if scope == "artifacts" else {".md"}) | (exts or set())
+    search_exts = ({".patch", ".comp", ".glsl", ".c"} if scope == "artifacts" else {".md"}) | (exts or set())
 
     for sub in sub_list:
         base = WIKI_ROOT / sub
@@ -78,7 +78,7 @@ def main():
     parser.add_argument("patterns", nargs="+", help="Search pattern(s) — all must match a line unless --any is used")
     parser.add_argument("--only", choices=["wiki", "sources", "all", "artifacts"], default="all",
                         help="Restrict search scope (default: all = wiki and sources; "
-                             "'artifacts' searches the saved upstream shader patches instead)")
+                             "'artifacts' searches the saved upstream patches and kernel files instead)")
     parser.add_argument("--context", type=int, default=1, help="Context lines around each match (default 1)")
     parser.add_argument("--any", action="store_true", help="Match if ANY pattern matches a line (default: all must match)")
     parser.add_argument("--limit", type=int, default=20, help="Max files reported (default 20)")

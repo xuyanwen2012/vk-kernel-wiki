@@ -7,6 +7,7 @@ tags: [cooperative-matrix, coopmat-shape, coopmat-fp32-accumulator, subgroup-siz
 confidence: source-reported
 related: [hw-radeon-780m, kernel-linear-4w-780m, kernel-linear-8da4w-780m, kernel-sdpa-prefill-780m, technique-fp32-accumulation, technique-drain-in-a-staging, technique-workgroup-tile-sizing, technique-causal-truncation]
 sources: [meas-780m-vulkaninfo, meas-780m-4w-bootstrap]
+version_sensitive: vs-radv-coopmat-lowering-after-25-2-7
 evidence_basis:
   - evidence_type: measurement
     source_id: meas-780m-vulkaninfo

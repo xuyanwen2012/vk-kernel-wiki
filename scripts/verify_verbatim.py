@@ -10,6 +10,9 @@ With --against-cache: additionally compares each recorded sha256 with the
 patch text in the evidence cache (`.cache/pr-evidence/`), which is what
 GitHub returned. Bundles without cached evidence are reported and skipped.
 
+Every bundle of complete kernel files under `artifacts/kernels/` is checked
+the same way (PROVENANCE.yaml, licence text, sha256 per file).
+
 Exit 0 when everything checks out, 1 otherwise.
 
 Usage:
@@ -84,10 +87,17 @@ def main() -> int:
     for rel, page in named.items():
         if rel not in bundles:
             errors.append(f"{page}: artifact_dir '{rel}' does not exist")
+    kernels_base = WIKI_ROOT / pr_artifacts.KERNELS_ROOT
+    kernel_bundles = sorted(
+        p.relative_to(WIKI_ROOT).as_posix() for p in kernels_base.iterdir() if p.is_dir()
+    ) if kernels_base.is_dir() else []
+    for rel in kernel_bundles:
+        errors.extend(pr_artifacts.kernel_bundle_errors(rel))
     for line in errors:
         print(f"ERROR: {line}")
     note = f", {uncached} without cached evidence" if args.against_cache else ""
-    print(f"Verified {len(bundles)} artifact bundle(s){note}: {len(errors)} error(s)")
+    kernels = f", {len(kernel_bundles)} kernel bundle(s)" if kernel_bundles else ""
+    print(f"Verified {len(bundles)} artifact bundle(s){note}{kernels}: {len(errors)} error(s)")
     return 1 if errors else 0
 
 

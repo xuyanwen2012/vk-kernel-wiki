@@ -11,6 +11,7 @@ languages: [glsl]
 aliases: ["sarc_linear_q4gsw_coopmat", "t128x128k32g42s32f32c", "q4gsw coopmat 780M", "4w linear 780M"]
 related: [hw-radeon-780m, hw-cooperative-matrix-rdna3, kernel-linear-8da4w-780m, kernel-sdpa-prefill-780m, technique-fp32-accumulation, technique-drain-in-a-staging, technique-workgroup-tile-sizing, pattern-unaligned-m-fallback]
 sources: [meas-780m-4w-bootstrap, meas-780m-e2e-prefill, meas-780m-vulkaninfo]
+version_sensitive: vs-radv-coopmat-lowering-after-25-2-7
 evidence_basis:
   - evidence_type: measurement
     source_id: meas-780m-4w-bootstrap

@@ -1,0 +1,32 @@
+repo: ggml-org/llama.cpp
+url: https://github.com/ggml-org/llama.cpp
+commit: c479922ac520a08969b4c1dc154d7bbb3c386d85
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-06'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+  file: flash_attn.comp
+  sha256: 6fa5c5e00b10b7d5aa958063702c56d337de295a81e5733b82f43b3bf876e0c7
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+  file: flash_attn_cm1.comp
+  sha256: bbbfb58692d1117790e89c9f7bcf27c2a63676f8d98dea1d8bb0882879b2d85f
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+  file: flash_attn_cm2.comp
+  sha256: dfb6c3cecca943644f4549bfa7ecf7d87dc00f0e6bc2f3bf81fa275dbecdebe0
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+  file: flash_attn_base.glsl
+  sha256: 46cb7d7232e3a425193ff95358532379329bd4d856cd11754c2a066a99088c89
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+  file: flash_attn_dequant.glsl
+  sha256: 45ea455c04e7bd0a71d47cbc6c49283bc00a14a4f0010a60bb3ca425b4e759b3
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl
+  file: flash_attn_mmq_funcs.glsl
+  sha256: e897fcd510b93ee291234e80154c58ac7f928aef33ee791bd45cc3def5dca144
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+  file: flash_attn_split_k_reduce.comp
+  sha256: d2cadeb70d4f412ed4be102f81ba6056969469c5defcbeeba376e2ff98e8c731
+- path: ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp
+  file: flash_attn_mask_opt.comp
+  sha256: ea8e055b4b7d09a7f3c2cb68ecec2caeb85231031305387e28856650ccd956d2

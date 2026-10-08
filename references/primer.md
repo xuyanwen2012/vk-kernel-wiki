@@ -2,7 +2,7 @@
 
 A map of the knowledge base, organised by the controlled vocabulary in `data/tags.yaml` and the architecture tree in `data/architectures.yaml`. Use it when a question is broad: find the area, then query by the term shown.
 
-**Current corpus: 590 pages. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`; the other 572 are generated pull-request pages from `ggml-org/llama.cpp`, `Tencent/ncnn` and `mesa/mesa`.** The tables below list measurement and wiki pages by id. Pull-request pages are not listed by id; where a term or node has only pull-request pages the table says so and names the generated index. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
+**Current corpus: 597 pages, including 4 official-document pages, 2 blog pages and 1 language page that are not tied to the 780M. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`; the other 572 are generated pull-request pages from `ggml-org/llama.cpp`, `Tencent/ncnn` and `mesa/mesa`.** The tables below list measurement and wiki pages by id. Pull-request pages are not listed by id; where a term or node has only pull-request pages the table says so and names the generated index. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
 
 Query any term with `python3 scripts/query.py --tag <term>`, and any node with `python3 scripts/query.py --architecture <node>`. Aliases for each are in `data/aliases.yaml`.
 
@@ -143,6 +143,17 @@ Pages live in `wiki/techniques/` (id prefix `technique-`). Index: `queries/by-te
 |---|---|---|
 | `causal-truncation` | skip work above the causal diagonal | `meas-780m-e2e-prefill`, `meas-780m-sdpa-port`, `kernel-sdpa-prefill-780m`, `pattern-sdpa-release-gap`, `technique-causal-truncation` |
 
+### Stated in upstream pull requests
+
+| Term | Meaning | Pages |
+|---|---|---|
+| `split-k-reduction` | K split across workgroups, partial sums reduced in a second pass | pull-request pages only; list: `queries/by-technique.md` |
+| `kernel-fusion` | several operators merged into one dispatch | pull-request pages only; list: `queries/by-technique.md` |
+| `device-specific-tuning` | parameters or kernel choice tuned per vendor, generation or device | pull-request pages only; list: `queries/by-technique.md` |
+| `driver-workaround` | a path disabled or changed because of a driver or compiler defect | pull-request pages only; list: `queries/by-technique.md` |
+| `winograd-convolution` | 3x3 convolution through the Winograd transform | pull-request pages only; list: `queries/by-technique.md` |
+| `channel-packing` | channels packed into vec4/vec8 elements (pack4, pack8) | pull-request pages only; list: `queries/by-technique.md` |
+
 ---
 
 ## Kernel Case Studies (`kernel_types`)
@@ -206,7 +217,7 @@ Pages live in `wiki/languages/` (id prefix `lang-`). Index: `queries/by-language
 
 | Term | Pages |
 |---|---|
-| `glsl` | `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
+| `glsl` | `lang-glsl-cooperative-matrix`, `doc-glsl-khr-cooperative-matrix`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `spirv` | no pages yet |
 | `cpp` | pull-request pages only; list: `queries/by-language.md` |
 | `c` | pull-request pages only; list: `queries/by-language.md` |
@@ -230,8 +241,8 @@ Migration pages describe porting a kernel from one architecture node to another 
 |---|---|---|---|
 | First-party measurement | `sources/measurements/` | `measurement` | `meas-780m-vulkaninfo`, `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-e2e-prefill` |
 | Upstream pull request | `sources/prs/` | `upstream-code` | 572 generated pages in `sources/prs/llama-cpp/`, `sources/prs/ncnn/` and `sources/prs/mesa/`; list: `queries/by-repo.md` |
-| Documentation and papers | `sources/docs/` | `official-doc`, `paper` | no pages yet |
-| Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | no pages yet |
+| Documentation and papers | `sources/docs/` | `official-doc`, `paper` | `doc-vk-khr-cooperative-matrix-proposal`, `doc-vk-nv-cooperative-matrix2-proposal`, `doc-glsl-khr-cooperative-matrix`, `doc-mesa-radv-envvars` |
+| Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | `blog-themaister-fsr4-wmma`, `blog-zolotukhin-matrix-cores-decode` |
 
 First-party measurements are the most trusted source type. Index per device: `queries/by-device.md`. PR pages per repository: `queries/by-repo.md`.
 

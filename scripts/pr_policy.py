@@ -24,9 +24,10 @@ Policy
   everything else is excluded.
 - Frontmatter is derived from positive evidence only. A term is emitted when
   a pattern matches the PR title or a changed shader path; nothing is guessed
-  from the description. `techniques` is always left empty: the technique
-  vocabulary names specific shader constructs and assigning one needs a human
-  or agent to read the diff.
+  from the description. `techniques` is filled only for the few terms a
+  title or shader file name states outright (a tile size, a fusion, a
+  workaround, a tuning pass); the terms that name a specific shader construct
+  are never guessed and need a human or agent to read the diff.
 - Architecture nodes come from two kinds of evidence. The PR title is
   matched against the node names and aliases of data/architectures.yaml and
   data/aliases.yaml. The patches are matched against the ledger's
@@ -291,6 +292,19 @@ _KERNEL_TYPE_PATTERNS = {
 }
 
 
+_TECHNIQUE_PATTERNS = {
+    "workgroup-tile-sizing": r"(?<![A-Za-z])(?:warp[ _-]?)?tiles?(?![A-Za-z])",
+    "required-subgroup-size": r"full[ _-]subgroups?|required[ _-]subgroup|subgroup[ _-]size[ _-]control",
+    "fp32-accumulation": r"fp32[ _-]accumulat",
+    "split-k-reduction": r"split[ _-]?k(?![A-Za-z])",
+    "kernel-fusion": r"(?<![A-Za-z])fus(?:e|ed|es|ing|ion)(?![A-Za-z])",
+    "device-specific-tuning": r"(?<![A-Za-z])tun(?:e|ed|es|ing)(?![A-Za-z])|heuristic",
+    "driver-workaround": r"work[ -]?around|black[ -]?list|deny[ -]?list|(?:driver|compiler)[ _-]bug",
+    "winograd-convolution": r"winograd",
+    "channel-packing": r"(?<![A-Za-z])pack(?:\d\w*|ed|ing)(?![A-Za-z])",
+}
+
+
 def _matching_terms(patterns: dict, text: str, allowed: set) -> list:
     return [
         term for term, pattern in patterns.items()
@@ -328,9 +342,11 @@ def derive_metadata(title: str, files: Iterable[Any], vocab: dict,
     if HEADER_SUFFIX in suffixes and not {"c", "cpp"} & set(languages) and "cpp" in allowed_languages:
         languages.append("cpp")
 
+    techniques = _matching_terms(_TECHNIQUE_PATTERNS, text, set(vocab.get("techniques") or []))
+
     return {
-        "tags": [*hardware, *kernel_types, *languages],
-        "techniques": [],
+        "tags": [*hardware, *techniques, *kernel_types, *languages],
+        "techniques": techniques,
         "hardware_features": hardware,
         "kernel_types": kernel_types,
         "languages": languages,

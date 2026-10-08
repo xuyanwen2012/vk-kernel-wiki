@@ -10,106 +10,106 @@
 |-----|-------|------|------------|------|
 | [#7005](../sources/prs/ncnn/PR-7005.md) | fix vulkan tanh gelu overflow | 2026-09-15 |  | elementwise, glsl |
 | [#6980](../sources/prs/ncnn/PR-6980.md) | prefer shader local memory for apple silicon | 2026-09-09 |  | cpp |
-| [#6972](../sources/prs/ncnn/PR-6972.md) | various workaround for adreno cooperative matrix shader | 2026-09-08 |  | cooperative-matrix, gemm, sdpa |
+| [#6972](../sources/prs/ncnn/PR-6972.md) | various workaround for adreno cooperative matrix shader | 2026-09-08 | driver-workaround, winograd-convolution | cooperative-matrix, driver-workaround, winograd-convolution |
 | [#6964](../sources/prs/ncnn/PR-6964.md) | fix vulkan reduction shared accumulator type precision issue | 2026-09-07 |  | glsl |
-| [#6962](../sources/prs/ncnn/PR-6962.md) | fix vulkan bf16 packed without int16shader | 2026-09-06 |  | bfloat16-arithmetic, fp16-arithmetic, cpp |
-| [#6930](../sources/prs/ncnn/PR-6930.md) | vulkan: apply atan2 zero workaround to packed shaders | 2026-08-25 |  | glsl |
+| [#6962](../sources/prs/ncnn/PR-6962.md) | fix vulkan bf16 packed without int16shader | 2026-09-06 | channel-packing | bfloat16-arithmetic, fp16-arithmetic, channel-packing |
+| [#6930](../sources/prs/ncnn/PR-6930.md) | vulkan: apply atan2 zero workaround to packed shaders | 2026-08-25 | driver-workaround, channel-packing | driver-workaround, channel-packing, glsl |
 | [#6927](../sources/prs/ncnn/PR-6927.md) | vulkan: fix fp16 arithmetic types in erf and celu shaders | 2026-08-22 |  | fp16-arithmetic, glsl |
-| [#6903](../sources/prs/ncnn/PR-6903.md) | x86/loongarch/mips: refine rsqrt with newton-raphson iterations && vulkan: use fp32 for coefficient | 2026-08-15 |  | normalization, glsl, cpp |
+| [#6903](../sources/prs/ncnn/PR-6903.md) | x86/loongarch/mips: refine rsqrt with newton-raphson iterations && vulkan: use fp32 for coefficient | 2026-08-15 | channel-packing | channel-packing, normalization, glsl |
 | [#6898](../sources/prs/ncnn/PR-6898.md) | discover VK_EXT_cooperative_matrix_maintenance1 and VK_EXT_shader_ocp_microscaling_types | 2026-08-11 |  | cooperative-matrix, cpp |
 | [#6895](../sources/prs/ncnn/PR-6895.md) | fix fp16sa shader compiler error on device without int64, move ncnn glsl macro definitions to ncnn_glsl_ext.comp | 2026-08-07 |  | fp16-arithmetic, cpp |
 | [#6780](../sources/prs/ncnn/PR-6780.md) | query VK_KHR_shader_subgroup_extended_types features, sanitize fp16 subgroup path | 2026-06-15 |  | fp16-arithmetic, gemm, glsl |
-| [#6751](../sources/prs/ncnn/PR-6751.md) | vulkan int8 kernels | 2026-05-28 |  | gemm, convolution, glsl |
-| [#6729](../sources/prs/ncnn/PR-6729.md) | vulkan: workaround llvmpipe atan2 zero case | 2026-05-19 |  | glsl |
+| [#6751](../sources/prs/ncnn/PR-6751.md) | vulkan int8 kernels | 2026-05-28 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, gemm |
+| [#6729](../sources/prs/ncnn/PR-6729.md) | vulkan: workaround llvmpipe atan2 zero case | 2026-05-19 | driver-workaround, channel-packing | driver-workaround, channel-packing, glsl |
 | [#6719](../sources/prs/ncnn/PR-6719.md) | Disable cooperative matrix for Adreno GPU drivers | 2026-05-12 |  | cooperative-matrix, cpp |
-| [#6602](../sources/prs/ncnn/PR-6602.md) | fix binaryop vulkan shader compilation on moltenvk | 2026-03-17 |  | glsl |
-| [#6573](../sources/prs/ncnn/PR-6573.md) | implement vulkan gemm packed | 2026-03-03 |  | gemm, glsl, cpp |
-| [#6572](../sources/prs/ncnn/PR-6572.md) | vulkan deconvolution gemm unified elempack | 2026-03-02 |  | gemm, glsl, cpp |
-| [#6565](../sources/prs/ncnn/PR-6565.md) | vulkan convolution gemm unified elempack | 2026-02-28 |  | gemm, convolution, glsl |
-| [#6566](../sources/prs/ncnn/PR-6566.md) | vulkan convolution1d packed unified elempack | 2026-02-28 |  | convolution, glsl, cpp |
-| [#6561](../sources/prs/ncnn/PR-6561.md) | vulkan convolution packed unified elempack | 2026-02-27 |  | convolution, glsl, cpp |
-| [#6562](../sources/prs/ncnn/PR-6562.md) | vulkan convolution 1x1s1d1 unified elempack | 2026-02-27 |  | convolution, glsl, cpp |
-| [#6564](../sources/prs/ncnn/PR-6564.md) | vulkan deconvolution packed unified elempack | 2026-02-27 |  | glsl, cpp |
-| [#6556](../sources/prs/ncnn/PR-6556.md) | vulkan groupnorm | 2026-02-26 |  | fp16-arithmetic, normalization, glsl |
-| [#6543](../sources/prs/ncnn/PR-6543.md) | unfold for vulkan | 2026-02-10 |  | convolution, glsl, cpp |
+| [#6602](../sources/prs/ncnn/PR-6602.md) | fix binaryop vulkan shader compilation on moltenvk | 2026-03-17 | channel-packing | channel-packing, glsl |
+| [#6573](../sources/prs/ncnn/PR-6573.md) | implement vulkan gemm packed | 2026-03-03 | channel-packing | channel-packing, gemm, glsl |
+| [#6572](../sources/prs/ncnn/PR-6572.md) | vulkan deconvolution gemm unified elempack | 2026-03-02 | channel-packing | channel-packing, gemm, glsl |
+| [#6565](../sources/prs/ncnn/PR-6565.md) | vulkan convolution gemm unified elempack | 2026-02-28 | channel-packing | channel-packing, gemm, convolution |
+| [#6566](../sources/prs/ncnn/PR-6566.md) | vulkan convolution1d packed unified elempack | 2026-02-28 | channel-packing | channel-packing, convolution, glsl |
+| [#6561](../sources/prs/ncnn/PR-6561.md) | vulkan convolution packed unified elempack | 2026-02-27 | channel-packing | channel-packing, convolution, glsl |
+| [#6562](../sources/prs/ncnn/PR-6562.md) | vulkan convolution 1x1s1d1 unified elempack | 2026-02-27 | channel-packing | channel-packing, convolution, glsl |
+| [#6564](../sources/prs/ncnn/PR-6564.md) | vulkan deconvolution packed unified elempack | 2026-02-27 | channel-packing | channel-packing, glsl, cpp |
+| [#6556](../sources/prs/ncnn/PR-6556.md) | vulkan groupnorm | 2026-02-26 | channel-packing | fp16-arithmetic, channel-packing, normalization |
+| [#6543](../sources/prs/ncnn/PR-6543.md) | unfold for vulkan | 2026-02-10 | channel-packing | channel-packing, convolution, glsl |
 | [#6538](../sources/prs/ncnn/PR-6538.md) | sdpa vulkan flash attention optimization without cooperative matrix | 2026-02-09 |  | cooperative-matrix, sdpa, glsl |
 | [#6528](../sources/prs/ncnn/PR-6528.md) | sdpa vulkan flash attention with cooperative matrix optimization | 2026-01-29 |  | cooperative-matrix, sdpa, glsl |
 | [#6524](../sources/prs/ncnn/PR-6524.md) | unroll 4x4 for gemm and sdpa vulkan, vectorize a and b loading, avoid bank conflict | 2026-01-24 |  | gemm, sdpa, glsl |
-| [#6519](../sources/prs/ncnn/PR-6519.md) | vulkan rotaryembed | 2026-01-21 |  | glsl, cpp |
+| [#6519](../sources/prs/ncnn/PR-6519.md) | vulkan rotaryembed | 2026-01-21 | channel-packing | channel-packing, glsl, cpp |
 | [#6521](../sources/prs/ncnn/PR-6521.md) | flexible fp16/bf16 coopmat optimization for vulkan sdpa with unified qk and qkv cross shader | 2026-01-21 |  | cooperative-matrix, bfloat16-arithmetic, fp16-arithmetic |
 | [#6514](../sources/prs/ncnn/PR-6514.md) | sdpa vulkan | 2026-01-16 |  | sdpa, glsl, cpp |
-| [#6515](../sources/prs/ncnn/PR-6515.md) | gemm vulkan bf16 cooperative matrix optimization | 2026-01-16 |  | cooperative-matrix, bfloat16-arithmetic, fp16-arithmetic |
+| [#6515](../sources/prs/ncnn/PR-6515.md) | gemm vulkan bf16 cooperative matrix optimization | 2026-01-16 | winograd-convolution | cooperative-matrix, bfloat16-arithmetic, fp16-arithmetic |
 | [#6476](../sources/prs/ncnn/PR-6476.md) | reduction vulkan shader | 2026-01-02 |  | glsl, cpp |
 | [#6478](../sources/prs/ncnn/PR-6478.md) | softplus vulkan shader | 2026-01-02 |  | elementwise, glsl, cpp |
 | [#6479](../sources/prs/ncnn/PR-6479.md) | shink vulkan shader | 2026-01-02 |  | glsl, cpp |
 | [#6473](../sources/prs/ncnn/PR-6473.md) | selu vulkan shader | 2026-01-01 |  | glsl, cpp |
-| [#6469](../sources/prs/ncnn/PR-6469.md) | [wip] vulkan bf16 infrastructure | 2025-12-28 |  | bfloat16-arithmetic, fp16-arithmetic, gemm |
+| [#6469](../sources/prs/ncnn/PR-6469.md) | [wip] vulkan bf16 infrastructure | 2025-12-28 | winograd-convolution, channel-packing | bfloat16-arithmetic, fp16-arithmetic, winograd-convolution |
 | [#6459](../sources/prs/ncnn/PR-6459.md) | fix (vulkan) fallback invalid subgroupSize (0/non-power-of-two) to avoid infinite loop (#6457) | 2025-12-18 |  | cpp |
 | [#6384](../sources/prs/ncnn/PR-6384.md) | vulkan eltwise unified elempack shader | 2025-10-31 |  | glsl, cpp |
-| [#6365](../sources/prs/ncnn/PR-6365.md) | feat: rms vulkan shader | 2025-10-22 |  | fp16-arithmetic, normalization, glsl |
+| [#6365](../sources/prs/ncnn/PR-6365.md) | feat: rms vulkan shader | 2025-10-22 | channel-packing | fp16-arithmetic, channel-packing, normalization |
 | [#6313](../sources/prs/ncnn/PR-6313.md) | fix gemm cm shader compile with fp16sa | 2025-09-11 |  | fp16-arithmetic, gemm, glsl |
 | [#6284](../sources/prs/ncnn/PR-6284.md) | flexible coopmat optimization for vulkan gemm | 2025-08-26 |  | cooperative-matrix, gemm, glsl |
-| [#6270](../sources/prs/ncnn/PR-6270.md) | drop vulkan shader pack8 | 2025-08-21 |  | glsl, cpp, python |
-| [#6240](../sources/prs/ncnn/PR-6240.md) | Layer norm vulkan shader | 2025-08-07 |  | fp16-arithmetic, glsl, cpp |
-| [#6199](../sources/prs/ncnn/PR-6199.md) | flexible coopmat mnk and unified elempack for vulkan deconvolution gemm | 2025-07-23 |  | cooperative-matrix, gemm, convolution |
-| [#6196](../sources/prs/ncnn/PR-6196.md) | flexible coopmat mnk and unified elempack for vulkan convolution winograd gemm | 2025-07-21 |  | cooperative-matrix, gemm, convolution |
+| [#6270](../sources/prs/ncnn/PR-6270.md) | drop vulkan shader pack8 | 2025-08-21 | channel-packing | channel-packing, glsl, cpp |
+| [#6240](../sources/prs/ncnn/PR-6240.md) | Layer norm vulkan shader | 2025-08-07 | channel-packing | fp16-arithmetic, channel-packing, glsl |
+| [#6199](../sources/prs/ncnn/PR-6199.md) | flexible coopmat mnk and unified elempack for vulkan deconvolution gemm | 2025-07-23 | channel-packing | cooperative-matrix, channel-packing, gemm |
+| [#6196](../sources/prs/ncnn/PR-6196.md) | flexible coopmat mnk and unified elempack for vulkan convolution winograd gemm | 2025-07-21 | winograd-convolution, channel-packing | cooperative-matrix, winograd-convolution, channel-packing |
 | [#6192](../sources/prs/ncnn/PR-6192.md) | flexible coopmat mnk and unified elempack for vulkan convolution gemm | 2025-07-15 |  | cooperative-matrix, gemm, convolution |
 | [#6179](../sources/prs/ncnn/PR-6179.md) | vulkan unaryop unified elempack shader | 2025-07-12 |  | glsl, cpp |
 | [#6175](../sources/prs/ncnn/PR-6175.md) | Unified elempack activation function vulkan shader | 2025-07-11 |  | elementwise, glsl, cpp |
 | [#6170](../sources/prs/ncnn/PR-6170.md) | vulkan sigmoid unified elempack shader | 2025-07-10 |  | elementwise, glsl, cpp |
 | [#6154](../sources/prs/ncnn/PR-6154.md) | flexible coopmat mnk and unified elempack for vulkan convolution 1x1s1d1 | 2025-07-03 |  | cooperative-matrix, convolution, glsl |
 | [#6132](../sources/prs/ncnn/PR-6132.md) | vulkan absval unified elempack shader | 2025-06-18 |  | glsl, cpp |
-| [#6128](../sources/prs/ncnn/PR-6128.md) | vulkan packing code clean, drop image storage type | 2025-06-17 |  | glsl, cpp |
-| [#6127](../sources/prs/ncnn/PR-6127.md) | vulkan tight fp16p pack1 | 2025-06-16 |  | fp16-arithmetic, gemm, convolution |
-| [#6116](../sources/prs/ncnn/PR-6116.md) | unified vulkan khr/nv cooperative matrix shader | 2025-06-11 |  | cooperative-matrix, gemm, convolution |
+| [#6128](../sources/prs/ncnn/PR-6128.md) | vulkan packing code clean, drop image storage type | 2025-06-17 | channel-packing | channel-packing, glsl, cpp |
+| [#6127](../sources/prs/ncnn/PR-6127.md) | vulkan tight fp16p pack1 | 2025-06-16 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
+| [#6116](../sources/prs/ncnn/PR-6116.md) | unified vulkan khr/nv cooperative matrix shader | 2025-06-11 | winograd-convolution, channel-packing | cooperative-matrix, winograd-convolution, channel-packing |
 | [#6111](../sources/prs/ncnn/PR-6111.md) | fix vulkan validation error, do not enforce local_size_x be multiple of subgroup size | 2025-06-06 |  | subgroup-size, cpp |
 | [#6100](../sources/prs/ncnn/PR-6100.md) | force subgroup 32 for cooperative matrix shader atm | 2025-05-31 |  | cooperative-matrix, cpp |
 | [#6067](../sources/prs/ncnn/PR-6067.md) | gpu info query cooperative matrix properties | 2025-05-21 |  | cooperative-matrix, cpp |
-| [#6034](../sources/prs/ncnn/PR-6034.md) | fix vulkan driver blacklist | 2025-05-03 |  | cpp |
-| [#6029](../sources/prs/ncnn/PR-6029.md) | fix shader compile failure on nvidia | 2025-04-28 |  | glsl |
-| [#5952](../sources/prs/ncnn/PR-5952.md) | clean vulkan shader common extension | 2025-03-28 |  | fp16-arithmetic, gemm, convolution |
-| [#5953](../sources/prs/ncnn/PR-5953.md) | workaround vulkan padding stall with new nvidia driver | 2025-03-28 |  | glsl |
-| [#5955](../sources/prs/ncnn/PR-5955.md) | discover VK_KHR_shader_non_semantic_info, checked convolution imagestore | 2025-03-28 |  | convolution, glsl, cpp |
+| [#6034](../sources/prs/ncnn/PR-6034.md) | fix vulkan driver blacklist | 2025-05-03 | driver-workaround | driver-workaround, cpp |
+| [#6029](../sources/prs/ncnn/PR-6029.md) | fix shader compile failure on nvidia | 2025-04-28 | channel-packing | channel-packing, glsl |
+| [#5952](../sources/prs/ncnn/PR-5952.md) | clean vulkan shader common extension | 2025-03-28 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
+| [#5953](../sources/prs/ncnn/PR-5953.md) | workaround vulkan padding stall with new nvidia driver | 2025-03-28 | driver-workaround, channel-packing | driver-workaround, channel-packing, glsl |
+| [#5955](../sources/prs/ncnn/PR-5955.md) | discover VK_KHR_shader_non_semantic_info, checked convolution imagestore | 2025-03-28 | channel-packing | channel-packing, convolution, glsl |
 | [#5946](../sources/prs/ncnn/PR-5946.md) | discover all subgroup features and VK_KHR_shader_subgroup_extended_types | 2025-03-26 |  | cpp |
-| [#5949](../sources/prs/ncnn/PR-5949.md) | define device feature macros for glslang, discover VK_EXT_shader_atomic_float and VK_EXT_shader_atomic_float2 | 2025-03-26 |  | glsl, cpp, python |
-| [#5931](../sources/prs/ncnn/PR-5931.md) | softmax 4d test and vulkan, softmax unified elempack optimization for x86 arm riscv | 2025-03-10 |  | softmax, glsl, cpp |
-| [#5739](../sources/prs/ncnn/PR-5739.md) | blacklist mesa vulkan cooperative matrix feature | 2024-10-16 |  | cooperative-matrix, cpp |
-| [#5298](../sources/prs/ncnn/PR-5298.md) | report vulkan cm 8x8x16 config, enable fp16a cm | 2024-01-18 |  | fp16-arithmetic, gemm, convolution |
+| [#5949](../sources/prs/ncnn/PR-5949.md) | define device feature macros for glslang, discover VK_EXT_shader_atomic_float and VK_EXT_shader_atomic_float2 | 2025-03-26 | channel-packing | channel-packing, glsl, cpp |
+| [#5931](../sources/prs/ncnn/PR-5931.md) | softmax 4d test and vulkan, softmax unified elempack optimization for x86 arm riscv | 2025-03-10 | channel-packing | channel-packing, softmax, glsl |
+| [#5739](../sources/prs/ncnn/PR-5739.md) | blacklist mesa vulkan cooperative matrix feature | 2024-10-16 | driver-workaround | cooperative-matrix, driver-workaround, cpp |
+| [#5298](../sources/prs/ncnn/PR-5298.md) | report vulkan cm 8x8x16 config, enable fp16a cm | 2024-01-18 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
 | [#5287](../sources/prs/ncnn/PR-5287.md) | check vulkan fp16 uniform support and implement lfp conversion without fp16u | 2024-01-15 |  | fp16-arithmetic, cpp |
 | [#5233](../sources/prs/ncnn/PR-5233.md) | enable uniform 16bit and 8bit when available, fix validation error in fp16sa shader | 2023-12-19 |  | fp16-arithmetic, cpp |
-| [#5191](../sources/prs/ncnn/PR-5191.md) | optimize vulkan global pooling | 2023-12-01 |  | glsl, cpp |
-| [#5095](../sources/prs/ncnn/PR-5095.md) | simplify vulkan conv1d | 2023-10-23 |  | convolution, glsl, cpp |
-| [#5060](../sources/prs/ncnn/PR-5060.md) | Vulkan conv1d | 2023-09-29 |  | convolution, glsl, cpp |
-| [#5001](../sources/prs/ncnn/PR-5001.md) | add gelu vulkan operator | 2023-09-03 |  | elementwise, glsl, cpp |
-| [#4973](../sources/prs/ncnn/PR-4973.md) | fix convolution winograd43 vulkan on fixed shape hint | 2023-08-24 |  | convolution, cpp |
-| [#4682](../sources/prs/ncnn/PR-4682.md) | workaround multiheadattention vulkan nan issue on nvidia gpu | 2023-04-28 |  | cpp |
-| [#4618](../sources/prs/ncnn/PR-4618.md) | vulkan gemm and multiheadattention | 2023-04-12 |  | gemm, glsl, cpp |
-| [#4496](../sources/prs/ncnn/PR-4496.md) | reduce vulkan winograd f43 transform shader register pressure | 2023-01-31 |  | convolution, glsl |
-| [#4492](../sources/prs/ncnn/PR-4492.md) | improve vulkan winograd f43 fp16 numerical stability | 2023-01-30 |  | fp16-arithmetic, convolution, glsl |
-| [#4280](../sources/prs/ncnn/PR-4280.md) | add elu vulkan operator | 2022-10-17 |  | elementwise, glsl, cpp |
-| [#4093](../sources/prs/ncnn/PR-4093.md) | fix vulkan winograd weight layout with cooperative matrix enabled | 2022-07-28 |  | cooperative-matrix, cpp |
-| [#3731](../sources/prs/ncnn/PR-3731.md) | vulkan int8 packing quantize dequantize requantize | 2022-04-24 |  | dequantize, glsl, cpp |
-| [#3711](../sources/prs/ncnn/PR-3711.md) | shader include vulkan activation, workaround for moltenvk tanh issue | 2022-04-16 |  | gemm, convolution, elementwise |
-| [#3657](../sources/prs/ncnn/PR-3657.md) | less specialization constant for vulkan conv1x1s1d1 shaders | 2022-03-27 |  | specialization-constants, convolution, glsl |
-| [#3646](../sources/prs/ncnn/PR-3646.md) | vulkan conv1x1s1d1 for any packing | 2022-03-23 |  | convolution, glsl, cpp |
-| [#3645](../sources/prs/ncnn/PR-3645.md) | vulkan winograd for any packing | 2022-03-22 |  | gemm, convolution, glsl |
-| [#3642](../sources/prs/ncnn/PR-3642.md) | two stage vulkan innerproduct | 2022-03-21 |  | glsl, cpp |
-| [#3640](../sources/prs/ncnn/PR-3640.md) | fuse vulkan winograd pad and crop | 2022-03-20 |  | convolution, glsl, cpp |
-| [#3639](../sources/prs/ncnn/PR-3639.md) | mix vulkan winograd f23 and f43 | 2022-03-19 |  | cpp |
-| [#3632](../sources/prs/ncnn/PR-3632.md) | massive vulkan optimization part3 | 2022-03-17 |  | gemm, convolution, glsl |
-| [#3628](../sources/prs/ncnn/PR-3628.md) | vulkan tensorcore optimization | 2022-03-16 |  | gemm, convolution, glsl |
-| [#3621](../sources/prs/ncnn/PR-3621.md) | massive vulkan optimization part2 | 2022-03-15 |  | gemm, convolution, glsl |
-| [#3602](../sources/prs/ncnn/PR-3602.md) | massive vulkan optimization | 2022-03-08 |  | gemm, convolution, glsl |
-| [#2698](../sources/prs/ncnn/PR-2698.md) | fix adaptive avg pooling accumulation overflow in vulkan using fp16 arithmetic | 2021-02-22 |  | fp16-arithmetic, glsl |
-| [#2681](../sources/prs/ncnn/PR-2681.md) | support adaptive_pooling in vulkan implementation | 2021-02-17 |  | glsl, cpp |
+| [#5191](../sources/prs/ncnn/PR-5191.md) | optimize vulkan global pooling | 2023-12-01 | channel-packing | channel-packing, glsl, cpp |
+| [#5095](../sources/prs/ncnn/PR-5095.md) | simplify vulkan conv1d | 2023-10-23 | channel-packing | channel-packing, convolution, glsl |
+| [#5060](../sources/prs/ncnn/PR-5060.md) | Vulkan conv1d | 2023-09-29 | channel-packing | channel-packing, convolution, glsl |
+| [#5001](../sources/prs/ncnn/PR-5001.md) | add gelu vulkan operator | 2023-09-03 | channel-packing | channel-packing, elementwise, glsl |
+| [#4973](../sources/prs/ncnn/PR-4973.md) | fix convolution winograd43 vulkan on fixed shape hint | 2023-08-24 | winograd-convolution | winograd-convolution, convolution, cpp |
+| [#4682](../sources/prs/ncnn/PR-4682.md) | workaround multiheadattention vulkan nan issue on nvidia gpu | 2023-04-28 | driver-workaround | driver-workaround, cpp |
+| [#4618](../sources/prs/ncnn/PR-4618.md) | vulkan gemm and multiheadattention | 2023-04-12 | channel-packing | channel-packing, gemm, glsl |
+| [#4496](../sources/prs/ncnn/PR-4496.md) | reduce vulkan winograd f43 transform shader register pressure | 2023-01-31 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, convolution |
+| [#4492](../sources/prs/ncnn/PR-4492.md) | improve vulkan winograd f43 fp16 numerical stability | 2023-01-30 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
+| [#4280](../sources/prs/ncnn/PR-4280.md) | add elu vulkan operator | 2022-10-17 | channel-packing | channel-packing, elementwise, glsl |
+| [#4093](../sources/prs/ncnn/PR-4093.md) | fix vulkan winograd weight layout with cooperative matrix enabled | 2022-07-28 | winograd-convolution | cooperative-matrix, winograd-convolution, cpp |
+| [#3731](../sources/prs/ncnn/PR-3731.md) | vulkan int8 packing quantize dequantize requantize | 2022-04-24 | channel-packing | channel-packing, dequantize, glsl |
+| [#3711](../sources/prs/ncnn/PR-3711.md) | shader include vulkan activation, workaround for moltenvk tanh issue | 2022-04-16 | driver-workaround, winograd-convolution, channel-packing | driver-workaround, winograd-convolution, channel-packing |
+| [#3657](../sources/prs/ncnn/PR-3657.md) | less specialization constant for vulkan conv1x1s1d1 shaders | 2022-03-27 | channel-packing | specialization-constants, channel-packing, convolution |
+| [#3646](../sources/prs/ncnn/PR-3646.md) | vulkan conv1x1s1d1 for any packing | 2022-03-23 | channel-packing | channel-packing, convolution, glsl |
+| [#3645](../sources/prs/ncnn/PR-3645.md) | vulkan winograd for any packing | 2022-03-22 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, gemm |
+| [#3642](../sources/prs/ncnn/PR-3642.md) | two stage vulkan innerproduct | 2022-03-21 | channel-packing | channel-packing, glsl, cpp |
+| [#3640](../sources/prs/ncnn/PR-3640.md) | fuse vulkan winograd pad and crop | 2022-03-20 | kernel-fusion, winograd-convolution, channel-packing | kernel-fusion, winograd-convolution, channel-packing |
+| [#3639](../sources/prs/ncnn/PR-3639.md) | mix vulkan winograd f23 and f43 | 2022-03-19 | winograd-convolution | winograd-convolution, cpp |
+| [#3632](../sources/prs/ncnn/PR-3632.md) | massive vulkan optimization part3 | 2022-03-17 | channel-packing | channel-packing, gemm, convolution |
+| [#3628](../sources/prs/ncnn/PR-3628.md) | vulkan tensorcore optimization | 2022-03-16 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, gemm |
+| [#3621](../sources/prs/ncnn/PR-3621.md) | massive vulkan optimization part2 | 2022-03-15 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, gemm |
+| [#3602](../sources/prs/ncnn/PR-3602.md) | massive vulkan optimization | 2022-03-08 | winograd-convolution, channel-packing | winograd-convolution, channel-packing, gemm |
+| [#2698](../sources/prs/ncnn/PR-2698.md) | fix adaptive avg pooling accumulation overflow in vulkan using fp16 arithmetic | 2021-02-22 | channel-packing | fp16-arithmetic, channel-packing, glsl |
+| [#2681](../sources/prs/ncnn/PR-2681.md) | support adaptive_pooling in vulkan implementation | 2021-02-17 | channel-packing | channel-packing, glsl, cpp |
 | [#2618](../sources/prs/ncnn/PR-2618.md) | reduce innerproduct gemm gpu memory usage | 2021-01-24 |  | gemm, glsl, cpp |
-| [#2231](../sources/prs/ncnn/PR-2231.md) | unified image shader storage type | 2020-10-18 |  | fp16-arithmetic, convolution, softmax |
-| [#1752](../sources/prs/ncnn/PR-1752.md) | Optimize Mish vulkan performance | 2020-05-12 |  | glsl |
-| [#1714](../sources/prs/ncnn/PR-1714.md) | adreno image shader + fp16 + fp16a | 2020-04-22 |  | fp16-arithmetic, gemm, convolution |
-| [#1636](../sources/prs/ncnn/PR-1636.md) | test fp16 packed and shader pack8 option | 2020-03-20 |  | fp16-arithmetic, glsl, cpp |
-| [#1523](../sources/prs/ncnn/PR-1523.md) | shader shape specialization constant and basic local group size partition | 2020-02-04 |  | fp16-arithmetic, specialization-constants, gemm |
-| [#1231](../sources/prs/ncnn/PR-1231.md) | 修改最新版ncnn/src/layer/vulkan/shader目录下的几个文件，以适配最新版的glslang，本次修改已在大疆Mani… | 2019-09-03 |  | softmax, glsl |
-| [#772](../sources/prs/ncnn/PR-772.md) | massive simd optimize in compute shader | 2019-01-27 |  | convolution, softmax, glsl |
+| [#2231](../sources/prs/ncnn/PR-2231.md) | unified image shader storage type | 2020-10-18 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
+| [#1752](../sources/prs/ncnn/PR-1752.md) | Optimize Mish vulkan performance | 2020-05-12 | channel-packing | channel-packing, glsl |
+| [#1714](../sources/prs/ncnn/PR-1714.md) | adreno image shader + fp16 + fp16a | 2020-04-22 | winograd-convolution, channel-packing | fp16-arithmetic, winograd-convolution, channel-packing |
+| [#1636](../sources/prs/ncnn/PR-1636.md) | test fp16 packed and shader pack8 option | 2020-03-20 | channel-packing | fp16-arithmetic, channel-packing, glsl |
+| [#1523](../sources/prs/ncnn/PR-1523.md) | shader shape specialization constant and basic local group size partition | 2020-02-04 | winograd-convolution, channel-packing | fp16-arithmetic, specialization-constants, winograd-convolution |
+| [#1231](../sources/prs/ncnn/PR-1231.md) | 修改最新版ncnn/src/layer/vulkan/shader目录下的几个文件，以适配最新版的glslang，本次修改已在大疆Mani… | 2019-09-03 | channel-packing | channel-packing, softmax, glsl |
+| [#772](../sources/prs/ncnn/PR-772.md) | massive simd optimize in compute shader | 2019-01-27 | channel-packing | channel-packing, convolution, softmax |
 | [#618](../sources/prs/ncnn/PR-618.md) | [WIP] vulkan compute | 2018-10-24 |  | convolution, softmax, elementwise |
 
 <a id="ggml-orgllama.cpp"></a>
@@ -119,24 +119,24 @@
 | PR | Title | Date | Techniques | Tags |
 |-----|-------|------|------------|------|
 | [#29988](../sources/prs/llama-cpp/PR-29988.md) | vulkan: fix Flash Attention shmem write out of bounds | 2026-10-05 |  | shared-memory-limit, sdpa, glsl |
-| [#29934](../sources/prs/llama-cpp/PR-29934.md) | vulkan: fix rdna4 mat_vec tuning | 2026-10-04 |  | cpp |
-| [#29936](../sources/prs/llama-cpp/PR-29936.md) | vulkan: revert mul_mat_id tile selection PR #29182 | 2026-10-04 |  | moe, cpp |
+| [#29934](../sources/prs/llama-cpp/PR-29934.md) | vulkan: fix rdna4 mat_vec tuning | 2026-10-04 | device-specific-tuning | device-specific-tuning, cpp |
+| [#29936](../sources/prs/llama-cpp/PR-29936.md) | vulkan: revert mul_mat_id tile selection PR #29182 | 2026-10-04 | workgroup-tile-sizing | workgroup-tile-sizing, moe, cpp |
 | [#29639](../sources/prs/llama-cpp/PR-29639.md) | vulkan: sparse flash attention for quantized K/V | 2026-09-29 |  | sdpa, glsl, cpp |
-| [#29520](../sources/prs/llama-cpp/PR-29520.md) | vulkan: fuse qwen4exp's SCALE -> SIGMOID -> SCALE -> hc_post chain | 2026-09-27 |  | glsl, cpp |
+| [#29520](../sources/prs/llama-cpp/PR-29520.md) | vulkan: fuse qwen4exp's SCALE -> SIGMOID -> SCALE -> hc_post chain | 2026-09-27 | kernel-fusion | kernel-fusion, glsl, cpp |
 | [#29469](../sources/prs/llama-cpp/PR-29469.md) | vulkan: fix argsort kernel selection for Adreno | 2026-09-26 |  | topk-sort, cpp |
-| [#29476](../sources/prs/llama-cpp/PR-29476.md) | vulkan: Tune GDN kernel, fix Intel performance | 2026-09-26 |  | gated-delta-net, cpp |
+| [#29476](../sources/prs/llama-cpp/PR-29476.md) | vulkan: Tune GDN kernel, fix Intel performance | 2026-09-26 | device-specific-tuning | device-specific-tuning, gated-delta-net, cpp |
 | [#29365](../sources/prs/llama-cpp/PR-29365.md) | vulkan: handle misalignment in conv_2d and conv_3d | 2026-09-24 |  | convolution, glsl, cpp |
-| [#29328](../sources/prs/llama-cpp/PR-29328.md) | vulkan: tune KHR cooperative matrix support for Adreno GPUs | 2026-09-23 |  | cooperative-matrix, cpp |
+| [#29328](../sources/prs/llama-cpp/PR-29328.md) | vulkan: tune KHR cooperative matrix support for Adreno GPUs | 2026-09-23 | device-specific-tuning | cooperative-matrix, device-specific-tuning, cpp |
 | [#29254](../sources/prs/llama-cpp/PR-29254.md) | [vulkan] Load F32 A matrix 2 at a time when its 2-aligned | 2026-09-21 |  | gemv, dequantize, glsl |
-| [#29182](../sources/prs/llama-cpp/PR-29182.md) | vulkan: MOE aware mul_mat_id tile selection | 2026-09-20 |  | moe, cpp |
-| [#28975](../sources/prs/llama-cpp/PR-28975.md) | vulkan: work around NV bug with argsort_large.comp | 2026-09-16 |  | topk-sort, glsl |
+| [#29182](../sources/prs/llama-cpp/PR-29182.md) | vulkan: MOE aware mul_mat_id tile selection | 2026-09-20 | workgroup-tile-sizing | workgroup-tile-sizing, moe, cpp |
+| [#28975](../sources/prs/llama-cpp/PR-28975.md) | vulkan: work around NV bug with argsort_large.comp | 2026-09-16 | driver-workaround | driver-workaround, topk-sort, glsl |
 | [#28988](../sources/prs/llama-cpp/PR-28988.md) | vulkan: support qwen4exp hc ops | 2026-09-16 |  | glsl, cpp |
 | [#28996](../sources/prs/llama-cpp/PR-28996.md) | vulkan: fix buffer_reference alignment in im2col shaders | 2026-09-16 |  | convolution, glsl |
-| [#28923](../sources/prs/llama-cpp/PR-28923.md) | vulkan : use BN/2 tail for MMID coopmat2 s tile | 2026-09-15 |  | cooperative-matrix, cooperative-matrix2, gemm |
+| [#28923](../sources/prs/llama-cpp/PR-28923.md) | vulkan : use BN/2 tail for MMID coopmat2 s tile | 2026-09-15 | workgroup-tile-sizing | cooperative-matrix, cooperative-matrix2, workgroup-tile-sizing |
 | [#28822](../sources/prs/llama-cpp/PR-28822.md) | vulkan: add IQ3_S  MMQ matmul kernels | 2026-09-12 |  | shared-memory-limit, gemm, glsl |
 | [#28705](../sources/prs/llama-cpp/PR-28705.md) | vulkan: fix data race and OOB access in argsort(large) | 2026-09-10 |  | topk-sort, glsl |
 | [#28592](../sources/prs/llama-cpp/PR-28592.md) | vulkan: Convert FILL to distribute workgroups in 2D to avoid exceeding maxComputeWorkGroupCount | 2026-09-08 |  | tensor-copy, glsl, cpp |
-| [#28531](../sources/prs/llama-cpp/PR-28531.md) | vulkan: disable large matmul tile on Samsung GPUs with 32KB shared memory | 2026-09-07 |  | shared-memory-limit, gemm, cpp |
+| [#28531](../sources/prs/llama-cpp/PR-28531.md) | vulkan: disable large matmul tile on Samsung GPUs with 32KB shared memory | 2026-09-07 | workgroup-tile-sizing | shared-memory-limit, workgroup-tile-sizing, gemm |
 | [#28501](../sources/prs/llama-cpp/PR-28501.md) | vulkan: raise the hoisted row-id limit for mul_mat_id from 256 to 512 experts | 2026-09-06 |  | moe, glsl, cpp |
 | [#28426](../sources/prs/llama-cpp/PR-28426.md) | vulkan: add dedicated iq4_xs mat-vec shader | 2026-09-05 |  | gemv, glsl, cpp |
 | [#28440](../sources/prs/llama-cpp/PR-28440.md) | vulkan: optimize IQ4_XS matmul kernels | 2026-09-05 |  | cooperative-matrix, gemm, glsl |
@@ -146,26 +146,26 @@
 | [#28253](../sources/prs/llama-cpp/PR-28253.md) | vulkan: support type-aligned GET_ROWS | 2026-09-02 |  | tensor-copy, glsl, cpp |
 | [#28190](../sources/prs/llama-cpp/PR-28190.md) | vulkan: fix FA dequant path engagement | 2026-09-01 |  | dequantize, cpp |
 | [#28105](../sources/prs/llama-cpp/PR-28105.md) | vulkan: support sparse Flash Attention | 2026-08-31 |  | cooperative-matrix, cooperative-matrix2, sdpa |
-| [#28024](../sources/prs/llama-cpp/PR-28024.md) | vulkan: rms_norm fusion opportunities | 2026-08-30 |  | normalization, glsl, cpp |
+| [#28024](../sources/prs/llama-cpp/PR-28024.md) | vulkan: rms_norm fusion opportunities | 2026-08-30 | kernel-fusion | kernel-fusion, normalization, glsl |
 | [#28032](../sources/prs/llama-cpp/PR-28032.md) | vulkan: top_k radix select for k >= 1024 for Qwen 3.8 Flash Next | 2026-08-30 |  | topk-sort, glsl, cpp |
 | [#27925](../sources/prs/llama-cpp/PR-27925.md) | vulkan: Change mul_mat_id to pad K rather than N | 2026-08-29 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#27952](../sources/prs/llama-cpp/PR-27952.md) | vulkan: int8 coopmat1 matmul implementation for AMD RDNA3 and RDNA4 | 2026-08-29 |  | cooperative-matrix, int8-cooperative-matrix, gemm |
-| [#27909](../sources/prs/llama-cpp/PR-27909.md) | vulkan: tune mat-vec rows for batched inference on Strix Halo | 2026-08-28 |  | cpp |
-| [#27726](../sources/prs/llama-cpp/PR-27726.md) | vulkan: warptiles currently assume warp sizes <= 64, clamp to work around larger warps | 2026-08-26 |  | cpp |
+| [#27909](../sources/prs/llama-cpp/PR-27909.md) | vulkan: tune mat-vec rows for batched inference on Strix Halo | 2026-08-28 | device-specific-tuning | device-specific-tuning, cpp |
+| [#27726](../sources/prs/llama-cpp/PR-27726.md) | vulkan: warptiles currently assume warp sizes <= 64, clamp to work around larger warps | 2026-08-26 | workgroup-tile-sizing, driver-workaround | workgroup-tile-sizing, driver-workaround, cpp |
 | [#27765](../sources/prs/llama-cpp/PR-27765.md) | vulkan: add TQ1_0 support (mm, mat-vec, mat-vec-id, dequant, get_rows) | 2026-08-26 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#27526](../sources/prs/llama-cpp/PR-27526.md) | vulkan: combine duplicated fastdiv functions, rename the one optimizing small divs | 2026-08-22 |  | moe, convolution, glsl |
-| [#27471](../sources/prs/llama-cpp/PR-27471.md) | vulkan: add f16 B-type matmul pipelines and warp tile size tuning for Intel coopmat1 | 2026-08-21 |  | cooperative-matrix, fp16-arithmetic, gemm |
+| [#27471](../sources/prs/llama-cpp/PR-27471.md) | vulkan: add f16 B-type matmul pipelines and warp tile size tuning for Intel coopmat1 | 2026-08-21 | workgroup-tile-sizing, device-specific-tuning | cooperative-matrix, fp16-arithmetic, workgroup-tile-sizing |
 | [#27449](../sources/prs/llama-cpp/PR-27449.md) | vulkan: handle larger batch sizes (>4) efficiently for IQ3_S mat-vec … | 2026-08-20 |  | gemv, glsl, cpp |
 | [#27453](../sources/prs/llama-cpp/PR-27453.md) | Feature: Added LIGHTNING_INDEXER support for Deepseek V4 ops on Vulkan Backend | 2026-08-20 |  | sdpa, glsl, cpp |
 | [#27413](../sources/prs/llama-cpp/PR-27413.md) | vulkan: FA MMQ should use fp32 for Q quantization calculations | 2026-08-19 |  | gemm, sdpa, glsl |
 | [#27344](../sources/prs/llama-cpp/PR-27344.md) | ggml: support ggml_rope_set_offset on vulkan | 2026-08-18 |  | rope, glsl, cpp |
 | [#27216](../sources/prs/llama-cpp/PR-27216.md) | Implemented vulkan backend ops for cross entropy loss  and cross_entropy_loss_back | 2026-08-17 |  | glsl, cpp |
-| [#27220](../sources/prs/llama-cpp/PR-27220.md) | vulkan : fuse UNARY(GELU\|SIGMOID\|SILU\|SOFTPLUS) + MUL | 2026-08-17 |  | elementwise, glsl, cpp |
+| [#27220](../sources/prs/llama-cpp/PR-27220.md) | vulkan : fuse UNARY(GELU\|SIGMOID\|SILU\|SOFTPLUS) + MUL | 2026-08-17 | kernel-fusion | kernel-fusion, elementwise, glsl |
 | [#26686](../sources/prs/llama-cpp/PR-26686.md) | Vulkan: add hoisting support for row IDs and expert count in shaders | 2026-08-06 |  | cooperative-matrix, cooperative-matrix2, gemm |
-| [#26578](../sources/prs/llama-cpp/PR-26578.md) | vulkan: add DeepSeek-V4 hyper-connection fused ops (DSV4_HC_COMB/PRE/POST) | 2026-08-04 |  | glsl, cpp |
+| [#26578](../sources/prs/llama-cpp/PR-26578.md) | vulkan: add DeepSeek-V4 hyper-connection fused ops (DSV4_HC_COMB/PRE/POST) | 2026-08-04 | kernel-fusion | kernel-fusion, glsl, cpp |
 | [#26585](../sources/prs/llama-cpp/PR-26585.md) | vulkan: tiled transpose for 0<->2 permuted CONT | 2026-08-04 |  | tensor-copy, glsl, cpp |
 | [#26586](../sources/prs/llama-cpp/PR-26586.md) | vulkan : added the PAD_REFLECT_1D operation | 2026-08-04 |  | glsl, cpp |
-| [#26124](../sources/prs/llama-cpp/PR-26124.md) | vulkan: extend topk_moe fusion to support sqrt(softplus) | 2026-07-25 |  | moe, topk-sort, glsl |
+| [#26124](../sources/prs/llama-cpp/PR-26124.md) | vulkan: extend topk_moe fusion to support sqrt(softplus) | 2026-07-25 | kernel-fusion | kernel-fusion, moe, topk-sort |
 | [#25850](../sources/prs/llama-cpp/PR-25850.md) | vulkan: add TQ2_0 (ternary) support | 2026-07-18 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#25773](../sources/prs/llama-cpp/PR-25773.md) | vulkan: use spec constant for matrix matrix multiplication A-type | 2026-07-16 |  | cooperative-matrix, cooperative-matrix2, shared-memory-limit |
 | [#25601](../sources/prs/llama-cpp/PR-25601.md) | vulkan backend ops: implemented GATED_LINEAR_ATTN | 2026-07-12 |  | glsl, cpp |
@@ -178,8 +178,8 @@
 | [#25338](../sources/prs/llama-cpp/PR-25338.md) | vulkan: Use native e2m1 and e4m3 conversions for mxfp4/nvfp4 | 2026-07-06 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#25036](../sources/prs/llama-cpp/PR-25036.md) | vulkan: fix step operator for 0 input | 2026-06-26 |  | elementwise, glsl |
 | [#24909](../sources/prs/llama-cpp/PR-24909.md) | vulkan: Apply bias before softmax in FA, to avoid overflow | 2026-06-22 |  | cooperative-matrix, sdpa, softmax |
-| [#24924](../sources/prs/llama-cpp/PR-24924.md) | vulkan: Workaround compiler bug in conv2d coopmat2 path | 2026-06-22 |  | cooperative-matrix, cooperative-matrix2, convolution |
-| [#24877](../sources/prs/llama-cpp/PR-24877.md) | Vulkan: route large matmuls to medium tile on Adreno | 2026-06-21 |  | gemm, cpp |
+| [#24924](../sources/prs/llama-cpp/PR-24924.md) | vulkan: Workaround compiler bug in conv2d coopmat2 path | 2026-06-22 | driver-workaround | cooperative-matrix, cooperative-matrix2, driver-workaround |
+| [#24877](../sources/prs/llama-cpp/PR-24877.md) | Vulkan: route large matmuls to medium tile on Adreno | 2026-06-21 | workgroup-tile-sizing | workgroup-tile-sizing, gemm, cpp |
 | [#24883](../sources/prs/llama-cpp/PR-24883.md) | vulkan: Support GET_ROWS_BACK | 2026-06-21 |  | tensor-copy, glsl, cpp |
 | [#24689](../sources/prs/llama-cpp/PR-24689.md) | vulkan: make mul_mm ALIGNED a spec constant | 2026-06-16 |  | cooperative-matrix, cooperative-matrix2, specialization-constants |
 | [#24663](../sources/prs/llama-cpp/PR-24663.md) | vulkan: roll bk loop in matmul for asahi linux | 2026-06-15 |  | gemm, cpp |
@@ -191,7 +191,7 @@
 | [#24425](../sources/prs/llama-cpp/PR-24425.md) | vulkan: add col2im_1d op | 2026-06-10 |  | convolution, glsl, cpp |
 | [#24362](../sources/prs/llama-cpp/PR-24362.md) | vulkan: disable FA mask_opt on GCN to improve performance | 2026-06-09 |  | cpp |
 | [#24287](../sources/prs/llama-cpp/PR-24287.md) | vulkan: reduce iq1 shared memory usage for mul_mm | 2026-06-08 |  | shared-memory-limit, gemm, gemv |
-| [#24306](../sources/prs/llama-cpp/PR-24306.md) | vulkan: use medium matmul tile on Asahi Linux | 2026-06-08 |  | gemm, cpp |
+| [#24306](../sources/prs/llama-cpp/PR-24306.md) | vulkan: use medium matmul tile on Asahi Linux | 2026-06-08 | workgroup-tile-sizing | workgroup-tile-sizing, gemm, cpp |
 | [#24186](../sources/prs/llama-cpp/PR-24186.md) | vulkan: check coopmat2 features before reporting support | 2026-06-05 |  | cooperative-matrix, cooperative-matrix2, cpp |
 | [#24215](../sources/prs/llama-cpp/PR-24215.md) | vulkan: support non-contig unary/glu ops | 2026-06-05 |  | elementwise, glsl, cpp |
 | [#24123](../sources/prs/llama-cpp/PR-24123.md) | vulkan: add `v_dot2_f32_f16` support in matrix-matrix multiplication and Flash Attention | 2026-06-04 |  | fp16-arithmetic, gemm, sdpa |
@@ -205,12 +205,12 @@
 | [#23005](../sources/prs/llama-cpp/PR-23005.md) | vulkan: fix matmul integer pipeline selection | 2026-05-13 |  | gemm, cpp |
 | [#22933](../sources/prs/llama-cpp/PR-22933.md) | vulkan: opt mul_mat_vecq for mi50 | 2026-05-11 |  | gemv, glsl, cpp |
 | [#22887](../sources/prs/llama-cpp/PR-22887.md) | vulkan: Switch MUL_MAT_VEC to 4 K per iteration for F16/32 | 2026-05-09 |  | fp16-arithmetic, gemv, dequantize |
-| [#22855](../sources/prs/llama-cpp/PR-22855.md) | vulkan: fuse snake activation (mul, sin, sqr, mul, add) | 2026-05-08 |  | glsl, cpp |
+| [#22855](../sources/prs/llama-cpp/PR-22855.md) | vulkan: fuse snake activation (mul, sin, sqr, mul, add) | 2026-05-08 | kernel-fusion | kernel-fusion, glsl, cpp |
 | [#22677](../sources/prs/llama-cpp/PR-22677.md) | vulkan: add cpy bf16 -> f32 pipelines | 2026-05-04 |  | bfloat16-arithmetic, fp16-arithmetic, tensor-copy |
 | [#22685](../sources/prs/llama-cpp/PR-22685.md) | vulkan: optimize operations in the IM2COL shader | 2026-05-04 |  | convolution, glsl |
 | [#22693](../sources/prs/llama-cpp/PR-22693.md) | vulkan: Check shared memory size for mmq shaders | 2026-05-04 |  | shared-memory-limit, gemm, cpp |
 | [#22637](../sources/prs/llama-cpp/PR-22637.md) | vulkan: Support unaligned tensors for ROPE | 2026-05-03 |  | rope, glsl, cpp |
-| [#22653](../sources/prs/llama-cpp/PR-22653.md) | vulkan: fuse SSM_CONV + ADD + SILU | 2026-05-03 |  | glsl, cpp |
+| [#22653](../sources/prs/llama-cpp/PR-22653.md) | vulkan: fuse SSM_CONV + ADD + SILU | 2026-05-03 | kernel-fusion | kernel-fusion, glsl, cpp |
 | [#22620](../sources/prs/llama-cpp/PR-22620.md) | vulkan: optimize conv2d and implement coopmat1 support | 2026-05-02 |  | cooperative-matrix, convolution, glsl |
 | [#22589](../sources/prs/llama-cpp/PR-22589.md) | vulkan: Support asymmetric FA in scalar/mmq/coopmat1 paths | 2026-05-01 |  | cooperative-matrix, cooperative-matrix2, shared-memory-limit |
 | [#22461](../sources/prs/llama-cpp/PR-22461.md) | vulkan: Fix Windows performance regression on Intel GPU BF16 workloads for Xe2 and newer | 2026-04-28 |  | bfloat16-arithmetic, fp16-arithmetic, cpp |
@@ -235,7 +235,7 @@
 | [#20219](../sources/prs/llama-cpp/PR-20219.md) | ggml-vulkan: add SGN operator, auto-generate Vulkan.csv and ops.md | 2026-03-08 |  | elementwise, glsl, cpp |
 | [#20183](../sources/prs/llama-cpp/PR-20183.md) | ggml-vulkan: Add ELU op support | 2026-03-07 |  | elementwise, glsl, cpp |
 | [#20084](../sources/prs/llama-cpp/PR-20084.md) | vulkan: Fix data races in coopmat1 mul_mat(_id) | 2026-03-03 |  | cooperative-matrix, gemm, glsl |
-| [#19988](../sources/prs/llama-cpp/PR-19988.md) | vulkan: tune MMVQ for Intel Windows | 2026-02-28 |  | gemv, cpp |
+| [#19988](../sources/prs/llama-cpp/PR-19988.md) | vulkan: tune MMVQ for Intel Windows | 2026-02-28 | device-specific-tuning | device-specific-tuning, gemv, cpp |
 | [#19921](../sources/prs/llama-cpp/PR-19921.md) | vulkan: fix fp16 Flash Attention on Windows AMD RDNA2 and below | 2026-02-26 |  | fp16-arithmetic, sdpa, glsl |
 | [#19793](../sources/prs/llama-cpp/PR-19793.md) | vulkan: fix coopmat1 without bf16 support | 2026-02-22 |  | cooperative-matrix, bfloat16-arithmetic, fp16-arithmetic |
 | [#19790](../sources/prs/llama-cpp/PR-19790.md) | vulkan: fix data race in mul_mat_id shader | 2026-02-21 |  | cooperative-matrix, cooperative-matrix2, gemm |
@@ -253,10 +253,10 @@
 | [#19301](../sources/prs/llama-cpp/PR-19301.md) | vulkan: Set k_load_shmem to false when K is too large | 2026-02-03 |  | shared-memory-limit, cpp |
 | [#19309](../sources/prs/llama-cpp/PR-19309.md) | vulkan: make FA mask/softcap enables spec constants | 2026-02-03 |  | cooperative-matrix, cooperative-matrix2, specialization-constants |
 | [#19075](../sources/prs/llama-cpp/PR-19075.md) | Vulkan Flash Attention Coopmat1 Refactor | 2026-01-24 |  | cooperative-matrix, cooperative-matrix2, sdpa |
-| [#18938](../sources/prs/llama-cpp/PR-18938.md) | vulkan: support flash attention GQA/split_k with small batches | 2026-01-19 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#18938](../sources/prs/llama-cpp/PR-18938.md) | vulkan: support flash attention GQA/split_k with small batches | 2026-01-19 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#18918](../sources/prs/llama-cpp/PR-18918.md) | vulkan: Use mul_mat_vec_id for small values of n | 2026-01-18 |  | gemv, glsl, cpp |
-| [#18831](../sources/prs/llama-cpp/PR-18831.md) | vulkan: Revert forced full subgroup for FlashAttention | 2026-01-14 |  | sdpa, cpp |
-| [#18814](../sources/prs/llama-cpp/PR-18814.md) | vulkan: work around Intel ANV fp16 bug in MMQ | 2026-01-13 |  | fp16-arithmetic, gemm, glsl |
+| [#18831](../sources/prs/llama-cpp/PR-18831.md) | vulkan: Revert forced full subgroup for FlashAttention | 2026-01-14 | required-subgroup-size | required-subgroup-size, sdpa, cpp |
+| [#18814](../sources/prs/llama-cpp/PR-18814.md) | vulkan: work around Intel ANV fp16 bug in MMQ | 2026-01-13 | driver-workaround | fp16-arithmetic, driver-workaround, gemm |
 | [#18749](../sources/prs/llama-cpp/PR-18749.md) | Vulkan: Optimize Matmul parameters for AMD GPUs with Coopmat support | 2026-01-11 |  | cooperative-matrix, gemm, cpp |
 | [#18763](../sources/prs/llama-cpp/PR-18763.md) | vulkan: Disable large coopmat matmul configuration on proprietary AMD driver | 2026-01-11 |  | cooperative-matrix, gemm, cpp |
 | [#18678](../sources/prs/llama-cpp/PR-18678.md) | vulkan: Use VK_EXT_shader_64bit_indexing to handle large mat_mul(_id) | 2026-01-07 |  | cooperative-matrix, cooperative-matrix2, gemm |
@@ -271,11 +271,11 @@
 | [#18352](../sources/prs/llama-cpp/PR-18352.md) | vulkan: preprocess mul_mat_id experts and discard workgroups more quickly | 2025-12-24 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#18327](../sources/prs/llama-cpp/PR-18327.md) | vulkan: Support UPSCALE w/antialias | 2025-12-23 |  | glsl, cpp |
 | [#18332](../sources/prs/llama-cpp/PR-18332.md) | vulkan: Use BK=32 for coopmat2 mul_mat_id | 2025-12-23 |  | cooperative-matrix, cooperative-matrix2, moe |
-| [#18280](../sources/prs/llama-cpp/PR-18280.md) | Vulkan: Tune Flash Attention for MoE on AMD GPUs | 2025-12-22 |  | sdpa, moe, cpp |
+| [#18280](../sources/prs/llama-cpp/PR-18280.md) | Vulkan: Tune Flash Attention for MoE on AMD GPUs | 2025-12-22 | device-specific-tuning | device-specific-tuning, sdpa, moe |
 | [#18295](../sources/prs/llama-cpp/PR-18295.md) | vulkan: extend topk_moe to handle sigmoid w/exp_probs_b for nemotron | 2025-12-22 |  | moe, topk-sort, glsl |
 | [#18306](../sources/prs/llama-cpp/PR-18306.md) | vulkan: handle rope with large number of rows | 2025-12-22 |  | rope, glsl, cpp |
 | [#18264](../sources/prs/llama-cpp/PR-18264.md) | vulkan: Extend rope fusions to allow mrope | 2025-12-21 |  | rope, glsl, cpp |
-| [#18178](../sources/prs/llama-cpp/PR-18178.md) | vulkan: Warptile tuning for Intel Xe2/Xe3 | 2025-12-18 |  | cpp |
+| [#18178](../sources/prs/llama-cpp/PR-18178.md) | vulkan: Warptile tuning for Intel Xe2/Xe3 | 2025-12-18 | workgroup-tile-sizing, device-specific-tuning | workgroup-tile-sizing, device-specific-tuning, cpp |
 | [#18180](../sources/prs/llama-cpp/PR-18180.md) | vulkan: fix im2col overflowing maxworkgroupcount | 2025-12-18 |  | convolution, glsl, cpp |
 | [#18062](../sources/prs/llama-cpp/PR-18062.md) | vulkan: support GGML_UNARY_OP_XIELU | 2025-12-15 |  | elementwise, glsl, cpp |
 | [#18026](../sources/prs/llama-cpp/PR-18026.md) | vulkan: fix mul_mat_vec_iq1_s formatting | 2025-12-14 |  | gemv, glsl |
@@ -302,40 +302,40 @@
 | [#17479](../sources/prs/llama-cpp/PR-17479.md) | vulkan: Implement GGML_OP_CUMSUM | 2025-11-24 |  | glsl, cpp |
 | [#17455](../sources/prs/llama-cpp/PR-17455.md) | vulkan: Use fewer rows for scalar FA when HS is not a multiple of 16 | 2025-11-23 |  | cpp |
 | [#17418](../sources/prs/llama-cpp/PR-17418.md) | vulkan: Implement top-k | 2025-11-21 |  | topk-sort, glsl, cpp |
-| [#17356](../sources/prs/llama-cpp/PR-17356.md) | vulkan: force full subgroups for flash attention to fix intel subgroup crash | 2025-11-18 |  | sdpa, cpp |
+| [#17356](../sources/prs/llama-cpp/PR-17356.md) | vulkan: force full subgroups for flash attention to fix intel subgroup crash | 2025-11-18 | required-subgroup-size | required-subgroup-size, sdpa, cpp |
 | [#17371](../sources/prs/llama-cpp/PR-17371.md) | vulkan: Add copy_transpose shader | 2025-11-18 |  | tensor-copy, glsl, cpp |
 | [#17313](../sources/prs/llama-cpp/PR-17313.md) | vulkan: support larger argsort | 2025-11-17 |  | topk-sort, glsl, cpp |
 | [#17319](../sources/prs/llama-cpp/PR-17319.md) | vulkan: implement ADD1, ARANGE, FILL, SOFTPLUS, STEP, ROUND, CEIL, FLOOR, TRUNC | 2025-11-17 |  | tensor-copy, elementwise, glsl |
 | [#17320](../sources/prs/llama-cpp/PR-17320.md) | vulkan: add log RTE support to fix Nvidia CI | 2025-11-17 |  | elementwise, glsl, cpp |
-| [#17285](../sources/prs/llama-cpp/PR-17285.md) | vulkan: MMQ Workaround for legacy Windows AMD driver bug | 2025-11-15 |  | gemm, glsl |
-| [#17287](../sources/prs/llama-cpp/PR-17287.md) | vulkan: Fuse mul_mat_id+add_id+mul and mul_mat+add+add. | 2025-11-15 |  | gemv, moe, glsl |
+| [#17285](../sources/prs/llama-cpp/PR-17285.md) | vulkan: MMQ Workaround for legacy Windows AMD driver bug | 2025-11-15 | driver-workaround | driver-workaround, gemm, glsl |
+| [#17287](../sources/prs/llama-cpp/PR-17287.md) | vulkan: Fuse mul_mat_id+add_id+mul and mul_mat+add+add. | 2025-11-15 | kernel-fusion | kernel-fusion, gemv, moe |
 | [#17245](../sources/prs/llama-cpp/PR-17245.md) | vulkan: implement ABS and NEG | 2025-11-13 |  | elementwise, glsl, cpp |
 | [#17183](../sources/prs/llama-cpp/PR-17183.md) | vulkan: add LOG operation support for F32 and F16 | 2025-11-12 |  | fp16-arithmetic, elementwise, glsl |
 | [#17186](../sources/prs/llama-cpp/PR-17186.md) | vulkan: skip all-negative-inf blocks in FA | 2025-11-12 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#17134](../sources/prs/llama-cpp/PR-17134.md) | vulkan: disable rms_norm + mul + rope for old gpus | 2025-11-10 |  | rope, normalization, cpp |
-| [#17095](../sources/prs/llama-cpp/PR-17095.md) | vulkan: fuse mul_mat_id + mul | 2025-11-08 |  | gemv, moe, glsl |
+| [#17095](../sources/prs/llama-cpp/PR-17095.md) | vulkan: fuse mul_mat_id + mul | 2025-11-08 | kernel-fusion | kernel-fusion, gemv, moe |
 | [#17108](../sources/prs/llama-cpp/PR-17108.md) | vulkan: fix mmq out of bounds reads | 2025-11-08 |  | gemm, glsl, cpp |
 | [#17022](../sources/prs/llama-cpp/PR-17022.md) | cuda/vulkan : bicubic interpolation | 2025-11-05 |  | glsl, cpp |
 | [#16985](../sources/prs/llama-cpp/PR-16985.md) | Add circular tiling support to pad, for Vulkan, CUDA, and CPU (used for making seamless textures) | 2025-11-04 |  | tensor-copy, glsl, cpp |
-| [#16977](../sources/prs/llama-cpp/PR-16977.md) | vulkan: fuse rms_norm + mul + rope (+ view + set_rows) | 2025-11-03 |  | rope, normalization, glsl |
+| [#16977](../sources/prs/llama-cpp/PR-16977.md) | vulkan: fuse rms_norm + mul + rope (+ view + set_rows) | 2025-11-03 | kernel-fusion | kernel-fusion, rope, normalization |
 | [#16978](../sources/prs/llama-cpp/PR-16978.md) | vulkan: Use spec constants for conv2d s/d/p and kernel W/H | 2025-11-03 |  | specialization-constants, convolution, glsl |
 | [#16907](../sources/prs/llama-cpp/PR-16907.md) | Vulkan: improve mul_mat_vec_iq1_m | 2025-11-01 |  | gemv, glsl |
 | [#16899](../sources/prs/llama-cpp/PR-16899.md) | vulkan: Fix multi_add invalid descriptor usage | 2025-10-31 |  | elementwise, glsl, cpp |
 | [#16900](../sources/prs/llama-cpp/PR-16900.md) | Vulkan: MMVQ Integer Dot K-Quant and MUL_MAT_ID support | 2025-10-31 |  | gemm, gemv, moe |
-| [#16868](../sources/prs/llama-cpp/PR-16868.md) | vulkan: fuse mul_mat+add and mul_mat_id+add_id | 2025-10-30 |  | gemv, moe, glsl |
+| [#16868](../sources/prs/llama-cpp/PR-16868.md) | vulkan: fuse mul_mat+add and mul_mat_id+add_id | 2025-10-30 | kernel-fusion | kernel-fusion, gemv, moe |
 | [#16872](../sources/prs/llama-cpp/PR-16872.md) | vulkan: disable spirv-opt for rope shaders | 2025-10-30 |  | rope, cpp |
 | [#16873](../sources/prs/llama-cpp/PR-16873.md) | vulkan: fix shmem overrun in mmq id shader | 2025-10-30 |  | shared-memory-limit, gemm, glsl |
 | [#16851](../sources/prs/llama-cpp/PR-16851.md) | vulkan: Handle argsort with a large number of rows | 2025-10-29 |  | topk-sort, glsl, cpp |
 | [#16796](../sources/prs/llama-cpp/PR-16796.md) | vulkan: Fix crash when FP16 mul_mat accumulation is not supported | 2025-10-27 |  | fp16-arithmetic, cpp |
-| [#16769](../sources/prs/llama-cpp/PR-16769.md) | vulkan: Fuse rope+set_rows | 2025-10-25 |  | rope, glsl, cpp |
+| [#16769](../sources/prs/llama-cpp/PR-16769.md) | vulkan: Fuse rope+set_rows | 2025-10-25 | kernel-fusion | kernel-fusion, rope, glsl |
 | [#16645](../sources/prs/llama-cpp/PR-16645.md) | vulkan: Optimize SSM_SCAN | 2025-10-18 |  | glsl, cpp |
-| [#16656](../sources/prs/llama-cpp/PR-16656.md) | vulkan: Update topk_moe fusion to handle gpt's late softmax | 2025-10-18 |  | moe, softmax, topk-sort |
+| [#16656](../sources/prs/llama-cpp/PR-16656.md) | vulkan: Update topk_moe fusion to handle gpt's late softmax | 2025-10-18 | kernel-fusion | kernel-fusion, moe, softmax |
 | [#16636](../sources/prs/llama-cpp/PR-16636.md) | vulkan: Increase BK to 32; use BK/4 for non-CM mul_mm.comp | 2025-10-17 |  | gemm, glsl |
-| [#16641](../sources/prs/llama-cpp/PR-16641.md) | vulkan: Implement topk_moe fused shader, ported from CUDA | 2025-10-17 |  | moe, topk-sort, glsl |
+| [#16641](../sources/prs/llama-cpp/PR-16641.md) | vulkan: Implement topk_moe fused shader, ported from CUDA | 2025-10-17 | kernel-fusion | kernel-fusion, moe, topk-sort |
 | [#16536](../sources/prs/llama-cpp/PR-16536.md) | Vulkan MMQ Integer Dot Refactor and K-Quant support | 2025-10-12 |  | cooperative-matrix, cooperative-matrix2, shared-memory-limit |
 | [#16543](../sources/prs/llama-cpp/PR-16543.md) | vulkan: Support FA with K/V in F32 | 2025-10-12 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#16463](../sources/prs/llama-cpp/PR-16463.md) | vulkan: Add State Space Model (SSM) Operations Support | 2025-10-07 |  | glsl, cpp |
-| [#16447](../sources/prs/llama-cpp/PR-16447.md) | vulkan: Handle FA with all -inf mask values | 2025-10-06 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#16447](../sources/prs/llama-cpp/PR-16447.md) | vulkan: Handle FA with all -inf mask values | 2025-10-06 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#16365](../sources/prs/llama-cpp/PR-16365.md) | vulkan: Fix FA coopmat1 invalid array indexing | 2025-10-01 |  | cooperative-matrix, sdpa, glsl |
 | [#16341](../sources/prs/llama-cpp/PR-16341.md) | vulkan : incremental shader builds | 2025-09-29 |  | cooperative-matrix, cooperative-matrix2, bfloat16-arithmetic |
 | [#16316](../sources/prs/llama-cpp/PR-16316.md) | vulkan: in flash attention, bounds check against nem1 (don't rely on GGML_KQ_MASK_PAD) | 2025-09-28 |  | cooperative-matrix, cooperative-matrix2, sdpa |
@@ -362,13 +362,13 @@
 | [#15717](../sources/prs/llama-cpp/PR-15717.md) | vulkan: disable large mmv subgroups on older Nvidia GPUs | 2025-09-01 |  | gemv, cpp |
 | [#15702](../sources/prs/llama-cpp/PR-15702.md) | vulkan: add missing clamps in new mul_mat_id paths | 2025-08-31 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#15686](../sources/prs/llama-cpp/PR-15686.md) | vulkan: handle large sizes for get_rows | 2025-08-30 |  | tensor-copy, glsl, cpp |
-| [#15652](../sources/prs/llama-cpp/PR-15652.md) | vulkan: clamp matmul and FA results to the max finite value | 2025-08-29 |  | cooperative-matrix, cooperative-matrix2, gemm |
+| [#15652](../sources/prs/llama-cpp/PR-15652.md) | vulkan: clamp matmul and FA results to the max finite value | 2025-08-29 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#15565](../sources/prs/llama-cpp/PR-15565.md) | vulkan: fix min subgroup 16 condition for mmid subgroup optimization | 2025-08-25 |  | moe, cpp |
 | [#15568](../sources/prs/llama-cpp/PR-15568.md) | vulkan: Remove splitting for mul_mat_id | 2025-08-25 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#15537](../sources/prs/llama-cpp/PR-15537.md) | vulkan: Support FA with any multiple of 8 head sizes | 2025-08-24 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#15546](../sources/prs/llama-cpp/PR-15546.md) | vulkan: mul_mat_id coopmat2 optimizations | 2025-08-24 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#15524](../sources/prs/llama-cpp/PR-15524.md) | vulkan: apply MUL_MAT_ID subgroup optimization to non-coopmat devices | 2025-08-23 |  | cooperative-matrix, gemm, moe |
-| [#15506](../sources/prs/llama-cpp/PR-15506.md) | vulkan: workaround MoltenVK compile failure in multi_add | 2025-08-22 |  | elementwise, glsl |
+| [#15506](../sources/prs/llama-cpp/PR-15506.md) | vulkan: workaround MoltenVK compile failure in multi_add | 2025-08-22 | driver-workaround | driver-workaround, elementwise, glsl |
 | [#15456](../sources/prs/llama-cpp/PR-15456.md) | vulkan: add exp operation | 2025-08-20 |  | elementwise, glsl, cpp |
 | [#15427](../sources/prs/llama-cpp/PR-15427.md) | vulkan: optimize mul_mat_id loading row ids into shared memory | 2025-08-19 |  | cooperative-matrix, cooperative-matrix2, shared-memory-limit |
 | [#15392](../sources/prs/llama-cpp/PR-15392.md) | vulkan : support conv_2d_dw with f16 weights | 2025-08-18 |  | fp16-arithmetic, convolution, cpp |
@@ -381,8 +381,8 @@
 | [#15355](../sources/prs/llama-cpp/PR-15355.md) | vulkan: Use larger workgroups for mul_mat_vec when M is small | 2025-08-15 |  | gemv, glsl, cpp |
 | [#15334](../sources/prs/llama-cpp/PR-15334.md) | vulkan: Add missing bounds checking to scalar/coopmat1 mul_mat_id | 2025-08-14 |  | cooperative-matrix, gemm, moe |
 | [#15281](../sources/prs/llama-cpp/PR-15281.md) | vulkan: optimize rms_norm, and allow the work to spread across multiple SMs | 2025-08-13 |  | normalization, elementwise, glsl |
-| [#15252](../sources/prs/llama-cpp/PR-15252.md) | vulkan: fuse adds | 2025-08-11 |  | elementwise, glsl, cpp |
-| [#15126](../sources/prs/llama-cpp/PR-15126.md) | vulkan: support flash attention sinks | 2025-08-06 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#15252](../sources/prs/llama-cpp/PR-15252.md) | vulkan: fuse adds | 2025-08-11 | kernel-fusion | kernel-fusion, elementwise, glsl |
+| [#15126](../sources/prs/llama-cpp/PR-15126.md) | vulkan: support flash attention sinks | 2025-08-06 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#15015](../sources/prs/llama-cpp/PR-15015.md) | vulkan: Support ne[3]>1 in noncontig matrix-vector multiply | 2025-08-01 |  | gemv, glsl, cpp |
 | [#14982](../sources/prs/llama-cpp/PR-14982.md) | vulkan: Use coopmat2 for conv2d | 2025-07-31 |  | cooperative-matrix, cooperative-matrix2, convolution |
 | [#14933](../sources/prs/llama-cpp/PR-14933.md) | vulkan: optimizations for direct convolution | 2025-07-29 |  | convolution, glsl, cpp |
@@ -395,56 +395,56 @@
 | [#14653](../sources/prs/llama-cpp/PR-14653.md) | vulkan: add RTE variants for glu/add/sub/mul/div | 2025-07-12 |  | convolution, rope, tensor-copy |
 | [#14587](../sources/prs/llama-cpp/PR-14587.md) | vulkan: support SET_ROWS | 2025-07-09 |  | tensor-copy, glsl, cpp |
 | [#14582](../sources/prs/llama-cpp/PR-14582.md) | vulkan: fix rope with partial rotation and non-cont src | 2025-07-08 |  | rope, glsl |
-| [#14554](../sources/prs/llama-cpp/PR-14554.md) | vulkan: optimize flash attention split_k_reduce | 2025-07-06 |  | sdpa, glsl, cpp |
+| [#14554](../sources/prs/llama-cpp/PR-14554.md) | vulkan: optimize flash attention split_k_reduce | 2025-07-06 | split-k-reduction | split-k-reduction, sdpa, glsl |
 | [#14555](../sources/prs/llama-cpp/PR-14555.md) | vulkan: optimizations for deepseek prompt processing | 2025-07-06 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#14518](../sources/prs/llama-cpp/PR-14518.md) | vulkan: Handle updated FA dim2/3 definition | 2025-07-03 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#14509](../sources/prs/llama-cpp/PR-14509.md) | vulkan: support mixed/deepseekR1 FA head sizes | 2025-07-02 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#14485](../sources/prs/llama-cpp/PR-14485.md) | vulkan: unpack more values at a time for iquants mat mul | 2025-07-01 |  | gemm, glsl, cpp |
 | [#14455](../sources/prs/llama-cpp/PR-14455.md) | vulkan : add GELU_ERF | 2025-06-30 |  | elementwise, glsl, cpp |
-| [#14449](../sources/prs/llama-cpp/PR-14449.md) | vulkan: support softmax/FA batch and broadcast | 2025-06-29 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#14449](../sources/prs/llama-cpp/PR-14449.md) | vulkan: support softmax/FA batch and broadcast | 2025-06-29 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#14451](../sources/prs/llama-cpp/PR-14451.md) | vulkan: Split large mul_mat_id to fit in shared memory | 2025-06-29 |  | shared-memory-limit, moe, cpp |
-| [#14366](../sources/prs/llama-cpp/PR-14366.md) | vulkan: Add fusion support for RMS_NORM+MUL | 2025-06-24 |  | normalization, glsl, cpp |
+| [#14366](../sources/prs/llama-cpp/PR-14366.md) | vulkan: Add fusion support for RMS_NORM+MUL | 2025-06-24 | kernel-fusion | kernel-fusion, normalization, glsl |
 | [#14345](../sources/prs/llama-cpp/PR-14345.md) | vulkan: Increase workgroup size for GLU, for performance | 2025-06-23 |  | elementwise, glsl, cpp |
 | [#14316](../sources/prs/llama-cpp/PR-14316.md) | ggml: adds CONV_2D op and direct GEMM Vulkan implementation | 2025-06-21 |  | gemm, convolution, glsl |
 | [#14001](../sources/prs/llama-cpp/PR-14001.md) | vulkan: Enable VK_KHR_cooperative_matrix extension for Intel Xe2 GPUs | 2025-06-04 |  | cooperative-matrix, cpp |
 | [#13813](../sources/prs/llama-cpp/PR-13813.md) | ggml-vulkan: adds support for op CONV_TRANSPOSE_1D | 2025-05-26 |  | convolution, glsl, cpp |
 | [#13626](../sources/prs/llama-cpp/PR-13626.md) | vulkan: small fixes | 2025-05-19 |  | gemm, dequantize, glsl |
-| [#13607](../sources/prs/llama-cpp/PR-13607.md) | Vulkan: Support fp32 accumulator in quantized matmul to fix GLM4-32B incoherence | 2025-05-17 |  | gemm, cpp |
+| [#13607](../sources/prs/llama-cpp/PR-13607.md) | Vulkan: Support fp32 accumulator in quantized matmul to fix GLM4-32B incoherence | 2025-05-17 | fp32-accumulation | fp32-accumulation, gemm, cpp |
 | [#13554](../sources/prs/llama-cpp/PR-13554.md) | vulkan: use scalar FA rather than coopmat2 when N==1 | 2025-05-15 |  | cooperative-matrix, cooperative-matrix2, cpp |
 | [#13556](../sources/prs/llama-cpp/PR-13556.md) | vulkan: move common FA code to flash_attn_base.comp | 2025-05-15 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#13506](../sources/prs/llama-cpp/PR-13506.md) | vulkan: KHR_coopmat flash attention | 2025-05-13 |  | cooperative-matrix, sdpa, glsl |
-| [#13517](../sources/prs/llama-cpp/PR-13517.md) | vulkan: workaround FA compile failures on macos | 2025-05-13 |  | sdpa, glsl |
+| [#13517](../sources/prs/llama-cpp/PR-13517.md) | vulkan: workaround FA compile failures on macos | 2025-05-13 | driver-workaround | driver-workaround, sdpa, glsl |
 | [#13324](../sources/prs/llama-cpp/PR-13324.md) | vulkan: scalar flash attention implementation | 2025-05-06 |  | sdpa, glsl, cpp |
 | [#13326](../sources/prs/llama-cpp/PR-13326.md) | vulkan: Allow up to 4096 elements for mul_mat_id row_ids | 2025-05-06 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#13266](../sources/prs/llama-cpp/PR-13266.md) | vulkan: Additional type support for unary, binary, and copy | 2025-05-02 |  | elementwise, glsl, cpp |
 | [#13191](../sources/prs/llama-cpp/PR-13191.md) | vulkan: Handle src1 batch dimension in non-contiguous mat-vec-mul shader | 2025-04-29 |  | gemv, glsl, cpp |
 | [#13193](../sources/prs/llama-cpp/PR-13193.md) | vulkan: use uint array index to avoid glslang bug | 2025-04-29 |  | cooperative-matrix, cooperative-matrix2, dequantize |
 | [#13031](../sources/prs/llama-cpp/PR-13031.md) | vulkan: support noncontiguous rms_norm | 2025-04-20 |  | normalization, glsl, cpp |
-| [#13016](../sources/prs/llama-cpp/PR-13016.md) | vulkan: matmul gcn tuning | 2025-04-18 |  | gemm, cpp |
-| [#12931](../sources/prs/llama-cpp/PR-12931.md) | vulkan: enable coopmat2 FA gqa and split_k optimizations more often | 2025-04-13 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#13016](../sources/prs/llama-cpp/PR-13016.md) | vulkan: matmul gcn tuning | 2025-04-18 | device-specific-tuning | device-specific-tuning, gemm, cpp |
+| [#12931](../sources/prs/llama-cpp/PR-12931.md) | vulkan: enable coopmat2 FA gqa and split_k optimizations more often | 2025-04-13 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#12853](../sources/prs/llama-cpp/PR-12853.md) | vulkan: use aligned loads for flash attention mask | 2025-04-09 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#12833](../sources/prs/llama-cpp/PR-12833.md) | vulkan: In coopmat2 mmq, load q4_k/q5_k scales through shared memory | 2025-04-08 |  | cooperative-matrix, cooperative-matrix2, shared-memory-limit |
 | [#12776](../sources/prs/llama-cpp/PR-12776.md) | vulkan: fix NaN issue in flash attention shader | 2025-04-06 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#12783](../sources/prs/llama-cpp/PR-12783.md) | vulkan: Use fp16 for the flash attention P*V multiplication | 2025-04-06 |  | cooperative-matrix, cooperative-matrix2, fp16-arithmetic |
-| [#12767](../sources/prs/llama-cpp/PR-12767.md) | Vulkan: Tune Vulkan mmq int dot shader for performance | 2025-04-05 |  | gemm, cpp |
+| [#12767](../sources/prs/llama-cpp/PR-12767.md) | Vulkan: Tune Vulkan mmq int dot shader for performance | 2025-04-05 | device-specific-tuning | device-specific-tuning, gemm, cpp |
 | [#12720](../sources/prs/llama-cpp/PR-12720.md) | vulkan: Use unclamped loads for flash attention mask | 2025-04-02 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#12722](../sources/prs/llama-cpp/PR-12722.md) | Vulkan: Fix mmq int dot float cache size | 2025-04-02 |  | gemm, glsl |
-| [#12627](../sources/prs/llama-cpp/PR-12627.md) | vulkan: Implement split_k for coopmat2 flash attention. | 2025-03-28 |  | cooperative-matrix, cooperative-matrix2, sdpa |
+| [#12627](../sources/prs/llama-cpp/PR-12627.md) | vulkan: Implement split_k for coopmat2 flash attention. | 2025-03-28 | split-k-reduction | cooperative-matrix, cooperative-matrix2, split-k-reduction |
 | [#12559](../sources/prs/llama-cpp/PR-12559.md) | vulkan: Implement grouped query attention in the coopmat2 FA shader | 2025-03-25 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#12554](../sources/prs/llama-cpp/PR-12554.md) | vulkan: Add bfloat16 support | 2025-03-24 |  | cooperative-matrix, cooperative-matrix2, bfloat16-arithmetic |
 | [#12529](../sources/prs/llama-cpp/PR-12529.md) | vulkan: fix mul_mat_vec failure in backend tests | 2025-03-23 |  | gemv, glsl, cpp |
 | [#12505](../sources/prs/llama-cpp/PR-12505.md) | vulkan: Optimize mul_mat_vec p021 and nc shaders | 2025-03-21 |  | gemv, glsl, cpp |
 | [#12480](../sources/prs/llama-cpp/PR-12480.md) | Vulkan: RTE rounding for cpy to quant | 2025-03-20 |  | tensor-copy, glsl, cpp |
-| [#12472](../sources/prs/llama-cpp/PR-12472.md) | vulkan: workaround for #10710 and #12147 16 bit unpack8 bug | 2025-03-19 |  | gemm, gemv, dequantize |
+| [#12472](../sources/prs/llama-cpp/PR-12472.md) | vulkan: workaround for #10710 and #12147 16 bit unpack8 bug | 2025-03-19 | driver-workaround | driver-workaround, gemm, gemv |
 | [#12427](../sources/prs/llama-cpp/PR-12427.md) | vulkan: optimize iq1 coopmat2 dequant functions | 2025-03-17 |  | cooperative-matrix, cooperative-matrix2, dequantize |
 | [#12309](../sources/prs/llama-cpp/PR-12309.md) | vulkan: use fp32 in coopmat2 q4_k dequant function | 2025-03-10 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#12312](../sources/prs/llama-cpp/PR-12312.md) | vulkan: Add N/2 and N/4 optimized paths in coopmat2 shader | 2025-03-10 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#12316](../sources/prs/llama-cpp/PR-12316.md) | vulkan: fix bug in coopmat1 mul_mat_id | 2025-03-10 |  | cooperative-matrix, gemm, moe |
 | [#12273](../sources/prs/llama-cpp/PR-12273.md) | vulkan: Pad N dimension of B matrix for coopmat2 perf, to avoid bounds checking | 2025-03-08 |  | cooperative-matrix, cooperative-matrix2, gemm |
-| [#12258](../sources/prs/llama-cpp/PR-12258.md) | vulkan: Adjust coopmat2 tile sizes and selection heuristic | 2025-03-07 |  | cooperative-matrix, cooperative-matrix2, cpp |
+| [#12258](../sources/prs/llama-cpp/PR-12258.md) | vulkan: Adjust coopmat2 tile sizes and selection heuristic | 2025-03-07 | workgroup-tile-sizing, device-specific-tuning | cooperative-matrix, cooperative-matrix2, workgroup-tile-sizing |
 | [#12188](../sources/prs/llama-cpp/PR-12188.md) | vulkan: double buffer scale caches | 2025-03-04 |  | gemv, glsl |
 | [#12135](../sources/prs/llama-cpp/PR-12135.md) | Vulkan: Add DP4A MMQ and Q8_1 quantization shader | 2025-03-01 |  | integer-dot-product, gemm, glsl |
-| [#12087](../sources/prs/llama-cpp/PR-12087.md) | vulkan: subgroup size tuning | 2025-02-26 |  | subgroup-size, cpp |
+| [#12087](../sources/prs/llama-cpp/PR-12087.md) | vulkan: subgroup size tuning | 2025-02-26 | device-specific-tuning | subgroup-size, device-specific-tuning, cpp |
 | [#12056](../sources/prs/llama-cpp/PR-12056.md) | Vulkan: add OP sigmoid | 2025-02-25 |  | elementwise, glsl, cpp |
 | [#12015](../sources/prs/llama-cpp/PR-12015.md) | vulkan: matmul dequantization improvements | 2025-02-21 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#11902](../sources/prs/llama-cpp/PR-11902.md) | vulkan: support multi/vision rope, and noncontiguous rope | 2025-02-16 |  | rope, glsl, cpp |
@@ -462,12 +462,12 @@
 | [#11281](../sources/prs/llama-cpp/PR-11281.md) | vulkan: fix coopmat2 flash attention for non-contiguous inputs | 2025-01-17 |  | cooperative-matrix, cooperative-matrix2, sdpa |
 | [#11284](../sources/prs/llama-cpp/PR-11284.md) | vulkan: fix coopmat2 validation failures | 2025-01-17 |  | cooperative-matrix, cooperative-matrix2, gemm |
 | [#11206](../sources/prs/llama-cpp/PR-11206.md) | vulkan: optimize coopmat2 q4_k/q5_k dequant functions. | 2025-01-12 |  | cooperative-matrix, cooperative-matrix2, dequantize |
-| [#11161](../sources/prs/llama-cpp/PR-11161.md) | Vulkan: Fix float16 use on devices without float16 support + fix subgroup_size_control validation error | 2025-01-09 |  | subgroup-size, subgroup-size-control, fp16-arithmetic |
+| [#11161](../sources/prs/llama-cpp/PR-11161.md) | Vulkan: Fix float16 use on devices without float16 support + fix subgroup_size_control validation error | 2025-01-09 | required-subgroup-size | subgroup-size, subgroup-size-control, fp16-arithmetic |
 | [#11166](../sources/prs/llama-cpp/PR-11166.md) | vulkan: support copy from f32 to q4_0/q4_1/q5_0/q5_1/q8_0/iq4_nl | 2025-01-09 |  | tensor-copy, elementwise, glsl |
 | [#11117](../sources/prs/llama-cpp/PR-11117.md) | Disable GL_KHR_cooperative_matrix Vulkan extension if not available. | 2025-01-07 |  | cooperative-matrix, glsl, cpp |
 | [#11130](../sources/prs/llama-cpp/PR-11130.md) | vulkan: optimize coopmat2 q2_k dequant function | 2025-01-07 |  | cooperative-matrix, cooperative-matrix2, dequantize |
 | [#11081](../sources/prs/llama-cpp/PR-11081.md) | vulkan: scale caching for k quants + misc fixes | 2025-01-05 |  | gemv, glsl |
-| [#11074](../sources/prs/llama-cpp/PR-11074.md) | Vulkan: Add device-specific blacklist for coopmat for the AMD proprietary driver | 2025-01-04 |  | cooperative-matrix, cpp |
+| [#11074](../sources/prs/llama-cpp/PR-11074.md) | Vulkan: Add device-specific blacklist for coopmat for the AMD proprietary driver | 2025-01-04 | driver-workaround | cooperative-matrix, driver-workaround, cpp |
 | [#10987](../sources/prs/llama-cpp/PR-10987.md) | vulkan: Use push constant offset to handle misaligned descriptors | 2024-12-26 |  | tensor-copy, elementwise, glsl |
 | [#10991](../sources/prs/llama-cpp/PR-10991.md) | vulkan: optimize mul_mat for small values of N | 2024-12-26 |  | gemv, glsl, cpp |
 | [#10942](../sources/prs/llama-cpp/PR-10942.md) | vulkan: im2col and matmul optimizations for stable diffusion | 2024-12-22 |  | gemm, convolution, glsl |
@@ -480,10 +480,10 @@
 | [#10763](../sources/prs/llama-cpp/PR-10763.md) | vulkan: disable spirv-opt for coopmat shaders | 2024-12-10 |  | cooperative-matrix, cpp |
 | [#10767](../sources/prs/llama-cpp/PR-10767.md) | vulkan: request round-to-even for fp16 in im2col/rope_head | 2024-12-10 |  | fp16-arithmetic, convolution, rope |
 | [#10713](../sources/prs/llama-cpp/PR-10713.md) | vulkan: compile a test shader in cmake to check for coopmat2 support | 2024-12-08 |  | cooperative-matrix, cooperative-matrix2, glsl |
-| [#10721](../sources/prs/llama-cpp/PR-10721.md) | Vulkan: Add VK_EXT_subgroup_size_control support to ensure full subgroups for coopmats | 2024-12-08 |  | cooperative-matrix, subgroup-size, subgroup-size-control |
+| [#10721](../sources/prs/llama-cpp/PR-10721.md) | Vulkan: Add VK_EXT_subgroup_size_control support to ensure full subgroups for coopmats | 2024-12-08 | required-subgroup-size | cooperative-matrix, subgroup-size, subgroup-size-control |
 | [#10723](../sources/prs/llama-cpp/PR-10723.md) | Vulkan: fix NaN in tanh.comp with AMD proprietary driver on Windows | 2024-12-08 |  | elementwise, glsl |
 | [#10665](../sources/prs/llama-cpp/PR-10665.md) | vulkan: small mul_mat_vec optimizations | 2024-12-04 |  | gemv, dequantize, tensor-copy |
-| [#10637](../sources/prs/llama-cpp/PR-10637.md) | vulkan: optimize and reenable split_k | 2024-12-03 |  | glsl, cpp |
+| [#10637](../sources/prs/llama-cpp/PR-10637.md) | vulkan: optimize and reenable split_k | 2024-12-03 | split-k-reduction | split-k-reduction, glsl, cpp |
 | [#10642](../sources/prs/llama-cpp/PR-10642.md) | vulkan: Implement "fast divide" (mul+shift) for unary ops like copy | 2024-12-03 |  | elementwise, glsl, cpp |
 | [#10597](../sources/prs/llama-cpp/PR-10597.md) | Vulkan: VK_KHR_cooperative_matrix support to speed up prompt processing | 2024-11-30 |  | cooperative-matrix, gemm, glsl |
 | [#10536](../sources/prs/llama-cpp/PR-10536.md) | vulkan: Dynamic subgroup size support for Q6_K mat_vec | 2024-11-27 |  | subgroup-size, gemv, glsl |
@@ -508,7 +508,7 @@
 | [#8855](../sources/prs/llama-cpp/PR-8855.md) | Fix Vulkan Quantized Matrix Vector Multiplication on AMD GPUs when ncols < 64 | 2024-08-04 |  | gemv, glsl, cpp |
 | [#8613](../sources/prs/llama-cpp/PR-8613.md) | Vulkan IQ4_NL Support | 2024-07-21 |  | gemm, dequantize, glsl |
 | [#7961](../sources/prs/llama-cpp/PR-7961.md) | Refactor Vulkan backend to allow multiple contexts | 2024-06-16 |  | gemv, glsl, cpp |
-| [#7947](../sources/prs/llama-cpp/PR-7947.md) | Vulkan Shader Refactor, Memory Debugging Option | 2024-06-15 |  | gemm, gemv, dequantize |
+| [#7947](../sources/prs/llama-cpp/PR-7947.md) | Vulkan Shader Refactor, Memory Debugging Option | 2024-06-15 | split-k-reduction | split-k-reduction, gemm, gemv |
 | [#7818](../sources/prs/llama-cpp/PR-7818.md) | Update Vulkan RoPE implementation | 2024-06-07 |  | rope, glsl, c |
 | [#7628](../sources/prs/llama-cpp/PR-7628.md) | Vulkan Mixture of Experts (MoE) support | 2024-05-29 |  | moe, glsl, cpp |
 | [#7475](../sources/prs/llama-cpp/PR-7475.md) | Vulkan Rope Frequency Factor Update | 2024-05-22 |  | rope, glsl, cpp |
@@ -576,7 +576,7 @@
 | [#26445](../sources/prs/mesa/PR-26445.md) | aco: implement 16-bit derivatives and improve fp16 support on gfx8 | 2023-12-01 |  | fp16-arithmetic, cpp |
 | [#25566](../sources/prs/mesa/PR-25566.md) | nir/lower_fp16_casts,radv,intel/compiler: add and use option to split fp64 casts | 2023-10-05 |  | fp16-arithmetic, cpp, c |
 | [#24683](../sources/prs/mesa/PR-24683.md) | radv: Implement VK_KHR_cooperative_matrix. | 2023-08-15 |  | cooperative-matrix, cpp, python |
-| [#23925](../sources/prs/mesa/PR-23925.md) | radv: Enable required subgroup size on mesh/task. | 2023-06-29 |  | subgroup-size, c |
+| [#23925](../sources/prs/mesa/PR-23925.md) | radv: Enable required subgroup size on mesh/task. | 2023-06-29 | required-subgroup-size | subgroup-size, required-subgroup-size, c |
 | [#23825](../sources/prs/mesa/PR-23825.md) | spirv, nir, types: Implement front-end of SPV_KHR_cooperative_matrix | 2023-06-23 |  | cooperative-matrix, cpp, c |
 | [#23572](../sources/prs/mesa/PR-23572.md) | radv/rt: Stop forcing wave32 by setting compute_subgroup_size | 2023-06-11 |  | subgroup-size, c |
 | [#21633](../sources/prs/mesa/PR-21633.md) | aco/tests: add tests for v_fma_f32 with 2 fp16 literals | 2023-03-01 |  | fp16-arithmetic, cpp |
@@ -586,12 +586,12 @@
 | [#12617](../sources/prs/mesa/PR-12617.md) | nir,spirv,radv,aco: implement VK_KHR_shader_integer_dot_product | 2021-08-30 |  | integer-dot-product, c, cpp |
 | [#9459](../sources/prs/mesa/PR-9459.md) | aco: set compr for fp16 exports | 2021-03-08 |  | fp16-arithmetic, cpp, c |
 | [#5347](../sources/prs/mesa/PR-5347.md) | radv/aco: enable FP16 features/extensions on GFX9+ | 2020-06-05 |  | fp16-arithmetic, c, python |
-| [#5056](../sources/prs/mesa/PR-5056.md) | radv/aco: enable VK_EXT_subgroup_size_control | 2020-05-15 |  | subgroup-size, subgroup-size-control, python |
+| [#5056](../sources/prs/mesa/PR-5056.md) | radv/aco: enable VK_EXT_subgroup_size_control | 2020-05-15 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 | [#4452](../sources/prs/mesa/PR-4452.md) | aco: implement fp16 arithmetic operations | 2020-04-05 |  | fp16-arithmetic, cpp |
 | [#4453](../sources/prs/mesa/PR-4453.md) | radv: only expose fp16 features for chips with double rate | 2020-04-05 |  | fp16-arithmetic, c, python |
 | [#4299](../sources/prs/mesa/PR-4299.md) | radv: enable VK_KHR_8bit_storage on GFX6-GFX7 | 2020-03-24 |  | 8bit-storage, python |
 | [#4227](../sources/prs/mesa/PR-4227.md) | radv: remove wrong assert that checks compute subgroup size | 2020-03-18 |  | subgroup-size, c |
-| [#4215](../sources/prs/mesa/PR-4215.md) | radv: accepted fixes for VK_EXT_subgroup_size_control | 2020-03-17 |  | subgroup-size, subgroup-size-control, c |
+| [#4215](../sources/prs/mesa/PR-4215.md) | radv: accepted fixes for VK_EXT_subgroup_size_control | 2020-03-17 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 | [#2872](../sources/prs/mesa/PR-2872.md) | radv: fix reporting subgroup size with VK_KHR_pipeline_executable_properties | 2019-11-25 |  | subgroup-size, c |
-| [#2588](../sources/prs/mesa/PR-2588.md) | radv: implement VK_EXT_subgroup_size_control | 2019-11-01 |  | subgroup-size, subgroup-size-control, cpp |
+| [#2588](../sources/prs/mesa/PR-2588.md) | radv: implement VK_EXT_subgroup_size_control | 2019-11-01 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 

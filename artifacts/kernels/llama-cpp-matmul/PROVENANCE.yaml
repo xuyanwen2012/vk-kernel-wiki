@@ -1,0 +1,53 @@
+repo: ggml-org/llama.cpp
+url: https://github.com/ggml-org/llama.cpp
+commit: c479922ac520a08969b4c1dc154d7bbb3c386d85
+license: MIT
+license_file: artifacts/prs/llama-cpp/LICENSE
+retrieved_at: '2026-10-06'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+  file: mul_mm.comp
+  sha256: abed36cd38b5edc3f0f365fbc71a672576e7cd8a703131e297b416f23c3b1221
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+  file: mul_mm_cm2.comp
+  sha256: 2ca3abf3485a02c5f61c0c3e461fb71431bbee473f0a03f86f6a465e1df97acd
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+  file: mul_mm_funcs.glsl
+  sha256: 71f86758ba309b36a9af0420e08abef386a3b3b08545e096cad10e16186ef61e
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+  file: mul_mmq.comp
+  sha256: 3a7c17a6e8f4aed07518e45d2b0bb38cd88d1a93048afd1d88f541bb9437a7ba
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+  file: mul_mmq_funcs.glsl
+  sha256: 00951dba21d0a0aeea149124c14376fe12229c7089a57624d23087961ddee39e
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl
+  file: mul_mmq_shmem_types.glsl
+  sha256: 4e15f8dbac95f755eddb8e571c265ccbac83785bacaea5dce7319350a82a2a48
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp
+  file: mul_mmq_cm1.comp
+  sha256: d1bba0f81349de07468e635ce2dec70e634e621bbcd2a9c2beffad39f3f7520c
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl
+  file: mul_mmq_cm1_funcs.glsl
+  sha256: 10e66b21853cbe66b66386e2142b17d126397718ded883d948e61aaf0fb12505
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+  file: mul_mat_vec.comp
+  sha256: 15e43c0c2a1cc64dde9cf4a8180a43aaf5aa85c5aa7a069154aa569eed7d93b8
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+  file: mul_mat_vec_base.glsl
+  sha256: fc7bb5cc47bd9761f8a3484466e10b61d7866df41a150cdd47cfa1f389110323
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+  file: mul_mat_vecq.comp
+  sha256: 44b67aeaeee503595fb156bc0b76b09a7e3244126d73e318b708c6d45938c466
+- path: ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq_funcs.glsl
+  file: mul_mat_vecq_funcs.glsl
+  sha256: 09d3c0c51323401046a86ef9b4fddfbda62635959b4b87fa7dc4e8ed507f55fd
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+  file: dequant_funcs.glsl
+  sha256: 3b7a5edf6072ee8e44b4a9ddeb89b099d1fb64901d9be419c8ed9701d2f1d68b
+- path: ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+  file: dequant_funcs_cm2.glsl
+  sha256: f60a583b16fb535efd250fb3bb1fedf5cc6bbb853461d2f39ea9e01d72734535
+- path: ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+  file: types.glsl
+  sha256: a88aade2345ab25eb681632d79632df5da7579460e0781f616338343e823a84c

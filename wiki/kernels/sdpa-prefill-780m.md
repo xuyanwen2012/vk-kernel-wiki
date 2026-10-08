@@ -11,6 +11,7 @@ languages: [glsl]
 aliases: ["sarc_sdpa_qk_coopmat", "sarc_sdpa_av_coopmat", "sarc_sdpa_attn_weights_softmax", "t128x64k32g22s64", "t64x64k32g22s64", "SDPA coopmat 780M", "attention 780M"]
 related: [hw-radeon-780m, hw-cooperative-matrix-rdna3, kernel-linear-4w-780m, kernel-linear-8da4w-780m, technique-causal-truncation]
 sources: [meas-780m-sdpa-port, meas-780m-e2e-prefill, meas-780m-4w-bootstrap, meas-780m-vulkaninfo]
+version_sensitive: vs-radv-coopmat-lowering-after-25-2-7
 evidence_basis:
   - evidence_type: measurement
     source_id: meas-780m-sdpa-port

@@ -6,6 +6,8 @@
 
 | Page | Path |
 |------|------|
+| [Why RDNA4's matrix cores sit out the local LLM decode loop](../sources/blogs/zolotukhin-matrix-cores-decode.md) | `sources/blogs/zolotukhin-matrix-cores-decode.md` |
+| [Mesa environment variables: RADV_DEBUG and RADV_PERFTEST flags for shader inspection and cooperative matrix](../sources/docs/mesa-radv-envvars.md) | `sources/docs/mesa-radv-envvars.md` |
 | [Vulkan: VK_KHR_cooperative_matrix support to speed up prompt processing](../sources/prs/llama-cpp/PR-10597.md) | `sources/prs/llama-cpp/PR-10597.md` |
 | [vulkan: small mul_mat_vec optimizations](../sources/prs/llama-cpp/PR-10665.md) | `sources/prs/llama-cpp/PR-10665.md` |
 | [Vulkan: fix NaN in tanh.comp with AMD proprietary driver on Windows](../sources/prs/llama-cpp/PR-10723.md) | `sources/prs/llama-cpp/PR-10723.md` |
@@ -73,6 +75,7 @@ Path: `amd` > `rdna3`
 
 | Page | Path |
 |------|------|
+| [Conquering FidelityFX FSR4 – Enabling the pretty pixels on Linux through maniacal persistence](../sources/blogs/themaister-fsr4-wmma.md) | `sources/blogs/themaister-fsr4-wmma.md` |
 | [vulkan: subgroup size tuning](../sources/prs/llama-cpp/PR-12087.md) | `sources/prs/llama-cpp/PR-12087.md` |
 | [vulkan: tune mat-vec rows for batched inference on Strix Halo](../sources/prs/llama-cpp/PR-27909.md) | `sources/prs/llama-cpp/PR-27909.md` |
 | [vulkan: int8 coopmat1 matmul implementation for AMD RDNA3 and RDNA4](../sources/prs/llama-cpp/PR-27952.md) | `sources/prs/llama-cpp/PR-27952.md` |
@@ -88,6 +91,7 @@ Path: `amd` > `rdna3`
 | [aco: WMMA statistics and s_delay_alu tweaks](../sources/prs/mesa/PR-36328.md) | `sources/prs/mesa/PR-36328.md` |
 | [radv/gfx11: add a RADV_PERFTEST flag to expose bfloat16 cmat](../sources/prs/mesa/PR-39456.md) | `sources/prs/mesa/PR-39456.md` |
 | [radv: VK_VALVE_shader_mixed_float_dot_product](../sources/prs/mesa/PR-40003.md) | `sources/prs/mesa/PR-40003.md` |
+| [GLSL cooperative matrix (GL_KHR_cooperative_matrix): types, load/store and multiply-add as specified and as used upstream](../wiki/languages/glsl-cooperative-matrix.md) | `wiki/languages/glsl-cooperative-matrix.md` |
 
 #### `radeon-780m` (device)
 

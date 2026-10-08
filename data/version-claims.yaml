@@ -40,4 +40,42 @@
 ##       - doc-<source-id>
 ##     notes: "<optional>"
 
-claims: []
+claims:
+- id: vs-radv-coopmat-lowering-after-25-2-7
+  tool: mesa-radv
+  claim_valid_for: Mesa 25.2.7
+  last_verified_release: 25.2.7
+  last_verified_at: '2026-10-06'
+  applies_to:
+  - wiki/hardware/cooperative-matrix-rdna3.md
+  - wiki/kernels/linear-4w-780m.md
+  - wiki/kernels/linear-8da4w-780m.md
+  - wiki/kernels/sdpa-prefill-780m.md
+  source_ids:
+  - pr-mesa-36117
+  - pr-mesa-36328
+  - pr-mesa-36583
+  - pr-mesa-36992
+  - pr-mesa-37002
+  - pr-mesa-37213
+  - pr-mesa-37879
+  - pr-mesa-38389
+  - pr-mesa-38589
+  - pr-mesa-38835
+  - pr-mesa-39256
+  - pr-mesa-39456
+  - pr-mesa-41500
+  - pr-mesa-41653
+  - pr-mesa-41691
+  - pr-mesa-41922
+  - pr-mesa-43056
+  - pr-mesa-43148
+  - pr-mesa-43634
+  - pr-mesa-43730
+  - pr-mesa-43771
+  - pr-mesa-43786
+  - pr-mesa-43864
+  notes: The measurements these pages cite were taken on RADV Mesa 25.2.7. A commit-id check on 2026-10-06 (data/release-membership.yaml)
+    found that the 23 merge requests listed in source_ids, all on cooperative-matrix handling in RADV, NIR or the
+    SPIR-V front end, are not contained in tag mesa-25.2.7 (a cherry-pick would not be detected). Whether any of
+    them changes the generated code or the timing of the measured kernels has not been measured.

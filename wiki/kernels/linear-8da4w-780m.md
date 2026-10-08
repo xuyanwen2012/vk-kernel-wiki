@@ -11,6 +11,7 @@ languages: [glsl]
 aliases: ["sarc_linear_dq8ca_coopmat_zpg", "t128x64k32g42s32", "dq8ca coopmat 780M", "8da4w linear 780M", "zpg"]
 related: [hw-radeon-780m, hw-cooperative-matrix-rdna3, kernel-linear-4w-780m, kernel-sdpa-prefill-780m, technique-workgroup-tile-sizing, pattern-unaligned-m-fallback]
 sources: [meas-780m-8da4w-port, meas-780m-sdpa-port, meas-780m-e2e-prefill, meas-780m-4w-bootstrap, meas-780m-vulkaninfo]
+version_sensitive: vs-radv-coopmat-lowering-after-25-2-7
 evidence_basis:
   - evidence_type: measurement
     source_id: meas-780m-8da4w-port

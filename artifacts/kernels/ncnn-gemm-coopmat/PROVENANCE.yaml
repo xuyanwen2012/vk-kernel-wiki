@@ -1,0 +1,35 @@
+repo: Tencent/ncnn
+url: https://github.com/Tencent/ncnn
+commit: 51f3b0bf03993d90f9328171f58d0ccaf1846ed6
+license: BSD-3-Clause
+license_file: artifacts/prs/ncnn/LICENSE
+retrieved_at: '2026-10-06'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: src/layer/vulkan/shader/gemm.comp
+  file: gemm.comp
+  sha256: a05ccd56d7327dcdf33d0c2e97ac59430abd435a2bedd7eef44960f0c20a06b0
+- path: src/layer/vulkan/shader/gemm_cm.comp
+  file: gemm_cm.comp
+  sha256: 5e83e0490a334e75d1181b5ffb32ccdc9bd79db2904d9cfde76b036a88a8c7b5
+- path: src/layer/vulkan/shader/gemm_int8_cm.comp
+  file: gemm_int8_cm.comp
+  sha256: 13d83be4634803cba2dd555176941da64aa90cf86970586a5de119dc84c7e2f8
+- path: src/layer/vulkan/shader/gemm_sg.comp
+  file: gemm_sg.comp
+  sha256: 4b6ebe56c40b919a2f23e2b92403074297c930625d7a85e1f3041785cc43cd78
+- path: src/layer/vulkan/shader/innerproduct_gemm.comp
+  file: innerproduct_gemm.comp
+  sha256: 682f3592a4c124a757218727bfc2ff95e4fec6d012dbfa7c9f50a9e78b6c86ed
+- path: src/layer/vulkan/shader/convolution_gemm_cm.comp
+  file: convolution_gemm_cm.comp
+  sha256: 590d0fbfefafa3fafadf2a34d37e174f2bd333195d5d2ab3fbd638c5b0cbd1cf
+- path: src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+  file: convolution_1x1s1d1_cm.comp
+  sha256: 8bc3b1800ad786873b4cc568897806f54ae878b571458b65b0a1964a95dacf9f
+- path: src/layer/vulkan/shader/sdpa_fa.comp
+  file: sdpa_fa.comp
+  sha256: 89d31199eb9d35a28c86067105d7cace2a2fda6bb8d24702a48411c19fe22fa0
+- path: src/layer/vulkan/shader/sdpa_fa_cm.comp
+  file: sdpa_fa_cm.comp
+  sha256: f998523d9fd44f8dca918742cc5b2fa622c106cb3229617227c939abe462e349

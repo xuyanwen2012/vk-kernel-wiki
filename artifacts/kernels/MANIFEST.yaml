@@ -1,0 +1,54 @@
+## Reference bundles of complete upstream kernel files.
+## Read by scripts/fetch_kernel_files.py; see its docstring for the format.
+bundles:
+- id: llama-cpp-matmul
+  ledger: llama-cpp
+  commit: c479922ac520a08969b4c1dc154d7bbb3c386d85
+  files:
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mm.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_cm2.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mm_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_shmem_types.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mmq_cm1_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vec_base.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/mul_mat_vecq_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/dequant_funcs_cm2.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/types.glsl
+- id: llama-cpp-flash-attention
+  ledger: llama-cpp
+  commit: c479922ac520a08969b4c1dc154d7bbb3c386d85
+  files:
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm1.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_cm2.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_base.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_dequant.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mmq_funcs.glsl
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_split_k_reduce.comp
+  - ggml/src/ggml-vulkan/vulkan-shaders/flash_attn_mask_opt.comp
+- id: ncnn-gemm-coopmat
+  ledger: ncnn
+  commit: 51f3b0bf03993d90f9328171f58d0ccaf1846ed6
+  files:
+  - src/layer/vulkan/shader/gemm.comp
+  - src/layer/vulkan/shader/gemm_cm.comp
+  - src/layer/vulkan/shader/gemm_int8_cm.comp
+  - src/layer/vulkan/shader/gemm_sg.comp
+  - src/layer/vulkan/shader/innerproduct_gemm.comp
+  - src/layer/vulkan/shader/convolution_gemm_cm.comp
+  - src/layer/vulkan/shader/convolution_1x1s1d1_cm.comp
+  - src/layer/vulkan/shader/sdpa_fa.comp
+  - src/layer/vulkan/shader/sdpa_fa_cm.comp
+- id: mesa-radv-coopmat
+  ledger: mesa
+  commit: 0b2fa0445c2cdf6ab5e3a00214954670f0e0d2af
+  files:
+  - src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  - src/compiler/nir/nir_lower_cooperative_matrix.c
+  - src/compiler/spirv/vtn_cmat.c

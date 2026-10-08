@@ -1,0 +1,6 @@
+## Empty version-sensitive claim registry for the test fixtures.
+##
+## Fixture roots share the real vocabulary, architecture tree, aliases and
+## schemas through the symlinks next to this file. They cannot share the real
+## registry: its claims name real pages, which a fixture root does not contain.
+claims: []

@@ -2,7 +2,7 @@
 
 A structured knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference (cooperative-matrix quantized linear, scaled dot-product attention) across GPU vendors, packaged as a Claude Code skill. The repository root is the skill directory.
 
-> **Status: current contents.** 590 pages: 5 source-measurement pages, 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`, and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel). Measurements and wiki pages cover the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. No other device has a measurement or wiki page. A pull-request page carries an architecture node only where the generator found evidence for one (the title, a device check the pull request adds to the code, or a changed path under a vendor's driver), recorded in `architecture_evidence`; most llama.cpp and ncnn pages carry none, and the Mesa pages are tagged `amd` or `rdna3`.
+> **Status: current contents.** 597 pages: 5 source-measurement pages, 4 official-document pages (Khronos cooperative-matrix proposals and GLSL extension, Mesa RADV environment variables), 2 blog pages, 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`, and 14 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 1 language). Measurements and the hardware, technique, pattern and kernel pages cover the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. No other device has a measurement or wiki page. A pull-request page carries an architecture node only where the generator found evidence for one (the title, a device check the pull request adds to the code, or a changed path under a vendor's driver), recorded in `architecture_evidence`; most llama.cpp and ncnn pages carry none, and the Mesa pages are tagged `amd` or `rdna3`.
 
 ## Install as a Claude Code Skill
 
@@ -16,7 +16,7 @@ python3 scripts/repo_status.py
 python3 scripts/query.py --architecture rdna3 --compact
 ```
 
-`repo_status.py` reports 590 indexed pages (577 source, 13 wiki), and the query lists the pages tagged `rdna3` or one of its devices.
+`repo_status.py` reports 597 indexed pages (583 source, 14 wiki), and the query lists the pages tagged `rdna3` or one of its devices.
 
 Optional override to point the scripts at another wiki root (a directory containing `data/tags.yaml`):
 
@@ -29,7 +29,8 @@ export VK_KERNEL_WIKI_ROOT=/path/to/another/root
 - Page schemas for six wiki page types and four source page types, including first-party measurement pages ([`data/schemas.yaml`](data/schemas.yaml)).
 - A controlled vocabulary ([`data/tags.yaml`](data/tags.yaml)) and alias map ([`data/aliases.yaml`](data/aliases.yaml)).
 - A data-driven architecture tree of vendors, generations and devices ([`data/architectures.yaml`](data/architectures.yaml)).
-- A version-claim registry with no claims yet ([`data/version-claims.yaml`](data/version-claims.yaml)).
+- A version-claim registry ([`data/version-claims.yaml`](data/version-claims.yaml)) with one claim: the 780M pages were measured on RADV Mesa 25.2.7, and 23 later cooperative-matrix merge requests are not in that release ([`data/release-membership.yaml`](data/release-membership.yaml)).
+- Reference bundles of complete upstream kernel files pinned to a commit ([`artifacts/kernels/`](artifacts/README.md)): llama.cpp matmul and flash attention shaders, ncnn cooperative-matrix shaders, and Mesa's RADV cooperative-matrix lowering.
 - Query, validation and index-generation scripts.
 - 18 knowledge pages for the AMD Radeon 780M on RADV Mesa 25.2.7: 5 first-party measurement source pages and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel). See [`index.md`](index.md).
 - 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`. See [`queries/by-repo.md`](queries/by-repo.md).
@@ -92,6 +93,8 @@ Rules that shape the content:
 | `scripts/refresh_candidate_ledger.py` | Search an upstream repository (GitHub through `gh`, or a GitLab instance over its public API) for merged pull requests and append include / defer / exclude rows to `candidates/<slug>.yaml` |
 | `scripts/generate-pr-pages.py` | Write a source-pr page for every `include` row of a ledger; rows it cannot turn into a page go to `data/pr-page-skipped.yaml` |
 | `scripts/fetch_pr_diff.py` | Save the shader patches of included pull requests as `artifacts/prs/<slug>/PR-<number>/` with a `PROVENANCE.yaml` and the upstream licence text |
+| `scripts/fetch_kernel_files.py` | Save the complete upstream files listed in `artifacts/kernels/MANIFEST.yaml`, pinned to a commit, with a `PROVENANCE.yaml` per bundle |
+| `scripts/check_release_membership.py` | Record in `data/release-membership.yaml` which included merge requests of a GitLab ledger a release tag contains |
 | `scripts/verify_verbatim.py` | Check offline that every artifact bundle matches its recorded sha256 and is named by a page; `--against-cache` also compares with the cached upstream patches |
 | `scripts/pr_policy.py`, `scripts/pr_evidence.py`, `scripts/pr_artifacts.py` | The intake decision rules, the `gh` fetch and cache layer, and the artifact bundle format shared by the scripts above |
 

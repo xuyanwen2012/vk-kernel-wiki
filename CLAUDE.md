@@ -2,7 +2,7 @@
 
 A structured knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference across GPU vendors, built for retrieval by LLM agents. This file is the rulebook for agents that edit the repository. For querying, see `SKILL.md`.
 
-Corpus status: 590 pages. 18 (5 source-measurement, 13 wiki) are for the device node `radeon-780m` on RADV Mesa 25.2.7; 572 are generated source-pr pages from `ggml-org/llama.cpp` (405), `Tencent/ncnn` (103) and `mesa/mesa` (64). Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
+Corpus status: 597 pages. 18 (5 source-measurement, 13 wiki) are for the device node `radeon-780m` on RADV Mesa 25.2.7; 4 are official-document pages, 2 are blog pages and 1 is a language page; 572 are generated source-pr pages from `ggml-org/llama.cpp` (405), `Tencent/ncnn` (103) and `mesa/mesa` (64). Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
 
 ## Non-Negotiable Authoring Rules
 
@@ -144,8 +144,10 @@ A page whose claim depends on a tool or driver version carries `version_sensitiv
 - `scripts/repo_status.py`: prints corpus counts.
 - `scripts/refresh_candidate_ledger.py --cutoff <date> [--repos <slug>]`: searches an upstream repository for merged pull requests and appends one include / defer / exclude row per pull request to `candidates/<slug>.yaml`. Existing rows are never changed; a row edited by hand carries `decision_source: manual`.
 - `scripts/generate-pr-pages.py [--repos <slug>]`: writes `sources/prs/<slug>/PR-<number>.md` for every `include` row. Rows that cannot become a valid page are listed in `data/pr-page-skipped.yaml`.
-- `scripts/pr_policy.py`: the intake rules both scripts share. Pages under `sources/prs/<slug>/` are generated: change the policy or the ledger and regenerate with `--force` instead of editing a page by hand. The generator leaves `techniques` empty; assigning one requires reading the diff.
+- `scripts/pr_policy.py`: the intake rules both scripts share. Pages under `sources/prs/<slug>/` are generated: change the policy or the ledger and regenerate with `--force` instead of editing a page by hand. The generator fills `techniques` only with the terms a title or shader file name states outright (tile sizing, split-k, fusion, tuning, workaround, Winograd, channel packing, required subgroup size, fp32 accumulation); every other technique term requires reading the diff.
 - `scripts/fetch_pr_diff.py [--repos <slug>]`: saves the shader patches of included pull requests under `artifacts/prs/<slug>/PR-<number>/` (`shaders.patch`, or `driver.patch` for a `scope_mode: driver` ledger, and `PROVENANCE.yaml`) and the upstream licence text at `artifacts/prs/<slug>/LICENSE`. The ledger must name the licence (`license: <SPDX id>`). Run it before the page generator so pages receive `artifact_dir`.
+- `scripts/fetch_kernel_files.py`: saves the complete upstream files listed in `artifacts/kernels/MANIFEST.yaml`, pinned to a commit. Quote code in a wiki page from these files, with the file, line range and commit as the locator.
+- `scripts/check_release_membership.py --repos <slug> --tag <tag>`: records in `data/release-membership.yaml` which included merge requests a release tag contains (by commit id). Use it before writing a version-sensitive claim.
 - `scripts/verify_verbatim.py [--against-cache]`: checks every artifact bundle against its recorded sha256 and against the pages. Never edit a file under `artifacts/` by hand.
 - The intake scripts call GitHub through `gh` and cache what they fetch under `.cache/pr-evidence/` (ignored by git). Everything else, including the test suite, is offline.
 - No Python package is required. The scripts prefer host PyYAML and fall back to the bundled loader, so they run under `python3 -S`.

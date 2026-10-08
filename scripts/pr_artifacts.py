@@ -26,6 +26,8 @@ from _yaml_compat import yaml
 from _wiki_root import WIKI_ROOT
 
 ARTIFACTS_ROOT = "artifacts/prs"
+KERNELS_ROOT = "artifacts/kernels"
+MANIFEST_NAME = "MANIFEST.yaml"
 PATCH_NAME = "shaders.patch"
 DRIVER_PATCH_NAME = "driver.patch"
 PATCH_NAMES = (PATCH_NAME, DRIVER_PATCH_NAME)
@@ -112,4 +114,40 @@ def bundle_errors(rel: str, root: Path = WIKI_ROOT) -> list:
     for path in hunks:
         if path not in listed:
             errors.append(f"{rel}: {patch_name} contains '{path}', which {PROVENANCE_NAME} does not list")
+    return errors
+
+
+def kernel_bundle_errors(rel: str, root: Path = WIKI_ROOT) -> list:
+    """Offline integrity check of one artifacts/kernels/<id>/ bundle."""
+    directory = Path(root) / rel
+    provenance_path = directory / PROVENANCE_NAME
+    if not provenance_path.is_file():
+        return [f"{rel}: missing {PROVENANCE_NAME}"]
+    try:
+        provenance = yaml.safe_load(provenance_path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        return [f"{rel}/{PROVENANCE_NAME}: unreadable ({exc})"]
+    errors = []
+    for field in ("repo", "commit", "license", "license_file", "retrieved_at", "files"):
+        if not provenance.get(field):
+            errors.append(f"{rel}/{PROVENANCE_NAME}: missing '{field}'")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(provenance.get("commit") or "")):
+        errors.append(f"{rel}/{PROVENANCE_NAME}: commit must be 40 hex characters")
+    if provenance.get("license_file") and not (Path(root) / str(provenance["license_file"])).is_file():
+        errors.append(f"{rel}: licence text '{provenance['license_file']}' does not exist")
+    listed = set()
+    for entry in provenance.get("files") or []:
+        name = entry.get("file") if isinstance(entry, dict) else None
+        if not name or not entry.get("path") or not entry.get("sha256"):
+            errors.append(f"{rel}/{PROVENANCE_NAME}: a files entry lacks 'path', 'file' or 'sha256'")
+            continue
+        listed.add(name)
+        path = directory / name
+        if not path.is_file():
+            errors.append(f"{rel}: missing file '{name}'")
+        elif hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
+            errors.append(f"{rel}: '{name}' does not match its recorded sha256")
+    for path in sorted(directory.iterdir()) if directory.is_dir() else []:
+        if path.name != PROVENANCE_NAME and path.name not in listed:
+            errors.append(f"{rel}: '{path.name}' is not listed in {PROVENANCE_NAME}")
     return errors

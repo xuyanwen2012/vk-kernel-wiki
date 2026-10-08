@@ -8,7 +8,8 @@ with VK_KERNEL_WIKI_ROOT selecting the root under test:
 
 - the real repository root;
 - a mini root under tests/fixtures/<case>/, whose `data` entry is a symlink to
-  the real data/ directory, so the real data/*.yaml files are exercised;
+  the tests/fixture-data/ directory, whose entries are symlinks to the real
+  data/*.yaml files (so those are exercised) plus an empty claim registry;
 - for the few cases that need a changed data file or a writable queries/
   directory, a temporary root assembled under tests/.tmp/ (removed afterwards);
 - for the mutation cases, a temporary copy of the valid fixture root with one
@@ -33,6 +34,8 @@ REPO_ROOT = TESTS_DIR.parent
 SCRIPTS = REPO_ROOT / "scripts"
 FIXTURES = TESTS_DIR / "fixtures"
 REAL_DATA = REPO_ROOT / "data"
+# What fixture roots see as data/: the real files, except an empty claim registry.
+FIXTURE_DATA = TESTS_DIR / "fixture-data"
 TMP_PARENT = Path(os.environ.get("VK_KERNEL_WIKI_TEST_TMPDIR") or TESTS_DIR / ".tmp")
 
 INDEX_FILES = [
@@ -95,10 +98,10 @@ class TempRoots(unittest.TestCase):
                 (root / sub).mkdir()
         (root / "queries").mkdir()
         if not data_overrides:
-            os.symlink(REAL_DATA.resolve(), root / "data")
+            os.symlink(FIXTURE_DATA.resolve(), root / "data")
         else:
             (root / "data").mkdir()
-            for path in sorted(REAL_DATA.iterdir()):
+            for path in sorted(FIXTURE_DATA.iterdir()):
                 if path.name not in data_overrides:
                     os.symlink(path.resolve(), root / "data" / path.name)
             for name, text in data_overrides.items():
@@ -279,7 +282,19 @@ def load_frontmatter(path):
 class ValidRootTest(TempRoots):
     def test_fixture_root_uses_real_data(self):
         self.assertTrue((VALID / "data").is_symlink())
-        self.assertEqual((VALID / "data").resolve(), REAL_DATA.resolve())
+        self.assertEqual((VALID / "data").resolve(), FIXTURE_DATA.resolve())
+        # Every data file the validator reads is the real one, except the claim
+        # registry: real claims name real pages, which fixture roots lack.
+        names = sorted(p.name for p in FIXTURE_DATA.iterdir())
+        self.assertEqual(names, ["aliases.yaml", "architectures.yaml", "schemas.yaml", "tags.yaml",
+                                 "version-claims.yaml"])
+        for name in names:
+            path = FIXTURE_DATA / name
+            if name == "version-claims.yaml":
+                self.assertFalse(path.is_symlink())
+                self.assertEqual(yaml.safe_load(path.read_text(encoding="utf-8")), {"claims": []})
+            else:
+                self.assertEqual(path.resolve(), (REAL_DATA / name).resolve())
 
     def test_valid_root_validates(self):
         proc = run_script("validate.py", root=VALID)
@@ -1434,6 +1449,18 @@ class PrPolicyTest(unittest.TestCase):
                 meta = self.policy.derive_metadata("FIXTURE", files, self.vocab, self.config)
                 self.assertEqual(meta["kernel_types"], expected)
 
+    def test_techniques_only_from_explicit_wording(self):
+        def techniques(title, *names):
+            files = [{"filename": f"src/fixture-shaders/{n}"} for n in names] or [{"filename": "src/fixture-shaders/x.comp"}]
+            return self.policy.derive_metadata(title, files, self.vocab, self.config)["techniques"]
+        self.assertEqual(techniques("FIXTURE change"), [])
+        self.assertEqual(techniques("FIXTURE: tune matmul tile for a device"), ["workgroup-tile-sizing", "device-specific-tuning"])
+        self.assertEqual(techniques("FIXTURE", "mul_mat_split_k_reduce.comp"), ["split-k-reduction"])
+        self.assertEqual(techniques("FIXTURE workaround for a compiler bug"), ["driver-workaround"])
+        self.assertEqual(techniques("FIXTURE", "convolution_pack4_3x3s1d1_winograd_gemm.comp"),
+                         ["winograd-convolution", "channel-packing"])
+        self.assertEqual(techniques("FIXTURE confused fortune textiles"), [])
+
     def test_host_source_only_is_deferred(self):
         decision = self.scope("src/fixture-backend.cpp", "docs/readme.md")
         self.assertEqual((decision.decision, decision.rule), ("defer", "backend-host-source-only"))
@@ -1694,6 +1721,30 @@ class PrPipelineTest(TempRoots):
         proc = run_script("validate.py", root=root)
         self.assertEqual(proc.returncode, 1, proc.stdout)
         self.assertIn("artifact_dir 'artifacts/prs/fixture-repo/PR-1' has no PROVENANCE.yaml", proc.stdout)
+
+    def test_kernel_bundle_integrity(self):
+        import hashlib
+        root = self.make_root()
+        bundle = root / "artifacts" / "kernels" / "fixture-kernels"
+        bundle.mkdir(parents=True)
+        (root / "artifacts" / "prs" / "fixture-repo").mkdir(parents=True)
+        (root / "artifacts" / "prs" / "fixture-repo" / "LICENSE").write_text("FIXTURE\n", encoding="utf-8")
+        (bundle / "a.comp").write_text("FIXTURE shader text\n", encoding="utf-8")
+        digest = hashlib.sha256(b"FIXTURE shader text\n").hexdigest()
+        (bundle / "PROVENANCE.yaml").write_text(yaml.safe_dump({
+            "repo": FIXTURE_REPO, "commit": "0123456789abcdef0123456789abcdef01234567", "license": "MIT",
+            "license_file": "artifacts/prs/fixture-repo/LICENSE", "retrieved_at": "2000-01-02",
+            "files": [{"path": "src/fixture-shaders/a.comp", "file": "a.comp", "sha256": digest}],
+        }), encoding="utf-8")
+        proc = run_script("verify_verbatim.py", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertEqual(summary_line(proc.stdout), "Verified 0 artifact bundle(s), 1 kernel bundle(s): 0 error(s)")
+        (bundle / "a.comp").write_text("FIXTURE changed\n", encoding="utf-8")
+        (bundle / "stray.comp").write_text("FIXTURE\n", encoding="utf-8")
+        proc = run_script("verify_verbatim.py", root=root)
+        self.assertEqual(proc.returncode, 1, proc.stdout)
+        self.assertIn("'a.comp' does not match its recorded sha256", proc.stdout)
+        self.assertIn("'stray.comp' is not listed in PROVENANCE.yaml", proc.stdout)
 
     def test_real_artifacts_are_intact(self):
         proc = run_script("verify_verbatim.py")

@@ -4,7 +4,7 @@
 > Built for retrieval by LLM agents. See [CLAUDE.md](CLAUDE.md) for schema and authoring rules.
 > This repository is a Claude Code skill; see [SKILL.md](SKILL.md).
 
-**Current corpus:** 590 pages: 5 source-measurement pages, 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`, and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel). Measured scope: the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. Nothing in the corpus is measured for another device, driver version or date. Counts come from `python3 scripts/repo_status.py`.
+**Current corpus:** 597 pages: 5 source-measurement pages, 4 official-document pages (Khronos cooperative-matrix proposals and GLSL extension, Mesa RADV environment variables), 2 blog pages, 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`, and 14 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 1 language). Measured scope: the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. Nothing in the corpus is measured for another device, driver version or date. Counts come from `python3 scripts/repo_status.py`.
 
 ## Query Tools
 
@@ -94,7 +94,7 @@ Directory: `wiki/patterns/`.
 
 ## Language Guides
 
-No pages yet. Directory: `wiki/languages/`.
+- [lang-glsl-cooperative-matrix](wiki/languages/glsl-cooperative-matrix.md): what GL_KHR_cooperative_matrix specifies, and one upstream int8 cooperative-matrix shader quoted from a pinned file
 
 ## Migration Notes
 
@@ -112,4 +112,10 @@ First-party measurements, directory `sources/measurements/`. Device, driver and 
 | `meas-780m-sdpa-port` | [sources/measurements/780m-sdpa-port.md](sources/measurements/780m-sdpa-port.md) | `radeon-780m` | RADV Mesa 25.2.7 (version attributed from the install history) | 2026-09-27 | https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae; in this repository: `sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt` |
 | `meas-780m-e2e-prefill` | [sources/measurements/780m-e2e-prefill.md](sources/measurements/780m-e2e-prefill.md) | `radeon-780m` | RADV Mesa 25.2.7 | 2026-09-28 | https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae |
 
-`sources/prs/` holds 572 generated pull-request pages (`llama-cpp/` 405, `ncnn/` 103, `mesa/` 64); they are listed in [queries/by-repo.md](queries/by-repo.md), not here. No pages yet in `sources/docs/` and `sources/blogs/`.
+`sources/prs/` holds 572 generated pull-request pages (`llama-cpp/` 405, `ncnn/` 103, `mesa/` 64); they are listed in [queries/by-repo.md](queries/by-repo.md), not here. 
+
+Official documents (`sources/docs/`): [doc-vk-khr-cooperative-matrix-proposal](sources/docs/vk-khr-cooperative-matrix-proposal.md), [doc-vk-nv-cooperative-matrix2-proposal](sources/docs/vk-nv-cooperative-matrix2-proposal.md), [doc-glsl-khr-cooperative-matrix](sources/docs/glsl-khr-cooperative-matrix.md), [doc-mesa-radv-envvars](sources/docs/mesa-radv-envvars.md).
+
+Blogs (`sources/blogs/`): [blog-themaister-fsr4-wmma](sources/blogs/themaister-fsr4-wmma.md), [blog-zolotukhin-matrix-cores-decode](sources/blogs/zolotukhin-matrix-cores-decode.md).
+
+Reference kernels (complete upstream files, not pages): `artifacts/kernels/llama-cpp-matmul/`, `artifacts/kernels/llama-cpp-flash-attention/`, `artifacts/kernels/ncnn-gemm-coopmat/`, `artifacts/kernels/mesa-radv-coopmat/`.

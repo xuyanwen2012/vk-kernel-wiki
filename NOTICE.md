@@ -23,6 +23,10 @@ The derived files have been modified for this repository: the subject matter, co
 | `sources/prs/ncnn/`, `artifacts/prs/ncnn/` | https://github.com/Tencent/ncnn | BSD-3-Clause, Copyright (C) 2017 Tencent; the saved files are ncnn's own shader sources, not the third-party components its licence file lists | `artifacts/prs/ncnn/LICENSE` (upstream `LICENSE.txt`) |
 | `sources/prs/mesa/`, `artifacts/prs/mesa/` | https://gitlab.freedesktop.org/mesa/mesa | MIT; copyright notices are in the headers of the upstream files | `artifacts/prs/mesa/LICENSE` (upstream `licenses/MIT`) |
 
+`artifacts/kernels/<bundle>/` holds complete upstream files from the same three repositories, pinned to a commit and under the same licences; each bundle's `PROVENANCE.yaml` names the repository, commit and licence file.
+
+`sources/docs/` and `sources/blogs/` hold short verbatim excerpts, each with a link to its source and remaining the work of its authors: the Vulkan-Docs proposals are CC-BY-4.0 (Copyright The Khronos Group Inc.); the GLSL extension specification is Copyright The Khronos Group Inc. under the terms at http://www.khronos.org/registry/speccopyright.html; the Mesa documentation is MIT; the two blog posts are quoted paragraph by paragraph with attribution and are not relicensed.
+
 Each `artifacts/prs/<slug>/PR-<number>/PROVENANCE.yaml` records the pull request, its merge commit, the retrieval date and a sha256 per file.
 
 ## PyYAML

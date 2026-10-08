@@ -1,0 +1,17 @@
+repo: mesa/mesa
+url: https://gitlab.freedesktop.org/mesa/mesa
+commit: 0b2fa0445c2cdf6ab5e3a00214954670f0e0d2af
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-06'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: src/amd/vulkan/nir/radv_nir_lower_cooperative_matrix.c
+  file: radv_nir_lower_cooperative_matrix.c
+  sha256: 85939443a22c546c78c483696787d41b0ab119a5aef9634d219eaed71719d9f0
+- path: src/compiler/nir/nir_lower_cooperative_matrix.c
+  file: nir_lower_cooperative_matrix.c
+  sha256: e64a86298ef47f782e4745a7eb5e7b023f96136e50aed2a45f01a184ef2a17f2
+- path: src/compiler/spirv/vtn_cmat.c
+  file: vtn_cmat.c
+  sha256: c15f65c6070d8353a667c1556b139c3f4fd953f3d0ed2c4297e751afb35b0705

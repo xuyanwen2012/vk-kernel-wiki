@@ -376,6 +376,32 @@ elementwise:
   - "unary operator"
   - "binary operator"
 
+split-k-reduction:
+  - "split k"
+  - split_k
+  - split_k_reduce
+
+kernel-fusion:
+  - "operator fusion"
+  - "fused kernel"
+
+device-specific-tuning:
+  - "per-device tuning"
+  - "vendor tuning"
+
+driver-workaround:
+  - workaround
+  - blacklist
+  - "driver bug"
+
+winograd-convolution:
+  - winograd
+
+channel-packing:
+  - pack4
+  - pack8
+  - "packed layout"
+
 # Languages
 spirv:
   - "SPIR-V"

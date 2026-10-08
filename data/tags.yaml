@@ -68,6 +68,13 @@ techniques:
   - row-major-activations       # row-major packed int8 activations
   # Attention
   - causal-truncation           # skip work above the causal diagonal
+  # Stated in upstream pull-request titles and shader file names
+  - split-k-reduction           # K split across workgroups, partial sums reduced in a second pass
+  - kernel-fusion               # several operators merged into one dispatch
+  - device-specific-tuning      # parameters or kernel choice tuned per vendor, generation or device
+  - driver-workaround           # a path disabled or changed because of a driver or compiler defect
+  - winograd-convolution        # 3x3 convolution through the Winograd transform
+  - channel-packing             # channels packed into vec4/vec8 elements (pack4, pack8)
 
 # Operator families.
 kernel_types:

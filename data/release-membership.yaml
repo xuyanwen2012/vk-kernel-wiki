@@ -1,0 +1,76 @@
+## Which included merge requests a release tag contains, by commit id.
+## Written by scripts/check_release_membership.py. A change that entered the
+## release by cherry-pick has another commit id and is listed as not contained.
+checks:
+- ledger: mesa
+  repo: mesa/mesa
+  tag: mesa-25.2.7
+  checked_at: '2026-10-06'
+  method: tags containing the landed commit of each merge request (GitLab commits/<sha>/refs?type=tag)
+  contained:
+  - pr-mesa-2588
+  - pr-mesa-2872
+  - pr-mesa-4215
+  - pr-mesa-4227
+  - pr-mesa-4299
+  - pr-mesa-4452
+  - pr-mesa-4453
+  - pr-mesa-5056
+  - pr-mesa-5347
+  - pr-mesa-9459
+  - pr-mesa-12617
+  - pr-mesa-15838
+  - pr-mesa-19114
+  - pr-mesa-20587
+  - pr-mesa-21633
+  - pr-mesa-23572
+  - pr-mesa-23825
+  - pr-mesa-23925
+  - pr-mesa-24683
+  - pr-mesa-25566
+  - pr-mesa-26445
+  - pr-mesa-26768
+  - pr-mesa-33120
+  - pr-mesa-33257
+  - pr-mesa-33378
+  - pr-mesa-34105
+  - pr-mesa-34382
+  - pr-mesa-34396
+  - pr-mesa-34511
+  - pr-mesa-34768
+  - pr-mesa-34793
+  - pr-mesa-35570
+  - pr-mesa-35633
+  - pr-mesa-35713
+  - pr-mesa-36016
+  - pr-mesa-36115
+  not_contained:
+  - pr-mesa-36117
+  - pr-mesa-36328
+  - pr-mesa-36583
+  - pr-mesa-36992
+  - pr-mesa-37002
+  - pr-mesa-37213
+  - pr-mesa-37442
+  - pr-mesa-37619
+  - pr-mesa-37867
+  - pr-mesa-37879
+  - pr-mesa-38389
+  - pr-mesa-38589
+  - pr-mesa-38835
+  - pr-mesa-39256
+  - pr-mesa-39456
+  - pr-mesa-40003
+  - pr-mesa-41500
+  - pr-mesa-41653
+  - pr-mesa-41691
+  - pr-mesa-41922
+  - pr-mesa-43056
+  - pr-mesa-43148
+  - pr-mesa-43426
+  - pr-mesa-43634
+  - pr-mesa-43730
+  - pr-mesa-43771
+  - pr-mesa-43786
+  - pr-mesa-43864
+  unknown: []
