@@ -10,7 +10,6 @@ tags:
 - cooperative-matrix
 - shared-memory-limit
 - shared-memory-fence
-- double-buffering
 - memory-model
 - gemm
 retrieved_at: '2026-10-10'
