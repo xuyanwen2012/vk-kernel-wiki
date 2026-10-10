@@ -232,9 +232,7 @@ def vendor_of(node):
 
 
 def page_architectures(fm):
-    # A migration page names its architectures in from_arch / to_arch.
-    names = as_list(fm.get("architectures")) + as_list(fm.get("from_arch")) + as_list(fm.get("to_arch"))
-    return {arch_policy.normalize(a) for a in names}
+    return {arch_policy.normalize(a) for a in as_list(fm.get("architectures"))}
 
 
 def subject_focus(fm, subjects):
