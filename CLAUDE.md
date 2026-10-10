@@ -37,7 +37,7 @@ Raw evidence. Each file has YAML frontmatter with a unique `id`. Bodies hold ver
 
 - `sources/measurements/`: first-party measurements. The most trusted source type.
 - `sources/prs/`: upstream pull requests.
-- `sources/docs/`: official documentation and papers.
+- `sources/docs/`: official documentation (`official-doc`: specification-grade only), other projects' source files (`upstream-code`), vendor and project articles and guides (`vendor-doc`) and papers.
 - `sources/blogs/`: benchmark blogs and community notes.
 
 ### Layer 2: Wiki (`wiki/`)
@@ -102,7 +102,7 @@ Vocabulary discipline:
   - (a) at least one entry has `evidence_type: measurement` and its `source_id` resolves to a source-measurement page, or
   - (b) it has at least one `official-doc` entry and at least one `upstream-code` entry.
 
-  Labels are bound to what they cite: an `official-doc` entry must cite a source page with `source_category: official-doc`, and an `upstream-code` entry must cite a source-pr page.
+  Labels are bound to what they cite: an `official-doc` entry must cite a source page with `source_category: official-doc`, and an `upstream-code` entry must cite a source-pr page. `official-doc` is reserved for specification-grade documents (Khronos specifications and proposals, the Vulkan Guide, vendor ISA / instruction specifications, driver documentation and release notes); a document page that quotes another project's source is `upstream-code` and a vendor or project article, guide or slide deck is `vendor-doc`, and neither counts towards (b).
 - `source-reported`: stated by at least one cited source.
 - `inferred`: synthesized from several sources; no single source states it.
 - `experimental`: undocumented or version-dependent behaviour. Attach a `version_sensitive` pointer where a tool or driver version matters.

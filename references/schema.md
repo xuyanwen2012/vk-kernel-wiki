@@ -105,9 +105,26 @@ removed is rejected.
 
 ### source-doc
 
-Required: `id`, `title`, `url`, `source_category` (`official-doc` | `paper`),
-`architectures`, `tags`, `retrieved_at`.
+Required: `id`, `title`, `url`, `source_category` (`official-doc` |
+`upstream-code` | `vendor-doc` | `paper`), `architectures`, `tags`,
+`retrieved_at`.
 Optional: `author`, `description`.
+
+Which category a document page takes:
+
+- `official-doc`: a specification-grade document. Khronos specifications,
+  extension texts and proposals, the Vulkan Guide, a vendor ISA or instruction
+  specification, driver documentation and driver release notes. Only this
+  category counts as `official-doc` evidence for `verified`.
+- `upstream-code`: a page that quotes another project's source files, tests
+  or code samples at a pinned commit (it is not a pull request, so it is not
+  `upstream-code` evidence for `verified` either, which needs a `source-pr`
+  page).
+- `vendor-doc`: a vendor or project article, guide, handbook, slide deck or
+  framework release note.
+- `paper`: a published paper.
+
+All four are citable in a page's `sources` and as a claim's `source_id`.
 
 ```yaml
 id: doc-example-specification
@@ -377,7 +394,8 @@ numbers carries `performance_claims: []`.
   label alone never satisfies it: a `measurement` entry must cite a
   `source-measurement` page, an `official-doc` entry a source page whose
   `source_category` is `official-doc`, and an `upstream-code` entry a
-  `source-pr` page. A mismatch is an error on any page that carries
+  `source-pr` page. A document page filed as `upstream-code` or `vendor-doc`
+  therefore never counts towards alternative (b). A mismatch is an error on any page that carries
   `evidence_basis`, whatever its confidence.
 - **`source-reported`**: stated by at least one cited source.
 - **`inferred`**: synthesized from several sources; no single source states it.

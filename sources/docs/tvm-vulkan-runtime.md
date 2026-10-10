@@ -3,7 +3,7 @@ id: doc-tvm-vulkan-runtime
 title: 'Apache TVM (TensorIR compiler emitting SPIR-V, not GLSL): Vulkan runtime, device capabilities used by code generation'
 author: The Apache Software Foundation
 url: https://github.com/apache/tvm/blob/9059d9d25149c9ca7a015717b5023d1e2e1185fd/docs/arch/runtimes/vulkan.rst
-source_category: official-doc
+source_category: vendor-doc
 architectures: []
 tags:
 - 8bit-storage

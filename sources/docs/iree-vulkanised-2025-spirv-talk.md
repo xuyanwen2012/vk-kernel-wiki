@@ -3,7 +3,7 @@ id: doc-iree-vulkanised-2025-spirv-talk
 title: 'The Long Tail of AI: SPIR-V in IREE and MLIR (Vulkanised 2025 slides; MLIR compiler, not GLSL)'
 author: Jakub Kuderski, AMD
 url: https://www.vulkan.org/user/pages/09.events/vulkanised-2025/T12-Jakub-Kuderski-AMD-IREE-MLIR.pdf
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - rdna3
 tags:

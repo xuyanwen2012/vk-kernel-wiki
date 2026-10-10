@@ -3,7 +3,7 @@ id: doc-amd-rdna-performance-guide
 title: "AMD RDNA Performance Guide: compute shaders (GPUOpen)"
 author: AMD
 url: https://gpuopen.com/learn/rdna-performance-guide/
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - amd
 tags:

@@ -3,7 +3,7 @@ id: doc-iree-vulkan-deployment-guide
 title: 'IREE (MLIR compiler emitting SPIR-V, not GLSL): GPU deployment using Vulkan'
 author: The IREE Authors
 url: https://iree.dev/guides/deployment-configurations/gpu-vulkan/
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - amd
 - arm

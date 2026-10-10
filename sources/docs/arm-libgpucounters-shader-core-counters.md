@@ -3,7 +3,7 @@ id: doc-arm-libgpucounters-shader-core-counters
 title: 'Arm libGPUCounters: Mali shader-core counter definitions for warps, register use and thread occupancy'
 author: Arm Limited
 url: https://github.com/ARM-software/libGPUCounters/tree/378c7b59e2dae87cbbffb0ac9cf96ed13c939823
-source_category: official-doc
+source_category: upstream-code
 architectures:
 - arm
 tags:

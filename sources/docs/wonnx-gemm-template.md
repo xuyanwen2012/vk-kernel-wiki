@@ -3,7 +3,7 @@ id: doc-wonnx-gemm-template
 title: 'wonnx (Rust runtime, WGSL templates, not GLSL): Gemm shader template multiplying matNxN chunks'
 author: Xavier Tao, Tommy van der Vorst and WONNX contributors
 url: https://github.com/webonnx/wonnx/blob/c62f5d336c152102882a163ebc1eb18e63550de8/wonnx/templates/matrix/gemm.wgsl
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - gemm

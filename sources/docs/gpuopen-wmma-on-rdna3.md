@@ -3,7 +3,7 @@ id: doc-gpuopen-wmma-on-rdna3
 title: "How to accelerate AI applications on RDNA 3 using WMMA (GPUOpen)"
 author: "Aaryaman Vasishta, Takahiro Harada (AMD)"
 url: https://gpuopen.com/learn/wmma_on_rdna3/
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - rdna3
 - rx-7900-xtx

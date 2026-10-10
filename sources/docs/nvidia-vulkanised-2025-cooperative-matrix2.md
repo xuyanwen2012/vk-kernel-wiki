@@ -3,7 +3,7 @@ id: doc-nvidia-vulkanised-2025-cooperative-matrix2
 title: "Machine Learning in Vulkan with Cooperative Matrix 2 (Vulkanised 2025 slides)"
 author: Jeff Bolz, NVIDIA
 url: https://vulkan.org/user/pages/09.events/vulkanised-2025/T47-Jeff-Bolz-NVIDIA.pdf
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - nvidia
 - rtx-4070

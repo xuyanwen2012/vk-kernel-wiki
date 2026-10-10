@@ -3,7 +3,7 @@ id: doc-intel-oneapi-gpu-guide-joint-matrix
 title: "Programming Intel XMX Using SYCL Joint Matrix Extension (oneAPI GPU Optimization Guide 2025.2)"
 author: Intel Corporation
 url: https://web.archive.org/web/20251008202018/https://www.intel.com/content/www/us/en/docs/oneapi/optimization-guide-gpu/2025-2/programming-intel-xmx-using-sycl-joint-matrix.html
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - intel
 tags:

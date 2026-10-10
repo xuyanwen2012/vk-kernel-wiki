@@ -250,7 +250,7 @@ Migration pages describe porting a kernel from one architecture node to another 
 |---|---|---|---|
 | First-party measurement | `sources/measurements/` | `measurement` | `meas-780m-vulkaninfo`, `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-e2e-prefill` |
 | Upstream pull request | `sources/prs/` | `upstream-code` | 572 generated pages in `sources/prs/llama-cpp/`, `sources/prs/ncnn/` and `sources/prs/mesa/`; list: `queries/by-repo.md` |
-| Documentation and papers | `sources/docs/` | `official-doc`, `paper` | `doc-vk-khr-cooperative-matrix-proposal`, `doc-vk-nv-cooperative-matrix2-proposal`, `doc-glsl-khr-cooperative-matrix`, `doc-mesa-radv-envvars` |
+| Documentation and papers | `sources/docs/` | `official-doc` (specification-grade), `upstream-code` (another project's source files), `vendor-doc` (vendor and project articles, guides, slide decks), `paper` | `doc-vk-khr-cooperative-matrix-proposal`, `doc-vk-nv-cooperative-matrix2-proposal`, `doc-glsl-khr-cooperative-matrix`, `doc-mesa-radv-envvars` |
 | Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | `blog-themaister-fsr4-wmma`, `blog-zolotukhin-matrix-cores-decode` |
 
 First-party measurements are the most trusted source type. Index per device: `queries/by-device.md`. PR pages per repository: `queries/by-repo.md`.
@@ -265,7 +265,7 @@ First-party measurements are the most trusted source type. Index per device: `qu
 | `reproducibility` | `concept`, `pseudocode`, `snippet`, `runnable`, `benchmarked` |
 | `evidence_types` | `official-doc`, `upstream-code`, `paper`, `benchmark`, `measurement`, `inference` |
 
-A `verified` wiki page needs an `evidence_basis` that holds either a `measurement` entry resolving to a source-measurement page, or both an `official-doc` and an `upstream-code` entry. Details: `references/schema.md`.
+A `verified` wiki page needs an `evidence_basis` that holds either a `measurement` entry resolving to a source-measurement page, or both an `official-doc` entry (citing a document page whose `source_category` is `official-doc`) and an `upstream-code` entry (citing a pull-request page). Details: `references/schema.md`.
 
 ## Version-Sensitive Claims
 

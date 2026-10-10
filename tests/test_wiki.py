@@ -165,7 +165,8 @@ class RealRepoTest(TempRoots):
         self.assertEqual(tags["reproducibility"], ["concept", "pseudocode", "snippet", "runnable", "benchmarked"])
         self.assertEqual(
             set(tags["source_categories"]),
-            {"official-doc", "upstream-code", "paper", "benchmark-blog", "community-note", "measurement"},
+            {"official-doc", "upstream-code", "vendor-doc", "paper", "benchmark-blog", "community-note",
+             "measurement"},
         )
         self.assertEqual(
             set(tags["evidence_types"]),
@@ -779,6 +780,38 @@ MUTATION_CASES = {
              "- evidence_type: upstream-code\n  source_id: blog-fixture-note")],
         [f"{_TECH}: evidence_basis[1]: evidence_type 'upstream-code' requires source_id "
          "'blog-fixture-note' to be a source-pr page (it is source-blog)",
+         f"{_TECH}: {_NOT_VERIFIED}(found evidence types: ['official-doc', 'upstream-code'])"],
+    ),
+    # official-doc evidence is reserved for specification-grade documents. A
+    # document page filed as a vendor article or as another project's source
+    # is itself valid and citable, but cannot carry the official-doc half.
+    "evidence-official-doc-label-on-a-vendor-doc": (
+        [sub(_DOC, "source_category: official-doc", "source_category: vendor-doc")],
+        [f"{_TECH}: evidence_basis[0]: evidence_type 'official-doc' requires source_id "
+         "'doc-fixture-spec' to have source_category 'official-doc' (it has 'vendor-doc')",
+         f"{_TECH}: {_NOT_VERIFIED}(found evidence types: ['official-doc', 'upstream-code'])"],
+    ),
+    "evidence-official-doc-label-on-a-code-document": (
+        [sub(_DOC, "source_category: official-doc", "source_category: upstream-code")],
+        [f"{_TECH}: evidence_basis[0]: evidence_type 'official-doc' requires source_id "
+         "'doc-fixture-spec' to have source_category 'official-doc' (it has 'upstream-code')",
+         f"{_TECH}: {_NOT_VERIFIED}(found evidence types: ['official-doc', 'upstream-code'])"],
+    ),
+    # ... nor the upstream-code half, which needs a pull-request page.
+    "evidence-upstream-code-label-on-a-code-document": (
+        [sub(_DOC, "source_category: official-doc", "source_category: upstream-code"),
+         sub(_TECH, "- evidence_type: official-doc\n  source_id: doc-fixture-spec",
+             "- evidence_type: upstream-code\n  source_id: doc-fixture-spec")],
+        [f"{_TECH}: evidence_basis[0]: evidence_type 'upstream-code' requires source_id "
+         "'doc-fixture-spec' to be a source-pr page (it is source-doc)",
+         f"{_TECH}: {_NOT_VERIFIED}(found evidence types: ['upstream-code'])"],
+    ),
+    "doc-with-a-blog-category": (
+        [sub(_DOC, "source_category: official-doc", "source_category: community-note")],
+        [f"{_DOC}: source_category 'community-note' not in allowed "
+         "['official-doc', 'upstream-code', 'vendor-doc', 'paper']",
+         f"{_TECH}: evidence_basis[0]: evidence_type 'official-doc' requires source_id "
+         "'doc-fixture-spec' to have source_category 'official-doc' (it has 'community-note')",
          f"{_TECH}: {_NOT_VERIFIED}(found evidence types: ['official-doc', 'upstream-code'])"],
     ),
     "evidence-entry-missing-evidence-type": (

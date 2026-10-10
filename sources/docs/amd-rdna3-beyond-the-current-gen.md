@@ -3,7 +3,7 @@ id: doc-amd-rdna3-beyond-the-current-gen
 title: "RDNA 3: Beyond the Current Gen (AMD slides, Reboot Develop Blue 2023)"
 author: "Lou Kramer (AMD)"
 url: https://gpuopen.com/presentations/2023/RDNA3_Beyond-the-current-gen-v4.pdf
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - rdna3
 tags:

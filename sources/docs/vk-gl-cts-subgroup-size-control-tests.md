@@ -3,7 +3,7 @@ id: doc-vk-gl-cts-subgroup-size-control-tests
 title: 'VK-GL-CTS: subgroup size control compute tests (dEQP-VK.subgroups.size_control.compute)'
 author: The Khronos Group Inc.
 url: https://github.com/KhronosGroup/VK-GL-CTS/blob/5c715f61311aaa60a78632091606de56efa220a1/external/vulkancts/modules/vulkan/subgroups/vktSubgroupsSizeControlTests.cpp
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - subgroup-size

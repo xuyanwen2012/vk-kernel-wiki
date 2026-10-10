@@ -3,7 +3,7 @@ id: doc-qualcomm-adreno-cooperative-matrix-sample
 title: 'Adreno GPU Vulkan code sample framework: cooperative matrix sample (GEMM, vector-to-matrix GEMM, convolution)'
 author: Qualcomm Innovation Center, Inc.
 url: https://github.com/SnapdragonGameStudios/adreno-gpu-vulkan-code-sample-framework/tree/584f0528d46d120a73b4f7bbd0102abfb358220b/samples/cooperative_matrix
-source_category: official-doc
+source_category: upstream-code
 architectures:
 - qualcomm
 tags:

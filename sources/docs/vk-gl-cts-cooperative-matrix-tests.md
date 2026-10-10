@@ -3,7 +3,7 @@ id: doc-vk-gl-cts-cooperative-matrix-tests
 title: 'VK-GL-CTS: cooperative-matrix compute tests (dEQP-VK.compute.*.cooperative_matrix)'
 author: The Khronos Group Inc.
 url: https://github.com/KhronosGroup/VK-GL-CTS/blob/5c715f61311aaa60a78632091606de56efa220a1/external/vulkancts/modules/vulkan/compute/vktComputeCooperativeMatrixTests.cpp
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - cooperative-matrix

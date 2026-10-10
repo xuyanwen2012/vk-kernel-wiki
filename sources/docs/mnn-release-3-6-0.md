@@ -3,7 +3,7 @@ id: doc-mnn-release-3-6-0
 title: 'MNN 3.6.0 release notes: Vulkan backend entries'
 author: MNN contributors (Alibaba)
 url: https://github.com/alibaba/MNN/releases/tag/3.6.0
-source_category: official-doc
+source_category: vendor-doc
 architectures: []
 tags:
 - cooperative-matrix

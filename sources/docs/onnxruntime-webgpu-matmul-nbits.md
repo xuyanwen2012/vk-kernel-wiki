@@ -3,7 +3,7 @@ id: doc-onnxruntime-webgpu-matmul-nbits
 title: 'ONNX Runtime WebGPU execution provider (C++ host, WGSL templates, not GLSL): MatMulNBits kernel selection, tile sizes and subgroup-matrix path'
 author: Microsoft Corporation
 url: https://github.com/microsoft/onnxruntime/tree/8fc9fd597453baae1ad73379c313f0586d812867/onnxruntime/contrib_ops/webgpu/quantization
-source_category: official-doc
+source_category: upstream-code
 architectures:
 - intel
 - nvidia

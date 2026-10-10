@@ -131,8 +131,10 @@ reproducibility:
   - benchmarked
 
 source_categories:
-  - official-doc
-  - upstream-code
+  - official-doc                # specification-grade document: Khronos specification, proposal or extension text, the Vulkan Guide,
+                                # a vendor ISA / instruction specification, driver documentation and release notes
+  - upstream-code               # another project's code: a pull request (sources/prs/) or a source file or code sample (sources/docs/)
+  - vendor-doc                  # vendor or project article, guide, handbook, slide deck or framework release note; citable, not a specification
   - paper
   - benchmark-blog
   - community-note

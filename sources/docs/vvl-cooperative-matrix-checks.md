@@ -3,7 +3,7 @@ id: doc-vvl-cooperative-matrix-checks
 title: 'Vulkan-ValidationLayers: cooperative-matrix shader checks (cc_spirv_cooperative.cpp)'
 author: The Khronos Group Inc., Valve Corporation, LunarG, Inc.
 url: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/99fd2cb5761410c0e8cd82395861abd75c9d1f06/layers/core_checks/cc_spirv_cooperative.cpp
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - cooperative-matrix

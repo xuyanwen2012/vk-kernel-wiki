@@ -3,7 +3,7 @@ id: doc-mnn-vulkan-optimization-handbook
 title: 'MNN Vulkan optimization handbook (skills/vulkan-optimize): cooperative matrix, subgroup reduction, fused epilogue, occupancy'
 author: MNN contributors (Alibaba)
 url: https://github.com/alibaba/MNN/blob/9c1788748c4d8aba00f9b644f50f5c15576d7d80/skills/vulkan-optimize/optimization-handbook.md
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - qualcomm
 - arm

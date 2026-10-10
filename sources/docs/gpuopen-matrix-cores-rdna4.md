@@ -3,7 +3,7 @@ id: doc-gpuopen-matrix-cores-rdna4
 title: "Using the Matrix Cores of AMD RDNA 4 architecture GPUs (GPUOpen)"
 author: "Takahiro Harada, Atsushi Yoshimura (AMD)"
 url: https://gpuopen.com/learn/using_matrix_core_amd_rdna4/
-source_category: official-doc
+source_category: vendor-doc
 architectures:
 - rdna4
 - rx-9070-xt

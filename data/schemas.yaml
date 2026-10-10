@@ -77,7 +77,13 @@ source-doc:
     - description
   constraints:
     id_prefix: doc-
-    source_category: [official-doc, paper]
+    ## official-doc is reserved for specification-grade documents, because the
+    ## 'verified' rule below accepts it as evidence. A page that quotes another
+    ## project's source file is upstream-code; a vendor or project article,
+    ## guide, slide deck or framework release note is vendor-doc. Neither
+    ## satisfies the rule: its official-doc half is bound to this category and
+    ## its upstream-code half to source-pr pages.
+    source_category: [official-doc, upstream-code, vendor-doc, paper]
     date_fields: [retrieved_at]
 
 source-blog:

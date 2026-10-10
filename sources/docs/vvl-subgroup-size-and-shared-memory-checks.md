@@ -3,7 +3,7 @@ id: doc-vvl-subgroup-size-and-shared-memory-checks
 title: 'Vulkan-ValidationLayers: required subgroup size, full subgroups, workgroup size and shared-memory size checks'
 author: The Khronos Group Inc., Valve Corporation, LunarG, Inc.
 url: https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/99fd2cb5761410c0e8cd82395861abd75c9d1f06/layers/core_checks/cc_spirv.cpp
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - subgroup-size

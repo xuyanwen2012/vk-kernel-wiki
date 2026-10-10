@@ -3,7 +3,7 @@ id: doc-cubek-matmul
 title: 'CubeK matmul (Burn / CubeCL; Rust kernels compiled to WGSL, SPIR-V, CUDA and others, not GLSL): tiling scheme, plane selector, double buffering'
 author: Tracel Technologies Inc. and CubeK contributors
 url: https://github.com/tracel-ai/cubek/tree/ea03524e1fa44a5c89f95f0fe19b9b74f9f2c461/crates/cubek-matmul
-source_category: official-doc
+source_category: upstream-code
 architectures: []
 tags:
 - gemm
