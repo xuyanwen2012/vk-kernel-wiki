@@ -1,0 +1,308 @@
+diff --git a/src/intel/compiler/brw/brw_compiler.c b/src/intel/compiler/brw/brw_compiler.c
+--- a/src/intel/compiler/brw/brw_compiler.c
++++ b/src/intel/compiler/brw/brw_compiler.c
+@@ -254,6 +254,8 @@ brw_get_compiler_config_value(const struct brw_compiler *compiler)
+ 
+    insert_u64_bit(&config, compiler->precise_trig);
+    bits++;
++   insert_u64_bit(&config, compiler->limit_trig_input_range);
++   bits++;
+    insert_u64_bit(&config, compiler->lower_dpas);
+    bits++;
+    insert_u64_bit(&config, compiler->optimistic_simd_heuristic);
+diff --git a/src/intel/compiler/brw/brw_compiler.h b/src/intel/compiler/brw/brw_compiler.h
+--- a/src/intel/compiler/brw/brw_compiler.h
++++ b/src/intel/compiler/brw/brw_compiler.h
+@@ -73,6 +73,11 @@ struct brw_compiler {
+     */
+    bool precise_trig;
+ 
++   /**
++    * Whether to limit sin/cos inputs to [-2pi, 2pi] to improve accuracy.
++    */
++   bool limit_trig_input_range;
++
+    /**
+     * Should DPAS instructions be lowered?
+     *
+@@ -223,16 +228,9 @@ struct brw_base_prog_key {
+ 
+    enum intel_vue_layout vue_layout:2;
+ 
+-   /**
+-    * Apply workarounds for SIN and COS input range problems.
+-    * This limits input range for SIN and COS to [-2p : 2p] to
+-    * avoid precision issues.
+-    */
+-   bool limit_trig_input_range:1;
+-
+    enum brw_divergent_atomics_flags divergent_atomics_flags:2;
+ 
+-   uint32_t padding:24;
++   uint32_t padding:25;
+ };
+ 
+ /**
+diff --git a/src/intel/compiler/brw/brw_nir.c b/src/intel/compiler/brw/brw_nir.c
+--- a/src/intel/compiler/brw/brw_nir.c
++++ b/src/intel/compiler/brw/brw_nir.c
+@@ -2506,6 +2506,9 @@ brw_preprocess_nir(const struct brw_compiler *compiler, nir_shader *nir,
+        !(devinfo->ver >= 10 || devinfo->platform == INTEL_PLATFORM_KBL))
+       OPT(brw_nir_apply_trig_workarounds);
+ 
++   if (compiler->limit_trig_input_range)
++      OPT(brw_nir_limit_trig_input_range_workaround);
++
+    /* This workaround existing for performance reasons. Since it requires not
+     * setting RENDER_SURFACE_STATE::SurfaceArray when the array length is 1,
+     * we're loosing the HW robustness feature in that case.
+@@ -3841,7 +3844,7 @@ brw_nir_api_subgroup_size(const nir_shader *nir,
+ 
+ void
+ brw_nir_apply_key(brw_pass_tracker *pt,
+-                  const struct brw_base_prog_key *key,
++                  UNUSED const struct brw_base_prog_key *key,
+                   unsigned max_subgroup_size)
+ {
+    nir_shader *nir = pt->nir;
+@@ -3871,12 +3874,6 @@ brw_nir_apply_key(brw_pass_tracker *pt,
+       .lower_subgroup_masks = true,
+    };
+    OPT(nir_lower_subgroups, &subgroups_options);
+-
+-   if (key->limit_trig_input_range)
+-      OPT(brw_nir_limit_trig_input_range_workaround);
+-
+-   if (pt->progress)
+-      brw_nir_optimize(pt);
+ }
+ 
+ enum brw_conditional_mod
+diff --git a/src/intel/compiler/brw/brw_nir_lower_ray_queries.c b/src/intel/compiler/brw/brw_nir_lower_ray_queries.c
+--- a/src/intel/compiler/brw/brw_nir_lower_ray_queries.c
++++ b/src/intel/compiler/brw/brw_nir_lower_ray_queries.c
+@@ -544,6 +544,13 @@ lower_ray_query_intrinsic(nir_builder *b,
+    }
+ }
+ 
++static nir_def *
++load_subgroup_size(nir_builder *b)
++{
++   unsigned imm_size = brw_nir_api_subgroup_size(b->shader, 0);
++   return imm_size ? nir_imm_int(b, imm_size) : nir_load_subgroup_size(b);
++}
++
+ static void
+ lower_ray_query_impl(nir_function_impl *impl, struct lowering_state *state)
+ {
+@@ -557,7 +564,7 @@ lower_ray_query_impl(nir_function_impl *impl, struct lowering_state *state)
+       b,
+       nir_iand(b,
+                nir_ige_imm(b, nir_load_subgroup_invocation(b), 16),
+-               nir_ieq_imm(b, nir_load_subgroup_size(b), 32)),
++               nir_ieq_imm(b, load_subgroup_size(b), 32)),
+       nir_iadd_imm(
+          b, rq_globals_base,
+          align(4 * RT_DISPATCH_GLOBALS_length(state->devinfo), 64)),
+diff --git a/src/intel/compiler/brw/brw_private.h b/src/intel/compiler/brw/brw_private.h
+--- a/src/intel/compiler/brw/brw_private.h
++++ b/src/intel/compiler/brw/brw_private.h
+@@ -38,6 +38,8 @@ const unsigned *brw_compile_cs(const struct brw_compiler *compiler,
+ const unsigned *brw_compile_bs(const struct brw_compiler *compiler,
+                                struct brw_compile_bs_params *params);
+ 
++unsigned brw_geometry_stage_dispatch_width(const struct intel_device_info *devinfo);
++
+ typedef struct brw_pass_tracker {
+    nir_shader *nir;
+    unsigned dispatch_width;
+@@ -159,8 +161,6 @@ inline bool brw_simd_any_compiled(const brw_simd_selection_state &state)
+    return brw_simd_first_compiled(state) >= 0;
+ }
+ 
+-unsigned brw_geometry_stage_dispatch_width(const struct intel_device_info *devinfo);
+-
+ bool brw_simd_should_compile(brw_simd_selection_state &state, unsigned simd);
+ 
+ void brw_simd_mark_compiled(brw_simd_selection_state &state, unsigned simd, bool spilled);
+diff --git a/src/intel/compiler/elk/elk_compiler.c b/src/intel/compiler/elk/elk_compiler.c
+--- a/src/intel/compiler/elk/elk_compiler.c
++++ b/src/intel/compiler/elk/elk_compiler.c
+@@ -140,6 +140,8 @@ elk_get_compiler_config_value(const struct elk_compiler *compiler)
+ 
+    insert_u64_bit(&config, compiler->precise_trig);
+    bits++;
++   insert_u64_bit(&config, compiler->limit_trig_input_range);
++   bits++;
+ 
+    enum intel_debug_flag debug_bits[] = {
+       DEBUG_NO_DUAL_OBJECT_GS,
+diff --git a/src/intel/compiler/elk/elk_compiler.h b/src/intel/compiler/elk/elk_compiler.h
+--- a/src/intel/compiler/elk/elk_compiler.h
++++ b/src/intel/compiler/elk/elk_compiler.h
+@@ -78,6 +78,11 @@ struct elk_compiler {
+     */
+    bool precise_trig;
+ 
++   /**
++    * Whether to limit sin/cos inputs to [-2pi, 2pi] to improve accuracy.
++    */
++   bool limit_trig_input_range;
++
+    /**
+     * Is 3DSTATE_CONSTANT_*'s Constant Buffer 0 relative to Dynamic State
+     * Base Address?  (If not, it's a normal GPU address.)
+@@ -192,14 +197,7 @@ struct elk_base_prog_key {
+ 
+    enum elk_robustness_flags robust_flags:2;
+ 
+-   unsigned padding:22;
+-
+-   /**
+-    * Apply workarounds for SIN and COS input range problems.
+-    * This limits input range for SIN and COS to [-2p : 2p] to
+-    * avoid precision issues.
+-    */
+-   bool limit_trig_input_range;
++   unsigned padding:30;
+ 
+    struct elk_sampler_prog_key_data tex;
+ };
+diff --git a/src/intel/compiler/elk/elk_nir.c b/src/intel/compiler/elk/elk_nir.c
+--- a/src/intel/compiler/elk/elk_nir.c
++++ b/src/intel/compiler/elk/elk_nir.c
+@@ -989,6 +989,9 @@ elk_preprocess_nir(const struct elk_compiler *compiler, nir_shader *nir,
+    if (compiler->precise_trig)
+       OPT(elk_nir_apply_trig_workarounds);
+ 
++   if (compiler->limit_trig_input_range)
++      OPT(elk_nir_limit_trig_input_range_workaround);
++
+    /* This workaround existing for performance reasons. Since it requires not
+     * setting RENDER_SURFACE_STATE::SurfaceArray when the array length is 1,
+     * we're loosing the HW robustness feature in that case.
+@@ -1740,9 +1743,6 @@ elk_nir_apply_key(nir_shader *nir,
+    };
+    OPT(nir_lower_subgroups, &subgroups_options);
+ 
+-   if (key->limit_trig_input_range)
+-      OPT(elk_nir_limit_trig_input_range_workaround);
+-
+    if (progress) {
+       const bool is_scalar = compiler->scalar_stage[nir->info.stage];
+       elk_nir_optimize(nir, is_scalar, compiler->devinfo);
+diff --git a/src/intel/compiler/jay/jay_nir.c b/src/intel/compiler/jay/jay_nir.c
+--- a/src/intel/compiler/jay/jay_nir.c
++++ b/src/intel/compiler/jay/jay_nir.c
+@@ -70,45 +70,59 @@ static bool
+ jay_nir_lower_simd(nir_builder *b, nir_intrinsic_instr *intr, void *simd_)
+ {
+    b->cursor = nir_after_instr(&intr->instr);
+-   unsigned *simd_width = simd_;
++   unsigned simd_width = *((unsigned *) simd_);
+ 
+-   /* mask & -mask isolates the lowest set bit in the mask. */
+-   if (intr->intrinsic == nir_intrinsic_elect) {
+-      nir_def *mask = nir_ballot(b, 1, *simd_width, nir_imm_true(b));
++   switch (intr->intrinsic) {
++   case nir_intrinsic_elect: {
++      /* mask & -mask isolates the lowest set bit in the mask. */
++      nir_def *mask = nir_ballot(b, 1, simd_width, nir_imm_true(b));
+       mask = nir_iand(b, mask, nir_ineg(b, mask));
+       nir_def_replace(&intr->def, nir_inverse_ballot(b, mask));
+       return true;
+    }
+ 
+-   /* Ballots must match the SIMD size */
+-   if (intr->intrinsic == nir_intrinsic_ballot ||
+-       intr->intrinsic == nir_intrinsic_ballot_relaxed) {
++   case nir_intrinsic_ballot:
++   case nir_intrinsic_ballot_relaxed: {
++      /* Ballots must match the SIMD size */
+       unsigned old_bitsize = intr->def.bit_size;
+-      intr->def.bit_size = *simd_width;
++      intr->def.bit_size = simd_width;
+       nir_def *u2uN = nir_u2uN(b, &intr->def, old_bitsize);
+       nir_def_rewrite_uses_after(&intr->def, u2uN);
+       return true;
+    }
+ 
+-   /* Just a constant */
+-   if (intr->intrinsic == nir_intrinsic_load_simd_width_intel) {
+-      nir_def_replace(&intr->def, nir_imm_int(b, *simd_width));
++   case nir_intrinsic_load_simd_width_intel:
++      /* Just a constant */
++      nir_def_replace(&intr->def, nir_imm_int(b, simd_width));
+       return true;
+-   }
++
++   case nir_intrinsic_load_subgroup_id:
++      /* If the whole workgroup fits in one thread, load_subgroup_id is 0. */
++      if (!b->shader->info.workgroup_size_variable &&
++          nir_static_workgroup_size(b->shader) <= simd_width) {
++         nir_def_replace(&intr->def, nir_imm_int(b, 0));
++         return true;
++      }
++      break;
+ 
+    /* Note: we don't treat read_invocation specially because there's little
+     * benefit but doing so would require expensive uniformizing in some cases.
+     */
+-   if (intr->intrinsic != nir_intrinsic_shuffle &&
+-       intr->intrinsic != nir_intrinsic_read_invocation)
+-      return false;
++   case nir_intrinsic_shuffle:
++   case nir_intrinsic_read_invocation: {
++      nir_def *data = intr->src[0].ssa;
++      assert(data->num_components == 1 && data->bit_size <= 32 && "scalarized");
+ 
+-   nir_def *data = intr->src[0].ssa;
+-   assert(data->num_components == 1 && data->bit_size <= 32 && "scalarized");
++      nir_def *offset_B = nir_imul_imm(b, intr->src[1].ssa, 4);
++      nir_def_replace(&intr->def, nir_shuffle_intel(b, 1, data, offset_B));
++      return true;
++   }
+ 
+-   nir_def *offset_B = nir_imul_imm(b, intr->src[1].ssa, 4);
+-   nir_def_replace(&intr->def, nir_shuffle_intel(b, 1, data, offset_B));
+-   return true;
++   default:
++      break;
++   }
++
++   return false;
+ }
+ 
+ struct frag_out_ctx {
+@@ -650,8 +664,6 @@ jay_process_nir(const struct intel_device_info *devinfo,
+                           nir->info.outputs_written, key->base.vue_layout,
+                           pos_slots);
+ 
+-      brw_nir_apply_key(pt, &key->base, simd_width);
+-
+       brw_nir_lower_gs_inputs(nir, compiler.devinfo, &input_vue_map,
+                               &prog_data->vue.urb_read_length);
+ 
+diff --git a/src/intel/vulkan/anv_physical_device.c b/src/intel/vulkan/anv_physical_device.c
+--- a/src/intel/vulkan/anv_physical_device.c
++++ b/src/intel/vulkan/anv_physical_device.c
+@@ -3054,6 +3054,8 @@ anv_physical_device_try_create(struct vk_instance *vk_instance,
+    device->compiler->shader_debug_log = compiler_debug_log;
+    device->compiler->shader_perf_log = compiler_perf_log;
+    device->compiler->spilling_rate = instance->drirc.debug.shader_spilling_rate;
++   device->compiler->limit_trig_input_range =
++      instance->drirc.debug.limit_trig_input_range;
+ 
+    isl_device_init(&device->isl_dev, &device->info);
+    device->isl_dev.buffer_length_in_aux_addr = !intel_needs_workaround(device->isl_dev.info, 14019708328);
+diff --git a/src/intel/vulkan/anv_shader_compile.c b/src/intel/vulkan/anv_shader_compile.c
+--- a/src/intel/vulkan/anv_shader_compile.c
++++ b/src/intel/vulkan/anv_shader_compile.c
+@@ -375,7 +375,6 @@ populate_base_prog_key(struct brw_base_prog_key *key,
+    if (rs != NULL)
+       key->robust_flags = anv_get_robust_flags(rs);
+    key->divergent_atomics_flags = pdevice->instance->drirc.perf.opt_divergent_atomics;
+-   key->limit_trig_input_range = pdevice->instance->drirc.debug.limit_trig_input_range;
+ }
+ 
+ static void

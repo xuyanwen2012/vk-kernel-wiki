@@ -1,0 +1,17 @@
+repo: mesa/mesa
+pr: 29346
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/29346
+merge_sha: 10c64ee63abbc05cb3cbf02c0fcddd22f15bf88d
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/29346/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/freedreno/vulkan/tu_device.cc
+  status: modified
+  sha256: 21ce0a344745a5daf5f7f9e10f3decf5a50547da380142626ac321a79d0f0586
+- path: src/freedreno/vulkan/tu_shader.cc
+  status: modified
+  sha256: 1bf192ec00c50b83de4586df5767a87c1b79a05386d6bf9e748eca86b98916e6

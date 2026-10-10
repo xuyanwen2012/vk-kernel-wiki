@@ -1,0 +1,116 @@
+diff --git a/src/intel/compiler/brw_from_nir.cpp b/src/intel/compiler/brw_from_nir.cpp
+--- a/src/intel/compiler/brw_from_nir.cpp
++++ b/src/intel/compiler/brw_from_nir.cpp
+@@ -31,6 +31,7 @@
+ #include "dev/intel_debug.h"
+ #include "util/u_math.h"
+ #include "util/bitscan.h"
++#include "compiler/glsl_types.h"
+ 
+ #include <vector>
+ 
+@@ -4843,6 +4844,53 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
+       break;
+    }
+ 
++   case nir_intrinsic_convert_cmat_intel: {
++      struct glsl_cmat_description dst_cmat_desc =
++         nir_intrinsic_dst_cmat_desc(instr);
++      struct glsl_cmat_description src_cmat_desc =
++         nir_intrinsic_src_cmat_desc(instr);
++
++      brw_reg_type dst_type =
++         brw_type_for_base_type((enum glsl_base_type)dst_cmat_desc.element_type);
++      brw_reg_type src_type =
++         brw_type_for_base_type((enum glsl_base_type)src_cmat_desc.element_type);
++
++      const unsigned dst_element_bits =
++         brw_type_size_bits(dst_type);
++      const unsigned src_element_bits =
++         brw_type_size_bits(src_type);
++
++      const unsigned element_bits = 32;
++      const unsigned src_packing_factor = element_bits / src_element_bits;
++      const unsigned src_components = nir_src_num_components(instr->src[0]);
++      const unsigned elems = src_components * src_packing_factor;
++
++      brw_builder bldn = bld.exec_all();
++      const brw_reg src = retype(get_nir_src(ntb, instr->src[0], 0), src_type);
++      const brw_reg dst = retype(dest, dst_type);
++
++      assert(dst_cmat_desc.use == src_cmat_desc.use);
++
++      switch (src_cmat_desc.use) {
++      case GLSL_CMAT_USE_B:
++         assert(dst_element_bits == src_element_bits);
++         FALLTHROUGH;
++
++      case GLSL_CMAT_USE_A:
++      case GLSL_CMAT_USE_ACCUMULATOR: {
++         const unsigned width = bldn.dispatch_width();
++         for (unsigned c = 0; c < elems; c++) {
++            bldn.MOV(suboffset(dst, c * width),
++                     suboffset(src, c * width));
++         }
++         break;
++      }
++      default:
++         unreachable("not reached");
++      }
++      break;
++   }
++
+    default:
+       brw_from_nir_emit_intrinsic(ntb, bld, instr);
+       break;
+diff --git a/src/intel/compiler/brw_nir_lower_cooperative_matrix.c b/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+--- a/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
++++ b/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+@@ -500,8 +500,16 @@ lower_cmat_convert(nir_builder *b, nir_intrinsic_instr *intrin,
+       result = emit_packed_alu1(b, state, &float_info, dst_info, op2, tmp);
+ 
+    } else {
+-      nir_op op = get_cmat_conversion_op(src_element_type, dst_element_type);
+-      result = emit_packed_alu1(b, state, src_info, dst_info, op, src);
++      const unsigned dst_components = glsl_get_vector_elements(dst_info->type);
++      const unsigned dst_bits = glsl_base_type_bit_size(dst_info->desc.element_type);
++
++      result =
++            nir_convert_cmat_intel(b,
++                                   dst_components,
++                                   dst_info->packing_factor * dst_bits,
++                                   src,
++                                   .dst_cmat_desc = dst_info->desc,
++                                   .src_cmat_desc = src_info->desc);
+    }
+ 
+    nir_store_deref(b, dst_slice, result, nir_component_mask(result->num_components));
+diff --git a/src/intel/dev/intel_device_info.c b/src/intel/dev/intel_device_info.c
+--- a/src/intel/dev/intel_device_info.c
++++ b/src/intel/dev/intel_device_info.c
+@@ -523,6 +523,7 @@ static const struct intel_device_info intel_device_info_chv = {
+ 
+ #define CMAT_PRE_XEHP_CONFIGURATIONS                                                                                            \
+    .cooperative_matrix_configurations = {                                                                                       \
++    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16 },    \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 },    \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 32, INTEL_CMAT_SINT8, INTEL_CMAT_SINT8, INTEL_CMAT_SINT32, INTEL_CMAT_SINT32 },          \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 8, 32, INTEL_CMAT_UINT8, INTEL_CMAT_UINT8, INTEL_CMAT_UINT32, INTEL_CMAT_UINT32 },          \
+@@ -538,6 +539,7 @@ static const struct intel_device_info intel_device_info_chv = {
+ 
+ #define CMAT_XE2_CONFIGURATIONS                                                                                                 \
+    .cooperative_matrix_configurations = {                                                                                       \
++    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16 },   \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 },   \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 }, \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 32, INTEL_CMAT_SINT8, INTEL_CMAT_SINT8, INTEL_CMAT_SINT32, INTEL_CMAT_SINT32 },         \
+diff --git a/src/intel/dev/intel_device_info.py b/src/intel/dev/intel_device_info.py
+--- a/src/intel/dev/intel_device_info.py
++++ b/src/intel/dev/intel_device_info.py
+@@ -479,5 +479,5 @@ Struct("intel_device_info",
+         Member("intel_device_info_mem_desc", "mem"),
+         Member("intel_device_info_pat_desc", "pat"),
+         Member("intel_cooperative_matrix_configuration",
+-               "cooperative_matrix_configurations", array=4)]
++               "cooperative_matrix_configurations", array=16)]
+        )

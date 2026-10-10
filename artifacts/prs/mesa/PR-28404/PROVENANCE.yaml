@@ -1,0 +1,32 @@
+repo: mesa/mesa
+pr: 28404
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28404
+merge_sha: 5e9c01dfe40796ffab4521357dfdaeab217c1240
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/28404/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: 950a07fbb8db85dd6f5d44452cf7b494024950925670106497064a27d6deabc3
+- path: src/intel/compiler/brw_eu_validate.c
+  status: modified
+  sha256: fa74a23fff745871e13fa9e8b6744f4f6c6b24b95c33e09312ad8474cfbe3cc4
+- path: src/intel/compiler/brw_fs_builder.h
+  status: modified
+  sha256: 6f3589ad9e45d0b50fefa251c7f00097a603b4940393a275a0435bf119a872d9
+- path: src/intel/compiler/brw_fs_lower_regioning.cpp
+  status: modified
+  sha256: cce8d02407d87e576b11018c1d89192fd9fbc7a3b78d56fa646e6a913e5f2e57
+- path: src/intel/compiler/brw_fs_nir.cpp
+  status: modified
+  sha256: 63841856adc8d68815409b6147a5f49da8680a5af9c47af20115a92c7f613826
+- path: src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: fd18fbca8607493cf01bb3aebd9ce937c6ff2dcdffcfde3e70b0c054ee16fa1b
+omitted_files:
+- path: src/intel/compiler/brw_disasm.c
+  reason: the file header carries its own permission notice (Copyright 2008 Keith Packard, an HPND-style notice), not the MIT text the ledger states

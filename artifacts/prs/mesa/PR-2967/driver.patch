@@ -1,0 +1,827 @@
+diff --git a/src/freedreno/vulkan/tu_cmd_buffer.c b/src/freedreno/vulkan/tu_cmd_buffer.c
+--- a/src/freedreno/vulkan/tu_cmd_buffer.c
++++ b/src/freedreno/vulkan/tu_cmd_buffer.c
+@@ -62,6 +62,8 @@ static uint32_t
+ tu_bo_list_add_info(struct tu_bo_list *list,
+                     const struct drm_msm_gem_submit_bo *bo_info)
+ {
++   assert(bo_info->handle != 0);
++
+    for (uint32_t i = 0; i < list->count; ++i) {
+       if (list->bo_infos[i].handle == bo_info->handle) {
+          assert(list->bo_infos[i].presumed == bo_info->presumed);
+@@ -834,8 +836,6 @@ tu6_emit_store_attachment(struct tu_cmd_buffer *cmd,
+ static void
+ tu6_emit_tile_store(struct tu_cmd_buffer *cmd, struct tu_cs *cs)
+ {
+-   const struct tu_framebuffer *fb = cmd->state.framebuffer;
+-   const struct tu_tiling_config *tiling = &cmd->state.tiling_config;
+    const struct tu_subpass *subpass = cmd->state.subpass;
+ 
+    if (false) {
+@@ -1118,9 +1118,6 @@ tu6_render_tile(struct tu_cmd_buffer *cmd,
+ static void
+ tu6_render_end(struct tu_cmd_buffer *cmd, struct tu_cs *cs)
+ {
+-   const struct tu_subpass *subpass = cmd->state.subpass;
+-   const struct tu_framebuffer *fb = cmd->state.framebuffer;
+-
+    VkResult result = tu_cs_reserve_space(cmd->device, cs, 16);
+    if (result != VK_SUCCESS) {
+       cmd->record_result = result;
+@@ -1812,12 +1809,20 @@ tu_CmdBindPipeline(VkCommandBuffer commandBuffer,
+       cmd->state.dirty |= TU_CMD_DIRTY_PIPELINE;
+       break;
+    case VK_PIPELINE_BIND_POINT_COMPUTE:
+-      tu_finishme("binding compute pipeline");
++      cmd->state.compute_pipeline = pipeline;
++      cmd->state.dirty |= TU_CMD_DIRTY_COMPUTE_PIPELINE;
+       break;
+    default:
+       unreachable("unrecognized pipeline bind point");
+       break;
+    }
++
++   tu_bo_list_add(&cmd->bo_list, &pipeline->program.binary_bo,
++                  MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_DUMP);
++   for (uint32_t i = 0; i < pipeline->cs.bo_count; i++) {
++      tu_bo_list_add(&cmd->bo_list, pipeline->cs.bos[i],
++                     MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_DUMP);
++   }
+ }
+ 
+ void
+@@ -2179,6 +2184,7 @@ enum tu_draw_state_group_id
+    TU_DRAW_STATE_FS_CONST,
+    TU_DRAW_STATE_VS_TEX,
+    TU_DRAW_STATE_FS_TEX,
++   TU_DRAW_STATE_FS_IBO,
+ 
+    TU_DRAW_STATE_COUNT,
+ };
+@@ -2418,27 +2424,24 @@ tu6_emit_textures(struct tu_device *device, struct tu_cs *draw_state,
+    if (!size)
+       return (struct tu_cs_entry) {};
+ 
+-   unsigned opcode, tex_samp_reg, tex_const_reg, tex_count_reg;
++   unsigned tex_samp_reg, tex_const_reg, tex_count_reg;
+    enum a6xx_state_block sb;
+ 
+    switch (type) {
+    case MESA_SHADER_VERTEX:
+       sb = SB6_VS_TEX;
+-      opcode = CP_LOAD_STATE6_GEOM;
+       tex_samp_reg = REG_A6XX_SP_VS_TEX_SAMP_LO;
+       tex_const_reg = REG_A6XX_SP_VS_TEX_CONST_LO;
+       tex_count_reg = REG_A6XX_SP_VS_TEX_COUNT;
+       break;
+    case MESA_SHADER_FRAGMENT:
+       sb = SB6_FS_TEX;
+-      opcode = CP_LOAD_STATE6_FRAG;
+       tex_samp_reg = REG_A6XX_SP_FS_TEX_SAMP_LO;
+       tex_const_reg = REG_A6XX_SP_FS_TEX_CONST_LO;
+       tex_count_reg = REG_A6XX_SP_FS_TEX_COUNT;
+       break;
+    case MESA_SHADER_COMPUTE:
+       sb = SB6_CS_TEX;
+-      opcode = CP_LOAD_STATE6_FRAG;
+       tex_samp_reg = REG_A6XX_SP_CS_TEX_SAMP_LO;
+       tex_const_reg = REG_A6XX_SP_CS_TEX_CONST_LO;
+       tex_count_reg = REG_A6XX_SP_CS_TEX_COUNT;
+@@ -2474,7 +2477,7 @@ tu6_emit_textures(struct tu_device *device, struct tu_cs *draw_state,
+    tu_cs_begin_sub_stream(device, draw_state, 64, &cs);
+ 
+    /* output sampler state: */
+-   tu_cs_emit_pkt7(&cs, opcode, 3);
++   tu_cs_emit_pkt7(&cs, tu6_stage2opcode(type), 3);
+    tu_cs_emit(&cs, CP_LOAD_STATE6_0_DST_OFF(0) |
+       CP_LOAD_STATE6_0_STATE_TYPE(ST6_SHADER) |
+       CP_LOAD_STATE6_0_STATE_SRC(SS6_INDIRECT) |
+@@ -2486,7 +2489,7 @@ tu6_emit_textures(struct tu_device *device, struct tu_cs *draw_state,
+    tu_cs_emit_qw(&cs, samp_addr); /* SRC_ADDR_LO/HI */
+ 
+    /* emit texture state: */
+-   tu_cs_emit_pkt7(&cs, opcode, 3);
++   tu_cs_emit_pkt7(&cs, tu6_stage2opcode(type), 3);
+    tu_cs_emit(&cs, CP_LOAD_STATE6_0_DST_OFF(0) |
+       CP_LOAD_STATE6_0_STATE_TYPE(ST6_CONSTANTS) |
+       CP_LOAD_STATE6_0_STATE_SRC(SS6_INDIRECT) |
+@@ -2503,6 +2506,74 @@ tu6_emit_textures(struct tu_device *device, struct tu_cs *draw_state,
+    return tu_cs_end_sub_stream(draw_state, &cs);
+ }
+ 
++static struct tu_cs_entry
++tu6_emit_ibo(struct tu_device *device, struct tu_cs *draw_state,
++             const struct tu_pipeline *pipeline,
++             struct tu_descriptor_state *descriptors_state,
++             gl_shader_stage type)
++{
++   const struct tu_program_descriptor_linkage *link =
++      &pipeline->program.link[type];
++
++   uint32_t size = link->image_mapping.num_ibo * A6XX_TEX_CONST_DWORDS;
++   if (!size)
++      return (struct tu_cs_entry) {};
++
++   struct tu_cs cs;
++   tu_cs_begin_sub_stream(device, draw_state, size, &cs);
++
++   for (unsigned i = 0; i < link->image_mapping.num_ibo; i++) {
++      unsigned idx = link->image_mapping.ibo_to_image[i];
++
++      if (idx & IBO_SSBO) {
++         idx &= ~IBO_SSBO;
++
++         uint64_t va = buffer_ptr(descriptors_state, &link->ssbo_map, idx);
++         /* We don't expose robustBufferAccess, so leave the size unlimited. */
++         uint32_t sz = MAX_STORAGE_BUFFER_RANGE / 4;
++
++         tu_cs_emit(&cs, A6XX_IBO_0_FMT(TFMT6_32_UINT));
++         tu_cs_emit(&cs,
++                    A6XX_IBO_1_WIDTH(sz & MASK(15)) |
++                    A6XX_IBO_1_HEIGHT(sz >> 15));
++         tu_cs_emit(&cs,
++                    A6XX_IBO_2_UNK4 |
++                    A6XX_IBO_2_UNK31 |
++                    A6XX_IBO_2_TYPE(A6XX_TEX_1D));
++         tu_cs_emit(&cs, 0);
++         tu_cs_emit_qw(&cs, va);
++         for (int i = 6; i < A6XX_TEX_CONST_DWORDS; i++)
++            tu_cs_emit(&cs, 0);
++      } else {
++         tu_finishme("Emit images");
++      }
++   }
++
++   struct tu_cs_entry entry = tu_cs_end_sub_stream(draw_state, &cs);
++
++   uint64_t ibo_addr = entry.bo->iova + entry.offset;
++
++   tu_cs_begin_sub_stream(device, draw_state, 64, &cs);
++
++   /* emit texture state: */
++   tu_cs_emit_pkt7(&cs, CP_LOAD_STATE6, 3);
++   tu_cs_emit(&cs, CP_LOAD_STATE6_0_DST_OFF(0) |
++              CP_LOAD_STATE6_0_STATE_TYPE(type == MESA_SHADER_COMPUTE ?
++                                          ST6_IBO : ST6_SHADER) |
++              CP_LOAD_STATE6_0_STATE_SRC(SS6_INDIRECT) |
++              CP_LOAD_STATE6_0_STATE_BLOCK(type == MESA_SHADER_COMPUTE ?
++                                           SB6_CS_SHADER : SB6_IBO) |
++              CP_LOAD_STATE6_0_NUM_UNIT(link->image_mapping.num_ibo));
++   tu_cs_emit_qw(&cs, ibo_addr); /* SRC_ADDR_LO/HI */
++
++   tu_cs_emit_pkt4(&cs,
++                   type == MESA_SHADER_COMPUTE ?
++                   REG_A6XX_SP_IBO_LO : REG_A6XX_SP_CS_IBO_LO, 2);
++   tu_cs_emit_qw(&cs, ibo_addr); /* SRC_ADDR_LO/HI */
++
++   return tu_cs_end_sub_stream(draw_state, &cs);
++}
++
+ static void
+ tu6_emit_border_color(struct tu_cmd_buffer *cmd,
+                       struct tu_cs *cs)
+@@ -2687,6 +2758,13 @@ tu6_bind_draw_states(struct tu_cmd_buffer *cmd,
+                                     descriptors_state, MESA_SHADER_FRAGMENT,
+                                     &needs_border)
+          };
++      draw_state_groups[draw_state_group_count++] =
++         (struct tu_draw_state_group) {
++            .id = TU_DRAW_STATE_FS_IBO,
++            .enable_mask = 0x6,
++            .ib = tu6_emit_ibo(cmd->device, &cmd->draw_state, pipeline,
++                               descriptors_state, MESA_SHADER_FRAGMENT)
++         };
+ 
+       if (needs_border)
+          tu6_emit_border_color(cmd, cs);
+@@ -2715,14 +2793,6 @@ tu6_bind_draw_states(struct tu_cmd_buffer *cmd,
+    tu_cs_sanity_check(cs);
+ 
+    /* track BOs */
+-   if (cmd->state.dirty & TU_CMD_DIRTY_PIPELINE) {
+-      tu_bo_list_add(&cmd->bo_list, &pipeline->program.binary_bo,
+-                     MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_DUMP);
+-      for (uint32_t i = 0; i < pipeline->cs.bo_count; i++) {
+-         tu_bo_list_add(&cmd->bo_list, pipeline->cs.bos[i],
+-                        MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_DUMP);
+-      }
+-   }
+    if (cmd->state.dirty & TU_CMD_DIRTY_VERTEX_BUFFERS) {
+       for (uint32_t i = 0; i < MAX_VBS; i++) {
+          const struct tu_buffer *buf = cmd->state.vb.buffers[i];
+@@ -2741,7 +2811,11 @@ tu6_bind_draw_states(struct tu_cmd_buffer *cmd,
+             }
+       }
+    }
+-   cmd->state.dirty = 0;
++
++   /* Fragment shader state overwrites compute shader state, so flag the
++    * compute pipeline for re-emit.
++    */
++   cmd->state.dirty = TU_CMD_DIRTY_COMPUTE_PIPELINE;
+ }
+ 
+ static void
+@@ -2924,9 +2998,156 @@ struct tu_dispatch_info
+ };
+ 
+ static void
+-tu_dispatch(struct tu_cmd_buffer *cmd_buffer,
++tu_emit_compute_driver_params(struct tu_cs *cs, struct tu_pipeline *pipeline,
++                              const struct tu_dispatch_info *info)
++{
++   gl_shader_stage type = MESA_SHADER_COMPUTE;
++   const struct tu_program_descriptor_linkage *link =
++      &pipeline->program.link[type];
++   const struct ir3_const_state *const_state = &link->const_state;
++   uint32_t offset_dwords = const_state->offsets.driver_param;
++
++   if (link->constlen <= offset_dwords)
++      return;
++
++   if (!info->indirect) {
++      uint32_t driver_params[] = {
++         info->blocks[0],
++         info->blocks[1],
++         info->blocks[2],
++         pipeline->compute.local_size[0],
++         pipeline->compute.local_size[1],
++         pipeline->compute.local_size[2],
++      };
++      uint32_t num_consts = MIN2(const_state->num_driver_params,
++                                 link->constlen - offset_dwords);
++      uint32_t align_size = align(num_consts, 4);
++
++      /* push constants */
++      tu_cs_emit_pkt7(cs, tu6_stage2opcode(type), 3 + align_size);
++      tu_cs_emit(cs, CP_LOAD_STATE6_0_DST_OFF(offset_dwords / 4) |
++                 CP_LOAD_STATE6_0_STATE_TYPE(ST6_CONSTANTS) |
++                 CP_LOAD_STATE6_0_STATE_SRC(SS6_DIRECT) |
++                 CP_LOAD_STATE6_0_STATE_BLOCK(tu6_stage2shadersb(type)) |
++                 CP_LOAD_STATE6_0_NUM_UNIT(align_size / 4));
++      tu_cs_emit(cs, 0);
++      tu_cs_emit(cs, 0);
++      uint32_t i;
++      for (i = 0; i < num_consts; i++)
++         tu_cs_emit(cs, driver_params[i]);
++      for (; i < align_size; i++)
++         tu_cs_emit(cs, 0);
++   } else {
++      tu_finishme("Indirect driver params");
++   }
++}
++
++static void
++tu_dispatch(struct tu_cmd_buffer *cmd,
+             const struct tu_dispatch_info *info)
+ {
++   struct tu_cs *cs = &cmd->cs;
++   struct tu_pipeline *pipeline = cmd->state.compute_pipeline;
++   struct tu_descriptor_state *descriptors_state =
++      &cmd->descriptors[VK_PIPELINE_BIND_POINT_COMPUTE];
++
++   VkResult result = tu_cs_reserve_space(cmd->device, cs, 256);
++   if (result != VK_SUCCESS) {
++      cmd->record_result = result;
++      return;
++   }
++
++   if (cmd->state.dirty & TU_CMD_DIRTY_COMPUTE_PIPELINE)
++      tu_cs_emit_ib(cs, &pipeline->program.state_ib);
++
++   struct tu_cs_entry ib;
++
++   ib = tu6_emit_consts(cmd, pipeline, descriptors_state, MESA_SHADER_COMPUTE);
++   if (ib.size)
++      tu_cs_emit_ib(cs, &ib);
++
++   tu_emit_compute_driver_params(cs, pipeline, info);
++
++   bool needs_border;
++   ib = tu6_emit_textures(cmd->device, &cmd->draw_state, pipeline,
++                          descriptors_state, MESA_SHADER_COMPUTE,
++                          &needs_border);
++   if (ib.size)
++      tu_cs_emit_ib(cs, &ib);
++
++   if (needs_border)
++      tu6_emit_border_color(cmd, cs);
++
++   ib = tu6_emit_ibo(cmd->device, &cmd->draw_state, pipeline,
++                     descriptors_state, MESA_SHADER_COMPUTE);
++   if (ib.size)
++      tu_cs_emit_ib(cs, &ib);
++
++   /* track BOs */
++   if (cmd->state.dirty & TU_CMD_DIRTY_DESCRIPTOR_SETS) {
++      unsigned i;
++      for_each_bit(i, descriptors_state->valid) {
++         struct tu_descriptor_set *set = descriptors_state->sets[i];
++         for (unsigned j = 0; j < set->layout->buffer_count; ++j)
++            if (set->descriptors[j]) {
++               tu_bo_list_add(&cmd->bo_list, set->descriptors[j],
++                              MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_WRITE);
++            }
++      }
++   }
++
++   /* Compute shader state overwrites fragment shader state, so we flag the
++    * graphics pipeline for re-emit.
++    */
++   cmd->state.dirty = TU_CMD_DIRTY_PIPELINE;
++
++   tu_cs_emit_pkt7(cs, CP_SET_MARKER, 1);
++   tu_cs_emit(cs, A6XX_CP_SET_MARKER_0_MODE(0x8));
++
++   const uint32_t *local_size = pipeline->compute.local_size;
++   const uint32_t *num_groups = info->blocks;
++   tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_CS_NDRANGE_0, 7);
++   tu_cs_emit(cs,
++              A6XX_HLSQ_CS_NDRANGE_0_KERNELDIM(3) |
++              A6XX_HLSQ_CS_NDRANGE_0_LOCALSIZEX(local_size[0] - 1) |
++              A6XX_HLSQ_CS_NDRANGE_0_LOCALSIZEY(local_size[1] - 1) |
++              A6XX_HLSQ_CS_NDRANGE_0_LOCALSIZEZ(local_size[2] - 1));
++   tu_cs_emit(cs, A6XX_HLSQ_CS_NDRANGE_1_GLOBALSIZE_X(local_size[0] * num_groups[0]));
++   tu_cs_emit(cs, 0);            /* HLSQ_CS_NDRANGE_2_GLOBALOFF_X */
++   tu_cs_emit(cs, A6XX_HLSQ_CS_NDRANGE_3_GLOBALSIZE_Y(local_size[1] * num_groups[1]));
++   tu_cs_emit(cs, 0);            /* HLSQ_CS_NDRANGE_4_GLOBALOFF_Y */
++   tu_cs_emit(cs, A6XX_HLSQ_CS_NDRANGE_5_GLOBALSIZE_Z(local_size[2] * num_groups[2]));
++   tu_cs_emit(cs, 0);            /* HLSQ_CS_NDRANGE_6_GLOBALOFF_Z */
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_CS_KERNEL_GROUP_X, 3);
++   tu_cs_emit(cs, 1);            /* HLSQ_CS_KERNEL_GROUP_X */
++   tu_cs_emit(cs, 1);            /* HLSQ_CS_KERNEL_GROUP_Y */
++   tu_cs_emit(cs, 1);            /* HLSQ_CS_KERNEL_GROUP_Z */
++
++   if (info->indirect) {
++      uint64_t iova = tu_buffer_iova(info->indirect) + info->indirect_offset;
++
++      tu_bo_list_add(&cmd->bo_list, info->indirect->bo,
++                     MSM_SUBMIT_BO_READ | MSM_SUBMIT_BO_WRITE);
++
++      tu_cs_emit_pkt7(cs, CP_EXEC_CS_INDIRECT, 4);
++      tu_cs_emit(cs, 0x00000000);
++      tu_cs_emit_qw(cs, iova);
++      tu_cs_emit(cs,
++                 A5XX_CP_EXEC_CS_INDIRECT_3_LOCALSIZEX(local_size[0] - 1) |
++                 A5XX_CP_EXEC_CS_INDIRECT_3_LOCALSIZEY(local_size[1] - 1) |
++                 A5XX_CP_EXEC_CS_INDIRECT_3_LOCALSIZEZ(local_size[2] - 1));
++   } else {
++      tu_cs_emit_pkt7(cs, CP_EXEC_CS, 4);
++      tu_cs_emit(cs, 0x00000000);
++      tu_cs_emit(cs, CP_EXEC_CS_1_NGROUPS_X(info->blocks[0]));
++      tu_cs_emit(cs, CP_EXEC_CS_2_NGROUPS_Y(info->blocks[1]));
++      tu_cs_emit(cs, CP_EXEC_CS_3_NGROUPS_Z(info->blocks[2]));
++   }
++
++   tu_cs_emit_wfi(cs);
++
++   tu6_emit_cache_flush(cmd, cs);
+ }
+ 
+ void
+diff --git a/src/freedreno/vulkan/tu_descriptor_set.c b/src/freedreno/vulkan/tu_descriptor_set.c
+--- a/src/freedreno/vulkan/tu_descriptor_set.c
++++ b/src/freedreno/vulkan/tu_descriptor_set.c
+@@ -678,8 +678,6 @@ static void write_texel_buffer_descriptor(struct tu_device *device,
+                                           struct tu_bo **buffer_list,
+                                           const VkBufferView _buffer_view)
+ {
+-   TU_FROM_HANDLE(tu_buffer_view, buffer_view, _buffer_view);
+-
+    tu_finishme("texel buffer descriptor");
+ }
+ 
+@@ -690,9 +688,8 @@ static void write_buffer_descriptor(struct tu_device *device,
+                                     const VkDescriptorBufferInfo *buffer_info)
+ {
+    TU_FROM_HANDLE(tu_buffer, buffer, buffer_info->buffer);
+-   uint64_t va = buffer->bo->iova;
+ 
+-   va += buffer_info->offset + buffer->bo_offset;
++   uint64_t va = tu_buffer_iova(buffer) + buffer_info->offset;
+    dst[0] = va;
+    dst[1] = va >> 32;
+ 
+@@ -708,13 +705,12 @@ static void write_dynamic_buffer_descriptor(struct tu_device *device,
+                                             const VkDescriptorBufferInfo *buffer_info)
+ {
+    TU_FROM_HANDLE(tu_buffer, buffer, buffer_info->buffer);
+-   uint64_t va = buffer->bo->iova;
++   uint64_t va = tu_buffer_iova(buffer) + buffer_info->offset;
+    unsigned size = buffer_info->range;
+ 
+    if (buffer_info->range == VK_WHOLE_SIZE)
+       size = buffer->size - buffer_info->offset;
+ 
+-   va += buffer_info->offset + buffer->bo_offset;
+    range->va = va;
+    range->size = size;
+ 
+diff --git a/src/freedreno/vulkan/tu_device.c b/src/freedreno/vulkan/tu_device.c
+--- a/src/freedreno/vulkan/tu_device.c
++++ b/src/freedreno/vulkan/tu_device.c
+@@ -725,7 +725,7 @@ tu_GetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice,
+       .maxImageArrayLayers = (1 << 11),
+       .maxTexelBufferElements = 128 * 1024 * 1024,
+       .maxUniformBufferRange = UINT32_MAX,
+-      .maxStorageBufferRange = UINT32_MAX,
++      .maxStorageBufferRange = MAX_STORAGE_BUFFER_RANGE,
+       .maxPushConstantsSize = MAX_PUSH_CONSTANTS_SIZE,
+       .maxMemoryAllocationCount = UINT32_MAX,
+       .maxSamplerAllocationCount = 64 * 1024,
+diff --git a/src/freedreno/vulkan/tu_meta_copy.c b/src/freedreno/vulkan/tu_meta_copy.c
+--- a/src/freedreno/vulkan/tu_meta_copy.c
++++ b/src/freedreno/vulkan/tu_meta_copy.c
+@@ -208,7 +208,7 @@ tu_blit_buffer(struct tu_buffer *buffer,
+    return (struct tu_blit_surf) {
+       .fmt = format,
+       .tile_mode = TILE6_LINEAR,
+-      .va = buffer->bo->iova + buffer->bo_offset + info->bufferOffset,
++      .va = tu_buffer_iova(buffer) + info->bufferOffset,
+       .pitch = pitch,
+       .layer_size = (info->bufferImageHeight ?: info->imageExtent.height) * pitch / vk_format_get_blockwidth(format) / vk_format_get_blockheight(format),
+       .width = info->imageExtent.width,
+diff --git a/src/freedreno/vulkan/tu_pipeline.c b/src/freedreno/vulkan/tu_pipeline.c
+--- a/src/freedreno/vulkan/tu_pipeline.c
++++ b/src/freedreno/vulkan/tu_pipeline.c
+@@ -450,7 +450,8 @@ tu6_emit_fs_config(struct tu_cs *cs, const struct ir3_shader_variant *fs)
+       sp_fs_ctrl |= A6XX_SP_FS_CTRL_REG0_PIXLODENABLE;
+ 
+    uint32_t sp_fs_config = A6XX_SP_FS_CONFIG_NTEX(fs->num_samp) |
+-                           A6XX_SP_FS_CONFIG_NSAMP(fs->num_samp);
++                           A6XX_SP_FS_CONFIG_NSAMP(fs->num_samp) |
++                           A6XX_SP_FS_CONFIG_NIBO(fs->image_mapping.num_ibo);
+    if (fs->instrlen)
+       sp_fs_config |= A6XX_SP_FS_CONFIG_ENABLED;
+ 
+@@ -470,6 +471,55 @@ tu6_emit_fs_config(struct tu_cs *cs, const struct ir3_shader_variant *fs)
+    tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_FS_CNTL, 1);
+    tu_cs_emit(cs, A6XX_HLSQ_FS_CNTL_CONSTLEN(align(fs->constlen, 4)) |
+                   A6XX_HLSQ_FS_CNTL_ENABLED);
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_SP_IBO_COUNT, 1);
++   tu_cs_emit(cs, fs->image_mapping.num_ibo);
++}
++
++static void
++tu6_emit_cs_config(struct tu_cs *cs, const struct ir3_shader_variant *v)
++{
++   tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_UPDATE_CNTL, 1);
++   tu_cs_emit(cs, 0xff);
++
++   unsigned constlen = align(v->constlen, 4);
++   tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_CS_CNTL, 1);
++   tu_cs_emit(cs, A6XX_HLSQ_CS_CNTL_CONSTLEN(constlen) |
++              A6XX_HLSQ_CS_CNTL_ENABLED);
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_SP_CS_CONFIG, 2);
++   tu_cs_emit(cs, A6XX_SP_CS_CONFIG_ENABLED |
++              A6XX_SP_CS_CONFIG_NIBO(v->image_mapping.num_ibo) |
++              A6XX_SP_CS_CONFIG_NTEX(v->num_samp) |
++              A6XX_SP_CS_CONFIG_NSAMP(v->num_samp) |
++              A6XX_SP_CS_CONFIG_NIBO(v->image_mapping.num_ibo));
++   tu_cs_emit(cs, v->instrlen);
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_SP_CS_CTRL_REG0, 1);
++   tu_cs_emit(cs, A6XX_SP_CS_CTRL_REG0_THREADSIZE(FOUR_QUADS) |
++              A6XX_SP_CS_CTRL_REG0_FULLREGFOOTPRINT(v->info.max_reg + 1) |
++              A6XX_SP_CS_CTRL_REG0_MERGEDREGS |
++              A6XX_SP_CS_CTRL_REG0_BRANCHSTACK(v->branchstack) |
++              COND(v->need_pixlod, A6XX_SP_CS_CTRL_REG0_PIXLODENABLE));
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_SP_CS_UNKNOWN_A9B1, 1);
++   tu_cs_emit(cs, 0x41);
++
++   uint32_t local_invocation_id =
++      ir3_find_sysval_regid(v, SYSTEM_VALUE_LOCAL_INVOCATION_ID);
++   uint32_t work_group_id =
++      ir3_find_sysval_regid(v, SYSTEM_VALUE_WORK_GROUP_ID);
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_HLSQ_CS_CNTL_0, 2);
++   tu_cs_emit(cs,
++              A6XX_HLSQ_CS_CNTL_0_WGIDCONSTID(work_group_id) |
++              A6XX_HLSQ_CS_CNTL_0_UNK0(regid(63, 0)) |
++              A6XX_HLSQ_CS_CNTL_0_UNK1(regid(63, 0)) |
++              A6XX_HLSQ_CS_CNTL_0_LOCALIDREGID(local_invocation_id));
++   tu_cs_emit(cs, 0x2fc);             /* HLSQ_CS_UNKNOWN_B998 */
++
++   tu_cs_emit_pkt4(cs, REG_A6XX_SP_CS_IBO_COUNT, 1);
++   tu_cs_emit(cs, v->image_mapping.num_ibo);
+ }
+ 
+ static void
+@@ -675,9 +725,6 @@ tu6_emit_vpc_varying_modes(struct tu_cs *cs,
+    tu_cs_emit_array(cs, ps_repl_modes, 8);
+ }
+ 
+-#define VALIDREG(r)      ((r) != regid(63,0))
+-#define CONDREG(r, val)  COND(VALIDREG(r), (val))
+-
+ static void
+ tu6_emit_fs_inputs(struct tu_cs *cs, const struct ir3_shader_variant *fs)
+ {
+@@ -1440,13 +1487,12 @@ tu6_emit_blend_constants(struct tu_cs *cs, const float constants[4])
+ }
+ 
+ static VkResult
+-tu_pipeline_builder_create_pipeline(struct tu_pipeline_builder *builder,
+-                                    struct tu_pipeline **out_pipeline)
++tu_pipeline_create(struct tu_device *dev,
++                   const VkAllocationCallbacks *pAllocator,
++                   struct tu_pipeline **out_pipeline)
+ {
+-   struct tu_device *dev = builder->device;
+-
+    struct tu_pipeline *pipeline =
+-      vk_zalloc2(&dev->alloc, builder->alloc, sizeof(*pipeline), 8,
++      vk_zalloc2(&dev->alloc, pAllocator, sizeof(*pipeline), 8,
+                  VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+    if (!pipeline)
+       return VK_ERROR_OUT_OF_HOST_MEMORY;
+@@ -1456,7 +1502,7 @@ tu_pipeline_builder_create_pipeline(struct tu_pipeline_builder *builder,
+    /* reserve the space now such that tu_cs_begin_sub_stream never fails */
+    VkResult result = tu_cs_reserve_space(dev, &pipeline->cs, 2048);
+    if (result != VK_SUCCESS) {
+-      vk_free2(&dev->alloc, builder->alloc, pipeline);
++      vk_free2(&dev->alloc, pAllocator, pipeline);
+       return result;
+    }
+ 
+@@ -1812,7 +1858,8 @@ static VkResult
+ tu_pipeline_builder_build(struct tu_pipeline_builder *builder,
+                           struct tu_pipeline **pipeline)
+ {
+-   VkResult result = tu_pipeline_builder_create_pipeline(builder, pipeline);
++   VkResult result = tu_pipeline_create(builder->device, builder->alloc,
++                                        pipeline);
+    if (result != VK_SUCCESS)
+       return result;
+ 
+@@ -1900,6 +1947,32 @@ tu_pipeline_builder_init_graphics(
+    }
+ }
+ 
++static VkResult
++tu_graphics_pipeline_create(VkDevice device,
++                            VkPipelineCache pipelineCache,
++                            const VkGraphicsPipelineCreateInfo *pCreateInfo,
++                            const VkAllocationCallbacks *pAllocator,
++                            VkPipeline *pPipeline)
++{
++   TU_FROM_HANDLE(tu_device, dev, device);
++   TU_FROM_HANDLE(tu_pipeline_cache, cache, pipelineCache);
++
++   struct tu_pipeline_builder builder;
++   tu_pipeline_builder_init_graphics(&builder, dev, cache,
++                                     pCreateInfo, pAllocator);
++
++   struct tu_pipeline *pipeline = NULL;
++   VkResult result = tu_pipeline_builder_build(&builder, &pipeline);
++   tu_pipeline_builder_finish(&builder);
++
++   if (result == VK_SUCCESS)
++      *pPipeline = tu_pipeline_to_handle(pipeline);
++   else
++      *pPipeline = NULL;
++
++   return result;
++}
++
+ VkResult
+ tu_CreateGraphicsPipelines(VkDevice device,
+                            VkPipelineCache pipelineCache,
+@@ -1908,62 +1981,147 @@ tu_CreateGraphicsPipelines(VkDevice device,
+                            const VkAllocationCallbacks *pAllocator,
+                            VkPipeline *pPipelines)
+ {
+-   TU_FROM_HANDLE(tu_device, dev, device);
+-   TU_FROM_HANDLE(tu_pipeline_cache, cache, pipelineCache);
+    VkResult final_result = VK_SUCCESS;
+ 
+    for (uint32_t i = 0; i < count; i++) {
+-      struct tu_pipeline_builder builder;
+-      tu_pipeline_builder_init_graphics(&builder, dev, cache,
+-                                        &pCreateInfos[i], pAllocator);
+-
+-      struct tu_pipeline *pipeline = NULL;
+-      VkResult result = tu_pipeline_builder_build(&builder, &pipeline);
+-      tu_pipeline_builder_finish(&builder);
+-
+-      if (result == VK_SUCCESS) {
+-         pPipelines[i] = tu_pipeline_to_handle(pipeline);
+-      } else {
+-         pPipelines[i] = NULL;
++      VkResult result = tu_graphics_pipeline_create(device, pipelineCache,
++                                                    &pCreateInfos[i], pAllocator,
++                                                    &pPipelines[i]);
++
++      if (result != VK_SUCCESS)
+          final_result = result;
+-      }
+    }
+ 
+    return final_result;
+ }
+ 
++static void
++tu6_emit_compute_program(struct tu_cs *cs,
++                         struct tu_shader *shader,
++                         const struct tu_bo *binary_bo)
++{
++   const struct ir3_shader_variant *v = &shader->variants[0];
++
++   tu6_emit_cs_config(cs, v);
++
++   /* The compute program is the only one in the pipeline, so 0 offset. */
++   tu6_emit_shader_object(cs, MESA_SHADER_COMPUTE, v, binary_bo, 0);
++
++   tu6_emit_immediates(cs, v, CP_LOAD_STATE6_FRAG, SB6_CS_SHADER);
++}
++
++static VkResult
++tu_compute_upload_shader(VkDevice device,
++                         struct tu_pipeline *pipeline,
++                         struct tu_shader *shader)
++{
++   TU_FROM_HANDLE(tu_device, dev, device);
++   struct tu_bo *bo = &pipeline->program.binary_bo;
++   struct ir3_shader_variant *v = &shader->variants[0];
++
++   uint32_t shader_size = sizeof(uint32_t) * v->info.sizedwords;
++   VkResult result =
++      tu_bo_init_new(dev, bo, shader_size);
++   if (result != VK_SUCCESS)
++      return result;
++
++   result = tu_bo_map(dev, bo);
++   if (result != VK_SUCCESS)
++      return result;
++
++   memcpy(bo->map, shader->binary, shader_size);
++
++   return VK_SUCCESS;
++}
++
++
+ static VkResult
+-tu_compute_pipeline_create(VkDevice _device,
++tu_compute_pipeline_create(VkDevice device,
+                            VkPipelineCache _cache,
+                            const VkComputePipelineCreateInfo *pCreateInfo,
+                            const VkAllocationCallbacks *pAllocator,
+                            VkPipeline *pPipeline)
+ {
++   TU_FROM_HANDLE(tu_device, dev, device);
++   const VkPipelineShaderStageCreateInfo *stage_info = &pCreateInfo->stage;
++   VkResult result;
++
++   struct tu_pipeline *pipeline;
++
++   result = tu_pipeline_create(dev, pAllocator, &pipeline);
++   if (result != VK_SUCCESS)
++      return result;
++
++   struct tu_shader_compile_options options;
++   tu_shader_compile_options_init(&options, NULL);
++
++   struct tu_shader *shader =
++      tu_shader_create(dev, MESA_SHADER_COMPUTE, stage_info, pAllocator);
++   if (!shader) {
++      result = VK_ERROR_OUT_OF_HOST_MEMORY;
++      goto fail;
++   }
++
++   result = tu_shader_compile(dev, shader, NULL, &options, pAllocator);
++   if (result != VK_SUCCESS)
++      return result;
++
++   struct tu_program_descriptor_linkage *link = &pipeline->program.link[MESA_SHADER_COMPUTE];
++   struct ir3_shader_variant *v = &shader->variants[0];
++
++   link->ubo_state = v->shader->ubo_state;
++   link->const_state = v->shader->const_state;
++   link->constlen = v->constlen;
++   link->texture_map = shader->texture_map;
++   link->sampler_map = shader->sampler_map;
++   link->ubo_map = shader->ubo_map;
++   link->ssbo_map = shader->ssbo_map;
++   link->image_mapping =  v->image_mapping;
++
++   result = tu_compute_upload_shader(device, pipeline, shader);
++   if (result != VK_SUCCESS)
++      return result;
++
++   for (int i = 0; i < 3; i++)
++      pipeline->compute.local_size[i] = v->shader->nir->info.cs.local_size[i];
++
++   struct tu_cs prog_cs;
++   tu_cs_begin_sub_stream(dev, &pipeline->cs, 512, &prog_cs);
++   tu6_emit_compute_program(&prog_cs, shader, &pipeline->program.binary_bo);
++   pipeline->program.state_ib = tu_cs_end_sub_stream(&pipeline->cs, &prog_cs);
++
++   *pPipeline = tu_pipeline_to_handle(pipeline);
+    return VK_SUCCESS;
++
++fail:
++   tu_shader_destroy(dev, shader, pAllocator);
++   if (result != VK_SUCCESS) {
++      tu_pipeline_finish(pipeline, dev, pAllocator);
++      vk_free2(&dev->alloc, pAllocator, pipeline);
++   }
++
++   return result;
+ }
+ 
+ VkResult
+-tu_CreateComputePipelines(VkDevice _device,
++tu_CreateComputePipelines(VkDevice device,
+                           VkPipelineCache pipelineCache,
+                           uint32_t count,
+                           const VkComputePipelineCreateInfo *pCreateInfos,
+                           const VkAllocationCallbacks *pAllocator,
+                           VkPipeline *pPipelines)
+ {
+-   VkResult result = VK_SUCCESS;
++   VkResult final_result = VK_SUCCESS;
+ 
+-   unsigned i = 0;
+-   for (; i < count; i++) {
+-      VkResult r;
+-      r = tu_compute_pipeline_create(_device, pipelineCache, &pCreateInfos[i],
+-                                     pAllocator, &pPipelines[i]);
+-      if (r != VK_SUCCESS) {
+-         result = r;
+-      }
+-      pPipelines[i] = VK_NULL_HANDLE;
++   for (uint32_t i = 0; i < count; i++) {
++      VkResult result = tu_compute_pipeline_create(device, pipelineCache,
++                                                   &pCreateInfos[i],
++                                                   pAllocator, &pPipelines[i]);
++      if (result != VK_SUCCESS)
++         final_result = result;
+    }
+ 
+-   return result;
++   return final_result;
+ }
+ 
+ void
+diff --git a/src/freedreno/vulkan/tu_private.h b/src/freedreno/vulkan/tu_private.h
+--- a/src/freedreno/vulkan/tu_private.h
++++ b/src/freedreno/vulkan/tu_private.h
+@@ -93,6 +93,8 @@ typedef uint32_t xcb_window_t;
+ #define NUM_META_FS_KEYS 13
+ #define TU_MAX_DRM_DEVICES 8
+ #define MAX_VIEWS 8
++/* The Qualcomm driver exposes 0x20000058 */
++#define MAX_STORAGE_BUFFER_RANGE 0x20000000
+ 
+ #define NUM_DEPTH_CLEAR_PIPELINES 3
+ 
+@@ -663,6 +665,12 @@ struct tu_buffer
+    VkDeviceSize bo_offset;
+ };
+ 
++static inline uint64_t
++tu_buffer_iova(struct tu_buffer *buffer)
++{
++   return buffer->bo->iova + buffer->bo_offset;
++}
++
+ enum tu_dynamic_state_bits
+ {
+    TU_DYNAMIC_VIEWPORT = 1 << 0,
+@@ -817,8 +825,9 @@ struct tu_tiling_config
+ enum tu_cmd_dirty_bits
+ {
+    TU_CMD_DIRTY_PIPELINE = 1 << 0,
+-   TU_CMD_DIRTY_VERTEX_BUFFERS = 1 << 1,
+-   TU_CMD_DIRTY_DESCRIPTOR_SETS = 1 << 2,
++   TU_CMD_DIRTY_COMPUTE_PIPELINE = 1 << 1,
++   TU_CMD_DIRTY_VERTEX_BUFFERS = 1 << 2,
++   TU_CMD_DIRTY_DESCRIPTOR_SETS = 1 << 3,
+ 
+    TU_CMD_DIRTY_DYNAMIC_LINE_WIDTH = 1 << 16,
+    TU_CMD_DIRTY_DYNAMIC_STENCIL_COMPARE_MASK = 1 << 17,
+@@ -831,6 +840,7 @@ struct tu_cmd_state
+    uint32_t dirty;
+ 
+    struct tu_pipeline *pipeline;
++   struct tu_pipeline *compute_pipeline;
+ 
+    /* Vertex buffers */
+    struct
+@@ -1159,6 +1169,11 @@ struct tu_pipeline
+    {
+       struct tu_cs_entry state_ib;
+    } blend;
++
++   struct
++   {
++      uint32_t local_size[3];
++   } compute;
+ };
+ 
+ void

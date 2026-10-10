@@ -1,0 +1,26 @@
+repo: mesa/mesa
+pr: 33637
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33637
+merge_sha: 55c476efed01121b3a64a58c304aae8ef9a79475
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/33637/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/valhall/ISA.xml
+  status: modified
+  sha256: 2c045fb48a8c310ec8142439408e5b44acc5f954bfb20d6dc90b20bc6af807d8
+- path: src/panfrost/compiler/bi_lower_swizzle.c
+  status: modified
+  sha256: 43f9d80f1a2ed0002dcacd7b6feb1a6fc10518f1a77e5c6f40429763196e5f17
+- path: src/panfrost/compiler/bifrost_compile.c
+  status: modified
+  sha256: 15ce08604fb4d74486b8b157a057df97b09cbc589393d8ac5305972ee3f9a76d
+- path: src/panfrost/compiler/bifrost_nir_algebraic.py
+  status: modified
+  sha256: 6f3b1b20198697d515325377571333d6a124ebb72563dc710c8238188152343f
+- path: src/panfrost/vulkan/panvk_physical_device.c
+  status: modified
+  sha256: b5c81a298d8e1428562b5a747b14b5b6b58832fef44b3aa79d267142f9f17c45

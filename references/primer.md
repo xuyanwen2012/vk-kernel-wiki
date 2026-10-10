@@ -23,13 +23,20 @@ Any node name is a valid value of the `architectures` field. Asking for a node r
 | `xe2` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
 | `arc-b580` | device | `xe2` | no pages yet |
 | `arc-pro-b70` | device | `xe2` | no pages yet |
+| `meteor-lake` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
+| `xe3` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
 | `nvidia` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
 | `rtx-4070-ti-super` | device | `nvidia` | no pages yet |
 | `jetson-orin` | device | `nvidia` | no pages yet |
+| `turing` | generation | `nvidia` | pull-request and document pages only; list: `queries/by-architecture.md` |
+| `ampere` | generation | `nvidia` | pull-request pages only; list: `queries/by-architecture.md` |
+| `blackwell` | generation | `nvidia` | pull-request pages only; list: `queries/by-architecture.md` |
 | `qualcomm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
 | `adreno-840` | device | `qualcomm` | no pages yet |
+| `adreno-7xx` | generation | `qualcomm` | pull-request pages only; list: `queries/by-architecture.md` |
 | `arm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
 | `mali-g1` | device | `arm` | no pages yet |
+| `bifrost` | generation | `arm` | pull-request pages only; list: `queries/by-architecture.md` |
 | `samsung` | vendor | | reserved, no devices |
 
 All measurement and wiki pages are tagged with the device node `radeon-780m` only, so a query for `rdna3` or `amd` returns them as descendants. Some pull-request pages are tagged with a vendor or generation node taken from the pull-request title or from a device check the pull request adds to the code. Measurements per device are indexed in `queries/by-device.md`.
@@ -57,6 +64,7 @@ Pages live in `wiki/hardware/` (id prefix `hw-`). Index: `queries/by-hardware-fe
 | `subgroup-size` | default subgroup size of the device | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `subgroup-size-control` | VK_EXT_subgroup_size_control (required size per pipeline) | `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m` |
 | `wave64` | adapters whose native subgroup is 64 lanes | `meas-780m-8da4w-port`, `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
+| `subgroup-operations` | GL_KHR_shader_subgroup operations a driver exposes (VkPhysicalDeviceSubgroupProperties) | pull-request pages only; list: `queries/by-hardware-feature.md` |
 
 ### Memory and storage
 
@@ -222,6 +230,7 @@ Pages live in `wiki/languages/` (id prefix `lang-`). Index: `queries/by-language
 | `cpp` | pull-request pages only; list: `queries/by-language.md` |
 | `c` | pull-request pages only; list: `queries/by-language.md` |
 | `python` | pull-request pages only; list: `queries/by-language.md` |
+| `rust` | pull-request pages only; list: `queries/by-language.md` |
 
 ---
 

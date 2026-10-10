@@ -20,6 +20,7 @@ hardware_features:
   - subgroup-size               # default subgroup size of the device
   - subgroup-size-control       # VK_EXT_subgroup_size_control (required size per pipeline)
   - wave64                      # adapters whose native subgroup is 64 lanes
+  - subgroup-operations         # GL_KHR_shader_subgroup built-ins a driver exposes (subgroupSupportedOperations, VkPhysicalDeviceSubgroupProperties)
   - shared-memory-limit         # maxComputeSharedMemorySize
   - storage-buffer              # tensor stored as a buffer (SSBO)
   - storage-texture3d           # tensor stored as a 3D texture
@@ -31,7 +32,6 @@ hardware_features:
   - integer-dot-product         # GL_EXT_integer_dot_product
   - specialization-constants    # local_size_*_id and spec-constant shape parameters
   - full-subgroups              # computeFullSubgroups / REQUIRE_FULL_SUBGROUPS (every subgroup launched fully populated)
-  - subgroup-operations         # GL_KHR_shader_subgroup built-ins / subgroupSupportedOperations
   - workgroup-size-limit        # maxComputeWorkGroupSize / maxComputeWorkGroupInvocations
   - control-barrier             # barrier() / OpControlBarrier, including split barriers
   - memory-model                # Vulkan memory model: data races, memory semantics, scopes
@@ -115,6 +115,7 @@ languages:
   - cpp
   - c
   - python
+  - rust                        # NAK, the NVK shader compiler in Mesa
 
 confidence:
   - verified

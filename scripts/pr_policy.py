@@ -22,6 +22,10 @@ Policy
   its title matches one of the ledger's `topic_patterns` (regular
   expressions) and it changes a path containing one of `driver_path_markers`;
   everything else is excluded.
+- `artifact_exclude_path_markers` (mapping: path substring -> reason) names
+  files whose patches are never saved as artifacts, because the file's own
+  licence header is not the licence the ledger states. Such a file still
+  counts for the decision and is still listed in a page's `changed_paths`.
 - Frontmatter is derived from positive evidence only. A term is emitted when
   a pattern matches the PR title or a changed shader path; nothing is guessed
   from the description. `techniques` is filled only for the few terms a
@@ -53,6 +57,7 @@ HOST_LANGUAGE_SUFFIXES = {
     ".cpp": "cpp", ".cc": "cpp", ".cxx": "cpp", ".hpp": "cpp",
     ".c": "c",
     ".py": "python",
+    ".rs": "rust",
 }
 # A .h file belongs to whichever of these the pull request also changes;
 # on its own it counts as C++ (the only case before C was in the vocabulary).
@@ -100,6 +105,7 @@ class PathConfig:
     mode: str = "shader"
     driver: tuple = ()
     topics: tuple = ()
+    artifact_exclude: tuple = ()
 
     @classmethod
     def from_ledger(cls, ledger: dict) -> "PathConfig":
@@ -113,6 +119,7 @@ class PathConfig:
             mode,
             tuple(ledger.get("driver_path_markers") or ()),
             tuple(ledger.get("topic_patterns") or ()),
+            tuple(ledger.get("artifact_exclude_path_markers") or ()),
         )
 
 
@@ -122,12 +129,21 @@ def is_shader_path(path: str, config: PathConfig) -> bool:
     return PurePosixPath(path).suffix.lower() in SHADER_SUFFIXES and _has_marker(path, config.shader)
 
 
+def artifact_excluded(path: str, config: PathConfig) -> bool:
+    """True for a path the ledger forbids saving (`artifact_exclude_path_markers`):
+    a file whose own licence header differs from the ledger's `license`."""
+    return any(marker in path for marker in config.artifact_exclude)
+
+
 def shader_files(files: Iterable[Any], config: PathConfig) -> list:
     """The changed-file records worth saving, removals included: shader source,
-    or in driver mode the files under the driver paths."""
+    or in driver mode the files under the driver paths. Paths the ledger
+    excludes from artifacts are left out."""
     if config.mode == "driver":
-        return [f for f in normalize_files(files) if any(m in f["filename"] for m in config.driver)]
-    return [f for f in normalize_files(files) if is_shader_path(f["filename"], config)]
+        kept = [f for f in normalize_files(files) if any(m in f["filename"] for m in config.driver)]
+    else:
+        kept = [f for f in normalize_files(files) if is_shader_path(f["filename"], config)]
+    return [f for f in kept if not artifact_excluded(f["filename"], config)]
 
 
 def _classify_driver(normalized: list, config: PathConfig, title: str) -> ScopeDecision:
@@ -255,16 +271,21 @@ def derive_architectures(title: str, files: Iterable[Any] = (), code_markers: Op
 _TOKEN = r"(?<![A-Za-z0-9]){}(?![A-Za-z0-9])"
 
 _HARDWARE_PATTERNS = {
-    "cooperative-matrix": r"coop[\s_-]?mat|cooperative[\s_-]matri|wmma|" + _TOKEN.format(r"cm[12]|cmat"),
+    # wmma (AMD) and dpas (Intel, the "systolic" array) are the instructions a
+    # cooperative-matrix multiply-add is lowered to.
+    "cooperative-matrix": (
+        r"coop[\s_-]?mat|cooperative[\s_-]?matri|wmma|systolic|" + _TOKEN.format(r"cm[12]|cmat|dpas")
+    ),
     "cooperative-matrix2": r"coop[\s_-]?mat[\s_-]?2|cooperative[\s_-]matrix[\s_-]?2|" + _TOKEN.format("cm2"),
     "bfloat16-arithmetic": _TOKEN.format(r"bf16|bfloat16"),
     "int8-cooperative-matrix": r"int8[\s_-]coop[\s_-]?mat",
     "integer-dot-product": _TOKEN.format("dp4a") + r"|integer[\s_-]dot[\s_-]product|dotPacked",
-    "subgroup-size": r"subgroup[\s_-]size",
+    "subgroup-size": r"subgroup[\s_-]?size",
+    "subgroup-operations": r"subgroup[\s_-]op(?:s|erations?)(?![A-Za-z])|VkPhysicalDeviceSubgroupProperties",
     "subgroup-size-control": r"subgroup[\s_-]size[\s_-]control",
     "wave64": _TOKEN.format("wave64"),
     "8bit-storage": r"8[\s_-]?bit[\s_-]storage",
-    "shared-memory-limit": _TOKEN.format("shmem") + r"|shared[\s_-]memory",
+    "shared-memory-limit": _TOKEN.format("shmem|slm") + r"|shared[\s_-]memory|maxComputeSharedMemorySize|workgroup[\s_-]memory",
     "fp16-arithmetic": _TOKEN.format(r"fp16|f16|float16"),
     "specialization-constants": r"spec(?:ialization)?[\s_-]constant",
 }

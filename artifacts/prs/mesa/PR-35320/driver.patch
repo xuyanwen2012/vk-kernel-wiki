@@ -1,0 +1,62 @@
+diff --git a/src/intel/compiler/brw_builder.h b/src/intel/compiler/brw_builder.h
+--- a/src/intel/compiler/brw_builder.h
++++ b/src/intel/compiler/brw_builder.h
+@@ -765,11 +765,9 @@ public:
+       inst->sdepth = sdepth;
+       inst->rcount = rcount;
+ 
+-      if (dst.type == BRW_TYPE_HF) {
+-         inst->size_written = reg_unit(shader->devinfo) * rcount * REG_SIZE / 2;
+-      } else {
+-         inst->size_written = reg_unit(shader->devinfo) * rcount * REG_SIZE;
+-      }
++      unsigned type_size = brw_type_size_bytes(dst.type);
++      assert(type_size == 4 || type_size == 2);
++      inst->size_written = rcount * reg_unit(shader->devinfo) * 8 * type_size;
+ 
+       return inst;
+    }
+diff --git a/src/intel/compiler/brw_inst.cpp b/src/intel/compiler/brw_inst.cpp
+--- a/src/intel/compiler/brw_inst.cpp
++++ b/src/intel/compiler/brw_inst.cpp
+@@ -564,22 +564,21 @@ brw_inst::size_read(const struct intel_device_info *devinfo, int arg) const
+        * coincidence, so this isn't so bad.
+        */
+       const unsigned reg_unit = this->exec_size / 8;
++      const unsigned type_size = brw_type_size_bytes(src[arg].type);
+ 
+       switch (arg) {
+       case 0:
+-         if (src[0].type == BRW_TYPE_HF) {
+-            return rcount * reg_unit * REG_SIZE / 2;
+-         } else {
+-            return rcount * reg_unit * REG_SIZE;
+-         }
++         assert(type_size == 4 || type_size == 2);
++         return rcount * reg_unit * 8 * type_size;
+       case 1:
+          return sdepth * reg_unit * REG_SIZE;
+       case 2:
+          /* This is simpler than the formula described in the Bspec, but it
+           * covers all of the cases that we support. Each inner sdepth
+-          * iteration of the DPAS consumes a single dword for int8, uint8, or
+-          * float16 types. These are the one source types currently
+-          * supportable through Vulkan. This is independent of reg_unit.
++          * iteration of the DPAS consumes a single dword for int8, uint8,
++          * float16, or bfloat16 types. These are the one source types
++          * currently supportable through Vulkan. This is independent of
++          * reg_unit.
+           */
+          return rcount * sdepth * 4;
+       default:
+diff --git a/src/intel/dev/intel_device_info.c b/src/intel/dev/intel_device_info.c
+--- a/src/intel/dev/intel_device_info.c
++++ b/src/intel/dev/intel_device_info.c
+@@ -541,6 +541,7 @@ static const struct intel_device_info intel_device_info_chv = {
+    .cooperative_matrix_configurations = {                                                                                       \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16 },   \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 },   \
++    { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16 }, \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_BFLOAT16, INTEL_CMAT_FLOAT32, INTEL_CMAT_FLOAT32 }, \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 32, INTEL_CMAT_SINT8, INTEL_CMAT_SINT8, INTEL_CMAT_SINT32, INTEL_CMAT_SINT32 },         \
+     { INTEL_CMAT_SCOPE_SUBGROUP, 8, 16, 32, INTEL_CMAT_UINT8, INTEL_CMAT_UINT8, INTEL_CMAT_UINT32, INTEL_CMAT_UINT32 },         \

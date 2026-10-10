@@ -1,0 +1,163 @@
+diff --git a/src/freedreno/ir3/ir3_assembler.c b/src/freedreno/ir3/ir3_assembler.c
+--- a/src/freedreno/ir3/ir3_assembler.c
++++ b/src/freedreno/ir3/ir3_assembler.c
+@@ -42,6 +42,8 @@ ir3_parse_asm(struct ir3_compiler *c, struct ir3_kernel_info *info, FILE *in)
+    v->compiler = c;
+    v->const_state = rzalloc_size(v, sizeof(*v->const_state));
+ 
++   v->shader_options.real_wavesize = IR3_SINGLE_OR_DOUBLE;
++
+    if (c->gen >= 6)
+       v->mergedregs = true;
+ 
+diff --git a/src/freedreno/ir3/ir3_nir.c b/src/freedreno/ir3/ir3_nir.c
+--- a/src/freedreno/ir3/ir3_nir.c
++++ b/src/freedreno/ir3/ir3_nir.c
+@@ -607,9 +607,23 @@ lower_subgroup_id_filter(const nir_instr *instr, const void *unused)
+ }
+ 
+ static nir_def *
+-lower_subgroup_id(nir_builder *b, nir_instr *instr, void *unused)
++lower_subgroup_id(nir_builder *b, nir_instr *instr, void *_shader)
+ {
+-   (void)unused;
++   struct ir3_shader *shader = _shader;
++
++   /* Vulkan allows implementations to tile workgroup invocations even when
++    * subgroup operations are involved, which is implied by this Note:
++    *
++    *    "There is no direct relationship between SubgroupLocalInvocationId and
++    *    LocalInvocationId or LocalInvocationIndex."
++    *
++    * However there is no way to get SubgroupId directly, so we have to use
++    * LocalInvocationIndex here. This means that whenever we do this lowering we
++    * have to force linear dispatch to make sure that the relation between
++    * SubgroupId/SubgroupLocalInvocationId and LocalInvocationIndex is what we
++    * expect.
++    */
++   shader->cs.force_linear_dispatch = true;
+ 
+    nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
+    if (intr->intrinsic == nir_intrinsic_load_subgroup_invocation) {
+@@ -638,10 +652,10 @@ lower_subgroup_id(nir_builder *b, nir_instr *instr, void *unused)
+ }
+ 
+ static bool
+-ir3_nir_lower_subgroup_id_cs(nir_shader *shader)
++ir3_nir_lower_subgroup_id_cs(nir_shader *nir, struct ir3_shader *shader)
+ {
+-   return nir_shader_lower_instructions(shader, lower_subgroup_id_filter,
+-                                        lower_subgroup_id, NULL);
++   return nir_shader_lower_instructions(nir, lower_subgroup_id_filter,
++                                        lower_subgroup_id, shader);
+ }
+ 
+ /**
+@@ -764,7 +778,7 @@ ir3_nir_post_finalize(struct ir3_shader *shader)
+    if ((s->info.stage == MESA_SHADER_COMPUTE) ||
+        (s->info.stage == MESA_SHADER_KERNEL)) {
+       bool progress = false;
+-      NIR_PASS(progress, s, ir3_nir_lower_subgroup_id_cs);
++      NIR_PASS(progress, s, ir3_nir_lower_subgroup_id_cs, shader);
+ 
+       /* ir3_nir_lower_subgroup_id_cs creates extra compute intrinsics which
+        * we need to lower again.
+diff --git a/src/freedreno/ir3/ir3_shader.c b/src/freedreno/ir3/ir3_shader.c
+--- a/src/freedreno/ir3/ir3_shader.c
++++ b/src/freedreno/ir3/ir3_shader.c
+@@ -410,6 +410,11 @@ create_variant(struct ir3_shader *shader, const struct ir3_shader_key *key,
+       shader->nir_finalized = true;
+    }
+ 
++   if (v->type == MESA_SHADER_COMPUTE ||
++       v->type == MESA_SHADER_KERNEL) {
++      v->cs.force_linear_dispatch = shader->cs.force_linear_dispatch;
++   }
++
+    if (!compile_variant(shader, v))
+       goto fail;
+ 
+diff --git a/src/freedreno/ir3/ir3_shader.h b/src/freedreno/ir3/ir3_shader.h
+--- a/src/freedreno/ir3/ir3_shader.h
++++ b/src/freedreno/ir3/ir3_shader.h
+@@ -837,6 +837,7 @@ struct ir3_shader_variant {
+       struct {
+          unsigned req_input_mem;
+          unsigned req_local_mem;
++         bool force_linear_dispatch;
+       } cs;
+    };
+ 
+@@ -909,6 +910,7 @@ struct ir3_shader {
+       struct {
+          unsigned req_input_mem;    /* in dwords */
+          unsigned req_local_mem;
++         bool force_linear_dispatch;
+       } cs;
+       /* For vertex shaders: */
+       struct {
+diff --git a/src/freedreno/vulkan/tu_device.cc b/src/freedreno/vulkan/tu_device.cc
+--- a/src/freedreno/vulkan/tu_device.cc
++++ b/src/freedreno/vulkan/tu_device.cc
+@@ -2166,9 +2166,9 @@ tu_init_cmdbuf_start_a725_quirk(struct tu_device *device)
+    tu_cs_emit_regs(&sub_cs, HLSQ_CS_CNTL_1(A7XX,
+             .linearlocalidregid = regid(63, 0),
+             .threadsize = THREAD128,
+-            .unk11 = true,
+-            .unk22 = true,
+-            .yalign = CS_YALIGN_1));
++            .workgrouprastorderzfirsten = true,
++            .wgtilewidth = 4,
++            .wgtileheight = 17));
+    tu_cs_emit_regs(&sub_cs, A6XX_SP_CS_CNTL_0(
+             .wgidconstid = regid(51, 3),
+             .wgsizeconstid = regid(48, 0),
+@@ -2177,7 +2177,7 @@ tu_init_cmdbuf_start_a725_quirk(struct tu_device *device)
+    tu_cs_emit_regs(&sub_cs, SP_CS_CNTL_1(A7XX,
+             .linearlocalidregid = regid(63, 0),
+             .threadsize = THREAD128,
+-            .unk15 = true));
++            .workitemrastorder = WORKITEMRASTORDER_TILED));
+    tu_cs_emit_regs(&sub_cs, A7XX_SP_CS_UNKNOWN_A9BE(0));
+ 
+    tu_cs_emit_regs(&sub_cs,
+diff --git a/src/freedreno/vulkan/tu_shader.cc b/src/freedreno/vulkan/tu_shader.cc
+--- a/src/freedreno/vulkan/tu_shader.cc
++++ b/src/freedreno/vulkan/tu_shader.cc
+@@ -1430,17 +1430,15 @@ tu6_emit_cs_config(struct tu_cs *cs,
+                   A6XX_SP_CS_CNTL_1_THREADSIZE(thrsz));
+       }
+    } else {
+-      enum a7xx_cs_yalign yalign = (v->local_size[1] % 8 == 0)   ? CS_YALIGN_8
+-                                   : (v->local_size[1] % 4 == 0) ? CS_YALIGN_4
+-                                   : (v->local_size[1] % 2 == 0) ? CS_YALIGN_2
+-                                                                 : CS_YALIGN_1;
++      unsigned tile_height = (v->local_size[1] % 8 == 0)   ? 3
++                             : (v->local_size[1] % 4 == 0) ? 5
++                             : (v->local_size[1] % 2 == 0) ? 9
++                                                           : 17;
+       tu_cs_emit_regs(
+          cs, HLSQ_CS_CNTL_1(CHIP,
+                    .linearlocalidregid = regid(63, 0), .threadsize = thrsz_cs,
+-                   /* A7XX TODO: blob either sets all of these unknowns
+-                    * together or doesn't set them at all.
+-                    */
+-                   .unk11 = true, .unk22 = true, .yalign = yalign, ));
++                   .workgrouprastorderzfirsten = true, 
++                   .wgtilewidth = 4, .wgtileheight = tile_height));
+ 
+       tu_cs_emit_regs(cs, HLSQ_FS_CNTL_0(CHIP, .threadsize = THREAD64));
+ 
+@@ -1454,8 +1452,10 @@ tu6_emit_cs_config(struct tu_cs *cs,
+                       SP_CS_CNTL_1(CHIP,
+                         .linearlocalidregid = regid(63, 0),
+                         .threadsize = thrsz_cs,
+-                        /* A7XX TODO: enable UNK15 when we don't use subgroup ops. */
+-                        .unk15 = false, ));
++                        .workitemrastorder =
++                           v->cs.force_linear_dispatch ?
++                           WORKITEMRASTORDER_LINEAR :
++                           WORKITEMRASTORDER_TILED, ));
+ 
+       tu_cs_emit_regs(
+          cs, A7XX_HLSQ_CS_LOCAL_SIZE(.localsizex = v->local_size[0] - 1,

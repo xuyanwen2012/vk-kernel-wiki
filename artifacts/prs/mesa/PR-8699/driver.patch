@@ -1,0 +1,56 @@
+diff --git a/src/intel/vulkan/anv_device.c b/src/intel/vulkan/anv_device.c
+--- a/src/intel/vulkan/anv_device.c
++++ b/src/intel/vulkan/anv_device.c
+@@ -1452,6 +1452,16 @@ void anv_GetPhysicalDeviceFeatures2(
+          break;
+       }
+ 
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_FEATURES_KHR: {
++         VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *features =
++            (VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR *)ext;
++         features->workgroupMemoryExplicitLayout = true;
++         features->workgroupMemoryExplicitLayoutScalarBlockLayout = true;
++         features->workgroupMemoryExplicitLayout8BitAccess = true;
++         features->workgroupMemoryExplicitLayout16BitAccess = true;
++         break;
++      }
++
+       case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT: {
+          VkPhysicalDeviceYcbcrImageArraysFeaturesEXT *features =
+             (VkPhysicalDeviceYcbcrImageArraysFeaturesEXT *)ext;
+diff --git a/src/intel/vulkan/anv_extensions.py b/src/intel/vulkan/anv_extensions.py
+--- a/src/intel/vulkan/anv_extensions.py
++++ b/src/intel/vulkan/anv_extensions.py
+@@ -119,6 +119,7 @@ EXTENSIONS = [
+     Extension('VK_KHR_variable_pointers',                 1, True),
+     Extension('VK_KHR_vulkan_memory_model',               3, True),
+     Extension('VK_KHR_wayland_surface',                   6, 'VK_USE_PLATFORM_WAYLAND_KHR'),
++    Extension('VK_KHR_workgroup_memory_explicit_layout',  1, True),
+     Extension('VK_KHR_xcb_surface',                       6, 'VK_USE_PLATFORM_XCB_KHR'),
+     Extension('VK_KHR_xlib_surface',                      6, 'VK_USE_PLATFORM_XLIB_KHR'),
+     Extension('VK_EXT_4444_formats',                      1, True),
+diff --git a/src/intel/vulkan/anv_pipeline.c b/src/intel/vulkan/anv_pipeline.c
+--- a/src/intel/vulkan/anv_pipeline.c
++++ b/src/intel/vulkan/anv_pipeline.c
+@@ -217,6 +217,7 @@ anv_shader_compile_to_nir(struct anv_device *device,
+          .variable_pointers = true,
+          .vk_memory_model = true,
+          .vk_memory_model_device_scope = true,
++         .workgroup_memory_explicit_layout = true,
+       },
+       .ubo_addr_format = nir_address_format_32bit_index_offset,
+       .ssbo_addr_format =
+@@ -1743,8 +1744,11 @@ anv_pipeline_compile_cs(struct anv_compute_pipeline *pipeline,
+ 
+       anv_pipeline_lower_nir(&pipeline->base, mem_ctx, &stage, layout);
+ 
+-      NIR_PASS_V(stage.nir, nir_lower_vars_to_explicit_types,
+-                 nir_var_mem_shared, shared_type_info);
++      if (!stage.nir->info.cs.shared_memory_explicit_layout) {
++         NIR_PASS_V(stage.nir, nir_lower_vars_to_explicit_types,
++                    nir_var_mem_shared, shared_type_info);
++      }
++
+       NIR_PASS_V(stage.nir, nir_lower_explicit_io,
+                  nir_var_mem_shared, nir_address_format_32bit_offset);
+       NIR_PASS_V(stage.nir, brw_nir_lower_cs_intrinsics);

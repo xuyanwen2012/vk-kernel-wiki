@@ -1,0 +1,23 @@
+repo: mesa/mesa
+pr: 30705
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/30705
+merge_sha: d22d6d814d28440bbe36962127da8d6d167e5bdb
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/30705/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_eu_defines.h
+  status: modified
+  sha256: 7fe41ab7bdcc61ac22f4a49739c5c383fc46436b2e409e8f63d46b810781f4d5
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: a5731400cf84b5891609823950d8d2c4ad1bb818e7c18950d54f5cb2f2e5e3f2
+- path: src/intel/compiler/brw_gram.y
+  status: modified
+  sha256: 306d09f591b0c294caa556625134f5406eef1328df99696e1290bcc1b969279b
+omitted_files:
+- path: src/intel/compiler/brw_disasm.c
+  reason: the file header carries its own permission notice (Copyright 2008 Keith Packard, an HPND-style notice), not the MIT text the ledger states

@@ -1,0 +1,395 @@
+diff --git a/src/panfrost/compiler/bifrost/bifrost_compile.h b/src/panfrost/compiler/bifrost/bifrost_compile.h
+--- a/src/panfrost/compiler/bifrost/bifrost_compile.h
++++ b/src/panfrost/compiler/bifrost/bifrost_compile.h
+@@ -73,11 +73,13 @@ void bifrost_compile_shader_nir(nir_shader *nir,
+                                 struct util_dynarray *binary,
+                                 struct pan_shader_info *info);
+ 
++bool valhall_can_merge_workgroups(nir_shader *nir);
++
+ #define VALHAL_EX_FIFO_VARYING_BITS \
+    (VARYING_BIT_PSIZ | VARYING_BIT_LAYER | VARYING_BIT_PRIMITIVE_ID)
+ 
+-#define DEFINE_OPTIONS(arch)                                                   \
+-   static const nir_shader_compiler_options bifrost_nir_options_v##arch = {    \
++#define DEFINE_OPTIONS(name, arch, merge_workgroups)                           \
++   static const nir_shader_compiler_options name = {                           \
+       .lower_scmp = true,                                                      \
+       .lower_flrp16 = true,                                                    \
+       .lower_flrp32 = true,                                                    \
+@@ -147,10 +149,17 @@ void bifrost_compile_shader_nir(nir_shader *nir,
+       .has_udot_4x8_sat = arch >= 9,                                           \
+       .has_sdot_4x8 = arch >= 9,                                               \
+       .has_sdot_4x8_sat = arch >= 9,                                           \
++                                                                               \
++      .divergence_analysis_options = merge_workgroups ?                        \
++         (nir_divergence_across_subgroups |                                    \
++          nir_divergence_multiple_workgroup_per_compute_subgroup)              \
++         : 0,                                                                  \
+    };
+ 
+-DEFINE_OPTIONS(6);
+-DEFINE_OPTIONS(9);
+-DEFINE_OPTIONS(11);
++DEFINE_OPTIONS(bifrost_nir_options_v6, 6, false);
++DEFINE_OPTIONS(bifrost_nir_options_v9, 9, false);
++DEFINE_OPTIONS(bifrost_nir_options_v9_merge_wg, 9, true);
++DEFINE_OPTIONS(bifrost_nir_options_v11, 11, false);
++DEFINE_OPTIONS(bifrost_nir_options_v11_merge_wg, 11, true);
+ 
+ #endif
+diff --git a/src/panfrost/compiler/bifrost/bifrost_nir.c b/src/panfrost/compiler/bifrost/bifrost_nir.c
+--- a/src/panfrost/compiler/bifrost/bifrost_nir.c
++++ b/src/panfrost/compiler/bifrost/bifrost_nir.c
+@@ -575,6 +575,61 @@ bi_lower_subgroups(nir_builder *b, nir_intrinsic_instr *intr, void *data)
+    return true;
+ }
+ 
++/* Workgroups may be merged if the structure of the workgroup is not software
++ * visible. This is true if neither shared memory nor BARRIER instructions nor
++ * subgroups are used. The hardware may be able to optimize compute shaders
++ * that set this flag.
++ *
++ * From the vulkan spec version 1.4.317 section 9.25.8:
++ *
++ *    "For shaders that have defined workgroups, each invocation in a subgroup
++ *     must be in the same local workgroup."
++ */
++bool
++valhall_can_merge_workgroups(nir_shader *nir)
++{
++   if (nir->info.shared_size != 0)
++      return false;
++
++   nir_foreach_function_impl(impl, nir) {
++      nir_foreach_block(block, impl) {
++         nir_foreach_instr(instr, block) {
++            if (instr->type != nir_instr_type_intrinsic)
++               continue;
++
++            /* We only emit BARRIER instructions for workgroup execution
++             * barriers. For subgroup execution barriers, the only consequence
++             * of merging workgroups is that the scope may be larger, which is
++             * allowed. */
++            nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(instr);
++            if (intrin->intrinsic == nir_intrinsic_barrier &&
++                nir_intrinsic_execution_scope(intrin) == SCOPE_WORKGROUP)
++               return false;
++
++            /* This is in nir->info.uses_wide_subgroups, but we don't want to
++             * force an extra nir_gather_shader_info call. */
++            if (nir_intrinsic_has_semantic(intrin, NIR_INTRINSIC_SUBGROUP))
++               return false;
++
++            /* load_subgroup_invocation allows observing merged workgroups
++             * because the first thread in the workgroup may have a nonzero
++             * subgroup invocation and so on. We don't have to care about
++             * load_subgroup_id, because we implement it by dividing the local
++             * invocation id, so it doesn't care what the actual subgroup
++             * layout is in hw.
++             *
++             * Note that these intrinsics do not have NIR_INTRINSIC_SUBGROUP
++             * because they do not perform any communication with other
++             * subgroup threads. */
++            if (intrin->intrinsic == nir_intrinsic_load_subgroup_invocation)
++               return false;
++         }
++      }
++   }
++
++   return true;
++}
++
+ static bool
+ bi_lower_load_output(nir_builder *b, nir_intrinsic_instr *intr,
+                      UNUSED void *data)
+@@ -1121,16 +1176,5 @@ bifrost_compile_shader_nir(nir_shader *nir,
+       bi_compile_variant(nir, inputs, binary, info, BI_IDVS_NONE);
+    }
+ 
+-   if (mesa_shader_stage_is_compute(nir->info.stage)) {
+-      /* Workgroups may be merged if the structure of the workgroup is
+-       * not software visible. This is true if neither shared memory
+-       * nor barriers are used. The hardware may be able to optimize
+-       * compute shaders that set this flag.
+-       */
+-      info->cs.allow_merging_workgroups = (nir->info.shared_size == 0) &&
+-                                          !nir->info.uses_control_barrier &&
+-                                          !nir->info.uses_memory_barrier;
+-   }
+-
+    info->ubo_mask &= (1 << nir->info.num_ubos) - 1;
+ }
+diff --git a/src/panfrost/compiler/pan_compiler.c b/src/panfrost/compiler/pan_compiler.c
+--- a/src/panfrost/compiler/pan_compiler.c
++++ b/src/panfrost/compiler/pan_compiler.c
+@@ -34,22 +34,26 @@ pan_want_debug_info(unsigned arch)
+ }
+ 
+ const nir_shader_compiler_options *
+-pan_get_nir_shader_compiler_options(unsigned arch)
++pan_get_nir_shader_compiler_options(unsigned arch, bool merge_wg)
+ {
+    switch (arch) {
+    case 4:
+    case 5:
++      assert(!merge_wg);
+       return &midgard_nir_options;
+    case 6:
+    case 7:
++      assert(!merge_wg);
+       return &bifrost_nir_options_v6;
+    case 9:
+    case 10:
+-      return &bifrost_nir_options_v9;
++      return merge_wg ? &bifrost_nir_options_v9_merge_wg :
++                        &bifrost_nir_options_v9;
+    case 11:
+    case 12:
+    case 13:
+-      return &bifrost_nir_options_v11;
++      return merge_wg ? &bifrost_nir_options_v11_merge_wg :
++                        &bifrost_nir_options_v11;
+    default:
+       assert(!"Unsupported arch");
+       return NULL;
+diff --git a/src/panfrost/compiler/pan_compiler.h b/src/panfrost/compiler/pan_compiler.h
+--- a/src/panfrost/compiler/pan_compiler.h
++++ b/src/panfrost/compiler/pan_compiler.h
+@@ -21,7 +21,7 @@ bool pan_will_dump_shaders(unsigned arch);
+ bool pan_want_debug_info(unsigned arch);
+ 
+ const nir_shader_compiler_options *
+-pan_get_nir_shader_compiler_options(unsigned arch);
++pan_get_nir_shader_compiler_options(unsigned arch, bool merge_wg);
+ 
+ void pan_preprocess_nir(nir_shader *nir, uint64_t gpu_id);
+ void pan_optimize_nir(nir_shader *nir, uint64_t gpu_id);
+diff --git a/src/panfrost/vulkan/bifrost/panvk_vX_meta_desc_copy.c b/src/panfrost/vulkan/bifrost/panvk_vX_meta_desc_copy.c
+--- a/src/panfrost/vulkan/bifrost/panvk_vX_meta_desc_copy.c
++++ b/src/panfrost/vulkan/bifrost/panvk_vX_meta_desc_copy.c
+@@ -332,7 +332,7 @@ panvk_meta_desc_copy_rsd(struct panvk_device *dev)
+    nir_builder b = nir_builder_init_simple_shader(
+       MESA_SHADER_COMPUTE,
+       pan_get_nir_shader_compiler_options(
+-         pan_arch(phys_dev->kmod.dev->props.gpu_id)),
++         pan_arch(phys_dev->kmod.dev->props.gpu_id), false),
+       "%s", "desc_copy");
+ 
+    /* We actually customize that at execution time to issue the
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+@@ -222,7 +222,7 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
+          cfg.workgroup_size_x = cs->cs.local_size.x;
+          cfg.workgroup_size_y = cs->cs.local_size.y;
+          cfg.workgroup_size_z = cs->cs.local_size.z;
+-         cfg.allow_merging_workgroups = false;
++         cfg.allow_merging_workgroups = cs->info.cs.allow_merging_workgroups;
+       }
+       cs_move32_to(b, cs_sr_reg32(b, COMPUTE, WG_SIZE),
+                    wg_size.opaque[0]);
+diff --git a/src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c b/src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c
+--- a/src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c
++++ b/src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c
+@@ -95,7 +95,8 @@ panvk_per_arch(dispatch_precomp)(struct panvk_precomp_ctx *ctx,
+          cfg.workgroup_size_x = shader->cs.local_size.x;
+          cfg.workgroup_size_y = shader->cs.local_size.y;
+          cfg.workgroup_size_z = shader->cs.local_size.z;
+-         cfg.allow_merging_workgroups = false;
++         cfg.allow_merging_workgroups =
++            shader->info.cs.allow_merging_workgroups;
+       }
+       cs_move32_to(b, cs_sr_reg32(b, COMPUTE, WG_SIZE), wg_size.opaque[0]);
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+--- a/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+@@ -206,7 +206,7 @@ get_frame_shader(struct panvk_device *dev,
+       goto out;
+ 
+    const struct nir_shader_compiler_options *nir_options =
+-      pan_get_nir_shader_compiler_options(PAN_ARCH);
++      pan_get_nir_shader_compiler_options(PAN_ARCH, false);
+    nir_shader *nir = GENX(pan_get_fb_shader)(&key->key, nir_options);
+ 
+    NIR_PASS(_, nir, nir_shader_instructions_pass, lower_instr,
+diff --git a/src/panfrost/vulkan/panvk_vX_shader.c b/src/panfrost/vulkan/panvk_vX_shader.c
+--- a/src/panfrost/vulkan/panvk_vX_shader.c
++++ b/src/panfrost/vulkan/panvk_vX_shader.c
+@@ -38,6 +38,7 @@
+ #include "vk_ycbcr_conversion.h"
+ 
+ #include "compiler/bifrost/bifrost_nir.h"
++#include "compiler/bifrost/bifrost_compile.h"
+ #include "compiler/pan_compiler.h"
+ #include "compiler/pan_nir.h"
+ #include "pan_shader.h"
+@@ -296,6 +297,75 @@ lower_layer_writes(nir_shader *nir)
+ }
+ #endif
+ 
++#if PAN_ARCH >= 10
++static bool
++mark_all_access_non_uniform(nir_builder *b, nir_instr *instr, void *data)
++{
++   switch (instr->type) {
++   case nir_instr_type_tex: {
++      nir_tex_instr *tex = nir_instr_as_tex(instr);
++
++      for (unsigned i = 0; i < tex->num_srcs; i++) {
++         switch (tex->src[i].src_type) {
++         case nir_tex_src_texture_offset:
++         case nir_tex_src_texture_handle:
++            tex->texture_non_uniform = true;
++            break;
++
++         case nir_tex_src_sampler_offset:
++         case nir_tex_src_sampler_handle:
++            tex->sampler_non_uniform = true;
++            break;
++
++         case nir_tex_src_offset:
++            tex->offset_non_uniform = true;
++            break;
++
++         default:
++            break;
++         }
++      }
++
++      return true;
++   }
++   case nir_instr_type_intrinsic: {
++      nir_intrinsic_instr *intrin = nir_instr_as_intrinsic(instr);
++
++      switch (intrin->intrinsic) {
++      case nir_intrinsic_load_ubo:
++      case nir_intrinsic_load_ssbo:
++      case nir_intrinsic_store_ssbo:
++      case nir_intrinsic_ssbo_atomic:
++      case nir_intrinsic_ssbo_atomic_swap:
++      case nir_intrinsic_image_load:
++      case nir_intrinsic_image_sparse_load:
++      case nir_intrinsic_image_store:
++      case nir_intrinsic_image_atomic:
++      case nir_intrinsic_image_atomic_swap:
++      case nir_intrinsic_image_size:
++      case nir_intrinsic_image_samples:
++      case nir_intrinsic_image_deref_load:
++      case nir_intrinsic_image_deref_sparse_load:
++      case nir_intrinsic_image_deref_store:
++      case nir_intrinsic_image_deref_atomic:
++      case nir_intrinsic_image_deref_atomic_swap:
++      case nir_intrinsic_image_deref_levels:
++      case nir_intrinsic_image_deref_size:
++      case nir_intrinsic_image_deref_samples:
++      case nir_intrinsic_image_deref_samples_identical:
++         nir_intrinsic_set_access(
++            intrin, nir_intrinsic_access(intrin) | ACCESS_NON_UNIFORM);
++         return true;
++      default:
++         return false;
++      }
++   }
++   default:
++      return false;
++   }
++}
++#endif
++
+ static void
+ shared_type_info(const struct glsl_type *type, unsigned *size, unsigned *align)
+ {
+@@ -344,7 +414,7 @@ panvk_get_nir_options(UNUSED struct vk_physical_device *vk_pdev,
+ {
+    struct panvk_physical_device *phys_dev = to_panvk_physical_device(vk_pdev);
+    return pan_get_nir_shader_compiler_options(
+-      pan_arch(phys_dev->kmod.dev->props.gpu_id));
++      pan_arch(phys_dev->kmod.dev->props.gpu_id), false);
+ }
+ 
+ static struct spirv_to_nir_options
+@@ -748,7 +818,8 @@ panvk_lower_nir(struct panvk_device *dev, nir_shader *nir,
+                 struct vk_descriptor_set_layout *const *set_layouts,
+                 const struct vk_pipeline_robustness_state *rs,
+                 const struct vk_graphics_pipeline_state *state,
+-                struct panvk_shader_desc_info *desc_info)
++                struct panvk_shader_desc_info *desc_info,
++                bool allow_merging_workgroups)
+ {
+    mesa_shader_stage stage = nir->info.stage;
+ 
+@@ -786,6 +857,17 @@ panvk_lower_nir(struct panvk_device *dev, nir_shader *nir,
+    NIR_PASS(_, nir, nir_lower_explicit_io, nir_var_mem_global,
+             nir_address_format_64bit_global);
+ 
++#if PAN_ARCH >= 10
++   if (allow_merging_workgroups) {
++      /* Accesses that were uniform in the source shader may now be
++       * nonuniform. To handle this, we just flag everything as nonuniform and
++       * then let nir_opt_non_uniform_access figure out which ones can really
++       * be nonuniform based on divergence analysis */
++      NIR_PASS(_, nir, nir_shader_instructions_pass,
++               mark_all_access_non_uniform, nir_metadata_all, NULL);
++   }
++#endif
++
+    /* nir_lower_non_uniform_access needs to run after lowering UBO and SSBO
+     * IO. This means we run it after nir_lower_descriptors, which reads the
+     * array indices, but it's okay because lower_descriptors treats all
+@@ -805,7 +887,8 @@ panvk_lower_nir(struct panvk_device *dev, nir_shader *nir,
+ 
+    /* In practice, most shaders do not have non-uniform-qualified accesses
+     * thus a cheaper and likely to fail check is run first. */
+-   if (nir_has_non_uniform_access(nir, lower_non_uniform_access_types)) {
++   if (allow_merging_workgroups ||
++       nir_has_non_uniform_access(nir, lower_non_uniform_access_types)) {
+       NIR_PASS(_, nir, nir_opt_non_uniform_access);
+       struct nir_lower_non_uniform_access_options opts = {
+          .types = lower_non_uniform_access_types,
+@@ -1323,7 +1406,7 @@ panvk_compile_shader(struct panvk_device *dev,
+ 
+          panvk_lower_nir(dev, nir, info->set_layout_count,
+                          info->set_layouts, info->robustness,
+-                         state, &variant->desc_info);
++                         state, &variant->desc_info, false);
+ 
+          /* We need the driver_location to match the vertex attribute
+           * location, so we can use the attribute layout described by
+@@ -1392,7 +1475,7 @@ panvk_compile_shader(struct panvk_device *dev,
+       inputs.varying_layout = vs_varying_layout;
+ 
+       panvk_lower_nir(dev, nir, info->set_layout_count, info->set_layouts,
+-                      info->robustness, state, &variant->desc_info);
++                      info->robustness, state, &variant->desc_info, false);
+ 
+       nir_assign_io_var_locations(nir, nir_var_shader_out);
+       panvk_lower_nir_io(nir);
+@@ -1431,8 +1514,25 @@ panvk_compile_shader(struct panvk_device *dev,
+ 
+       nir_shader *nir = info->nir;
+ 
++#if PAN_ARCH >= 9
++      nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
++      variant->info.cs.allow_merging_workgroups =
++         valhall_can_merge_workgroups(nir);
++
++      /* With merged workgroups, we need to use different divergence analysis
++       * options to take into account that threads from different workgroups
++       * may be in the same subgroup */
++      if (variant->info.cs.allow_merging_workgroups) {
++         nir->options = pan_get_nir_shader_compiler_options(PAN_ARCH, true);
++         /* Invalidate the old divergence analysis */
++         nir_foreach_function_impl(impl, nir)
++            nir_progress(true, impl, ~nir_metadata_divergence);
++      }
++#endif
++
+       panvk_lower_nir(dev, nir, info->set_layout_count, info->set_layouts,
+-                      info->robustness, state, &variant->desc_info);
++                      info->robustness, state, &variant->desc_info,
++                      variant->info.cs.allow_merging_workgroups);
+ 
+       variant->own_bin = true;
+ 

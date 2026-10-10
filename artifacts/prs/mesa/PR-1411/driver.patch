@@ -1,0 +1,497 @@
+diff --git a/src/intel/compiler/brw_compiler.h b/src/intel/compiler/brw_compiler.h
+--- a/src/intel/compiler/brw_compiler.h
++++ b/src/intel/compiler/brw_compiler.h
+@@ -203,9 +203,27 @@ struct brw_sampler_prog_key_data {
+    float scale_factors[32];
+ };
+ 
++/** An enum representing what kind of input gl_SubgroupSize is. */
++enum PACKED brw_subgroup_size_type
++{
++   BRW_SUBGROUP_SIZE_API_CONSTANT,     /**< Default Vulkan behavior */
++   BRW_SUBGROUP_SIZE_UNIFORM,          /**< OpenGL behavior */
++   BRW_SUBGROUP_SIZE_VARYING,          /**< VK_EXT_subgroup_size_control */
++
++   /* These enums are specifically chosen so that the value of the enum is
++    * also the subgroup size.  If any new values are added, they must respect
++    * this invariant.
++    */
++   BRW_SUBGROUP_SIZE_REQUIRE_8   = 8,  /**< VK_EXT_subgroup_size_control */
++   BRW_SUBGROUP_SIZE_REQUIRE_16  = 16, /**< VK_EXT_subgroup_size_control */
++   BRW_SUBGROUP_SIZE_REQUIRE_32  = 32, /**< VK_EXT_subgroup_size_control */
++};
++
+ struct brw_base_prog_key {
+    unsigned program_string_id;
+ 
++   enum brw_subgroup_size_type subgroup_size_type;
++
+    struct brw_sampler_prog_key_data tex;
+ };
+ 
+diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
+--- a/src/intel/compiler/brw_fs.cpp
++++ b/src/intel/compiler/brw_fs.cpp
+@@ -7967,7 +7967,9 @@ brw_compile_fs(const struct brw_compiler *compiler, void *log_data,
+ {
+    const struct gen_device_info *devinfo = compiler->devinfo;
+ 
+-   brw_nir_apply_sampler_key(shader, compiler, &key->base.tex, true);
++   unsigned max_subgroup_size = unlikely(INTEL_DEBUG & DEBUG_DO32) ? 32 : 16;
++
++   brw_nir_apply_key(shader, compiler, &key->base, max_subgroup_size, true);
+    brw_nir_lower_fs_inputs(shader, devinfo, key);
+    brw_nir_lower_fs_outputs(shader);
+ 
+@@ -8228,7 +8230,7 @@ compile_cs_to_nir(const struct brw_compiler *compiler,
+                   unsigned dispatch_width)
+ {
+    nir_shader *shader = nir_shader_clone(mem_ctx, src_shader);
+-   brw_nir_apply_sampler_key(shader, compiler, &key->base.tex, true);
++   brw_nir_apply_key(shader, compiler, &key->base, dispatch_width, true);
+ 
+    NIR_PASS_V(shader, brw_nir_lower_cs_intrinsics, dispatch_width);
+ 
+@@ -8262,15 +8264,33 @@ brw_compile_cs(const struct brw_compiler *compiler, void *log_data,
+    min_dispatch_width = MAX2(8, min_dispatch_width);
+    min_dispatch_width = util_next_power_of_two(min_dispatch_width);
+    assert(min_dispatch_width <= 32);
++   unsigned max_dispatch_width = 32;
+ 
+    fs_visitor *v8 = NULL, *v16 = NULL, *v32 = NULL;
+    cfg_t *cfg = NULL;
+    const char *fail_msg = NULL;
+    unsigned promoted_constants = 0;
+ 
++   if ((int)key->base.subgroup_size_type >= (int)BRW_SUBGROUP_SIZE_REQUIRE_8) {
++      /* These enum values are expressly chosen to be equal to the subgroup
++       * size that they require.
++       */
++      const unsigned required_dispatch_width =
++         (unsigned)key->base.subgroup_size_type;
++      assert(required_dispatch_width == 8 ||
++             required_dispatch_width == 16 ||
++             required_dispatch_width == 32);
++      if (required_dispatch_width < min_dispatch_width ||
++          required_dispatch_width > max_dispatch_width) {
++         fail_msg = "Cannot satisfy explicit subgroup size";
++      } else {
++         min_dispatch_width = max_dispatch_width = required_dispatch_width;
++      }
++   }
++
+    /* Now the main event: Visit the shader IR and generate our CS IR for it.
+     */
+-   if (min_dispatch_width <= 8) {
++   if (!fail_msg && min_dispatch_width <= 8 && max_dispatch_width >= 8) {
+       nir_shader *nir8 = compile_cs_to_nir(compiler, mem_ctx, key,
+                                            src_shader, 8);
+       v8 = new fs_visitor(compiler, log_data, mem_ctx, &key->base,
+@@ -8291,7 +8311,7 @@ brw_compile_cs(const struct brw_compiler *compiler, void *log_data,
+    }
+ 
+    if (likely(!(INTEL_DEBUG & DEBUG_NO16)) &&
+-       !fail_msg && min_dispatch_width <= 16) {
++       !fail_msg && min_dispatch_width <= 16 && max_dispatch_width >= 16) {
+       /* Try a SIMD16 compile */
+       nir_shader *nir16 = compile_cs_to_nir(compiler, mem_ctx, key,
+                                             src_shader, 16);
+@@ -8325,7 +8345,8 @@ brw_compile_cs(const struct brw_compiler *compiler, void *log_data,
+    /* We should always be able to do SIMD32 for compute shaders */
+    assert(!v16 || v16->max_dispatch_width >= 32);
+ 
+-   if (!fail_msg && (min_dispatch_width > 16 || (INTEL_DEBUG & DEBUG_DO32))) {
++   if (!fail_msg && (min_dispatch_width > 16 || (INTEL_DEBUG & DEBUG_DO32)) &&
++       max_dispatch_width >= 32) {
+       /* Try a SIMD32 compile */
+       nir_shader *nir32 = compile_cs_to_nir(compiler, mem_ctx, key,
+                                             src_shader, 32);
+diff --git a/src/intel/compiler/brw_fs_nir.cpp b/src/intel/compiler/brw_fs_nir.cpp
+--- a/src/intel/compiler/brw_fs_nir.cpp
++++ b/src/intel/compiler/brw_fs_nir.cpp
+@@ -4916,6 +4916,14 @@ fs_visitor::nir_emit_intrinsic(const fs_builder &bld, nir_intrinsic_instr *instr
+       break;
+    }
+ 
++   case nir_intrinsic_load_subgroup_size:
++      /* This should only happen for fragment shaders because every other case
++       * is lowered in NIR so we can optimize on it.
++       */
++      assert(stage == MESA_SHADER_FRAGMENT);
++      bld.MOV(retype(dest, BRW_REGISTER_TYPE_D), brw_imm_d(dispatch_width));
++      break;
++
+    case nir_intrinsic_load_subgroup_invocation:
+       bld.MOV(retype(dest, BRW_REGISTER_TYPE_D),
+               nir_system_values[SYSTEM_VALUE_SUBGROUP_INVOCATION]);
+diff --git a/src/intel/compiler/brw_nir.c b/src/intel/compiler/brw_nir.c
+--- a/src/intel/compiler/brw_nir.c
++++ b/src/intel/compiler/brw_nir.c
+@@ -704,10 +704,8 @@ brw_preprocess_nir(const struct brw_compiler *compiler, nir_shader *nir,
+    OPT(nir_lower_system_values);
+ 
+    const nir_lower_subgroups_options subgroups_options = {
+-      .subgroup_size = BRW_SUBGROUP_SIZE,
+       .ballot_bit_size = 32,
+       .lower_to_scalar = true,
+-      .lower_subgroup_masks = true,
+       .lower_vote_trivial = !is_scalar,
+       .lower_shuffle = true,
+    };
+@@ -919,11 +917,10 @@ brw_postprocess_nir(nir_shader *nir, const struct brw_compiler *compiler,
+    }
+ }
+ 
+-void
++static bool
+ brw_nir_apply_sampler_key(nir_shader *nir,
+                           const struct brw_compiler *compiler,
+-                          const struct brw_sampler_prog_key_data *key_tex,
+-                          bool is_scalar)
++                          const struct brw_sampler_prog_key_data *key_tex)
+ {
+    const struct gen_device_info *devinfo = compiler->devinfo;
+    nir_lower_tex_options tex_options = {
+@@ -966,10 +963,77 @@ brw_nir_apply_sampler_key(nir_shader *nir,
+    memcpy(&tex_options.scale_factors, &key_tex->scale_factors,
+           sizeof(tex_options.scale_factors));
+ 
+-   if (nir_lower_tex(nir, &tex_options)) {
+-      nir_validate_shader(nir, "after nir_lower_tex");
+-      brw_nir_optimize(nir, compiler, is_scalar, false);
++   return nir_lower_tex(nir, &tex_options);
++}
++
++static unsigned
++get_subgroup_size(gl_shader_stage stage,
++                  const struct brw_base_prog_key *key,
++                  unsigned max_subgroup_size)
++{
++   switch (key->subgroup_size_type) {
++   case BRW_SUBGROUP_SIZE_API_CONSTANT:
++      /* We have to use the global constant size. */
++      return BRW_SUBGROUP_SIZE;
++
++   case BRW_SUBGROUP_SIZE_UNIFORM:
++      /* It has to be uniform across all invocations but can vary per stage
++       * if we want.  This gives us a bit more freedom.
++       *
++       * For compute, brw_nir_apply_key is called per-dispatch-width so this
++       * is the actual subgroup size and not a maximum.  However, we only
++       * invoke one size of any given compute shader so it's still guaranteed
++       * to be uniform across invocations.
++       */
++      return max_subgroup_size;
++
++   case BRW_SUBGROUP_SIZE_VARYING:
++      /* The subgroup size is allowed to be fully varying.  For geometry
++       * stages, we know it's always 8 which is max_subgroup_size so we can
++       * return that.  For compute, brw_nir_apply_key is called once per
++       * dispatch-width so max_subgroup_size is the real subgroup size.
++       *
++       * For fragment, we return 0 and let it fall through to the back-end
++       * compiler.  This means we can't optimize based on subgroup size but
++       * that's a risk the client took when it asked for a varying subgroup
++       * size.
++       */
++      return stage == MESA_SHADER_FRAGMENT ? 0 : max_subgroup_size;
++
++   case BRW_SUBGROUP_SIZE_REQUIRE_8:
++   case BRW_SUBGROUP_SIZE_REQUIRE_16:
++   case BRW_SUBGROUP_SIZE_REQUIRE_32:
++      assert(stage == MESA_SHADER_COMPUTE);
++      /* These enum values are expressly chosen to be equal to the subgroup
++       * size that they require.
++       */
++      return key->subgroup_size_type;
+    }
++
++   unreachable("Invalid subgroup size type");
++}
++
++void
++brw_nir_apply_key(nir_shader *nir,
++                  const struct brw_compiler *compiler,
++                  const struct brw_base_prog_key *key,
++                  unsigned max_subgroup_size,
++                  bool is_scalar)
++{
++   bool progress = false;
++
++   OPT(brw_nir_apply_sampler_key, compiler, &key->tex);
++
++   const nir_lower_subgroups_options subgroups_options = {
++      .subgroup_size = get_subgroup_size(nir->info.stage, key,
++                                         max_subgroup_size),
++      .ballot_bit_size = 32,
++      .lower_subgroup_masks = true,
++   };
++   OPT(nir_lower_subgroups, &subgroups_options);
++
++   if (progress)
++      brw_nir_optimize(nir, compiler, is_scalar, false);
+ }
+ 
+ enum brw_reg_type
+diff --git a/src/intel/compiler/brw_nir.h b/src/intel/compiler/brw_nir.h
+--- a/src/intel/compiler/brw_nir.h
++++ b/src/intel/compiler/brw_nir.h
+@@ -137,10 +137,11 @@ bool brw_nir_apply_trig_workarounds(nir_shader *nir);
+ 
+ void brw_nir_apply_tcs_quads_workaround(nir_shader *nir);
+ 
+-void brw_nir_apply_sampler_key(nir_shader *nir,
+-                               const struct brw_compiler *compiler,
+-                               const struct brw_sampler_prog_key_data *key,
+-                               bool is_scalar);
++void brw_nir_apply_key(nir_shader *nir,
++                       const struct brw_compiler *compiler,
++                       const struct brw_base_prog_key *key,
++                       unsigned max_subgroup_size,
++                       bool is_scalar);
+ 
+ enum brw_reg_type brw_type_for_nir_type(const struct gen_device_info *devinfo,
+                                         nir_alu_type type);
+diff --git a/src/intel/compiler/brw_shader.cpp b/src/intel/compiler/brw_shader.cpp
+--- a/src/intel/compiler/brw_shader.cpp
++++ b/src/intel/compiler/brw_shader.cpp
+@@ -1244,7 +1244,7 @@ brw_compile_tes(const struct brw_compiler *compiler,
+    nir->info.inputs_read = key->inputs_read;
+    nir->info.patch_inputs_read = key->patch_inputs_read;
+ 
+-   brw_nir_apply_sampler_key(nir, compiler, &key->base.tex, is_scalar);
++   brw_nir_apply_key(nir, compiler, &key->base, 8, is_scalar);
+    brw_nir_lower_tes_inputs(nir, input_vue_map);
+    brw_nir_lower_vue_outputs(nir);
+    brw_postprocess_nir(nir, compiler, is_scalar);
+diff --git a/src/intel/compiler/brw_vec4.cpp b/src/intel/compiler/brw_vec4.cpp
+--- a/src/intel/compiler/brw_vec4.cpp
++++ b/src/intel/compiler/brw_vec4.cpp
+@@ -2845,7 +2845,7 @@ brw_compile_vs(const struct brw_compiler *compiler, void *log_data,
+                char **error_str)
+ {
+    const bool is_scalar = compiler->scalar_stage[MESA_SHADER_VERTEX];
+-   brw_nir_apply_sampler_key(shader, compiler, &key->base.tex, is_scalar);
++   brw_nir_apply_key(shader, compiler, &key->base, 8, is_scalar);
+ 
+    const unsigned *assembly = NULL;
+ 
+diff --git a/src/intel/compiler/brw_vec4_gs_visitor.cpp b/src/intel/compiler/brw_vec4_gs_visitor.cpp
+--- a/src/intel/compiler/brw_vec4_gs_visitor.cpp
++++ b/src/intel/compiler/brw_vec4_gs_visitor.cpp
+@@ -639,7 +639,7 @@ brw_compile_gs(const struct brw_compiler *compiler, void *log_data,
+                        &c.input_vue_map, inputs_read,
+                        shader->info.separate_shader);
+ 
+-   brw_nir_apply_sampler_key(shader, compiler, &key->base.tex, is_scalar);
++   brw_nir_apply_key(shader, compiler, &key->base, 8, is_scalar);
+    brw_nir_lower_vue_inputs(shader, &c.input_vue_map);
+    brw_nir_lower_vue_outputs(shader);
+    brw_postprocess_nir(shader, compiler, is_scalar);
+diff --git a/src/intel/compiler/brw_vec4_tcs.cpp b/src/intel/compiler/brw_vec4_tcs.cpp
+--- a/src/intel/compiler/brw_vec4_tcs.cpp
++++ b/src/intel/compiler/brw_vec4_tcs.cpp
+@@ -397,7 +397,7 @@ brw_compile_tcs(const struct brw_compiler *compiler,
+                             nir->info.outputs_written,
+                             nir->info.patch_outputs_written);
+ 
+-   brw_nir_apply_sampler_key(nir, compiler, &key->base.tex, is_scalar);
++   brw_nir_apply_key(nir, compiler, &key->base, 8, is_scalar);
+    brw_nir_lower_vue_inputs(nir, &input_vue_map);
+    brw_nir_lower_tcs_outputs(nir, &vue_prog_data->vue_map,
+                              key->tes_primitive_mode);
+diff --git a/src/intel/vulkan/anv_device.c b/src/intel/vulkan/anv_device.c
+--- a/src/intel/vulkan/anv_device.c
++++ b/src/intel/vulkan/anv_device.c
+@@ -1590,6 +1590,17 @@ void anv_GetPhysicalDeviceProperties2(
+          break;
+       }
+ 
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT: {
++         VkPhysicalDeviceSubgroupSizeControlPropertiesEXT *props =
++            (VkPhysicalDeviceSubgroupSizeControlPropertiesEXT *)ext;
++         STATIC_ASSERT(8 <= BRW_SUBGROUP_SIZE && BRW_SUBGROUP_SIZE <= 32);
++         props->minSubgroupSize = 8;
++         props->maxSubgroupSize = 32;
++         props->maxComputeWorkgroupSubgroups = pdevice->info.max_cs_threads;
++         props->requiredSubgroupSizeStages = VK_SHADER_STAGE_COMPUTE_BIT;
++         break;
++      }
++
+       case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES_EXT: {
+          VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT *props =
+             (VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT *)ext;
+diff --git a/src/intel/vulkan/anv_extensions.py b/src/intel/vulkan/anv_extensions.py
+--- a/src/intel/vulkan/anv_extensions.py
++++ b/src/intel/vulkan/anv_extensions.py
+@@ -147,6 +147,7 @@ EXTENSIONS = [
+     Extension('VK_EXT_shader_demote_to_helper_invocation', 1, True),
+     Extension('VK_EXT_shader_stencil_export',             1, 'device->info.gen >= 9'),
+     Extension('VK_EXT_shader_viewport_index_layer',       1, True),
++    Extension('VK_EXT_subgroup_size_control',             1, True),
+     Extension('VK_EXT_texel_buffer_alignment',            1, True),
+     Extension('VK_EXT_transform_feedback',                1, True),
+     Extension('VK_EXT_vertex_attribute_divisor',          3, True),
+diff --git a/src/intel/vulkan/anv_pipeline.c b/src/intel/vulkan/anv_pipeline.c
+--- a/src/intel/vulkan/anv_pipeline.c
++++ b/src/intel/vulkan/anv_pipeline.c
+@@ -353,18 +353,25 @@ populate_sampler_prog_key(const struct gen_device_info *devinfo,
+ 
+ static void
+ populate_base_prog_key(const struct gen_device_info *devinfo,
++                       VkPipelineShaderStageCreateFlags flags,
+                        struct brw_base_prog_key *key)
+ {
++   if (flags & VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT)
++      key->subgroup_size_type = BRW_SUBGROUP_SIZE_VARYING;
++   else
++      key->subgroup_size_type = BRW_SUBGROUP_SIZE_API_CONSTANT;
++
+    populate_sampler_prog_key(devinfo, &key->tex);
+ }
+ 
+ static void
+ populate_vs_prog_key(const struct gen_device_info *devinfo,
++                     VkPipelineShaderStageCreateFlags flags,
+                      struct brw_vs_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
+ 
+    /* XXX: Handle vertex input work-arounds */
+ 
+@@ -373,43 +380,47 @@ populate_vs_prog_key(const struct gen_device_info *devinfo,
+ 
+ static void
+ populate_tcs_prog_key(const struct gen_device_info *devinfo,
++                      VkPipelineShaderStageCreateFlags flags,
+                       unsigned input_vertices,
+                       struct brw_tcs_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
+ 
+    key->input_vertices = input_vertices;
+ }
+ 
+ static void
+ populate_tes_prog_key(const struct gen_device_info *devinfo,
++                      VkPipelineShaderStageCreateFlags flags,
+                       struct brw_tes_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
+ }
+ 
+ static void
+ populate_gs_prog_key(const struct gen_device_info *devinfo,
++                     VkPipelineShaderStageCreateFlags flags,
+                      struct brw_gs_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
+ }
+ 
+ static void
+ populate_wm_prog_key(const struct gen_device_info *devinfo,
++                     VkPipelineShaderStageCreateFlags flags,
+                      const struct anv_subpass *subpass,
+                      const VkPipelineMultisampleStateCreateInfo *ms_info,
+                      struct brw_wm_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
+ 
+    /* We set this to 0 here and set to the actual value before we call
+     * brw_compile_fs.
+@@ -456,11 +467,37 @@ populate_wm_prog_key(const struct gen_device_info *devinfo,
+ 
+ static void
+ populate_cs_prog_key(const struct gen_device_info *devinfo,
++                     VkPipelineShaderStageCreateFlags flags,
++                     const VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT *rss_info,
+                      struct brw_cs_prog_key *key)
+ {
+    memset(key, 0, sizeof(*key));
+ 
+-   populate_base_prog_key(devinfo, &key->base);
++   populate_base_prog_key(devinfo, flags, &key->base);
++
++   if (rss_info) {
++      assert(key->base.subgroup_size_type != BRW_SUBGROUP_SIZE_VARYING);
++
++      /* These enum values are expressly chosen to be equal to the subgroup
++       * size that they require.
++       */
++      assert(rss_info->requiredSubgroupSize == 8 ||
++             rss_info->requiredSubgroupSize == 16 ||
++             rss_info->requiredSubgroupSize == 32);
++      key->base.subgroup_size_type = rss_info->requiredSubgroupSize;
++   } else if (flags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT) {
++      /* If the client expressly requests full subgroups and they don't
++       * specify a subgroup size, we need to pick one.  If they're requested
++       * varying subgroup sizes, we set it to UNIFORM and let the back-end
++       * compiler pick.  Otherwise, we specify the API value of 32.
++       * Performance will likely be terrible in this case but there's nothing
++       * we can do about that.  The client should have chosen a size.
++       */
++      if (flags & VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT)
++         key->base.subgroup_size_type = BRW_SUBGROUP_SIZE_UNIFORM;
++      else
++         key->base.subgroup_size_type = BRW_SUBGROUP_SIZE_REQUIRE_32;
++   }
+ }
+ 
+ struct anv_pipeline_stage {
+@@ -1042,21 +1079,22 @@ anv_pipeline_compile_graphics(struct anv_pipeline *pipeline,
+       const struct gen_device_info *devinfo = &pipeline->device->info;
+       switch (stage) {
+       case MESA_SHADER_VERTEX:
+-         populate_vs_prog_key(devinfo, &stages[stage].key.vs);
++         populate_vs_prog_key(devinfo, sinfo->flags, &stages[stage].key.vs);
+          break;
+       case MESA_SHADER_TESS_CTRL:
+-         populate_tcs_prog_key(devinfo,
++         populate_tcs_prog_key(devinfo, sinfo->flags,
+                                info->pTessellationState->patchControlPoints,
+                                &stages[stage].key.tcs);
+          break;
+       case MESA_SHADER_TESS_EVAL:
+-         populate_tes_prog_key(devinfo, &stages[stage].key.tes);
++         populate_tes_prog_key(devinfo, sinfo->flags, &stages[stage].key.tes);
+          break;
+       case MESA_SHADER_GEOMETRY:
+-         populate_gs_prog_key(devinfo, &stages[stage].key.gs);
++         populate_gs_prog_key(devinfo, sinfo->flags, &stages[stage].key.gs);
+          break;
+       case MESA_SHADER_FRAGMENT:
+-         populate_wm_prog_key(devinfo, pipeline->subpass,
++         populate_wm_prog_key(devinfo, sinfo->flags,
++                              pipeline->subpass,
+                               info->pMultisampleState,
+                               &stages[stage].key.wm);
+          break;
+@@ -1350,7 +1388,12 @@ anv_pipeline_compile_cs(struct anv_pipeline *pipeline,
+ 
+    struct anv_shader_bin *bin = NULL;
+ 
+-   populate_cs_prog_key(&pipeline->device->info, &stage.key.cs);
++   const VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT *rss_info =
++      vk_find_struct_const(info->stage.pNext,
++                           PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT);
++
++   populate_cs_prog_key(&pipeline->device->info, info->stage.flags,
++                        rss_info, &stage.key.cs);
+ 
+    ANV_FROM_HANDLE(anv_pipeline_layout, layout, info->layout);
+ 

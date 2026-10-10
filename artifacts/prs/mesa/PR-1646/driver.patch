@@ -1,0 +1,30 @@
+diff --git a/src/intel/vulkan/anv_device.c b/src/intel/vulkan/anv_device.c
+--- a/src/intel/vulkan/anv_device.c
++++ b/src/intel/vulkan/anv_device.c
+@@ -1166,6 +1166,14 @@ void anv_GetPhysicalDeviceFeatures2(
+          break;
+       }
+ 
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES_EXT: {
++         VkPhysicalDeviceSubgroupSizeControlFeaturesEXT *features =
++            (VkPhysicalDeviceSubgroupSizeControlFeaturesEXT *)ext;
++         features->subgroupSizeControl = true;
++         features->computeFullSubgroups = true;
++         break;
++      }
++
+       case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT: {
+          VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *features =
+             (VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *)ext;
+diff --git a/src/intel/vulkan/anv_extensions.py b/src/intel/vulkan/anv_extensions.py
+--- a/src/intel/vulkan/anv_extensions.py
++++ b/src/intel/vulkan/anv_extensions.py
+@@ -149,7 +149,7 @@ EXTENSIONS = [
+     Extension('VK_EXT_shader_demote_to_helper_invocation', 1, True),
+     Extension('VK_EXT_shader_stencil_export',             1, 'device->info.gen >= 9'),
+     Extension('VK_EXT_shader_viewport_index_layer',       1, True),
+-    Extension('VK_EXT_subgroup_size_control',             1, True),
++    Extension('VK_EXT_subgroup_size_control',             2, True),
+     Extension('VK_EXT_texel_buffer_alignment',            1, True),
+     Extension('VK_EXT_transform_feedback',                1, 'device->info.gen >= 8'),
+     Extension('VK_EXT_vertex_attribute_divisor',          3, True),

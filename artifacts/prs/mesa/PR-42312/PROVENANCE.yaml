@@ -1,0 +1,41 @@
+repo: mesa/mesa
+pr: 42312
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42312
+merge_sha: 9d3d256bb5429f76f3e9096f312ef8355c8b785b
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/42312/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/jay/jay_assign_accumulators.c
+  status: modified
+  sha256: 6a3ad9205cd7701f36e392fbc1011dc5000fcd4415435bdf789dce3c87f931b3
+- path: src/intel/compiler/jay/jay_builder_opcodes.h.py
+  status: modified
+  sha256: 34908b14729391ee70ce2f18bcb90bbba930d550914bf11278434ac229281708
+- path: src/intel/compiler/jay/jay_from_nir.c
+  status: modified
+  sha256: d96d706287203a31d35ce7f980f92bff38c2d3ea866b6f539b83cb703c30a038
+- path: src/intel/compiler/jay/jay_ir.h
+  status: modified
+  sha256: 3a5b88f860253024d3bcbf0d88c519f1bd256f4a0ec6bb9aa04095ad38cbaf7f
+- path: src/intel/compiler/jay/jay_opcodes.py
+  status: modified
+  sha256: 0252bb26d9377d4fa04e90cf0361880d3ba94a22b36235c7fde66677629656a9
+- path: src/intel/compiler/jay/jay_opt_predicate.c
+  status: modified
+  sha256: 342203a89f8dc334bcd23e60119d2ece5e811074a28cb4cda3916ec95c12a94b
+- path: src/intel/compiler/jay/jay_simd_width.c
+  status: modified
+  sha256: 699c2b781fc2abf263cc7b5219a3bbcd6b24832dd957a1b3703c64ee03744ddb
+- path: src/intel/compiler/jay/jay_stride.c
+  status: modified
+  sha256: 91acd9c2f487ad1b56ff10b1815acff11c5249a55cb94ff54ce31d95a5f35bae
+- path: src/intel/compiler/jay/jay_to_binary.c
+  status: modified
+  sha256: 33ab6d7225a72fb41803e849a71fb37242eb8b0a4c6f8c134e99b82e9e1aad93
+- path: src/intel/compiler/jay/jay_validate.c
+  status: modified
+  sha256: 43d15ecfc0d9c2675970c249b00583718b4f13e51f0ba26590ee8527beec5561

@@ -1,0 +1,23 @@
+repo: mesa/mesa
+pr: 41981
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41981
+merge_sha: 0dbf521d3815f61c9f342b3149a466b7a9f869fe
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/41981/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/bifrost/bifrost/bi_schedule.c
+  status: modified
+  sha256: 32d881f98ba86fb9e80e1bd4ca8e79da8fe8a0d0917e7dca917dd4c8ec924171
+- path: src/panfrost/compiler/bifrost/bifrost_compile.c
+  status: modified
+  sha256: 3d8f5bc8a582b03eaa9d5b36604efe1808f7455933387e45364bfe45180b6a1b
+- path: src/panfrost/compiler/bifrost/compiler.h
+  status: modified
+  sha256: 7fe538b48c6b2cd996ce8e370721abdd89fd2739f75352a75a56eb1f019c78f2
+- path: src/panfrost/vulkan/panvk_vX_physical_device.c
+  status: modified
+  sha256: 3f679e252d36b0d6ddd4aad59c4b5c22c3c42503dd326f2cc7cffc98230bf314

@@ -18,6 +18,9 @@
 ## - Node names are unique across the whole tree (a name identifies one node).
 ## - `children` may be omitted or empty. A vendor with no children is a
 ##   reserved node: valid as a tag, but it has no devices yet.
+## - A generation may be declared before any of its devices (`kind: generation`
+##   written out, no children) when a source names the generation but no
+##   device of it. It is valid as a tag and never as a measurement `device`.
 ## - `kind` may be omitted; it then defaults to `vendor` for a root node,
 ##   `generation` for a non-root node with children, and `device` otherwise.
 ## - Mapping order is meaningful: generated indices list nodes in this order.
@@ -65,6 +68,11 @@ architectures:
             kind: device
       arc-a770:
         kind: device
+      # Generations named by upstream driver source; no device node yet.
+      meteor-lake:
+        kind: generation
+      xe3:
+        kind: generation
 
   nvidia:
     kind: vendor
@@ -75,18 +83,31 @@ architectures:
         kind: device
       jetson-orin:
         kind: device
+      # Generations named by upstream driver source; no device node yet.
+      turing:
+        kind: generation
+      ampere:
+        kind: generation
+      blackwell:
+        kind: generation
 
   qualcomm:
     kind: vendor
     children:
       adreno-840:
         kind: device
+      # Generation named by upstream driver source; no device node yet.
+      adreno-7xx:
+        kind: generation
 
   arm:
     kind: vendor
     children:
       mali-g1:
         kind: device
+      # Generation named by upstream driver source; no device node yet.
+      bifrost:
+        kind: generation
 
   # Reserved vendor node. Intentionally empty.
   samsung:

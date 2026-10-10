@@ -1,0 +1,274 @@
+diff --git a/src/intel/compiler/brw/brw_from_nir.cpp b/src/intel/compiler/brw/brw_from_nir.cpp
+--- a/src/intel/compiler/brw/brw_from_nir.cpp
++++ b/src/intel/compiler/brw/brw_from_nir.cpp
+@@ -4356,7 +4356,9 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
+                 rcount)
+          ->saturate = nir_intrinsic_saturate(instr);
+ 
+-      cs_prog_data->uses_systolic = true;
++      if (!ntb.s.compiler->lower_dpas)
++         cs_prog_data->uses_systolic = true;
++
+       break;
+    }
+ 
+diff --git a/src/intel/vulkan/anv_genX.h b/src/intel/vulkan/anv_genX.h
+--- a/src/intel/vulkan/anv_genX.h
++++ b/src/intel/vulkan/anv_genX.h
+@@ -116,9 +116,11 @@ void genX(urb_workaround)(struct anv_cmd_buffer *cmd_buffer,
+                           const struct intel_urb_config *urb_cfg);
+ 
+ void genX(flush_pipeline_select_3d)(struct anv_cmd_buffer *cmd_buffer);
+-void genX(flush_pipeline_select_gpgpu)(struct anv_cmd_buffer *cmd_buffer);
++void genX(flush_pipeline_select_gpgpu)(struct anv_cmd_buffer *cmd_buffer,
++                                       bool uses_systolic);
+ void genX(emit_pipeline_select)(struct anv_batch *batch, uint32_t pipeline,
+-                                const struct anv_device *device);
++                                const struct anv_device *device,
++                                bool uses_systolic);
+ 
+ void genX(apply_task_urb_workaround)(struct anv_cmd_buffer *cmd_buffer);
+ 
+diff --git a/src/intel/vulkan/anv_private.h b/src/intel/vulkan/anv_private.h
+--- a/src/intel/vulkan/anv_private.h
++++ b/src/intel/vulkan/anv_private.h
+@@ -4729,6 +4729,10 @@ enum anv_cmd_descriptor_buffer_mode {
+ struct anv_cmd_state {
+    /* PIPELINE_SELECT.PipelineSelection */
+    uint32_t                                     current_pipeline;
++
++   /* PIPELINE_SELECT.SystolicModeEnable (Gfx125 only). */
++   bool                                         current_pipeline_systolic;
++
+    const struct intel_l3_config *               current_l3_config;
+    uint32_t                                     last_aux_map_state;
+ 
+diff --git a/src/intel/vulkan/genX_blorp_exec.c b/src/intel/vulkan/genX_blorp_exec.c
+--- a/src/intel/vulkan/genX_blorp_exec.c
++++ b/src/intel/vulkan/genX_blorp_exec.c
+@@ -451,7 +451,7 @@ blorp_exec_on_compute(struct blorp_batch *batch,
+    struct anv_cmd_buffer *cmd_buffer = batch->driver_batch;
+    assert(cmd_buffer->queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT);
+ 
+-   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
++   genX(flush_pipeline_select_gpgpu)(cmd_buffer, false);
+ 
+    /* Apply any outstanding flushes in case pipeline select haven't. */
+    genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
+diff --git a/src/intel/vulkan/genX_cmd_buffer.c b/src/intel/vulkan/genX_cmd_buffer.c
+--- a/src/intel/vulkan/genX_cmd_buffer.c
++++ b/src/intel/vulkan/genX_cmd_buffer.c
+@@ -50,7 +50,8 @@ static void emit_pipe_control(struct anv_batch *batch,
+                               enum anv_pipe_bits bits);
+ 
+ static void genX(flush_pipeline_select)(struct anv_cmd_buffer *cmd_buffer,
+-                                        uint32_t pipeline);
++                                        uint32_t pipeline,
++                                        bool uses_systolic);
+ 
+ static enum anv_pipe_bits
+ convert_pc_to_bits(struct GENX(PIPE_CONTROL) *pc) {
+@@ -327,9 +328,12 @@ genX(cmd_buffer_emit_state_base_address)(struct anv_cmd_buffer *cmd_buffer)
+    /* Wa_1607854226:
+     *
+     *  Put the pipeline back into its current mode.
++    *
++    * This workaround is on platforms where PIPELINE_SELECT doesn't carry
++    * systolic mode state, so there's no need to save/restore it here.
+     */
+    if (gfx12_wa_pipeline != UINT32_MAX)
+-      genX(flush_pipeline_select)(cmd_buffer, gfx12_wa_pipeline);
++      genX(flush_pipeline_select)(cmd_buffer, gfx12_wa_pipeline, false);
+ #endif
+ 
+    /* After re-setting the surface state base address, we have to do some
+@@ -3792,6 +3796,7 @@ genX(BeginCommandBuffer)(
+        * pipeline mode is 3D. This avoid some stalling/state-emission.
+        */
+       cmd_buffer->state.current_pipeline = _3D;
++      cmd_buffer->state.current_pipeline_systolic = false;
+    }
+ 
+ 
+@@ -4274,8 +4279,11 @@ genX(CmdExecuteCommands)(
+ 
+       /* Set the current pipeline state to the secondary's state if it did
+        * program the PIPELINE_SELECT instruction. */
+-      if (secondary->state.current_pipeline != UINT32_MAX)
++      if (secondary->state.current_pipeline != UINT32_MAX) {
+          container->state.current_pipeline = secondary->state.current_pipeline;
++         container->state.current_pipeline_systolic =
++            secondary->state.current_pipeline_systolic;
++      }
+    }
+ 
+    /* The secondary isn't counted in our VF cache tracking so we need to
+@@ -4364,6 +4372,7 @@ genX(CmdExecuteCommands)(
+ 
+       /* Memcpy is done using the 3D pipeline. */
+       container->state.current_pipeline = _3D;
++      container->state.current_pipeline_systolic = false;
+    }
+ }
+ 
+@@ -5360,7 +5369,8 @@ genX(batch_emit_breakpoint)(struct anv_batch *batch,
+  */
+ void
+ genX(emit_pipeline_select)(struct anv_batch *batch, uint32_t pipeline,
+-                           const struct anv_device *device)
++                           const struct anv_device *device,
++                           bool uses_systolic)
+ {
+    /* Bspec 55860: Xe2+ no longer requires PIPELINE_SELECT */
+ #if GFX_VER < 20
+@@ -5371,12 +5381,7 @@ genX(emit_pipeline_select)(struct anv_batch *batch, uint32_t pipeline,
+ #endif
+       ps.PipelineSelection = pipeline;
+ #if GFX_VERx10 == 125
+-      /* It might still be better to only enable this when the compute
+-       * pipeline will have DPAS instructions.
+-       */
+-      ps.SystolicModeEnable = pipeline == GPGPU &&
+-         device->vk.enabled_extensions.KHR_cooperative_matrix &&
+-         device->vk.enabled_features.cooperativeMatrix;
++      ps.SystolicModeEnable = uses_systolic;
+ #endif
+    }
+ #endif /* if GFX_VER < 20 */
+@@ -5384,11 +5389,14 @@ genX(emit_pipeline_select)(struct anv_batch *batch, uint32_t pipeline,
+ 
+ static void
+ genX(flush_pipeline_select)(struct anv_cmd_buffer *cmd_buffer,
+-                            uint32_t pipeline)
++                            uint32_t pipeline,
++                            bool uses_systolic)
+ {
+    UNUSED const struct intel_device_info *devinfo = cmd_buffer->device->info;
+ 
+-   if (cmd_buffer->state.current_pipeline == pipeline)
++   /* Track systolic for PIPELINE_SELECT only in Gfx125. */
++   if (cmd_buffer->state.current_pipeline == pipeline &&
++       (GFX_VERx10 != 125 || cmd_buffer->state.current_pipeline_systolic == uses_systolic))
+       return;
+ 
+ #if GFX_VER < 20
+@@ -5539,7 +5547,8 @@ genX(flush_pipeline_select)(struct anv_cmd_buffer *cmd_buffer,
+    }
+ #endif
+ 
+-   genX(emit_pipeline_select)(&cmd_buffer->batch, pipeline, cmd_buffer->device);
++   genX(emit_pipeline_select)(&cmd_buffer->batch, pipeline, cmd_buffer->device,
++                              uses_systolic);
+ 
+ #if GFX_VER == 9
+    if (devinfo->platform == INTEL_PLATFORM_GLK) {
+@@ -5573,18 +5582,21 @@ genX(flush_pipeline_select)(struct anv_cmd_buffer *cmd_buffer,
+ #endif
+ #endif /* GFX_VER < 20 */
+    cmd_buffer->state.current_pipeline = pipeline;
++   cmd_buffer->state.current_pipeline_systolic = uses_systolic;
+ }
+ 
+ void
+ genX(flush_pipeline_select_3d)(struct anv_cmd_buffer *cmd_buffer)
+ {
+-   genX(flush_pipeline_select)(cmd_buffer, _3D);
++   const bool uses_systolic = false;
++   genX(flush_pipeline_select)(cmd_buffer, _3D, uses_systolic);
+ }
+ 
+ void
+-genX(flush_pipeline_select_gpgpu)(struct anv_cmd_buffer *cmd_buffer)
++genX(flush_pipeline_select_gpgpu)(struct anv_cmd_buffer *cmd_buffer,
++                                  bool uses_systolic)
+ {
+-   genX(flush_pipeline_select)(cmd_buffer, GPGPU);
++   genX(flush_pipeline_select)(cmd_buffer, GPGPU, uses_systolic);
+ }
+ 
+ void
+diff --git a/src/intel/vulkan/genX_cmd_compute.c b/src/intel/vulkan/genX_cmd_compute.c
+--- a/src/intel/vulkan/genX_cmd_compute.c
++++ b/src/intel/vulkan/genX_cmd_compute.c
+@@ -119,7 +119,8 @@ cmd_buffer_flush_compute_state(struct anv_cmd_buffer *cmd_buffer)
+    genX(flush_descriptor_buffers)(cmd_buffer, &comp_state->base,
+                                   VK_SHADER_STAGE_COMPUTE_BIT);
+ 
+-   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
++   const bool uses_systolic = get_cs_prog_data(comp_state)->uses_systolic;
++   genX(flush_pipeline_select_gpgpu)(cmd_buffer, uses_systolic);
+ 
+    /* Apply any pending pipeline flushes we may have.  We want to apply them
+     * now because, if any of those flushes are for things like push constants,
+@@ -1150,7 +1151,7 @@ cmd_buffer_trace_rays(struct anv_cmd_buffer *cmd_buffer,
+    genX(flush_descriptor_buffers)(cmd_buffer, &rt->base,
+                                   ANV_RT_STAGE_BITS);
+ 
+-   genX(flush_pipeline_select_gpgpu)(cmd_buffer);
++   genX(flush_pipeline_select_gpgpu)(cmd_buffer, false);
+ 
+    cmd_buffer->state.rt.pipeline_dirty = false;
+ 
+diff --git a/src/intel/vulkan/genX_gpu_memcpy.c b/src/intel/vulkan/genX_gpu_memcpy.c
+--- a/src/intel/vulkan/genX_gpu_memcpy.c
++++ b/src/intel/vulkan/genX_gpu_memcpy.c
+@@ -309,7 +309,7 @@ genX(emit_so_memcpy_init)(struct anv_memcpy_state *state,
+ 
+       const struct intel_l3_config *cfg = intel_get_default_l3_config(device->info);
+       genX(emit_l3_config)(batch, device, cfg);
+-      genX(emit_pipeline_select)(batch, _3D, device);
++      genX(emit_pipeline_select)(batch, _3D, device, false);
+ 
+       /* Dummy URB config, will trigger URB reemission */
+       struct intel_urb_config urb_cfg_in = { 0 };
+diff --git a/src/intel/vulkan/genX_init_state.c b/src/intel/vulkan/genX_init_state.c
+--- a/src/intel/vulkan/genX_init_state.c
++++ b/src/intel/vulkan/genX_init_state.c
+@@ -411,7 +411,7 @@ init_render_queue_state(struct anv_queue *queue, bool is_companion_rcs_batch)
+ 
+    struct anv_batch *batch = &submit->batch;
+ 
+-   genX(emit_pipeline_select)(batch, _3D, device);
++   genX(emit_pipeline_select)(batch, _3D, device, false);
+ 
+ #if GFX_VER == 9
+    anv_batch_write_reg(batch, GENX(CACHE_MODE_1), cm1) {
+@@ -718,7 +718,7 @@ init_render_queue_state(struct anv_queue *queue, bool is_companion_rcs_batch)
+                                       ANV_PIPE_FLUSH_BITS | ANV_PIPE_INVALIDATE_BITS);
+ #endif
+ 
+-   genX(emit_pipeline_select)(batch, GPGPU, device);
++   genX(emit_pipeline_select)(batch, GPGPU, device, false);
+    anv_batch_emit(batch, GENX(CFE_STATE), cfe) {
+       cfe.MaximumNumberofThreads =
+          devinfo->max_cs_threads * devinfo->subslice_total;
+@@ -734,7 +734,7 @@ init_render_queue_state(struct anv_queue *queue, bool is_companion_rcs_batch)
+                                       ANV_PIPE_FLUSH_BITS | ANV_PIPE_INVALIDATE_BITS);
+ #endif
+ 
+-   genX(emit_pipeline_select)(batch, _3D, device);
++   genX(emit_pipeline_select)(batch, _3D, device, false);
+ #endif
+ 
+ #if GFX_VERx10 >= 125
+@@ -793,7 +793,7 @@ init_compute_queue_state(struct anv_queue *queue)
+ 
+    struct anv_batch *batch = &submit->batch;
+ 
+-   genX(emit_pipeline_select)(batch, GPGPU, queue->device);
++   genX(emit_pipeline_select)(batch, GPGPU, queue->device, false);
+ 
+ #if GFX_VER == 12
+    if (queue->device->info->has_aux_map) {
+diff --git a/src/intel/vulkan/genX_query.c b/src/intel/vulkan/genX_query.c
+--- a/src/intel/vulkan/genX_query.c
++++ b/src/intel/vulkan/genX_query.c
+@@ -1873,7 +1873,7 @@ copy_query_results_with_shader(struct anv_cmd_buffer *cmd_buffer,
+       if (anv_cmd_buffer_is_render_queue(cmd_buffer))
+          genX(flush_pipeline_select_3d)(cmd_buffer);
+       else
+-         genX(flush_pipeline_select_gpgpu)(cmd_buffer);
++         genX(flush_pipeline_select_gpgpu)(cmd_buffer, false);
+    }
+ 
+    if ((cmd_buffer->state.queries.buffer_write_bits |

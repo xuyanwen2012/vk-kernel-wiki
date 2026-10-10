@@ -1,0 +1,84 @@
+diff --git a/src/panfrost/compiler/bifrost/valhall/test/test-lower-constants.cpp b/src/panfrost/compiler/bifrost/valhall/test/test-lower-constants.cpp
+--- a/src/panfrost/compiler/bifrost/valhall/test/test-lower-constants.cpp
++++ b/src/panfrost/compiler/bifrost/valhall/test/test-lower-constants.cpp
+@@ -207,6 +207,23 @@ TEST_F(LowerConstants, HandleTrickyNegativesFP16)
+                        bi_neg(bi_half(va_lut(3), 1))));
+ }
+ 
++TEST_F(LowerConstants, DontWidenConstantsOfVectorOps)
++{
++   CASE(bi_icmp_or_v2u16_to(b, bi_register(0), bi_register(0),
++                            bi_imm_u32(0x00003F80), bi_register(0), BI_CMPF_EQ,
++                            BI_RESULT_TYPE_M1),
++        bi_icmp_or_v2u16_to(b, bi_register(0), bi_register(0),
++                            bi_iadd_imm_i32(b, va_lut(0), 0x00003F80),
++                            bi_register(0), BI_CMPF_EQ, BI_RESULT_TYPE_M1));
++
++   CASE(bi_icmp_or_v4u8_to(b, bi_register(0), bi_register(0),
++                           bi_imm_u32(0x00000005), bi_register(0), BI_CMPF_EQ,
++                           BI_RESULT_TYPE_M1),
++        bi_icmp_or_v4u8_to(b, bi_register(0), bi_register(0),
++                           bi_iadd_imm_i32(b, va_lut(0), 0x00000005),
++                           bi_register(0), BI_CMPF_EQ, BI_RESULT_TYPE_M1));
++}
++
+ TEST_F(LowerConstants, MaintainMkvecRestrictedSwizzles)
+ {
+    CASE(bi_mkvec_v2i8_to(b, bi_register(0), bi_register(0), bi_imm_u8(0),
+diff --git a/src/panfrost/compiler/bifrost/valhall/va_lower_constants.c b/src/panfrost/compiler/bifrost/valhall/va_lower_constants.c
+--- a/src/panfrost/compiler/bifrost/valhall/va_lower_constants.c
++++ b/src/panfrost/compiler/bifrost/valhall/va_lower_constants.c
+@@ -156,8 +156,19 @@ va_lookup_constant(uint32_t value, struct va_src_info info, bool is_signed)
+       }
+    }
+ 
++   /* The widening swizzle returned below selects one sub-word of a LUT entry.
++    * On a 32-bit instruction the hardware zero/sign-extends that sub-word into
++    * the full 32-bit lane. The same encoded swizzle has a different meaning on
++    * an 8/16-bit vector instruction: it replicates the sub-word across all
++    * lanes (for example .h0 is BI_SWIZZLE_H00, half 0 broadcast to both lanes),
++    * so a constant like (0x3f80, 0x0000) would turn into (0x3f80, 0x3f80).
++    * Only widen for 32-bit instructions. The replicated-halves case for 16-bit
++    * is handled separately via info.swizzle above.
++    */
++   bool can_widen = info.widen && info.size == VA_SIZE_32;
++
+    /* Try extending a byte */
+-   if ((info.widen || info.lanes || info.lane) &&
++   if ((can_widen || info.lanes || info.lane) &&
+        is_extension_of_8(value, is_signed)) {
+ 
+       bi_index lut = va_lut_index_8(value & 0xFF);
+@@ -166,7 +177,7 @@ va_lookup_constant(uint32_t value, struct va_src_info info, bool is_signed)
+    }
+ 
+    /* Try extending a halfword */
+-   if (info.widen && is_extension_of_16(value, is_signed)) {
++   if (can_widen && is_extension_of_16(value, is_signed)) {
+ 
+       bi_index lut = va_lut_index_16(value & 0xFFFF);
+       if (!bi_is_null(lut))
+diff --git a/src/panfrost/vulkan/panvk_vX_physical_device.c b/src/panfrost/vulkan/panvk_vX_physical_device.c
+--- a/src/panfrost/vulkan/panvk_vX_physical_device.c
++++ b/src/panfrost/vulkan/panvk_vX_physical_device.c
+@@ -133,6 +133,7 @@ panvk_per_arch(get_physical_device_extensions)(
+       .KHR_variable_pointers = true,
+       .KHR_vertex_attribute_divisor = true,
+       .KHR_vulkan_memory_model = true,
++      .KHR_workgroup_memory_explicit_layout = true,
+       .KHR_zero_initialize_workgroup_memory = true,
+       .EXT_4444_formats = true,
+       .EXT_attachment_feedback_loop_dynamic_state = true,
+@@ -635,6 +636,12 @@ panvk_per_arch(get_physical_device_features)(
+       /* VK_KHR_shader_untyped_pointers */
+       .shaderUntypedPointers = PAN_ARCH >= 9,
+ 
++      /* VK_KHR_workgroup_memory_explicit_layout */
++      .workgroupMemoryExplicitLayout = true,
++      .workgroupMemoryExplicitLayoutScalarBlockLayout = true,
++      .workgroupMemoryExplicitLayout8BitAccess = true,
++      .workgroupMemoryExplicitLayout16BitAccess = true,
++
+       /* VK_EXT_shader_module_identifier */
+       .shaderModuleIdentifier = true,
+ 

@@ -1,0 +1,38 @@
+repo: mesa/mesa
+pr: 27635
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27635
+merge_sha: ab6118361b6831e96bb9ffd9c9ed233134a33c92
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/27635/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/nak/builder.rs
+  status: modified
+  sha256: 59a4dc5fa96099108b4939a5ad183651429587e5c64aad021fd9ca6a3cd49d80
+- path: src/nouveau/compiler/nak/encode_sm70.rs
+  status: modified
+  sha256: 69cc188f3e1c280eced1353aabb63edc0b0be982d453b8ca34c3bde0f1e38fd2
+- path: src/nouveau/compiler/nak/from_nir.rs
+  status: modified
+  sha256: 30065b8f30a58471790487a7ec2cb96c14a418213df9f75d3b129b71f36718e0
+- path: src/nouveau/compiler/nak/ir.rs
+  status: modified
+  sha256: db877c68e7bd1a2be1ee98b4d8eac6b25e35be05d36d92e48e0735ec5cf98bb7
+- path: src/nouveau/compiler/nak/legalize.rs
+  status: modified
+  sha256: 619dcdb06e0e0b5ea4ee1fe0215eca333ec296996bb9ae05e4845ddbe936d763
+- path: src/nouveau/compiler/nak/opt_copy_prop.rs
+  status: modified
+  sha256: c98efb562ae3d4398551e50d8096ee56cc4da44a058e2143a1245d7133ad0dde
+- path: src/nouveau/compiler/nak_nir.c
+  status: modified
+  sha256: 4c276f1873ac7d541e02e3a24e00c3d7b4c973cfc5095363f75ca2364a8db4c0
+- path: src/nouveau/vulkan/nvk_physical_device.c
+  status: modified
+  sha256: 038de8b717341cf56e962ea3dee399e516c4879a9aeb6a6d620b7799c411343d
+- path: src/nouveau/vulkan/nvk_shader.c
+  status: modified
+  sha256: cf63ee8d4349d13f823a78dcb3e216b852d81a59f1aaab4fecdb478e9bfd1947

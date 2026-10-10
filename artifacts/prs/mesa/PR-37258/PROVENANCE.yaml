@@ -1,0 +1,62 @@
+repo: mesa/mesa
+pr: 37258
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37258
+merge_sha: 2ac56414732598595e841380da4a5939a0ad5780
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/37258/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/elk/elk_nir.c
+  status: modified
+  sha256: a349a98ae3846beb9b351f9d556a0088246ac4662734c13c8a366d4c428cab42
+- path: src/intel/compiler/elk/elk_simd_selection.cpp
+  status: modified
+  sha256: 6338083e4b80722260a25a13d10fe8120492c94515a6c7fdaacb17fd85f3bc34
+- path: src/intel/compiler/elk/elk_test_fs_cmod_propagation.cpp
+  status: modified
+  sha256: 4cb67a9d1a313ae67ca58a8aa96182723ea9d2c0c67e2624e047c7f777daad98
+- path: src/intel/compiler/elk/elk_test_fs_combine_constants.cpp
+  status: modified
+  sha256: b85954be6d7e5e28f87ee5b29e3ca64d8789fa71c4fa14f275ad4eecb9d93fed
+- path: src/intel/compiler/elk/elk_test_fs_copy_propagation.cpp
+  status: modified
+  sha256: 2ba0b776d10814286220604516995001fe69934eda9fa28464b7ad685004d893
+- path: src/intel/compiler/elk/elk_test_fs_saturate_propagation.cpp
+  status: modified
+  sha256: fd410a7cd902f9f1812e4bbd2af7a5561e8006435ed32e3c8c0fc96a96c3c743
+- path: src/intel/compiler/elk/elk_test_predicated_break.cpp
+  status: modified
+  sha256: 810314e8f42c2eaf607c8662bf7be632323b640de416d6952d5566ad428e2014
+- path: src/intel/compiler/elk/elk_test_vec4_cmod_propagation.cpp
+  status: modified
+  sha256: 94337b07e5392932daa0366f41ce949fae95c45c5060a599f98ea047e9028d33
+- path: src/intel/compiler/elk/elk_test_vec4_copy_propagation.cpp
+  status: modified
+  sha256: 65c497193fef65c007a087e3d1c94ef0cce23bb030341c27f43d289f0f79f4c7
+- path: src/intel/compiler/elk/elk_test_vec4_dead_code_eliminate.cpp
+  status: modified
+  sha256: f938a3f89cb62ed3488328204f3ff1e573ad1d981461307186c18d7720c232f9
+- path: src/intel/compiler/elk/elk_test_vec4_register_coalesce.cpp
+  status: modified
+  sha256: dffe108bb3feaec73459e03760406d1ef789900ca37c7f57cae01088e28845fa
+- path: src/intel/compiler/brw_compile_fs.cpp
+  status: modified
+  sha256: 9ab0e1b6b4a14a74b3398a4d12431bfa23bedac6c00972d86ff19d3dd31d766c
+- path: src/intel/compiler/brw_nir.c
+  status: modified
+  sha256: 90a267730dea05a5733f2d38fb52109e68898309aa545818db3aecc335c93b25
+- path: src/intel/compiler/brw_simd_selection.cpp
+  status: modified
+  sha256: 8f10bb3b61a7f68fabc504f7b07ebf9073293bd1e7d0a93bf8ef8e78990c694c
+- path: src/intel/compiler/test_helpers.h
+  status: modified
+  sha256: d59baebafa3ee8f8bafa58e5421505b43f7a80b6218377b3184371797ce5631b
+- path: src/intel/vulkan/anv_shader_compile.c
+  status: modified
+  sha256: 268347248f75eec46a805e756e446eb070b5b4729d17093a72feb3c271808f9c
+- path: src/intel/vulkan/anv_util.c
+  status: modified
+  sha256: 8222ea75b031b18cc8c76a660adddd0e183d7ef9dce6063cfb2bc52a171a2879

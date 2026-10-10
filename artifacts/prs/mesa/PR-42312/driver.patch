@@ -1,0 +1,288 @@
+diff --git a/src/intel/compiler/jay/jay_assign_accumulators.c b/src/intel/compiler/jay/jay_assign_accumulators.c
+--- a/src/intel/compiler/jay/jay_assign_accumulators.c
++++ b/src/intel/compiler/jay/jay_assign_accumulators.c
+@@ -137,7 +137,8 @@ can_access_accum(jay_shader *shader, jay_inst *I, signed src)
+    if (jay_op_is_control_flow(I->op) ||
+        I->op == JAY_OPCODE_MATH ||
+        I->op == JAY_OPCODE_SEND ||
+-       I->op == JAY_OPCODE_DPAS) {
++       I->op == JAY_OPCODE_DPAS ||
++       I->op == JAY_OPCODE_SLICE_REPACK) {
+       return false;
+    }
+ 
+diff --git a/src/intel/compiler/jay/jay_builder_opcodes.h.py b/src/intel/compiler/jay/jay_builder_opcodes.h.py
+--- a/src/intel/compiler/jay/jay_builder_opcodes.h.py
++++ b/src/intel/compiler/jay/jay_builder_opcodes.h.py
+@@ -15,8 +15,9 @@ if TYPE_CHECKING:
+ 
+ 
+ def infer_type(op: 'Opcode') -> bool:
++    no_infer_ops = ['dpas', 'slice_repack']
+     return op.has_dest and (set(op.types) <= set(["u1", "u32", "u64"]) or
+-                            op.name == 'mov') and op.name != 'dpas'
++                            op.name == 'mov') and op.name not in no_infer_ops
+ 
+ 
+ def signature(op: 'Opcode', with_dest: bool = True, with_types: bool = False,
+@@ -146,7 +147,7 @@ def main() -> int:
+                 opcodes=ops,
+                 signature=signature,
+                 infer_type=infer_type,
+-                no_typed_wrappers={'dpas'}))
++                no_typed_wrappers={'dpas', 'slice_repack'}))
+     except Exception:
+         print(exceptions.text_error_template().render())
+         return 1
+diff --git a/src/intel/compiler/jay/jay_from_nir.c b/src/intel/compiler/jay/jay_from_nir.c
+--- a/src/intel/compiler/jay/jay_from_nir.c
++++ b/src/intel/compiler/jay/jay_from_nir.c
+@@ -1403,6 +1403,69 @@ jay_emit_dpas(struct nir_to_jay_state *nj, nir_intrinsic_instr *intr)
+    nj->s->prog_data->cs.uses_systolic = true;
+ }
+ 
++static void
++jay_emit_convert_cmat(struct nir_to_jay_state *nj, nir_intrinsic_instr *intr)
++{
++   struct glsl_cmat_description dst_cmat_desc = nir_intrinsic_dst_cmat_desc(intr);
++   struct glsl_cmat_description src_cmat_desc = nir_intrinsic_src_cmat_desc(intr);
++
++   enum jay_type dst_type =
++      jay_type_for_glsl_base_type((enum glsl_base_type)dst_cmat_desc.element_type);
++   enum jay_type src_type =
++      jay_type_for_glsl_base_type((enum glsl_base_type)src_cmat_desc.element_type);
++
++   const unsigned dst_element_bits = jay_type_size_bits(dst_type);
++   const unsigned src_element_bits = jay_type_size_bits(src_type);
++
++   assert(dst_cmat_desc.use == src_cmat_desc.use);
++   if (src_cmat_desc.use == GLSL_CMAT_USE_B)
++      assert(dst_element_bits == src_element_bits);
++
++   const unsigned dst_pf = 32 / dst_element_bits;
++   const unsigned src_pf = 32 / src_element_bits;
++   const unsigned elems = nir_src_num_components(intr->src[0]) * src_pf;
++
++   jay_def dst = nj_def(&intr->def);
++   jay_def src = nj_src(intr->src[0]);
++
++   jay_builder *b = &nj->bld;
++
++   jay_def src_tmp = src_pf > 1 ? jay_alloc_def(b, GPR, elems) : src;
++   jay_def dst_tmp = dst_pf > 1 ? jay_alloc_def(b, GPR, elems) : dst;
++
++   if (src_pf > 1) {
++      for (unsigned i = 0; i < elems; i += src_pf) {
++         jay_SLICE_REPACK(b, jay_extract_range(src_tmp, i, src_pf),
++                          jay_extract(src, i / src_pf),
++                          util_logbase2(src_pf), /* unpack */ true);
++      }
++   }
++
++   if ((src_type == JAY_TYPE_BF16 && dst_type != JAY_TYPE_F32) ||
++       (dst_type == JAY_TYPE_BF16 && src_type != JAY_TYPE_F32)) {
++      jay_def tmp = jay_alloc_def(b, GPR, elems);
++      for (unsigned i = 0; i < elems; ++i) {
++         jay_CVT(b, JAY_TYPE_F32, jay_extract(tmp, i),
++                 jay_extract(src_tmp, i), src_type, JAY_ROUND, 0);
++      }
++      src_tmp = tmp;
++      src_type = JAY_TYPE_F32;
++   }
++
++   for (unsigned i = 0; i < elems; ++i) {
++      jay_CVT(b, dst_type, jay_extract(dst_tmp, i), jay_extract(src_tmp, i),
++              src_type, JAY_ROUND, 0);
++   }
++
++   if (dst_pf > 1) {
++      for (unsigned i = 0; i < elems; i += dst_pf) {
++         jay_SLICE_REPACK(b, jay_extract(dst, i / dst_pf),
++                          jay_extract_range(dst_tmp, i, dst_pf),
++                          util_logbase2(dst_pf), /* unpack */ false);
++      }
++   }
++}
++
+ static void
+ jay_emit_intrinsic(struct nir_to_jay_state *nj, nir_intrinsic_instr *intr)
+ {
+@@ -1910,6 +1973,10 @@ jay_emit_intrinsic(struct nir_to_jay_state *nj, nir_intrinsic_instr *intr)
+       jay_emit_dpas(nj, intr);
+       break;
+ 
++   case nir_intrinsic_convert_cmat_intel:
++      jay_emit_convert_cmat(nj, intr);
++      break;
++
+    default:
+ #ifndef NDEBUG
+       assert(intr->intrinsic < nir_num_intrinsics);
+diff --git a/src/intel/compiler/jay/jay_ir.h b/src/intel/compiler/jay/jay_ir.h
+--- a/src/intel/compiler/jay/jay_ir.h
++++ b/src/intel/compiler/jay/jay_ir.h
+@@ -977,10 +977,18 @@ jay_simd_width_physical(jay_shader *s, const jay_inst *I)
+ static inline unsigned
+ jay_macro_length(const jay_inst *I)
+ {
+-   bool macro = (I->op == JAY_OPCODE_MUL_32 ||
+-                 I->op == JAY_OPCODE_SHUFFLE ||
+-                 I->op == JAY_OPCODE_LOOP_ONCE);
+-   return macro ? 2 : 1;
++   switch (I->op) {
++   case JAY_OPCODE_MUL_32:
++   case JAY_OPCODE_SHUFFLE:
++   case JAY_OPCODE_LOOP_ONCE:
++      return 2;
++
++   case JAY_OPCODE_SLICE_REPACK:
++      return 1 << jay_slice_repack_factor_log2(I);
++
++   default:
++      return 1;
++   }
+ }
+ 
+ static inline bool
+@@ -991,7 +999,8 @@ jay_is_no_mask(const jay_inst *I)
+           I->op == JAY_OPCODE_DESWIZZLE_EVEN ||
+           I->op == JAY_OPCODE_DESWIZZLE_ODD ||
+           I->op == JAY_OPCODE_OFFSET_PACKED_PIXEL_COORDS ||
+-          I->op == JAY_OPCODE_DPAS;
++          I->op == JAY_OPCODE_DPAS ||
++          I->op == JAY_OPCODE_SLICE_REPACK;
+ }
+ 
+ /**
+diff --git a/src/intel/compiler/jay/jay_opcodes.py b/src/intel/compiler/jay/jay_opcodes.py
+--- a/src/intel/compiler/jay/jay_opcodes.py
++++ b/src/intel/compiler/jay/jay_opcodes.py
+@@ -235,6 +235,12 @@ op('dpas', 3, 'u32', 0, [
+     'uint8_t pad[3]',
+ ])
+ 
++# Pack/unpack multiple sources to/from a single 32-bit def.
++op('slice_repack', 1, 'u32', 0, [
++   'uint8_t factor_log2',
++   'bool unpack',
++])
++
+ # Initialize helper invocations. Takes 16-bit halves of the dispatch mask.
+ op('init_helpers', 2, 'u16', Props.NO_DEST)
+ 
+diff --git a/src/intel/compiler/jay/jay_opt_predicate.c b/src/intel/compiler/jay/jay_opt_predicate.c
+--- a/src/intel/compiler/jay/jay_opt_predicate.c
++++ b/src/intel/compiler/jay/jay_opt_predicate.c
+@@ -29,6 +29,7 @@ predicate_block(jay_builder *b,
+           I->op == JAY_OPCODE_MAX ||
+           I->op == JAY_OPCODE_CSEL ||
+           I->op == JAY_OPCODE_DPAS ||
++          I->op == JAY_OPCODE_SLICE_REPACK ||
+           (condition.file != UFLAG && jay_is_no_mask(I)) ||
+           (--limit) < 0)
+          return false;
+diff --git a/src/intel/compiler/jay/jay_simd_width.c b/src/intel/compiler/jay/jay_simd_width.c
+--- a/src/intel/compiler/jay/jay_simd_width.c
++++ b/src/intel/compiler/jay/jay_simd_width.c
+@@ -29,6 +29,11 @@ max_simd_width(const jay_shader *shader, const jay_inst *I)
+       return 16;
+    }
+ 
++   if (I->op == JAY_OPCODE_CVT && (I->type == JAY_TYPE_BF16 ||
++                                   jay_cvt_src_type(I) == JAY_TYPE_BF16)) {
++      return 16;
++   }
++
+    if (I->op != JAY_OPCODE_SEND) {
+       /* If any source/destination is 64-bit strided, we must split to avoid
+        * crossing more than 2 GRFs. Note that SENDs don't have this restriction,
+diff --git a/src/intel/compiler/jay/jay_stride.c b/src/intel/compiler/jay/jay_stride.c
+--- a/src/intel/compiler/jay/jay_stride.c
++++ b/src/intel/compiler/jay/jay_stride.c
+@@ -76,6 +76,10 @@ jay_dst_stride_minmax(jay_inst *I, bool do_max)
+       return JAY_STRIDE_2;
+    }
+ 
++   if (I->op == JAY_OPCODE_SLICE_REPACK && jay_slice_repack_unpack(I)) {
++      return JAY_STRIDE_4;
++   }
++
+    /* The src2 restriction quoted above effectively implies we should not stride
+     * destinations of 3-source instructions either.
+     */
+@@ -110,6 +114,9 @@ jay_src_stride_minmax(jay_inst *I, unsigned s, bool do_max)
+       max = JAY_STRIDE_4;
+    }
+ 
++   if (jay_src_type(I, s) == JAY_TYPE_BF16)
++      return JAY_STRIDE_2;
++
+    if (restrict_mixed_strides(I, s) &&
+        jay_type_size_bits(jay_src_type(I, s)) < jay_type_size_bits(I->type)) {
+ 
+diff --git a/src/intel/compiler/jay/jay_to_binary.c b/src/intel/compiler/jay/jay_to_binary.c
+--- a/src/intel/compiler/jay/jay_to_binary.c
++++ b/src/intel/compiler/jay/jay_to_binary.c
+@@ -305,6 +305,7 @@ static const struct {
+    OP(WHILE, WHILE, 0),
+    OP(XOR, XOR, 2),
+    OP(ZIP_UGPR16, MOV, 0),
++   OP(SLICE_REPACK, MOV, 1),
+    /* clang-format on */
+ };
+ 
+@@ -617,6 +618,29 @@ emit(struct jay_codegen *jc,
+       break;
+    }
+ 
++   case JAY_OPCODE_SLICE_REPACK: {
++      const unsigned elem_bits = 32 >> jay_slice_repack_factor_log2(I);
++      const unsigned unpacked_B = idx_in_macro * gen->exec_size * 4;
++      const unsigned packed_B = idx_in_macro * gen->exec_size * (elem_bits / 8);
++      gen_reg_type t = to_gen_reg_type(jay_type(JAY_TYPE_U, elem_bits));
++
++      gen_operand *unpacked = &gen->src[0];
++      gen_operand *packed   = &gen->dst;
++
++      if (jay_slice_repack_unpack(I))
++         SWAP(unpacked, packed);
++
++      *packed   = gen_retype(gen_byte_offset(jc->devinfo, *packed,   packed_B), t);
++      *unpacked = gen_retype(gen_byte_offset(jc->devinfo, *unpacked, unpacked_B), t);
++
++      if (elem_bits == 16)
++         *unpacked = gen_restride(*unpacked, 4, 2, 2);
++      else if (elem_bits == 8)
++         *unpacked = gen_restride(*unpacked, 8, 2, 4);
++
++      break;
++   }
++
+    default:
+       break;
+    }
+diff --git a/src/intel/compiler/jay/jay_validate.c b/src/intel/compiler/jay/jay_validate.c
+--- a/src/intel/compiler/jay/jay_validate.c
++++ b/src/intel/compiler/jay/jay_validate.c
+@@ -123,6 +123,9 @@ get_src_words(struct validate_state *validate, jay_inst *I, unsigned s)
+       return bytes / (shader->dispatch_width * 4);
+    }
+ 
++   if (I->op == JAY_OPCODE_SLICE_REPACK && !jay_slice_repack_unpack(I))
++      return 1 << jay_slice_repack_factor_log2(I);
++
+    unsigned simd_width = jay_simd_width_logical(validate->func->shader, I);
+    unsigned elsize = jay_type_vector_length(jay_src_type(I, s));
+ 
+@@ -311,6 +314,11 @@ validate_inst(struct validate_state *validate, jay_inst *I)
+       CHECK(jay_num_values(I->src[0]) == 16);
+       CHECK(jay_num_values(I->src[1]) == 16);
+       CHECK(jay_grf_per_gpr(validate->func->shader) == 2);
++   } else if (I->op == JAY_OPCODE_SLICE_REPACK) {
++      const bool unpack = jay_slice_repack_unpack(I);
++      const unsigned pf = 1 << jay_slice_repack_factor_log2(I);
++      CHECK(pf == 1 || pf == 2 || pf == 4);
++      CHECK(jay_num_values(I->dst) == (unpack ? pf : 1));
+    }
+ }
+ 

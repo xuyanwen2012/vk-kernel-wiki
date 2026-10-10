@@ -1,0 +1,397 @@
+diff --git a/src/intel/compiler/elk/elk_nir.c b/src/intel/compiler/elk/elk_nir.c
+--- a/src/intel/compiler/elk/elk_nir.c
++++ b/src/intel/compiler/elk/elk_nir.c
+@@ -1683,12 +1683,11 @@ elk_nir_apply_sampler_key(nir_shader *nir,
+ static unsigned
+ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+ {
+-   switch (info->subgroup_size) {
+-   case SUBGROUP_SIZE_API_CONSTANT:
+-      /* We have to use the global constant size. */
+-      return ELK_SUBGROUP_SIZE;
+-
+-   case SUBGROUP_SIZE_UNIFORM:
++   if (info->api_subgroup_size) {
++      /* We have to use the global/required constant size. */
++      assert(info->api_subgroup_size >= 8 && info->api_subgroup_size <= 32);
++      return info->api_subgroup_size;
++   } else if (info->api_subgroup_size_draw_uniform) {
+       /* It has to be uniform across all invocations but can vary per stage
+        * if we want.  This gives us a bit more freedom.
+        *
+@@ -1698,8 +1697,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+        * to be uniform across invocations.
+        */
+       return max_subgroup_size;
+-
+-   case SUBGROUP_SIZE_VARYING:
++   } else {
+       /* The subgroup size is allowed to be fully varying.  For geometry
+        * stages, we know it's always 8 which is max_subgroup_size so we can
+        * return that.  For compute, elk_nir_apply_key is called once per
+@@ -1711,27 +1709,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+        * size.
+        */
+       return info->stage == MESA_SHADER_FRAGMENT ? 0 : max_subgroup_size;
+-
+-   case SUBGROUP_SIZE_REQUIRE_4:
+-      UNREACHABLE("Unsupported subgroup size type");
+-
+-   case SUBGROUP_SIZE_REQUIRE_8:
+-   case SUBGROUP_SIZE_REQUIRE_16:
+-   case SUBGROUP_SIZE_REQUIRE_32:
+-      assert(mesa_shader_stage_uses_workgroup(info->stage) ||
+-             (info->stage >= MESA_SHADER_RAYGEN && info->stage <= MESA_SHADER_CALLABLE));
+-      /* These enum values are expressly chosen to be equal to the subgroup
+-       * size that they require.
+-       */
+-      return info->subgroup_size;
+-
+-   case SUBGROUP_SIZE_FULL_SUBGROUPS:
+-   case SUBGROUP_SIZE_REQUIRE_64:
+-   case SUBGROUP_SIZE_REQUIRE_128:
+-      break;
+    }
+-
+-   UNREACHABLE("Invalid subgroup size type");
+ }
+ 
+ unsigned
+diff --git a/src/intel/compiler/elk/elk_simd_selection.cpp b/src/intel/compiler/elk/elk_simd_selection.cpp
+--- a/src/intel/compiler/elk/elk_simd_selection.cpp
++++ b/src/intel/compiler/elk/elk_simd_selection.cpp
+@@ -30,12 +30,8 @@
+ unsigned
+ elk_required_dispatch_width(const struct shader_info *info)
+ {
+-   if ((int)info->subgroup_size >= (int)SUBGROUP_SIZE_REQUIRE_8) {
+-      assert(mesa_shader_stage_uses_workgroup(info->stage));
+-      /* These enum values are expressly chosen to be equal to the subgroup
+-       * size that they require.
+-       */
+-      return (unsigned)info->subgroup_size;
++   if (info->min_subgroup_size == info->max_subgroup_size) {
++      return info->max_subgroup_size;
+    } else {
+       return 0;
+    }
+diff --git a/src/intel/compiler/elk/elk_test_fs_cmod_propagation.cpp b/src/intel/compiler/elk/elk_test_fs_cmod_propagation.cpp
+--- a/src/intel/compiler/elk/elk_test_fs_cmod_propagation.cpp
++++ b/src/intel/compiler/elk/elk_test_fs_cmod_propagation.cpp
+@@ -78,8 +78,7 @@ cmod_propagation_test::cmod_propagation_test()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_wm_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL);
+ 
+    v = new cmod_propagation_fs_visitor(compiler, &params, prog_data, shader);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_fs_combine_constants.cpp b/src/intel/compiler/elk/elk_test_fs_combine_constants.cpp
+--- a/src/intel/compiler/elk/elk_test_fs_combine_constants.cpp
++++ b/src/intel/compiler/elk/elk_test_fs_combine_constants.cpp
+@@ -26,8 +26,7 @@ struct FSCombineConstantsTest : public ::testing::Test {
+       params.mem_ctx = mem_ctx;
+ 
+       prog_data = {};
+-      nir_shader *nir =
+-         nir_shader_create(mem_ctx, MESA_SHADER_COMPUTE, NULL, NULL);
++      nir_shader *nir = nir_shader_create(mem_ctx, MESA_SHADER_COMPUTE, NULL);
+ 
+       shader = new elk_fs_visitor(&compiler, &params, NULL,
+                               &prog_data.base, nir, 8, false, false);
+diff --git a/src/intel/compiler/elk/elk_test_fs_copy_propagation.cpp b/src/intel/compiler/elk/elk_test_fs_copy_propagation.cpp
+--- a/src/intel/compiler/elk/elk_test_fs_copy_propagation.cpp
++++ b/src/intel/compiler/elk/elk_test_fs_copy_propagation.cpp
+@@ -67,8 +67,7 @@ copy_propagation_test::copy_propagation_test()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_wm_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL);
+ 
+    v = new copy_propagation_fs_visitor(compiler, &params, prog_data, shader);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_fs_saturate_propagation.cpp b/src/intel/compiler/elk/elk_test_fs_saturate_propagation.cpp
+--- a/src/intel/compiler/elk/elk_test_fs_saturate_propagation.cpp
++++ b/src/intel/compiler/elk/elk_test_fs_saturate_propagation.cpp
+@@ -67,8 +67,7 @@ saturate_propagation_test::saturate_propagation_test()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_wm_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_FRAGMENT, NULL);
+ 
+    v = new saturate_propagation_fs_visitor(compiler, &params, prog_data, shader);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_predicated_break.cpp b/src/intel/compiler/elk/elk_test_predicated_break.cpp
+--- a/src/intel/compiler/elk/elk_test_predicated_break.cpp
++++ b/src/intel/compiler/elk/elk_test_predicated_break.cpp
+@@ -48,8 +48,7 @@ PredicatedBreakTest::SetUp()
+    params.mem_ctx = mem_ctx;
+ 
+    prog_data = {};
+-   nir_shader *nir =
+-      nir_shader_create(mem_ctx, MESA_SHADER_FRAGMENT, NULL, NULL);
++   nir_shader *nir = nir_shader_create(mem_ctx, MESA_SHADER_FRAGMENT, NULL);
+ 
+    shader_a = new elk_fs_visitor(&compiler, &params, NULL,
+                              &prog_data.base, nir, 8, false, false);
+diff --git a/src/intel/compiler/elk/elk_test_vec4_cmod_propagation.cpp b/src/intel/compiler/elk/elk_test_vec4_cmod_propagation.cpp
+--- a/src/intel/compiler/elk/elk_test_vec4_cmod_propagation.cpp
++++ b/src/intel/compiler/elk/elk_test_vec4_cmod_propagation.cpp
+@@ -107,8 +107,7 @@ void cmod_propagation_vec4_test::SetUp()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_vue_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL);
+ 
+    v = new cmod_propagation_vec4_visitor(compiler, &params, shader, prog_data);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_vec4_copy_propagation.cpp b/src/intel/compiler/elk/elk_test_vec4_copy_propagation.cpp
+--- a/src/intel/compiler/elk/elk_test_vec4_copy_propagation.cpp
++++ b/src/intel/compiler/elk/elk_test_vec4_copy_propagation.cpp
+@@ -97,8 +97,7 @@ void copy_propagation_vec4_test::SetUp()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_vue_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL);
+ 
+    v = new copy_propagation_vec4_visitor(compiler, &params, shader, prog_data);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_vec4_dead_code_eliminate.cpp b/src/intel/compiler/elk/elk_test_vec4_dead_code_eliminate.cpp
+--- a/src/intel/compiler/elk/elk_test_vec4_dead_code_eliminate.cpp
++++ b/src/intel/compiler/elk/elk_test_vec4_dead_code_eliminate.cpp
+@@ -97,8 +97,7 @@ void dead_code_eliminate_vec4_test::SetUp()
+    params.mem_ctx = ctx;
+ 
+    prog_data = ralloc(ctx, struct elk_vue_prog_data);
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL);
+ 
+   v = new dead_code_eliminate_vec4_visitor(compiler, &params, shader, prog_data);
+ 
+diff --git a/src/intel/compiler/elk/elk_test_vec4_register_coalesce.cpp b/src/intel/compiler/elk/elk_test_vec4_register_coalesce.cpp
+--- a/src/intel/compiler/elk/elk_test_vec4_register_coalesce.cpp
++++ b/src/intel/compiler/elk/elk_test_vec4_register_coalesce.cpp
+@@ -101,8 +101,7 @@ void register_coalesce_vec4_test::SetUp()
+    params = {};
+    params.mem_ctx = ctx;
+ 
+-   nir_shader *shader =
+-      nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL, NULL);
++   nir_shader *shader = nir_shader_create(ctx, MESA_SHADER_VERTEX, NULL);
+ 
+    v = new register_coalesce_vec4_visitor(compiler, &params, shader, prog_data);
+ 
+diff --git a/src/intel/compiler/brw_compile_fs.cpp b/src/intel/compiler/brw_compile_fs.cpp
+--- a/src/intel/compiler/brw_compile_fs.cpp
++++ b/src/intel/compiler/brw_compile_fs.cpp
+@@ -1576,8 +1576,7 @@ brw_compile_fs(const struct brw_compiler *compiler,
+     * data clear shaders.
+     */
+    const unsigned reqd_dispatch_width = brw_required_dispatch_width(&nir->info);
+-   assert(reqd_dispatch_width == SUBGROUP_SIZE_VARYING ||
+-          reqd_dispatch_width == SUBGROUP_SIZE_REQUIRE_16);
++   assert(reqd_dispatch_width == 0 || reqd_dispatch_width == 16);
+ 
+    /* Limit identified when first variant is compiled, see
+     * brw_shader::limit_dispatch_width().
+@@ -1750,7 +1749,7 @@ brw_compile_fs(const struct brw_compiler *compiler,
+ 
+    } else {
+       if ((!has_spilled && dispatch_width_limit >= 16 && INTEL_SIMD(FS, 16)) ||
+-          reqd_dispatch_width == SUBGROUP_SIZE_REQUIRE_16) {
++          reqd_dispatch_width == 16) {
+          /* Try a SIMD16 compile */
+          brw_shader_params shader_params = base_shader_params;
+          shader_params.dispatch_width = 16;
+@@ -1783,7 +1782,7 @@ brw_compile_fs(const struct brw_compiler *compiler,
+       /* Currently, the compiler only supports SIMD32 on SNB+ */
+       if (!has_spilled &&
+           dispatch_width_limit >= 32 &&
+-          reqd_dispatch_width == SUBGROUP_SIZE_VARYING &&
++          reqd_dispatch_width == 0 &&
+           !simd16_failed && INTEL_SIMD(FS, 32) &&
+           !prog_data->base.ray_queries) {
+          /* Try a SIMD32 compile */
+@@ -1818,7 +1817,7 @@ brw_compile_fs(const struct brw_compiler *compiler,
+ 
+       if (devinfo->ver >= 12 && !has_spilled &&
+           max_polygons >= 2 && !key->coarse_pixel &&
+-          reqd_dispatch_width == SUBGROUP_SIZE_VARYING) {
++          reqd_dispatch_width == 0) {
+ 
+          if (devinfo->ver >= 20 && max_polygons >= 4 &&
+              dispatch_width_limit >= 32 &&
+@@ -1890,7 +1889,7 @@ brw_compile_fs(const struct brw_compiler *compiler,
+    /* When the caller compiles a repclear or fast clear shader, they
+     * want SIMD16-only.
+     */
+-   if (reqd_dispatch_width == SUBGROUP_SIZE_REQUIRE_16)
++   if (reqd_dispatch_width == 16)
+       v8.reset();
+ 
+    brw_generator g(compiler, &params->base, &prog_data->base,
+diff --git a/src/intel/compiler/brw_nir.c b/src/intel/compiler/brw_nir.c
+--- a/src/intel/compiler/brw_nir.c
++++ b/src/intel/compiler/brw_nir.c
+@@ -2426,12 +2426,11 @@ brw_postprocess_nir(nir_shader *nir, const struct brw_compiler *compiler,
+ static unsigned
+ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+ {
+-   switch (info->subgroup_size) {
+-   case SUBGROUP_SIZE_API_CONSTANT:
+-      /* We have to use the global constant size. */
+-      return BRW_SUBGROUP_SIZE;
+-
+-   case SUBGROUP_SIZE_UNIFORM:
++   if (info->api_subgroup_size) {
++      /* We have to use the global/required constant size. */
++      assert(info->api_subgroup_size >= 8 && info->api_subgroup_size <= 32);
++      return info->api_subgroup_size;
++   } else if (info->api_subgroup_size_draw_uniform) {
+       /* It has to be uniform across all invocations but can vary per stage
+        * if we want.  This gives us a bit more freedom.
+        *
+@@ -2441,8 +2440,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+        * to be uniform across invocations.
+        */
+       return max_subgroup_size;
+-
+-   case SUBGROUP_SIZE_VARYING:
++   } else {
+       /* The subgroup size is allowed to be fully varying.  For geometry
+        * stages, we know it's always 8 which is max_subgroup_size so we can
+        * return that.  For compute, brw_nir_apply_key is called once per
+@@ -2454,25 +2452,7 @@ get_subgroup_size(const struct shader_info *info, unsigned max_subgroup_size)
+        * size.
+        */
+       return info->stage == MESA_SHADER_FRAGMENT ? 0 : max_subgroup_size;
+-
+-   case SUBGROUP_SIZE_REQUIRE_4:
+-      UNREACHABLE("Unsupported subgroup size type");
+-
+-   case SUBGROUP_SIZE_REQUIRE_8:
+-   case SUBGROUP_SIZE_REQUIRE_16:
+-   case SUBGROUP_SIZE_REQUIRE_32:
+-      /* These enum values are expressly chosen to be equal to the subgroup
+-       * size that they require.
+-       */
+-      return info->subgroup_size;
+-
+-   case SUBGROUP_SIZE_FULL_SUBGROUPS:
+-   case SUBGROUP_SIZE_REQUIRE_64:
+-   case SUBGROUP_SIZE_REQUIRE_128:
+-      break;
+    }
+-
+-   UNREACHABLE("Invalid subgroup size type");
+ }
+ 
+ unsigned
+diff --git a/src/intel/compiler/brw_simd_selection.cpp b/src/intel/compiler/brw_simd_selection.cpp
+--- a/src/intel/compiler/brw_simd_selection.cpp
++++ b/src/intel/compiler/brw_simd_selection.cpp
+@@ -30,11 +30,8 @@
+ unsigned
+ brw_required_dispatch_width(const struct shader_info *info)
+ {
+-   if ((int)info->subgroup_size >= (int)SUBGROUP_SIZE_REQUIRE_8) {
+-      /* These enum values are expressly chosen to be equal to the subgroup
+-       * size that they require.
+-       */
+-      return (unsigned)info->subgroup_size;
++   if (info->min_subgroup_size == info->max_subgroup_size) {
++      return info->max_subgroup_size;
+    } else {
+       return 0;
+    }
+diff --git a/src/intel/compiler/test_helpers.h b/src/intel/compiler/test_helpers.h
+--- a/src/intel/compiler/test_helpers.h
++++ b/src/intel/compiler/test_helpers.h
+@@ -135,7 +135,7 @@ protected:
+       if (dispatch_width == 0)
+          dispatch_width = devinfo->ver >= 20 ? 16 : 8;
+ 
+-      nir_shader *nir = nir_shader_create(mem_ctx, stage, NULL, NULL);
++      nir_shader *nir = nir_shader_create(mem_ctx, stage, NULL);
+       brw_stage_prog_data *pd =
+          (struct brw_stage_prog_data *)rzalloc(mem_ctx, brw_any_prog_data);
+ 
+diff --git a/src/intel/vulkan/anv_shader_compile.c b/src/intel/vulkan/anv_shader_compile.c
+--- a/src/intel/vulkan/anv_shader_compile.c
++++ b/src/intel/vulkan/anv_shader_compile.c
+@@ -652,29 +652,21 @@ anv_fixup_subgroup_size(struct anv_instance *instance, struct shader_info *info)
+     */
+    if (instance->assume_full_subgroups &&
+        info->uses_wide_subgroup_intrinsics &&
+-       info->subgroup_size == SUBGROUP_SIZE_API_CONSTANT &&
++       info->api_subgroup_size == BRW_SUBGROUP_SIZE &&
+        local_size &&
+-       local_size % BRW_SUBGROUP_SIZE == 0)
+-      info->subgroup_size = SUBGROUP_SIZE_FULL_SUBGROUPS;
+-
+-   /* If the client requests that we dispatch full subgroups but doesn't
+-    * allow us to pick a subgroup size, we have to smash it to the API
+-    * value of 32.  Performance will likely be terrible in this case but
+-    * there's nothing we can do about that.  The client should have chosen
+-    * a size.
+-    */
+-   if (info->subgroup_size == SUBGROUP_SIZE_FULL_SUBGROUPS)
+-      info->subgroup_size =
+-         instance->assume_full_subgroups != 0 ?
+-         instance->assume_full_subgroups : BRW_SUBGROUP_SIZE;
++       local_size % BRW_SUBGROUP_SIZE == 0) {
++      info->max_subgroup_size = BRW_SUBGROUP_SIZE;
++      info->min_subgroup_size = BRW_SUBGROUP_SIZE;
++   }
+ 
+    /* Cooperative matrix extension requires that all invocations in a subgroup
+     * be active. As a result, when the application does not request a specific
+     * subgroup size, we must use SIMD32.
+     */
+    if (info->stage == MESA_SHADER_COMPUTE && info->cs.has_cooperative_matrix &&
+-       info->subgroup_size < SUBGROUP_SIZE_REQUIRE_8) {
+-      info->subgroup_size = BRW_SUBGROUP_SIZE;
++       info->max_subgroup_size > info->min_subgroup_size) {
++      info->api_subgroup_size = info->max_subgroup_size;
++      info->min_subgroup_size = info->max_subgroup_size;
+    }
+ }
+ 
+@@ -1244,7 +1236,7 @@ anv_shader_lower_nir(struct anv_device *device,
+    if (nir->info.stage == MESA_SHADER_COMPUTE &&
+        nir->info.cs.has_cooperative_matrix) {
+       anv_fixup_subgroup_size(pdevice->instance, &nir->info);
+-      NIR_PASS(_, nir, brw_nir_lower_cmat, nir->info.subgroup_size);
++      NIR_PASS(_, nir, brw_nir_lower_cmat, nir->info.api_subgroup_size);
+       NIR_PASS(_, nir, nir_lower_indirect_derefs, nir_var_function_temp, 16);
+    }
+ 
+diff --git a/src/intel/vulkan/anv_util.c b/src/intel/vulkan/anv_util.c
+--- a/src/intel/vulkan/anv_util.c
++++ b/src/intel/vulkan/anv_util.c
+@@ -360,10 +360,10 @@ anv_device_init_rt_shaders(struct anv_device *device)
+       nir_shader *trampoline_nir =
+          brw_nir_create_raygen_trampoline(device->physical->compiler, tmp_ctx);
+ 
+-      if (device->info->ver >= 20)
+-         trampoline_nir->info.subgroup_size = SUBGROUP_SIZE_REQUIRE_16;
+-      else
+-         trampoline_nir->info.subgroup_size = SUBGROUP_SIZE_REQUIRE_8;
++      unsigned require_size = device->info->ver >= 20 ? 16 : 8;
++      trampoline_nir->info.api_subgroup_size = require_size;
++      trampoline_nir->info.max_subgroup_size = require_size;
++      trampoline_nir->info.min_subgroup_size = require_size;
+ 
+       struct brw_cs_prog_data trampoline_prog_data = {
+          .uses_btd_stack_ids = true,

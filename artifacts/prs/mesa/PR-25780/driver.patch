@@ -1,0 +1,35 @@
+diff --git a/src/nouveau/vulkan/nvk_physical_device.c b/src/nouveau/vulkan/nvk_physical_device.c
+--- a/src/nouveau/vulkan/nvk_physical_device.c
++++ b/src/nouveau/vulkan/nvk_physical_device.c
+@@ -96,6 +96,7 @@ nvk_get_device_extensions(const struct nv_device_info *info,
+ #endif
+       .KHR_uniform_buffer_standard_layout = true,
+       .KHR_variable_pointers = true,
++      .KHR_workgroup_memory_explicit_layout = true,
+       .EXT_4444_formats = true,
+       .EXT_border_color_swizzle = true,
+       .EXT_buffer_device_address = true,
+@@ -252,6 +253,12 @@ nvk_get_device_features(const struct nv_device_info *info,
+       .shaderSubgroupClock = true,
+       .shaderDeviceClock = true,
+ 
++      /* VK_KHR_workgroup_memory_explicit_layout */
++      .workgroupMemoryExplicitLayout = true,
++      .workgroupMemoryExplicitLayoutScalarBlockLayout = true,
++      .workgroupMemoryExplicitLayout8BitAccess = false,
++      .workgroupMemoryExplicitLayout16BitAccess = false,
++
+       /* VK_EXT_4444_formats */
+       .formatA4R4G4B4 = true,
+       .formatA4B4G4R4 = true,
+diff --git a/src/nouveau/vulkan/nvk_shader.c b/src/nouveau/vulkan/nvk_shader.c
+--- a/src/nouveau/vulkan/nvk_shader.c
++++ b/src/nouveau/vulkan/nvk_shader.c
+@@ -119,6 +119,7 @@ nvk_physical_device_spirv_options(const struct nvk_physical_device *pdev,
+          .tessellation = true,
+          .transform_feedback = true,
+          .variable_pointers = true,
++         .workgroup_memory_explicit_layout = true,
+       },
+       .ssbo_addr_format = nvk_buffer_addr_format(rs->storage_buffers),
+       .phys_ssbo_addr_format = nir_address_format_64bit_global,

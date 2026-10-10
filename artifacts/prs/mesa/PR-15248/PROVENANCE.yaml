@@ -1,0 +1,47 @@
+repo: mesa/mesa
+pr: 15248
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/15248
+merge_sha: 02906baba745e6a6d2f27c1654e361665db4ac77
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/15248/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/vulkan/panvk_cmd_buffer.c
+  status: modified
+  sha256: 74df87b28cff937f141d27f47f102d7465cadf296419e1e8cfaf205f735bef21
+- path: src/panfrost/vulkan/panvk_descriptor_set.c
+  status: modified
+  sha256: 2e57c1372e7e907ecf30a3aa5726fd1e560af7febcd2ca5f2a8f6524af299417
+- path: src/panfrost/vulkan/panvk_pipeline.c
+  status: modified
+  sha256: 04a00b3136d5760e819e7a56bf580c0fd453de655f371978611f88a3349d9500
+- path: src/panfrost/vulkan/panvk_private.h
+  status: modified
+  sha256: 91f7801c27a371af5b5cffc029ff246d5eb7d18d22b82a9f06f6cb1b9f2bd8f8
+- path: src/panfrost/vulkan/panvk_vX_cmd_buffer.c
+  status: modified
+  sha256: b532aefe12e4f88d4b364c59c8b6d8d7209fb04767b63f9b485c87c9dcc8fbbb
+- path: src/panfrost/vulkan/panvk_vX_cs.c
+  status: modified
+  sha256: bafbdd4897b6366c89fa6a4c014bc1ce1b5dbfb307f3286ff2bc4ab67044bc07
+- path: src/panfrost/vulkan/panvk_vX_cs.h
+  status: modified
+  sha256: c30f8261a3057c690af3aba71fe7a19d05c87f3ab262073bb153f88f9c1f861f
+- path: src/panfrost/vulkan/panvk_vX_descriptor_set.c
+  status: modified
+  sha256: cecd6918246c603635be0e29bddce84cb48477459ee43f1ffed59c244959c996
+- path: src/panfrost/vulkan/panvk_vX_image.c
+  status: modified
+  sha256: ad599118765c6fd814236a30c7d2d839d8a7b0fea9d0eb3642c2793903b15211
+- path: src/panfrost/vulkan/panvk_vX_pipeline.c
+  status: modified
+  sha256: 40f3223b4ff5f7a2a17ddeb4e25f735f2535e20c2b152a3078b766c8b3cfcd20
+- path: src/panfrost/vulkan/panvk_vX_shader.c
+  status: modified
+  sha256: 78344dbd6667c70ba8170de697aab29845862d61dcee66936015f5956cac8c81
+- path: src/panfrost/vulkan/panvk_varyings.h
+  status: modified
+  sha256: a5dd66b09278cb571301a3881fa13fae3d745d1f98f61813a45ec06179dd75fc

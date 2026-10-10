@@ -1,0 +1,14 @@
+repo: mesa/mesa
+pr: 33881
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33881
+merge_sha: bcff33ff93b5e5104addafe2e7d58c2ab7141aa7
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/33881/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/vulkan/panvk_physical_device.c
+  status: modified
+  sha256: 54a6a0d1f15ddb0fd518cba0c1483e460d93a9a13cf369692cbc6d4ea6210109

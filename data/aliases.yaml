@@ -40,6 +40,35 @@ xe2:
   - Battlemage
   - BMG
 
+meteor-lake:
+  - "Meteor Lake"
+  - MTL
+
+xe3:
+  - Xe3
+  - "Panther Lake"
+  - PTL
+
+turing:
+  - Turing
+  - "RTX 20 series"
+
+ampere:
+  - Ampere
+  - "RTX 30 series"
+
+blackwell:
+  - Blackwell
+  - "RTX 50 series"
+
+adreno-7xx:
+  - a7xx
+  - "Adreno 7xx"
+
+bifrost:
+  - Bifrost
+  - "Mali Bifrost"
+
 # Architecture nodes — devices
 radeon-780m:
   - 780M
@@ -209,8 +238,10 @@ full-subgroups:
   - VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT
 
 subgroup-operations:
+  - "subgroup ops"
   - "subgroup operations"
   - GL_KHR_shader_subgroup
+  - VkPhysicalDeviceSubgroupProperties
   - subgroupSupportedOperations
   - subgroupBallot
   - subgroupShuffle
@@ -476,6 +507,9 @@ channel-packing:
 # Languages
 spirv:
   - "SPIR-V"
+
+rust:
+  - Rust
 
 cpp:
   - "C++"

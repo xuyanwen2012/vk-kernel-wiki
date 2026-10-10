@@ -1,0 +1,58 @@
+repo: mesa/mesa
+pr: 33664
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/33664
+merge_sha: 5eb1edcf9db99dfb09d7bd3d393f01c10b2ad447
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/33664/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_eu_defines.h
+  status: modified
+  sha256: fa2f00e0a248861082fc5de953656a1ffb28e8e8f100d83963b01da7ba8b1778
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: 4f4101f41082bab72211ffd1fecaa97395eaa668f32e95a88696ba53123f157c
+- path: src/intel/compiler/brw_eu_inst.h
+  status: modified
+  sha256: 6fbbb9bda2acada5f5899d9c03c1449fc57c5ab0197eefa0794274fcb1c20f86
+- path: src/intel/compiler/brw_eu_validate.c
+  status: modified
+  sha256: 2776feac145c4072fc0883d8a18c9ad0ed43e06080da1cac88f5115c35ae08d4
+- path: src/intel/compiler/brw_gram.y
+  status: modified
+  sha256: 8a3d083a81cfb107ac431725a0f2ac3e4a51807c2a620d4d22060252c1ff64c8
+- path: src/intel/compiler/brw_inst.cpp
+  status: modified
+  sha256: 7ddf8b23ea05b1beac8393e160e20e8c1c9c8186be41ce863cc7a36e71c88937
+- path: src/intel/compiler/brw_lower_scoreboard.cpp
+  status: modified
+  sha256: d5f400e697da55d68ed6bbcd67b5bc91c0716264d7ee84f7856d12e30fc91609
+- path: src/intel/compiler/brw_reg.h
+  status: modified
+  sha256: fb14ab7d539d5324dc50174df69643c8b14c119854710c6f3d78eb354110a782
+- path: src/intel/compiler/brw_reg_type.c
+  status: modified
+  sha256: f4a213bde94ed1e4532c07b5e093e5dedf18d06c0eecb92d5726116537adaeb9
+- path: src/intel/compiler/brw_reg_type.h
+  status: modified
+  sha256: 511d7f346e74570030c889cf7517d62975bf843bbabc468e2b4374c3e0cd375f
+- path: src/intel/compiler/brw_validate.cpp
+  status: modified
+  sha256: 97924d151acaae877ad8a01d311369f9c3e1804d0fc993d096c72a435efc4413
+- path: src/intel/compiler/test_eu_validate.cpp
+  status: modified
+  sha256: 5a6593b5f41b3dbd6ebd1c88b08f806818db85c384b987e2d5db987a39f5034a
+- path: src/intel/dev/intel_device_info.c
+  status: modified
+  sha256: 2b42196feb2e61b1d201b90689c35b140a90d52e7b35ad8920108476fd803405
+- path: src/intel/dev/intel_device_info.py
+  status: modified
+  sha256: be502fb625c2425bbd702092c58b19bf3173a8e8d5b145ea43b4201a9cdf0ccc
+omitted_files:
+- path: src/intel/compiler/brw_disasm.c
+  reason: the file header carries its own permission notice (Copyright 2008 Keith Packard, an HPND-style notice), not the MIT text the ledger states
+- path: src/intel/compiler/brw_lex.l
+  reason: the file has no licence header

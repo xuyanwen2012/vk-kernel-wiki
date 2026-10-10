@@ -1,0 +1,29 @@
+repo: mesa/mesa
+pr: 1313
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1313
+merge_sha: b390ff35170fdc2b7f1fb1709a79d81edcd56981
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/1313/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_eu.h
+  status: modified
+  sha256: ada93f4253d90b066d9a62eb8765d457d141b1e393bcbad3d39e014d9bf796e6
+- path: src/intel/compiler/brw_eu_defines.h
+  status: modified
+  sha256: fd4d500297d2cab7dea4e7cb9215b8555e6232e89cbe7b82ecc6f42b06a42494
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: e0388cd34c7699f92ddff1991a21c59a12c86780c6794f53e3ae2a705a299946
+- path: src/intel/compiler/brw_fs_generator.cpp
+  status: modified
+  sha256: 03645420baa243eb2c0ff349cf5b63ba74c28c71f39528cefec5a78d416768f8
+- path: src/intel/compiler/brw_fs_nir.cpp
+  status: modified
+  sha256: 440ee36cedce6a9646e9e7e69649a62e635b36bb82b8525d4514dcd4d7f330c1
+- path: src/intel/compiler/brw_vec4_generator.cpp
+  status: modified
+  sha256: 16b7f4aebe59bce0ec83838d7b66e2010ad15242474dfdefb89e9339f7d1cbc6

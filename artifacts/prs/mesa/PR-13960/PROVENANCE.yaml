@@ -1,0 +1,53 @@
+repo: mesa/mesa
+pr: 13960
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13960
+merge_sha: c45c6e36eb99f08f09001974c78c52f8d76e0223
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/13960/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/freedreno/ir3/ir3.c
+  status: modified
+  sha256: a15fc7d57b857407b78de7838bac301a79e544f20daa070005edf330604fcf47
+- path: src/freedreno/ir3/ir3_compiler_nir.c
+  status: modified
+  sha256: eea594591898cc60e210a0258898df96e541b957c2e19892c55cf7ecdeb1f6d6
+- path: src/freedreno/ir3/ir3_disk_cache.c
+  status: modified
+  sha256: 1e2fedfb6104df596aee3ec05654074f3836af62a8bb6e89484993997b88952a
+- path: src/freedreno/ir3/ir3_nir.c
+  status: modified
+  sha256: b99a763896bbeeb15d4578f8e5349e414b5cd3c6e7b251883c6a409a1993c0cb
+- path: src/freedreno/ir3/ir3_nir.h
+  status: modified
+  sha256: 9cdcbbb158cfa584586573487ee806414c149ed6701cc4605086f8b805c4503f
+- path: src/freedreno/ir3/ir3_ra.c
+  status: modified
+  sha256: f4d0c30688cb5932cf5f73e3cb6a6988e4ac6c9a4aeb170c95c2a1b541be49db
+- path: src/freedreno/ir3/ir3_shader.c
+  status: modified
+  sha256: 01aa49717989dd9aa8f7e090f5533567a8d1b6e95f04d01cde064766966e0501
+- path: src/freedreno/ir3/ir3_shader.h
+  status: modified
+  sha256: 089d7e258770b3071fda8ffa723099c5f4fe036d4dad3a35f45bb1959eb14209
+- path: src/freedreno/vulkan/tu_clear_blit.c
+  status: modified
+  sha256: 6c5290033af249d290b9253a483930ed05a3841e4544e67b9f1e153475fda9c8
+- path: src/freedreno/vulkan/tu_cmd_buffer.c
+  status: modified
+  sha256: cd9fc3ee6bf2fbade6c67bd3b580c74a56c1138279e087d95707fafd3c7e6293
+- path: src/freedreno/vulkan/tu_device.c
+  status: modified
+  sha256: 57ac25fc8c7c9e3bedbc9c0aaf1a5ce8f16bb734d2c0f735de85b4f403f2a1dc
+- path: src/freedreno/vulkan/tu_pipeline.c
+  status: modified
+  sha256: 4884cd8abe26fb67757762fb28cd4a10725d8394db6e53ce7450940583362ec5
+- path: src/freedreno/vulkan/tu_private.h
+  status: modified
+  sha256: 4be3b3926a088ffe161676d0d5000a755eb18c1964036ed50cfa87e5753fb56d
+- path: src/freedreno/vulkan/tu_shader.c
+  status: modified
+  sha256: fbe176fadf4a1feb166ca575aff74789673a2843b3c46345d66b4d95cec98ccc

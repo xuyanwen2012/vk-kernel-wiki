@@ -1,0 +1,29 @@
+diff --git a/src/intel/vulkan/anv_physical_device.c b/src/intel/vulkan/anv_physical_device.c
+--- a/src/intel/vulkan/anv_physical_device.c
++++ b/src/intel/vulkan/anv_physical_device.c
+@@ -1366,7 +1366,8 @@ get_properties(const struct anv_physical_device *pdevice,
+       .maxFragmentDualSrcAttachments            = 1,
+       .maxFragmentCombinedOutputResources       = MAX_RTS + desc_limits.max_ssbos +
+                                                   desc_limits.max_images,
+-      .maxComputeSharedMemorySize               = intel_device_info_get_max_slm_size(&pdevice->info),
++      .maxComputeSharedMemorySize               = MIN2(MAX_SLM_SIZE,
++                                                       intel_device_info_get_max_slm_size(&pdevice->info)),
+       .maxComputeWorkGroupCount                 = { 65535, 65535, 65535 },
+       .maxComputeWorkGroupInvocations           = max_workgroup_size,
+       .maxComputeWorkGroupSize = {
+diff --git a/src/intel/vulkan/anv_private.h b/src/intel/vulkan/anv_private.h
+--- a/src/intel/vulkan/anv_private.h
++++ b/src/intel/vulkan/anv_private.h
+@@ -202,6 +202,12 @@ get_max_vbs(const struct intel_device_info *devinfo) {
+ #define MAX_EMBEDDED_SAMPLERS 2048
+ #define MAX_CUSTOM_BORDER_COLORS 4096
+ #define MAX_DESCRIPTOR_SET_INPUT_ATTACHMENTS 256
++/* Different SKUs have different maximum values. Make things more consistent
++ * across them, by setting a maximum of 48KiB because it's what some of the
++ * other vendors report as maximum and also above the required limit from DX
++ * (16KiB on "downlevel hardware", 32KiB otherwise).
++ */
++#define MAX_SLM_SIZE (48 * 1024)
+ /* We need 16 for UBO block reads to work and 32 for push UBOs. However, we
+  * use 64 here to avoid cache issues. This could most likely bring it back to
+  * 32 if we had different virtual addresses for the different views on a given

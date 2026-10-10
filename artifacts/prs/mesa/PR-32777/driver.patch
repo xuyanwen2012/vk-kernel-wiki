@@ -1,0 +1,2212 @@
+diff --git a/src/nouveau/compiler/nak/from_nir.rs b/src/nouveau/compiler/nak/from_nir.rs
+--- a/src/nouveau/compiler/nak/from_nir.rs
++++ b/src/nouveau/compiler/nak/from_nir.rs
+@@ -3728,6 +3728,73 @@ impl<'a> ShaderFromNir<'a> {
+                 let dst = b.isetp(IntCmpType::I32, IntCmpOp::Ne, src, 0.into());
+                 self.set_dst(&intrin.def, dst.into());
+             }
++            nir_intrinsic_cmat_muladd_nv => {
++                let flags: nak_nir_cmat_mul_add_flags =
++                    unsafe { std::mem::transmute(intrin.flags()) };
++                let cmat_a = self.get_src(&srcs[0]);
++                let cmat_b = self.get_src(&srcs[1]);
++                let cmat_c = self.get_src(&srcs[2]);
++                let dst_bit_size = intrin.def.bit_size();
++                let dst = b.alloc_ssa_vec(
++                    RegFile::GPR,
++                    (intrin.def.num_components() * intrin.def.bit_size)
++                        .div_ceil(32),
++                );
++                let dst_type = FloatType::from_bits(dst_bit_size.into());
++                match flags.cmat_type() {
++                    NAK_CMAT_TYPE_M16N8K8_FLOAT
++                    | NAK_CMAT_TYPE_M16N8K16_FLOAT => {
++                        let mat_size = match flags.cmat_type() {
++                            NAK_CMAT_TYPE_M16N8K8_FLOAT => HmmaSize::M16N8K8,
++                            NAK_CMAT_TYPE_M16N8K16_FLOAT => HmmaSize::M16N8K16,
++                            val => unreachable!("unsupported HMMA type: {val}"),
++                        };
++
++                        assert_eq!(flags.a_type(), GLSL_TYPE_FLOAT16);
++                        assert_eq!(flags.b_type(), GLSL_TYPE_FLOAT16);
++                        assert!(!flags.sat());
++                        b.push_op(OpHmma {
++                            dst: dst.clone().into(),
++                            dst_type: dst_type,
++                            src_type: FloatType::F16,
++                            mat_size: mat_size,
++                            srcs: [cmat_a.into(), cmat_b.into(), cmat_c.into()],
++                        });
++                    }
++                    NAK_CMAT_TYPE_M8N8K16_INT
++                    | NAK_CMAT_TYPE_M16N8K16_INT
++                    | NAK_CMAT_TYPE_M16N8K32_INT => {
++                        let a_type = match flags.a_type() {
++                            GLSL_TYPE_UINT8 => IntType::U8,
++                            GLSL_TYPE_INT8 => IntType::I8,
++                            val => unreachable!("Invalid a_type: {val}"),
++                        };
++                        let b_type = match flags.b_type() {
++                            GLSL_TYPE_UINT8 => IntType::U8,
++                            GLSL_TYPE_INT8 => IntType::I8,
++                            val => unreachable!("Invalid b_type: {val}"),
++                        };
++
++                        let mat_size = match flags.cmat_type() {
++                            NAK_CMAT_TYPE_M8N8K16_INT => ImmaSize::M8N8K16,
++                            NAK_CMAT_TYPE_M16N8K16_INT => ImmaSize::M16N8K16,
++                            NAK_CMAT_TYPE_M16N8K32_INT => ImmaSize::M16N8K32,
++                            val => unreachable!("unsupported IMMA type: {val}"),
++                        };
++
++                        b.push_op(OpImma {
++                            dst: dst.clone().into(),
++                            mat_size,
++                            srcs: [cmat_a.into(), cmat_b.into(), cmat_c.into()],
++                            src_types: [a_type, b_type],
++                            saturate: flags.sat(),
++                        });
++                    }
++                    val => unreachable!("Unknown cmat_type {val}"),
++                }
++
++                self.set_dst(&intrin.def, dst.into());
++            }
+             _ => panic!(
+                 "Unsupported intrinsic instruction: {}",
+                 intrin.info().name()
+diff --git a/src/nouveau/compiler/nak/ir.rs b/src/nouveau/compiler/nak/ir.rs
+--- a/src/nouveau/compiler/nak/ir.rs
++++ b/src/nouveau/compiler/nak/ir.rs
+@@ -3350,6 +3350,108 @@ impl DisplayOp for OpHMul2 {
+ }
+ impl_display_for_op!(OpHMul2);
+ 
++#[derive(Clone, Copy, Eq, PartialEq)]
++#[allow(dead_code)]
++pub enum ImmaSize {
++    M8N8K16,
++    M8N8K32,
++    M16N8K16,
++    M16N8K32,
++    M16N8K64,
++}
++
++impl fmt::Display for ImmaSize {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        match self {
++            ImmaSize::M8N8K16 => write!(f, ".m8n8k16"),
++            ImmaSize::M8N8K32 => write!(f, ".m8n8k32"),
++            ImmaSize::M16N8K16 => write!(f, ".m16n8k16"),
++            ImmaSize::M16N8K32 => write!(f, ".m16n8k32"),
++            ImmaSize::M16N8K64 => write!(f, ".m16n8k64"),
++        }
++    }
++}
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpImma {
++    #[dst_type(Vec)]
++    pub dst: Dst,
++
++    pub mat_size: ImmaSize,
++    pub src_types: [IntType; 2],
++    pub saturate: bool,
++
++    #[src_type(SSA)]
++    pub srcs: [Src; 3],
++}
++
++impl DisplayOp for OpImma {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let sat = if self.saturate { ".sat" } else { "" };
++        write!(
++            f,
++            "imma{}{}{}{sat} {} {} {}",
++            self.mat_size,
++            self.src_types[0],
++            self.src_types[1],
++            self.srcs[0],
++            self.srcs[1],
++            self.srcs[2],
++        )
++    }
++}
++
++impl_display_for_op!(OpImma);
++
++#[derive(Clone, Copy, Eq, PartialEq)]
++#[allow(dead_code)]
++pub enum HmmaSize {
++    M16N8K16,
++    M16N8K8,
++    M16N8K4,
++}
++
++impl fmt::Display for HmmaSize {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        match self {
++            HmmaSize::M16N8K16 => write!(f, ".m16n8k16"),
++            HmmaSize::M16N8K8 => write!(f, ".m16n8k8"),
++            HmmaSize::M16N8K4 => write!(f, ".m16n8k4"),
++        }
++    }
++}
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHmma {
++    #[dst_type(Vec)]
++    pub dst: Dst,
++
++    pub mat_size: HmmaSize,
++    pub src_type: FloatType,
++    pub dst_type: FloatType,
++
++    #[src_type(SSA)]
++    pub srcs: [Src; 3],
++}
++
++impl DisplayOp for OpHmma {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(
++            f,
++            "hmma{}{} {} {} {}",
++            self.mat_size,
++            self.dst_type,
++            self.srcs[0],
++            self.srcs[1],
++            self.srcs[2],
++        )
++    }
++}
++
++impl_display_for_op!(OpHmma);
++
+ #[repr(C)]
+ #[derive(SrcsAsSlice, DstsAsSlice)]
+ pub struct OpHFma2 {
+@@ -7639,6 +7741,8 @@ pub enum Op {
+     HMul2(OpHMul2),
+     HSet2(OpHSet2),
+     HSetP2(OpHSetP2),
++    Imma(OpImma),
++    Hmma(OpHmma),
+     HMnMx2(OpHMnMx2),
+     BMsk(OpBMsk),
+     BRev(OpBRev),
+@@ -7805,6 +7909,9 @@ impl Op {
+             | Op::DMul(_)
+             | Op::DSetP(_) => false,
+ 
++            // Matrix Multiply Add
++            Op::Imma(_) | Op::Hmma(_) => false,
++
+             // Integer ALU
+             Op::BRev(_) | Op::Flo(_) | Op::PopC(_) => false,
+             Op::IMad(_) | Op::IMul(_) => sm >= 70,
+diff --git a/src/nouveau/compiler/nak/opt_instr_sched_common.rs b/src/nouveau/compiler/nak/opt_instr_sched_common.rs
+--- a/src/nouveau/compiler/nak/opt_instr_sched_common.rs
++++ b/src/nouveau/compiler/nak/opt_instr_sched_common.rs
+@@ -182,6 +182,9 @@ pub fn side_effect_type(op: &Op) -> SideEffect {
+         | Op::LdTram(_)
+         | Op::MemBar(_) => SideEffect::Memory,
+ 
++        // Matrix ops
++        Op::Imma(_) | Op::Hmma(_) => SideEffect::None,
++
+         // Control-flow ops
+         Op::BClear(_)
+         | Op::Break(_)
+@@ -319,6 +322,8 @@ pub fn estimate_variable_latency(sm: u8, op: &Op) -> u32 {
+         | Op::S2R(_)
+         | Op::Match(_) => 16,
+ 
++        Op::Hmma(_) | Op::Imma(_) => 22,
++
+         _ => panic!("Unknown variable latency op {op}"),
+     }
+ }
+diff --git a/src/nouveau/compiler/nak/sm70_encode.rs b/src/nouveau/compiler/nak/sm70_encode.rs
+--- a/src/nouveau/compiler/nak/sm70_encode.rs
++++ b/src/nouveau/compiler/nak/sm70_encode.rs
+@@ -3832,6 +3832,96 @@ impl SM70Op for OpMatch {
+     }
+ }
+ 
++impl SM70Op for OpImma {
++    fn legalize(&mut self, b: &mut LegalizeBuilder) {
++        legalize_ext_instr(self, b);
++    }
++
++    fn encode(&self, e: &mut SM70Encoder<'_>) {
++        assert!(e.sm >= 75);
++
++        e.set_opcode(0x237);
++        e.set_dst(&self.dst);
++        e.set_reg_src(24..32, &self.srcs[0]);
++        e.set_reg_src(32..40, &self.srcs[1]);
++        e.set_reg_src(64..72, &self.srcs[2]);
++        e.set_bit(74, true); // SRC1.COL
++
++        assert!(self.mat_size == ImmaSize::M8N8K16 || e.sm >= 80);
++        e.set_field2(
++            75..76,
++            85..87,
++            match self.mat_size {
++                ImmaSize::M8N8K16 => 0u8,
++                ImmaSize::M8N8K32 => 2u8,
++                ImmaSize::M16N8K16 => 4u8,
++                ImmaSize::M16N8K32 => 5u8,
++                ImmaSize::M16N8K64 => 6u8,
++            },
++        );
++
++        e.set_bit(76, self.src_types[0].is_signed());
++        e.set_bit(78, self.src_types[1].is_signed());
++        e.set_bit(82, self.saturate);
++
++        match self.mat_size {
++            ImmaSize::M8N8K32 | ImmaSize::M16N8K64 => {
++                assert_eq!(self.src_types[0].bits(), 4);
++                assert_eq!(self.src_types[1].bits(), 4);
++            }
++            ImmaSize::M16N8K32 => {
++                assert!(matches!(self.src_types[0].bits(), 4 | 8));
++                assert!(matches!(self.src_types[1].bits(), 4 | 8));
++            }
++            ImmaSize::M8N8K16 | ImmaSize::M16N8K16 => {
++                assert_eq!(self.src_types[0].bits(), 8);
++                assert_eq!(self.src_types[1].bits(), 8);
++            }
++        }
++        e.set_bit(83, self.src_types[0].bits() == 4);
++        e.set_bit(84, self.src_types[1].bits() == 4);
++    }
++}
++
++impl SM70Op for OpHmma {
++    fn legalize(&mut self, b: &mut LegalizeBuilder) {
++        legalize_ext_instr(self, b);
++    }
++
++    fn encode(&self, e: &mut SM70Encoder<'_>) {
++        assert!(e.sm >= 75);
++
++        e.set_opcode(0x23c);
++        e.set_dst(&self.dst);
++        e.set_reg_src(24..32, &self.srcs[0]);
++        e.set_reg_src(32..40, &self.srcs[1]);
++        e.set_reg_src(64..72, &self.srcs[2]);
++
++        assert!(self.mat_size != HmmaSize::M16N8K4 || e.sm >= 80);
++        e.set_field2(
++            75..76,
++            78..79,
++            match self.mat_size {
++                HmmaSize::M16N8K8 => 0u8,
++                HmmaSize::M16N8K16 => 1u8,
++                HmmaSize::M16N8K4 => 2u8,
++            },
++        );
++
++        assert!(matches!(self.dst_type, FloatType::F16 | FloatType::F32));
++        e.set_bit(76, self.dst_type == FloatType::F32);
++        e.set_field(
++            82..84,
++            match self.src_type {
++                FloatType::F16 => 0u8,
++                // FloatType::BF16 => 1u8,
++                // FloatType::TF32 => 2u8,
++                _ => unreachable!("unsupported src type!"),
++            },
++        )
++    }
++}
++
+ macro_rules! as_sm70_op_match {
+     ($op: expr) => {
+         match $op {
+@@ -3920,6 +4010,8 @@ macro_rules! as_sm70_op_match {
+             Op::OutFinal(op) => op,
+             Op::Vote(op) => op,
+             Op::Match(op) => op,
++            Op::Hmma(op) => op,
++            Op::Imma(op) => op,
+             _ => panic!("Unsupported op: {}", $op),
+         }
+     };
+diff --git a/src/nouveau/compiler/nak/sm75_instr_latencies.rs b/src/nouveau/compiler/nak/sm75_instr_latencies.rs
+--- a/src/nouveau/compiler/nak/sm75_instr_latencies.rs
++++ b/src/nouveau/compiler/nak/sm75_instr_latencies.rs
+@@ -26,11 +26,11 @@ enum RegLatencySM75 {
+     IMADWideUpper,
+     RedirectedFP64,
+     RedirectedFP16,
+-    RedirectedHMMA_884_F16,
+-    RedirectedHMMA_884_F32,
++    RedirectedHMMA_884_F16(usize),
++    RedirectedHMMA_884_F32(usize),
+     RedirectedHMMA_1688,
+     RedirectedHMMA_16816,
+-    IMMA,
++    IMMA(usize),
+     Decoupled,
+     DecoupledOther, //reads only
+     BMov,
+@@ -104,16 +104,11 @@ impl RegLatencySM75 {
+ 
+             Op::HMnMx2(_) => RedirectedFP16, // not in docs
+             // let in for documentation purposes
+-            //            Op::Hmma(h) => {
+-            //              match h.mat_size {
+-            //                  HmmaSize::M16N8K4 => match h.dst_type {
+-            //                      FloatType::F16 => RedirectedHMMA_884_F16,
+-            //                      _ => RedirectedHMMA_884_F32
+-            //                  }
+-            //                  HmmaSize::M16N8K8 => RedirectedHMMA_1688,
+-            //                  HmmaSize::M16N8K16 => RedirectedHMMA_16816,
+-            //                }
+-            //           }
++            Op::Hmma(h) => match (h.mat_size, h.dst_type) {
++                (HmmaSize::M16N8K8, _) => RedirectedHMMA_1688,
++                (HmmaSize::M16N8K16, _) => RedirectedHMMA_16816,
++                _ => panic!("Illegal HMMA in reg category {}", h),
++            },
+             Op::Ipa(_) => Decoupled,
+             Op::MuFu(_) => Decoupled,
+ 
+@@ -168,8 +163,7 @@ impl RegLatencySM75 {
+             // PMTRIG => CoupledDisp64
+             // CSMTEST =>  CoupledAlu,
+             Op::Bar(_) => Decoupled,
+-            // Remove when Imma added
+-            //Op::Imma(_) => IMMA,
++            Op::Imma(_) => IMMA(op_reg_idx),
+             Op::IDp4(_) => CoupledFMA,
+             Op::BClear(_) => Decoupled,
+             Op::Bra(_) => Decoupled,
+@@ -229,11 +223,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 5,
+                 RedirectedFP64 => 9,
+                 RedirectedFP16 => 8,
+-                RedirectedHMMA_884_F16 => 13,
+-                RedirectedHMMA_884_F32 => 10,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
+                 RedirectedHMMA_1688 => 14,
+                 RedirectedHMMA_16816 => 22,
+-                IMMA => 10,
++                IMMA(_) => 10,
+                 _ => 1,
+             },
+             CoupledFMA | IMADLo => match writer {
+@@ -244,11 +238,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 4,
+                 RedirectedFP64 => 9,
+                 RedirectedFP16 => 8,
+-                RedirectedHMMA_884_F16 => 13,
+-                RedirectedHMMA_884_F32 => 10,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
+                 RedirectedHMMA_1688 => 14,
+                 RedirectedHMMA_16816 => 22,
+-                IMMA => 10,
++                IMMA(_) => 10,
+                 _ => 1,
+             },
+             IMADWideAB => match writer {
+@@ -259,11 +253,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 6,
+                 RedirectedFP64 => 9,
+                 RedirectedFP16 => 8,
+-                RedirectedHMMA_884_F16 => 13,
+-                RedirectedHMMA_884_F32 => 10,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
+                 RedirectedHMMA_1688 => 14,
+                 RedirectedHMMA_16816 => 22,
+-                IMMA => 10,
++                IMMA(_) => 10,
+                 _ => 1,
+             },
+             IMADWideLower | IMADWideUpper => match reader {
+@@ -275,11 +269,11 @@ impl RegLatencySM75 {
+                     IMADWideUpper => 2,
+                     RedirectedFP64 => 9,
+                     RedirectedFP16 => 8,
+-                    RedirectedHMMA_884_F16 => 13,
+-                    RedirectedHMMA_884_F32 => 10,
++                    RedirectedHMMA_884_F16(_) => 13,
++                    RedirectedHMMA_884_F32(_) => 10,
+                     RedirectedHMMA_1688 => 14,
+                     RedirectedHMMA_16816 => 22,
+-                    IMMA => 10,
++                    IMMA(_) => 10,
+                     _ => 1,
+                 },
+                 IMADWideUpper => match writer {
+@@ -290,11 +284,11 @@ impl RegLatencySM75 {
+                     IMADWideUpper => 2,
+                     RedirectedFP64 => 7,
+                     RedirectedFP16 => 6,
+-                    RedirectedHMMA_884_F16 => 11,
+-                    RedirectedHMMA_884_F32 => 8,
++                    RedirectedHMMA_884_F16(_) => 11,
++                    RedirectedHMMA_884_F32(_) => 8,
+                     RedirectedHMMA_1688 => 12,
+                     RedirectedHMMA_16816 => 20,
+-                    IMMA => 8,
++                    IMMA(_) => 8,
+                     _ => 1,
+                 },
+                 _ => {
+@@ -309,11 +303,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 6,
+                 RedirectedFP64 => 8,
+                 RedirectedFP16 => 8,
+-                RedirectedHMMA_884_F16 => 13,
+-                RedirectedHMMA_884_F32 => 10,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
+                 RedirectedHMMA_1688 => 14,
+                 RedirectedHMMA_16816 => 22,
+-                IMMA => 10,
++                IMMA(_) => 10,
+                 _ => 1,
+             },
+             RedirectedFP16 => match writer {
+@@ -324,18 +318,46 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 6,
+                 RedirectedFP64 => 9,
+                 RedirectedFP16 => 6,
+-                RedirectedHMMA_884_F16 => 13,
+-                RedirectedHMMA_884_F32 => 10,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
++                RedirectedHMMA_1688 => 14,
++                RedirectedHMMA_16816 => 22,
++                IMMA(_) => 10,
++                _ => 1,
++            },
++            RedirectedHMMA_884_F16(read_idx) => match writer {
++                CoupledDisp64 => 6,
++                CoupledAlu | CoupledDisp => 6,
++                CoupledFMA | IMADLo => 6,
++                IMADWideLower => 6,
++                IMADWideUpper => 6,
++                RedirectedFP64 => 9,
++                RedirectedFP16 => 8,
++                RedirectedHMMA_884_F16(_) if read_idx == 2 => 4,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
+                 RedirectedHMMA_1688 => 14,
+                 RedirectedHMMA_16816 => 22,
+-                IMMA => 10,
++                IMMA(_) => 10,
+                 _ => 1,
+             },
+-            RedirectedHMMA_884_F16
+-            | RedirectedHMMA_884_F32
+-            | RedirectedHMMA_1688
+-            | RedirectedHMMA_16816
+-            | Decoupled => {
++            RedirectedHMMA_884_F32(read_idx) => match writer {
++                CoupledDisp64 => 6,
++                CoupledAlu | CoupledDisp => 6,
++                CoupledFMA | IMADLo => 6,
++                IMADWideLower => 6,
++                IMADWideUpper => 6,
++                RedirectedFP64 => 9,
++                RedirectedFP16 => 8,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) if read_idx == 2 => 4,
++                RedirectedHMMA_884_F32(_) => 10,
++                RedirectedHMMA_1688 => 14,
++                RedirectedHMMA_16816 => 22,
++                IMMA(_) => 10,
++                _ => 1,
++            },
++            RedirectedHMMA_1688 | RedirectedHMMA_16816 | Decoupled => {
+                 match writer {
+                     CoupledDisp64 => 6,
+                     CoupledAlu | CoupledDisp => 6,
+@@ -344,31 +366,45 @@ impl RegLatencySM75 {
+                     IMADWideUpper => 6,
+                     RedirectedFP64 => 9,
+                     RedirectedFP16 => 8,
+-                    RedirectedHMMA_884_F16 => 13, //4 for back to back FMA for 884
+-                    RedirectedHMMA_884_F32 => 10, //4 for back o back FMA for 884
++                    RedirectedHMMA_884_F16(_) => 13,
++                    RedirectedHMMA_884_F32(_) => 10,
+                     RedirectedHMMA_1688 => 14,
+                     RedirectedHMMA_16816 => 22,
+-                    IMMA => 10,
+-                    _ => 1,
+-                }
+-            }
+-            IMMA | DecoupledOther => {
+-                match writer {
+-                    CoupledDisp64 => 8,
+-                    CoupledAlu | CoupledDisp => 8,
+-                    CoupledFMA | IMADLo => 8,
+-                    IMADWideLower => 8,
+-                    IMADWideUpper => 8,
+-                    RedirectedFP64 => 9,
+-                    RedirectedFP16 => 8,
+-                    RedirectedHMMA_884_F16 => 13,
+-                    RedirectedHMMA_884_F32 => 10,
+-                    RedirectedHMMA_1688 => 14,
+-                    RedirectedHMMA_16816 => 22,
+-                    IMMA => 10, // 4 for back to back IMMA
++                    IMMA(_) => 10,
+                     _ => 1,
+                 }
+             }
++            IMMA(read_idx) => match writer {
++                CoupledDisp64 => 8,
++                CoupledAlu | CoupledDisp => 8,
++                CoupledFMA | IMADLo => 8,
++                IMADWideLower => 8,
++                IMADWideUpper => 8,
++                RedirectedFP64 => 9,
++                RedirectedFP16 => 8,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
++                RedirectedHMMA_1688 => 14,
++                RedirectedHMMA_16816 => 22,
++                IMMA(_) if read_idx == 2 => 4,
++                IMMA(_) => 10,
++                _ => 1,
++            },
++            DecoupledOther => match writer {
++                CoupledDisp64 => 8,
++                CoupledAlu | CoupledDisp => 8,
++                CoupledFMA | IMADLo => 8,
++                IMADWideLower => 8,
++                IMADWideUpper => 8,
++                RedirectedFP64 => 9,
++                RedirectedFP16 => 8,
++                RedirectedHMMA_884_F16(_) => 13,
++                RedirectedHMMA_884_F32(_) => 10,
++                RedirectedHMMA_1688 => 14,
++                RedirectedHMMA_16816 => 22,
++                IMMA(_) => 10,
++                _ => 1,
++            },
+             BMov | GuardPredicate => {
+                 panic!("Not a RAW category")
+             }
+@@ -393,11 +429,11 @@ impl RegLatencySM75 {
+                 | IMADLo | IMADWideLower | IMADWideUpper => 1,
+                 RedirectedFP64 => 4,
+                 RedirectedFP16 => 3,
+-                RedirectedHMMA_884_F16 => 8,
+-                RedirectedHMMA_884_F32 => pred(has_pred, 2, 2),
++                RedirectedHMMA_884_F16(_) => 8,
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 2, 2),
+                 RedirectedHMMA_1688 => 9,
+                 RedirectedHMMA_16816 => 17,
+-                IMMA => 5,
++                IMMA(_) => 5,
+                 _ => 1,
+             },
+             CoupledDisp | CoupledAlu => match writer1 {
+@@ -406,11 +442,11 @@ impl RegLatencySM75 {
+                 | IMADWideLower | IMADWideUpper => 1,
+                 RedirectedFP64 => pred(has_pred, 4, 1),
+                 RedirectedFP16 => pred(has_pred, 3, 1),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 8, 1),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 5, 1),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 8, 1),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 5, 1),
+                 RedirectedHMMA_1688 => pred(has_pred, 9, 1),
+                 RedirectedHMMA_16816 => pred(has_pred, 17, 1),
+-                IMMA => pred(has_pred, 5, 1),
++                IMMA(_) => pred(has_pred, 5, 1),
+                 _ => 1,
+             },
+             CoupledFMA | IMADLo => match writer1 {
+@@ -420,11 +456,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => pred(has_pred, 1, 1),
+                 RedirectedFP64 => pred(has_pred, 4, 1),
+                 RedirectedFP16 => pred(has_pred, 3, 1),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 8, 1),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 5, 1),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 8, 1),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 5, 1),
+                 RedirectedHMMA_1688 => pred(has_pred, 9, 1),
+                 RedirectedHMMA_16816 => pred(has_pred, 17, 1),
+-                IMMA => pred(has_pred, 5, 1),
++                IMMA(_) => pred(has_pred, 5, 1),
+                 _ => 1,
+             },
+             IMADWideLower => match writer1 {
+@@ -435,11 +471,11 @@ impl RegLatencySM75 {
+                 IMADWideUpper => 1,
+                 RedirectedFP64 => pred(has_pred, 4, 3),
+                 RedirectedFP16 => pred(has_pred, 3, 3),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 8, 3),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 5, 3),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 8, 3),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 5, 3),
+                 RedirectedHMMA_1688 => pred(has_pred, 9, 3),
+                 RedirectedHMMA_16816 => pred(has_pred, 17, 3),
+-                IMMA => pred(has_pred, 5, 3),
++                IMMA(_) => pred(has_pred, 5, 3),
+                 _ => 1,
+             },
+             IMADWideUpper => match writer1 {
+@@ -448,11 +484,11 @@ impl RegLatencySM75 {
+                 | IMADWideLower | IMADWideUpper => 1,
+                 RedirectedFP64 => pred(has_pred, 4, 1),
+                 RedirectedFP16 => pred(has_pred, 3, 1),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 8, 1),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 5, 1),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 8, 1),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 5, 1),
+                 RedirectedHMMA_1688 => pred(has_pred, 9, 1),
+                 RedirectedHMMA_16816 => pred(has_pred, 17, 1),
+-                IMMA => pred(has_pred, 5, 1),
++                IMMA(_) => pred(has_pred, 5, 1),
+                 _ => 1,
+             },
+             RedirectedFP64 => match writer1 {
+@@ -460,11 +496,11 @@ impl RegLatencySM75 {
+                 | IMADLo | IMADWideLower | IMADWideUpper => 2,
+                 RedirectedFP64 => 1,
+                 RedirectedFP16 => 2,
+-                RedirectedHMMA_884_F16 => 5,
+-                RedirectedHMMA_884_F32 => 2,
++                RedirectedHMMA_884_F16(_) => 5,
++                RedirectedHMMA_884_F32(_) => 2,
+                 RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 14,
+-                IMMA => 2,
++                IMMA(_) => 2,
+                 _ => 1,
+             },
+             RedirectedFP16 => match writer1 {
+@@ -472,71 +508,71 @@ impl RegLatencySM75 {
+                 | IMADLo | IMADWideLower | IMADWideUpper => 2,
+                 RedirectedFP64 => pred(has_pred, 1, 1),
+                 RedirectedFP16 => 1,
+-                RedirectedHMMA_884_F16 => pred(has_pred, 6, 1),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 3, 1),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 6, 1),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 3, 1),
+                 RedirectedHMMA_1688 => pred(has_pred, 7, 1),
+                 RedirectedHMMA_16816 => pred(has_pred, 15, 1),
+-                IMMA => pred(has_pred, 3, 1),
++                IMMA(_) => pred(has_pred, 3, 1),
+                 _ => 1,
+             },
+-            RedirectedHMMA_884_F16 => match writer1 {
++            RedirectedHMMA_884_F16(_) => match writer1 {
+                 CoupledDisp64 | CoupledDisp | CoupledAlu | CoupledFMA
+                 | IMADLo | IMADWideLower | IMADWideUpper => 2,
+                 RedirectedFP64 => pred(has_pred, 3, 2),
+                 RedirectedFP16 => pred(has_pred, 2, 2),
+-                RedirectedHMMA_884_F16 => 1,
+-                RedirectedHMMA_884_F32 => pred(has_pred, 2, 4),
++                RedirectedHMMA_884_F16(_) => 1,
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 2, 4),
+                 RedirectedHMMA_1688 => pred(has_pred, 6, 4),
+                 RedirectedHMMA_16816 => pred(has_pred, 16, 2),
+-                IMMA => pred(has_pred, 2, 4),
++                IMMA(_) => pred(has_pred, 2, 4),
+                 _ => 1,
+             },
+-            RedirectedHMMA_884_F32 => match writer1 {
++            RedirectedHMMA_884_F32(_) => match writer1 {
+                 CoupledDisp64 | CoupledDisp | CoupledAlu | CoupledFMA
+                 | IMADLo | IMADWideLower | IMADWideUpper => 2,
+                 RedirectedFP64 => pred(has_pred, 3, 2),
+                 RedirectedFP16 => pred(has_pred, 2, 2),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 4, 5),
+-                RedirectedHMMA_884_F32 => 1,
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 4, 5),
++                RedirectedHMMA_884_F32(_) => 1,
+                 RedirectedHMMA_1688 => pred(has_pred, 6, 4),
+                 RedirectedHMMA_16816 => pred(has_pred, 16, 2),
+-                IMMA => pred(has_pred, 2, 4),
++                IMMA(_) => pred(has_pred, 2, 4),
+                 _ => 1,
+             },
+             RedirectedHMMA_1688 => match writer1 {
+                 CoupledDisp64 | CoupledDisp | CoupledAlu | CoupledFMA
+                 | IMADLo | IMADWideLower | IMADWideUpper | RedirectedFP64
+                 | RedirectedFP16 => 2,
+-                RedirectedHMMA_884_F16 => 4,
+-                RedirectedHMMA_884_F32 => 2,
++                RedirectedHMMA_884_F16(_) => 4,
++                RedirectedHMMA_884_F32(_) => 2,
+                 RedirectedHMMA_1688 => 1,
+                 RedirectedHMMA_16816 => 16,
+-                IMMA => 2,
++                IMMA(_) => 2,
+                 _ => 1,
+             },
+             RedirectedHMMA_16816 => match writer1 {
+                 CoupledDisp64 | CoupledDisp | CoupledAlu | CoupledFMA
+                 | IMADLo | IMADWideLower | IMADWideUpper | RedirectedFP64
+                 | RedirectedFP16 => 2,
+-                RedirectedHMMA_884_F16 => 4,
+-                RedirectedHMMA_884_F32 => 2,
++                RedirectedHMMA_884_F16(_) => 4,
++                RedirectedHMMA_884_F32(_) => 2,
+                 RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 1,
+-                IMMA => 2,
++                IMMA(_) => 2,
+                 _ => 1,
+             },
+-            IMMA => match writer1 {
++            IMMA(_) => match writer1 {
+                 CoupledDisp64 | CoupledDisp | CoupledAlu | CoupledFMA
+                 | IMADLo | IMADWideLower | IMADWideUpper => {
+                     pred(has_pred, 2, 2)
+                 }
+                 RedirectedFP64 => pred(has_pred, 2, 3),
+                 RedirectedFP16 => pred(has_pred, 2, 2),
+-                RedirectedHMMA_884_F16 => pred(has_pred, 2, 7),
+-                RedirectedHMMA_884_F32 => pred(has_pred, 2, 4),
++                RedirectedHMMA_884_F16(_) => pred(has_pred, 2, 7),
++                RedirectedHMMA_884_F32(_) => pred(has_pred, 2, 4),
+                 RedirectedHMMA_1688 => pred(has_pred, 6, 4),
+                 RedirectedHMMA_16816 => pred(has_pred, 14, 4),
+-                IMMA => 1,
++                IMMA(_) => 1,
+                 _ => 1,
+             },
+             Decoupled => match writer1 {
+@@ -549,11 +585,11 @@ impl RegLatencySM75 {
+                 | IMADWideUpper
+                 | RedirectedFP64
+                 | RedirectedFP16
+-                | RedirectedHMMA_884_F16
+-                | RedirectedHMMA_884_F32
++                | RedirectedHMMA_884_F16(_)
++                | RedirectedHMMA_884_F32(_)
+                 | RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 14,
+-                IMMA => 2,
++                IMMA(_) => 2,
+                 _ => 1,
+             },
+             BMov => {
+@@ -568,11 +604,11 @@ impl RegLatencySM75 {
+                     | IMADWideUpper
+                     | RedirectedFP64
+                     | RedirectedFP16
+-                    | RedirectedHMMA_884_F16
+-                    | RedirectedHMMA_884_F32
++                    | RedirectedHMMA_884_F16(_)
++                    | RedirectedHMMA_884_F32(_)
+                     | RedirectedHMMA_1688 => 9,
+                     RedirectedHMMA_16816 => 14,
+-                    IMMA => 9,
++                    IMMA(_) => 9,
+                     _ => 1,
+                 }
+             }
+@@ -605,15 +641,15 @@ impl RegLatencySM75 {
+                 Decoupled => 1,
+                 _ => 2,
+             },
+-            RedirectedHMMA_884_F16 => match reader {
+-                RedirectedHMMA_884_F16 => 1,
++            RedirectedHMMA_884_F16(_) => match reader {
++                RedirectedHMMA_884_F16(_) => 1,
+                 RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 14,
+                 Decoupled => 1,
+                 _ => 2,
+             },
+-            RedirectedHMMA_884_F32 => match reader {
+-                RedirectedHMMA_884_F32 => 1,
++            RedirectedHMMA_884_F32(_) => match reader {
++                RedirectedHMMA_884_F32(_) => 1,
+                 RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 14,
+                 Decoupled => 1,
+@@ -631,10 +667,10 @@ impl RegLatencySM75 {
+                 Decoupled => 1,
+                 _ => 2,
+             },
+-            IMMA => match reader {
++            IMMA(_) => match reader {
+                 RedirectedHMMA_1688 => 6,
+                 RedirectedHMMA_16816 => 14,
+-                IMMA => 1,
++                IMMA(_) => 1,
+                 Decoupled => 1,
+                 _ => 2,
+             },
+@@ -1160,11 +1196,11 @@ impl SM75Latency {
+                 // We don't think fp16 needs scoreboarding on any known hw
+                 // Put this back if we figure out it does.
+                 //RegLatencySM75::RedirectedFP16 |
+-                RegLatencySM75::RedirectedHMMA_884_F16 |
+-                RegLatencySM75::RedirectedHMMA_884_F32 |
++                RegLatencySM75::RedirectedHMMA_884_F16(_) |
++                RegLatencySM75::RedirectedHMMA_884_F32(_) |
+                 RegLatencySM75::RedirectedHMMA_1688 |
+                 RegLatencySM75::RedirectedHMMA_16816 |
+-                RegLatencySM75::IMMA |
++                RegLatencySM75::IMMA(_) |
+                 RegLatencySM75::Decoupled => true,
+                 _ => false
+             }
+diff --git a/src/nouveau/compiler/nak/sm80_instr_latencies.rs b/src/nouveau/compiler/nak/sm80_instr_latencies.rs
+--- a/src/nouveau/compiler/nak/sm80_instr_latencies.rs
++++ b/src/nouveau/compiler/nak/sm80_instr_latencies.rs
+@@ -144,16 +144,21 @@ impl RegLatencySM80 {
+ 
+             Op::HSet2(_) | Op::HSetP2(_) | Op::HMnMx2(_) => FP16_Alu,
+             // let in for documentation purposes
+-            //Op::Hmma(h) => {
+-            //match h.mat_size {
+-            //        HmmaSize::M16N8K4 => match h.dst_type {
+-            //            FloatType::F16 => MMA_1x_Collect,
+-            //            _ => MMA_2x_Collect,
+-            //        }
+-            //        HmmaSize::M16N8K8 => MMA_1x_Collect,
+-            //        HmmaSize::M16N8K16 => MMA_2x_Collect,
+-            //    }
+-            //}
++            Op::Hmma(h) => match (h.mat_size, h.dst_type, h.src_type) {
++                (HmmaSize::M16N8K16, FloatType::F32, FloatType::F16) => {
++                    MMA_2x_collect
++                }
++                // (HmmaSize::M16N8K16, FloatType::F32, FloatType::BF16) => MMA_2x_collect,
++                // (HmmaSize::M16N8K8, FloatType::F32, FloatType::TF32) => MMA_2x_collect,
++                (HmmaSize::M16N8K8, FloatType::F32, FloatType::F16) => {
++                    MMA_1x_collect
++                }
++                // (HmmaSize::M16N8K8, FloatType::F32, FloatType::BF16) => MMA_1x_collect,
++                // (HmmaSize::M16N8K4, FloatType::F32, FloatType::TF32) => MMA_1x_collect,
++                (HmmaSize::M16N8K16, FloatType::F16, _) => MMA_2x_collect,
++                (HmmaSize::M16N8K8, FloatType::F16, _) => MMA_1x_collect,
++                _ => panic!("Illegal HMMA in reg category {}", h),
++            },
+             Op::Ipa(_) => DecoupledAgu,
+             Op::MuFu(_) => Decoupled,
+ 
+@@ -202,7 +207,17 @@ impl RegLatencySM80 {
+             // CSMTEST =>  CoupledAlu,
+             Op::Bar(_) => DecoupledAgu,
+             // Remove when Imma added
+-            //Op::Imma(_) => IMMA,
++            Op::Imma(i) => match (i.mat_size, i.src_types[0]) {
++                (ImmaSize::M16N8K64, _) => MMA_2x_collect,
++                (ImmaSize::M16N8K32, IntType::I8 | IntType::U8) => {
++                    MMA_2x_collect
++                }
++                // (ImmaSize::M16N8K32, IntType::I4 | IntType::U4) => MMA_1x_collect,
++                (ImmaSize::M16N8K16, _) => MMA_1x_collect,
++                (ImmaSize::M8N8K32, _) => IMMA_88,
++                (ImmaSize::M8N8K16, _) => IMMA_88,
++                _ => panic!("Illegal IMMA in reg category {}", i),
++            },
+             Op::IDp4(_) => CoupledFMA,
+             Op::BClear(_) => Decoupled,
+             Op::Bra(_) => Decoupled,
+@@ -257,8 +272,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 10,
+                 Clmad => 12,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -280,8 +295,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 10,
+                 Clmad => 12,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -303,8 +318,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 10,
+                 Clmad => 12,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -326,8 +341,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 8,
+                 Clmad => 10,
+                 IMMA_88 => 11,
+-                MMA_1x_collect => 11,
+-                MMA_2x_collect => 15,
++                MMA_1x_collect => 14,
++                MMA_2x_collect => 22,
+                 DMMA => 23,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -353,8 +368,8 @@ impl RegLatencySM80 {
+                     RedirectedFP64 => 10,
+                     Clmad => 12,
+                     IMMA_88 => 13,
+-                    MMA_1x_collect => 13,
+-                    MMA_2x_collect => 17,
++                    MMA_1x_collect => 16,
++                    MMA_2x_collect => 24,
+                     DMMA => 25,
+                     Cbu => 1,
+                     Decoupled => 1,
+@@ -377,8 +392,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 10,
+                 Clmad => 12,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -400,8 +415,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 6,
+                 Clmad => 12,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -423,8 +438,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 10,
+                 Clmad => 8,
+                 IMMA_88 => 13,
+-                MMA_1x_collect => 13,
+-                MMA_2x_collect => 17,
++                MMA_1x_collect => 16,
++                MMA_2x_collect => 24,
+                 DMMA => 25,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -447,8 +462,8 @@ impl RegLatencySM80 {
+                     RedirectedFP64 => 11,
+                     Clmad => 13,
+                     IMMA_88 => 14,        //6??
+-                    MMA_1x_collect => 14, //6??
+-                    MMA_2x_collect => 18,
++                    MMA_1x_collect => 16, //6??
++                    MMA_2x_collect => 24,
+                     DMMA => 26,
+                     Cbu => 1,
+                     Decoupled => 1,
+@@ -472,8 +487,8 @@ impl RegLatencySM80 {
+                     RedirectedFP64 => 11,
+                     Clmad => 13,
+                     IMMA_88 => 14,
+-                    MMA_1x_collect => 14,
+-                    MMA_2x_collect => 18, //10??
++                    MMA_1x_collect => 16,
++                    MMA_2x_collect => 24, //10??
+                     DMMA => 26,
+                     Cbu => 1,
+                     Decoupled => 1,
+@@ -497,8 +512,8 @@ impl RegLatencySM80 {
+                     RedirectedFP64 => 11,
+                     Clmad => 13,
+                     IMMA_88 => 14,
+-                    MMA_1x_collect => 14,
+-                    MMA_2x_collect => 18,
++                    MMA_1x_collect => 16,
++                    MMA_2x_collect => 24,
+                     DMMA => 26, //18??
+                     Cbu => 1,
+                     Decoupled => 1,
+@@ -521,8 +536,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 6,
+                 Clmad => 8,
+                 IMMA_88 => 11,
+-                MMA_1x_collect => 11,
+-                MMA_2x_collect => 15,
++                MMA_1x_collect => 14,
++                MMA_2x_collect => 22,
+                 DMMA => 23,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -544,8 +559,8 @@ impl RegLatencySM80 {
+                 RedirectedFP64 => 7,
+                 Clmad => 9,
+                 IMMA_88 => 12,
+-                MMA_1x_collect => 12,
+-                MMA_2x_collect => 16,
++                MMA_1x_collect => 15,
++                MMA_2x_collect => 23,
+                 DMMA => 24,
+                 Cbu => 1,
+                 Decoupled => 1,
+@@ -787,7 +802,10 @@ impl RegLatencySM80 {
+         match writer {
+             CoupledAlu | CoupledDisp64 | CoupledFMA | IMADWideWriteDL
+             | IMADWideWriteDH | FP16 | FP16_Alu | FP16_F32 | HFMA2_MMA
+-            | RedirectedFP64 => 1,
++            | RedirectedFP64 => match reader {
++                MMA_2x_collect => 7,
++                _ => 1,
++            },
+             Clmad | IMMA_88 | MMA_1x_collect | MMA_2x_collect | DMMA | Cbu
+             | Decoupled | DecoupledAgu => match reader {
+                 CoupledAlu | CoupledDisp64 | CoupledFMA | IMADWideReadAB
+diff --git a/src/nouveau/compiler/meson.build b/src/nouveau/compiler/meson.build
+--- a/src/nouveau/compiler/meson.build
++++ b/src/nouveau/compiler/meson.build
+@@ -16,6 +16,7 @@ libnak_c_files = files(
+   'nak.h',
+   'nak_nir.c',
+   'nak_nir_lower_cf.c',
++  'nak_nir_lower_cmat.c',
+   'nak_nir_lower_fs_inputs.c',
+   'nak_nir_lower_gs_intrinsics.c',
+   'nak_nir_lower_image_addrs.c',
+@@ -65,6 +66,8 @@ _nak_bindings_rs = rust.bindgen(
+     '--allowlist-function', 'drm.*',
+     '--allowlist-function', 'nak_.*',
+     '--allowlist-function', 'nouveau_ws_.*',
++    # provided through compiler::bindings::*
++    '--blocklist-type', 'glsl_.*',
+     '--no-prepend-enum-name',
+     '--with-derive-default',
+   ],
+diff --git a/src/nouveau/compiler/nak_nir.c b/src/nouveau/compiler/nak_nir.c
+--- a/src/nouveau/compiler/nak_nir.c
++++ b/src/nouveau/compiler/nak_nir.c
+@@ -354,6 +354,8 @@ nak_preprocess_nir(nir_shader *nir, const struct nak_compiler *nak)
+ 
+    OPT(nir, nir_lower_global_vars_to_local);
+ 
++   OPT(nir, nak_nir_lower_cmat, nak);
++
+    OPT(nir, nir_split_var_copies);
+    OPT(nir, nir_split_struct_vars, nir_var_function_temp);
+ 
+diff --git a/src/nouveau/compiler/nak_nir_lower_cmat.c b/src/nouveau/compiler/nak_nir_lower_cmat.c
+--- /dev/null
++++ b/src/nouveau/compiler/nak_nir_lower_cmat.c
+@@ -0,0 +1,860 @@
++/*
++ * Copyright © 2023 Bas Nieuwenhuizen
++ * Copyright © 2024 Collabora, Ltd.
++ * SPDX-License-Identifier: MIT
++ */
++
++#include "util/macros.h"
++#include "glsl_types.h"
++#include "nak_private.h"
++#include "nir_builder.h"
++
++static enum nak_cmat_type
++get_nak_cmat_type_for_muladd(struct glsl_cmat_description a_desc,
++                             struct glsl_cmat_description b_desc,
++                             struct glsl_cmat_description c_desc)
++{
++   unsigned m = a_desc.rows;
++   unsigned k = b_desc.rows;
++   unsigned n = c_desc.cols;
++
++   bool a_is_int8 = a_desc.element_type == GLSL_TYPE_INT8 ||
++                    a_desc.element_type == GLSL_TYPE_UINT8;
++   bool b_is_int8 = b_desc.element_type == GLSL_TYPE_INT8 ||
++                    b_desc.element_type == GLSL_TYPE_UINT8;
++   bool c_is_int32 = c_desc.element_type == GLSL_TYPE_INT ||
++                     c_desc.element_type == GLSL_TYPE_UINT;
++
++   if (m ==  8 && a_is_int8 &&
++       n ==  8 && b_is_int8 &&
++       k == 16 && c_is_int32)
++      return NAK_CMAT_TYPE_M8N8K16_INT;
++
++   if (m == 16 && a_is_int8 &&
++       n ==  8 && b_is_int8 &&
++       k == 16 && c_is_int32)
++      return NAK_CMAT_TYPE_M16N8K16_INT;
++
++   if (m == 16 && a_is_int8 &&
++       n ==  8 && b_is_int8 &&
++       k == 32 && c_is_int32)
++      return NAK_CMAT_TYPE_M16N8K32_INT;
++
++   if (m == 16 && a_is_int8 &&
++       n == 16 && b_is_int8 &&
++       k == 32 && c_is_int32)
++      return NAK_CMAT_TYPE_M16N16K32_INT_SW;
++
++   if (m == 16 && a_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       n ==  8 && b_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       k ==  8 && glsl_base_type_is_float(c_desc.element_type))
++      return NAK_CMAT_TYPE_M16N8K8_FLOAT;
++
++   if (m == 16 && a_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       n ==  8 && b_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       k == 16 && glsl_base_type_is_float(c_desc.element_type))
++       return NAK_CMAT_TYPE_M16N8K16_FLOAT;
++
++   if (m == 16 && a_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       n == 16 && b_desc.element_type == GLSL_TYPE_FLOAT16 &&
++       k == 16 && glsl_base_type_is_float(c_desc.element_type))
++      return NAK_CMAT_TYPE_M16N16K16_FLOAT_SW;
++
++   unreachable("Unable to determine matrix muladd layout!");
++}
++
++enum nak_matrix_type_layout {
++   NAK_MAT_16x32_INT8,
++   NAK_MAT_16X16,
++};
++
++static enum nak_matrix_type_layout
++determine_matrix_type(struct glsl_cmat_description desc)
++{
++   bool is_int8 = desc.element_type == GLSL_TYPE_INT8 ||
++                  desc.element_type == GLSL_TYPE_UINT8;
++   bool is_int8_a = is_int8 && desc.use == GLSL_CMAT_USE_A;
++   bool is_int8_b = is_int8 && desc.use == GLSL_CMAT_USE_B;
++   ASSERTED bool is_int32 = desc.element_type == GLSL_TYPE_INT ||
++                            desc.element_type == GLSL_TYPE_UINT;
++   ASSERTED bool is_float16 = desc.element_type == GLSL_TYPE_FLOAT16;
++   ASSERTED bool is_float32 = desc.element_type == GLSL_TYPE_FLOAT;
++   ASSERTED bool use_accum = desc.use == GLSL_CMAT_USE_ACCUMULATOR;
++
++   /* This format doesn't exist on any hardware we are aware of so far and is
++    * part of lowering
++    */
++   if (desc.rows == 32 && desc.cols == 16 && is_int8_b)
++      return NAK_MAT_16x32_INT8;
++
++   /* Even though this condition might be correct, we assert on all the
++    * combination we actually verified on hardware.
++    */
++   if (is_int8_a || is_int8_b) {
++      assert(
++         (desc.rows ==  8 && desc.cols == 16 && is_int8_a) ||
++         (desc.rows == 16 && desc.cols ==  8 && is_int8_b) ||
++         (desc.rows == 16 && desc.cols == 16 && is_int8_a) ||
++         (desc.rows == 16 && desc.cols == 32 && is_int8_a) ||
++         (desc.rows == 32 && desc.cols ==  8 && is_int8_b)
++      );
++      return NAK_MAT_16x32_INT8;
++   } else {
++      assert(
++         (desc.rows ==  8 && desc.cols ==  8 && is_float16 && !use_accum) ||
++         (desc.rows == 16 && desc.cols ==  8 && is_float16              ) ||
++         (desc.rows == 16 && desc.cols ==  8 && is_float32              ) ||
++         (desc.rows == 16 && desc.cols == 16 && is_float16              ) ||
++         (desc.rows == 16 && desc.cols == 16 && is_float32              ) ||
++         (desc.rows ==  8 && desc.cols ==  8 && is_int32                ) ||
++         (desc.rows == 16 && desc.cols ==  8 && is_int32                ) ||
++         (desc.rows == 16 && desc.cols == 16 && is_int32                )
++      );
++      return NAK_MAT_16X16;
++   }
++}
++
++static unsigned
++get_cmat_size(struct glsl_cmat_description matrix_desc)
++{
++   return matrix_desc.cols * matrix_desc.rows;
++}
++
++static unsigned
++get_cmat_length(struct glsl_cmat_description matrix_desc)
++{
++   return get_cmat_size(matrix_desc) / NAK_SUBGROUP_SIZE;
++}
++
++static nir_def *
++load_cmat_deref(nir_builder *b, nir_deref_instr *src)
++{
++   struct glsl_cmat_description matrix_desc =
++      *glsl_get_cmat_description(src->type);
++
++   return nir_build_load_deref(
++      b, get_cmat_length(matrix_desc),
++      glsl_base_type_bit_size(matrix_desc.element_type), &src->def, 0);
++}
++
++static ALWAYS_INLINE nir_def *
++load_cmat_src(nir_builder *b, nir_src src)
++{
++   return load_cmat_deref(b, nir_src_as_deref(src));
++}
++
++static ALWAYS_INLINE struct glsl_cmat_description
++cmat_src_desc(nir_src src)
++{
++   nir_deref_instr *deref = nir_src_as_deref(src);
++   return *glsl_get_cmat_description(deref->type);
++}
++
++static void
++store_cmat_deref(nir_builder *b, nir_deref_instr *dst, nir_def *val)
++{
++   ASSERTED struct glsl_cmat_description matrix_desc =
++      *glsl_get_cmat_description(dst->type);
++
++   assert(val->bit_size == glsl_base_type_bit_size(matrix_desc.element_type));
++   assert(val->num_components == get_cmat_length(matrix_desc));
++
++   nir_store_deref(b, dst, val, ~0);
++}
++
++static ALWAYS_INLINE void
++store_cmat_src(nir_builder *b, nir_src dst_src, nir_def *val)
++{
++   store_cmat_deref(b, nir_src_as_deref(dst_src), val);
++}
++
++static const struct glsl_type *
++remap_matrix_type(struct hash_table *mapping, const struct glsl_type *orig)
++{
++   struct hash_entry *entry = _mesa_hash_table_search(mapping, orig);
++
++   if (entry)
++      return entry->data;
++
++   const struct glsl_type *new_type = orig;
++
++   if (glsl_type_is_cmat(orig)) {
++      struct glsl_cmat_description matrix_desc =
++         *glsl_get_cmat_description(orig);
++
++      new_type = glsl_vector_type(matrix_desc.element_type,
++                                  get_cmat_length(matrix_desc));
++   } else if (glsl_type_is_array(orig)) {
++      const struct glsl_type *elem_type = glsl_get_array_element(orig);
++      const struct glsl_type *new_elem_type =
++         remap_matrix_type(mapping, elem_type);
++
++      if (elem_type != new_elem_type) {
++         new_type = glsl_array_type(new_elem_type, glsl_get_length(orig),
++                                    glsl_get_explicit_stride(orig));
++      }
++   } else if (glsl_type_is_struct(orig)) {
++      unsigned i;
++      for (i = 0; i < orig->length; i++) {
++         const struct glsl_type *field_type = glsl_get_struct_field(orig, i);
++         const struct glsl_type *new_field_type =
++            remap_matrix_type(mapping, field_type);
++
++         if (field_type != new_field_type) {
++            break;
++         }
++      }
++
++      /* If we found a cmat, remap the structure type */
++      if (i < orig->length) {
++         struct glsl_struct_field *fields =
++            malloc(sizeof(struct glsl_struct_field) * orig->length);
++
++         /* Copy everything that didn't change */
++         memcpy(fields, orig->fields.structure,
++                sizeof(struct glsl_struct_field) * i);
++
++         /* Remap the rest */
++         for (; i < orig->length; i++) {
++            fields[i] = *glsl_get_struct_field_data(orig, i);
++            fields[i].type = remap_matrix_type(mapping, fields[i].type);
++         }
++
++         new_type =
++            glsl_struct_type(fields, orig->length, glsl_get_type_name(orig),
++                             glsl_struct_type_is_packed(orig));
++
++         free(fields);
++      }
++   }
++
++   _mesa_hash_table_insert(mapping, orig, (void *)new_type);
++   return new_type;
++}
++
++/* Computes the index in a linear matrix buffer a thread needs to load from in
++ * order to execute an MMA on the Matrix.
++ *
++ * This is a generalized formula based on the Matrix layout descriptions from
++ * the CUDA PTX instruction set documentation:
++ * https://docs.nvidia.com/cuda/archive/12.8.1/parallel-thread-execution/index.html#matrix-multiply-accumulate-operation-using-mma-instruction
++ */
++static void
++compute_mat(struct nir_builder *b, nir_def *lane_id,
++            unsigned idx, nir_def **col, nir_def **row,
++            struct glsl_cmat_description desc,
++            unsigned scale)
++{
++   assert(idx < 8 * scale);
++
++   nir_def *quad_id = nir_ushr_imm(b, lane_id, 2);
++   nir_def *thread_id_in_quad = nir_iand_imm(b, lane_id, 0x3);
++
++   unsigned row_bound = (desc.use == GLSL_CMAT_USE_B ? 4 : 2) * scale;
++   unsigned col_bound = (desc.use == GLSL_CMAT_USE_B ? 2 : 4) * scale;
++
++   scale = 1 << scale;
++   *row = quad_id;
++   if (idx & row_bound)
++      *row = nir_iadd_imm(b, *row, 8);
++
++   *col = nir_iadd_imm(b, nir_imul_imm(b, thread_id_in_quad, scale),
++                          idx & (scale - 1));
++   if (idx & col_bound)
++      *col = nir_iadd_imm(b, *col, scale * 4);
++}
++
++static void
++compute_mat_16x32_int8(struct nir_builder *b, nir_def *lane_id,
++                       unsigned idx, nir_def **col, nir_def **row,
++                       struct glsl_cmat_description desc)
++{
++   compute_mat(b, lane_id, idx, col, row, desc, 2);
++}
++
++static void
++compute_mat_16x16(struct nir_builder *b, nir_def *lane_id,
++                       unsigned idx, nir_def **col, nir_def **row,
++                       struct glsl_cmat_description desc)
++{
++   compute_mat(b, lane_id, idx, col, row, desc, 1);
++}
++
++static void
++compute_matrix_offsets(struct nir_builder *b, struct glsl_cmat_description desc,
++                       enum glsl_matrix_layout layout, nir_def *lane_id,
++                       unsigned idx, nir_def **col_offset, nir_def **row_offset)
++{
++   enum nak_matrix_type_layout cmat_type = determine_matrix_type(desc);
++   switch (cmat_type) {
++   case NAK_MAT_16x32_INT8:
++      compute_mat_16x32_int8(b, lane_id, idx, col_offset, row_offset, desc);
++      break;
++
++   case NAK_MAT_16X16:
++      compute_mat_16x16(b, lane_id, idx, col_offset, row_offset, desc);
++      break;
++   }
++
++   /* The layout calculation code relies on col and row being swapped for B
++    * row-major and non B col-major matrices.
++    */
++   if ((desc.use == GLSL_CMAT_USE_B && layout == GLSL_MATRIX_LAYOUT_ROW_MAJOR) ||
++       (desc.use != GLSL_CMAT_USE_B && layout != GLSL_MATRIX_LAYOUT_ROW_MAJOR)) {
++      nir_def *tmp = *col_offset;
++      *col_offset = *row_offset;
++      *row_offset = tmp;
++   }
++}
++
++/* Returns the hw native Matrix muladd operation */
++static enum nak_cmat_type
++get_hw_nak_cmat_type(enum nak_cmat_type cmat_type, uint8_t sm)
++{
++   switch (cmat_type) {
++   case NAK_CMAT_TYPE_M8N8K16_INT:
++      return NAK_CMAT_TYPE_M8N8K16_INT;
++   case NAK_CMAT_TYPE_M16N8K16_INT:
++      return sm >= 80 ? NAK_CMAT_TYPE_M16N8K16_INT
++                      : NAK_CMAT_TYPE_M8N8K16_INT; /* no lowering code yet */
++   case NAK_CMAT_TYPE_M16N8K32_INT:
++   case NAK_CMAT_TYPE_M16N16K32_INT_SW:
++      /* On Turing we only have 8x8x16 */
++      return sm >= 80 ? NAK_CMAT_TYPE_M16N8K32_INT
++                      : NAK_CMAT_TYPE_M8N8K16_INT;
++   case NAK_CMAT_TYPE_M16N8K8_FLOAT:
++      return NAK_CMAT_TYPE_M16N8K8_FLOAT;
++   case NAK_CMAT_TYPE_M16N8K16_FLOAT:
++   case NAK_CMAT_TYPE_M16N16K16_FLOAT_SW:
++      return NAK_CMAT_TYPE_M16N8K16_FLOAT;
++   default:
++      unreachable("Unknown Matrix muladd type.");
++   }
++}
++
++static nir_def *
++lower_cmat_muladd(nir_builder *b, nir_intrinsic_instr *intr, nir_def *cmat_a,
++                  nir_def *cmat_b, nir_def *cmat_c,
++                  struct glsl_cmat_description a_desc,
++                  struct glsl_cmat_description b_desc,
++                  struct glsl_cmat_description c_desc,
++                  struct glsl_cmat_description d_desc, uint8_t sm)
++{
++   unsigned dst_length = get_cmat_length(d_desc);
++
++   enum nak_cmat_type cmat_type =
++      get_nak_cmat_type_for_muladd(a_desc, b_desc, c_desc);
++   enum nak_cmat_type hw_cmat_type = get_hw_nak_cmat_type(cmat_type, sm);
++
++   nir_cmat_signed cmat_signed = nir_intrinsic_cmat_signed_mask(intr);
++   bool a_signed = cmat_signed & NIR_CMAT_A_SIGNED;
++   bool b_signed = cmat_signed & NIR_CMAT_B_SIGNED;
++
++   const struct nak_nir_cmat_mul_add_flags flags = {
++      .cmat_type = hw_cmat_type,
++      .a_type = glsl_apply_signedness_to_base_type(a_desc.element_type, a_signed),
++      .b_type = glsl_apply_signedness_to_base_type(b_desc.element_type, b_signed),
++      .sat = nir_intrinsic_saturate(intr),
++   };
++
++   /* Simple case: we can execute the MMA in one instruction */
++   if (cmat_type == hw_cmat_type) {
++      return nir_cmat_muladd_nv(b, dst_length, cmat_a, cmat_b, cmat_c,
++                                .flags = NAK_AS_U32(flags));
++   }
++
++   unsigned a_length = get_cmat_length(a_desc);
++   unsigned b_length = get_cmat_length(b_desc);
++   unsigned c_length = get_cmat_length(c_desc);
++
++   nir_def *a_comps[NIR_MAX_VEC_COMPONENTS];
++   nir_def *b_comps[NIR_MAX_VEC_COMPONENTS];
++   nir_def *c_comps[NIR_MAX_VEC_COMPONENTS];
++   nir_def *d_comps[NIR_MAX_VEC_COMPONENTS];
++
++   for (unsigned i = 0; i < a_length; i++)
++      a_comps[i] = nir_channel(b, cmat_a, i);
++
++   for (unsigned i = 0; i < b_length; i++)
++      b_comps[i] = nir_channel(b, cmat_b, i);
++
++   for (unsigned i = 0; i < c_length; i++)
++      c_comps[i] = nir_channel(b, cmat_c, i);
++
++   if (hw_cmat_type == NAK_CMAT_TYPE_M8N8K16_INT &&
++         (cmat_type == NAK_CMAT_TYPE_M16N8K32_INT ||
++          cmat_type == NAK_CMAT_TYPE_M16N16K32_INT_SW)) {
++      const unsigned a_hw_length = 4;
++      const unsigned b_hw_length = 4;
++      const unsigned c_hw_length = 2;
++      const unsigned d_hw_length = 2;
++
++      for (unsigned i = 0; i < dst_length / d_hw_length; i++) {
++         unsigned cmat_a_lo_offset = (i % 2) * a_hw_length;
++         unsigned cmat_a_hi_offset = cmat_a_lo_offset + 8;
++
++         unsigned cmat_b_lo_offset = (i / 2) * b_hw_length;
++         if (cmat_type == NAK_CMAT_TYPE_M16N16K32_INT_SW)
++            cmat_b_lo_offset *= 2;
++         unsigned cmat_b_hi_offset = cmat_b_lo_offset + 4;
++
++         unsigned cmat_c_offset = i * c_hw_length;
++
++         nir_def *cmat_a_lo = nir_vec(b, &a_comps[cmat_a_lo_offset], a_hw_length);
++         nir_def *cmat_a_hi = nir_vec(b, &a_comps[cmat_a_hi_offset], a_hw_length);
++         nir_def *cmat_b_lo = nir_vec(b, &b_comps[cmat_b_lo_offset], b_hw_length);
++         nir_def *cmat_b_hi = nir_vec(b, &b_comps[cmat_b_hi_offset], b_hw_length);
++         nir_def *c_part = nir_vec(b, &c_comps[cmat_c_offset], c_hw_length);
++
++         nir_def *new_c = nir_cmat_muladd_nv(b, d_hw_length, cmat_a_lo,
++                                             cmat_b_lo, c_part,
++                                             .flags = NAK_AS_U32(flags));
++         nir_def *tmp_d = nir_cmat_muladd_nv(b, d_hw_length, cmat_a_hi,
++                                             cmat_b_hi, new_c,
++                                             .flags = NAK_AS_U32(flags));
++
++         for (unsigned c = 0; c < d_hw_length; c++)
++            d_comps[i * d_hw_length + c] = nir_channel(b, tmp_d, c);
++      }
++   } else if ((cmat_type == NAK_CMAT_TYPE_M16N16K32_INT_SW &&
++               hw_cmat_type == NAK_CMAT_TYPE_M16N8K32_INT) ||
++              (cmat_type == NAK_CMAT_TYPE_M16N16K16_FLOAT_SW &&
++               hw_cmat_type == NAK_CMAT_TYPE_M16N8K16_FLOAT))  {
++      nir_def *cmat_b_lo = nir_vec(b,  b_comps,               b_length / 2);
++      nir_def *cmat_b_hi = nir_vec(b, &b_comps[b_length / 2], b_length / 2);
++
++      nir_def *cmat_c_lo = nir_vec(b,  c_comps,               c_length / 2);
++      nir_def *cmat_c_hi = nir_vec(b, &c_comps[c_length / 2], c_length / 2);
++
++      nir_def *cmat_d_lo = nir_cmat_muladd_nv(b, dst_length / 2, cmat_a,
++                                              cmat_b_lo, cmat_c_lo,
++                                              .flags = NAK_AS_U32(flags));
++      nir_def *cmat_d_hi = nir_cmat_muladd_nv(b, dst_length / 2, cmat_a,
++                                              cmat_b_hi, cmat_c_hi,
++                                              .flags = NAK_AS_U32(flags));
++
++      for (unsigned i = 0; i < dst_length / 2; i++) {
++         d_comps[i]                  = nir_channel(b, cmat_d_lo, i);
++         d_comps[i + dst_length / 2] = nir_channel(b, cmat_d_hi, i);
++      }
++   } else {
++      assert(0 && "lowering not implemented");
++   }
++
++   return nir_vec(b, d_comps, dst_length);
++}
++
++static nir_def *
++lower_cmat_convert(nir_builder *b, nir_intrinsic_instr *intr, nir_def *cmat,
++                   struct glsl_cmat_description a_desc,
++                   struct glsl_cmat_description d_desc)
++{
++   nir_cmat_signed cmat_signed_mask = nir_intrinsic_cmat_signed_mask(intr);
++
++   enum glsl_base_type src_type = glsl_apply_signedness_to_base_type(
++      a_desc.element_type, cmat_signed_mask & NIR_CMAT_A_SIGNED);
++   enum glsl_base_type dst_type = glsl_apply_signedness_to_base_type(
++      d_desc.element_type, cmat_signed_mask & NIR_CMAT_RESULT_SIGNED);
++
++   /* We want to shuffle the smaller values for better packing. */
++   bool conv_narrows =
++      glsl_base_type_bit_size(src_type) > glsl_base_type_bit_size(dst_type);
++   nir_op op =
++      nir_type_conversion_op(nir_get_nir_type_for_glsl_base_type(src_type),
++                             nir_get_nir_type_for_glsl_base_type(dst_type),
++                             nir_rounding_mode_undef);
++
++   /* If the result type is smaller, we convert before shuffling. */
++   if (conv_narrows)
++      cmat = nir_build_alu1(b, op, cmat);
++
++   enum nak_matrix_type_layout a_layout = determine_matrix_type(a_desc);
++   enum nak_matrix_type_layout d_layout = determine_matrix_type(d_desc);
++
++   /* Matrix layout conversion code. For some conversions we also need
++    * to fix the layout, so we shuffle values around to achieve that.
++    */
++   if (a_layout != d_layout) {
++      nir_def *lane_id = nir_load_subgroup_invocation(b);
++      unsigned mask    = a_layout == NAK_MAT_16X16 ? 0x1 : 0x2;
++      unsigned compare = a_layout == NAK_MAT_16X16 ? 0x2 : 0x1;
++
++      nir_def *adj;
++      if (a_layout == NAK_MAT_16X16) {
++         adj = nir_ishl_imm(b, nir_iand_imm(b, lane_id, mask), 1);
++      } else {
++         adj = nir_ushr_imm(b, nir_iand_imm(b, lane_id, mask), 1);
++      }
++
++      /* lane_id & 0x1c + (lane_id & mask << 1) */
++      /* lane_id & 0x1c + (lane_id & mask >> 1) */
++      nir_def *lane0 = nir_iadd(b, nir_iand_imm(b, lane_id, 0x1c), adj);
++      /* lane_id & 0x1c + (lane_id & mask << 1) + mask */
++      /* lane_id & 0x1c + (lane_id & mask >> 1) + mask */
++      nir_def *lane1 = nir_iadd_imm(b, lane0, mask);
++      nir_def *cond = nir_ieq_imm(b, nir_iand_imm(b, lane_id, compare), 0);
++
++      if (cmat->num_components == 4) {
++         nir_def *xy = nir_channels(b, cmat, 0x3);
++         nir_def *zw = nir_channels(b, cmat, 0xc);
++
++         nir_def *xy0 = nir_shuffle(b, xy, lane0);
++         nir_def *zw0 = nir_shuffle(b, xy, lane1);
++         nir_def *xy1 = nir_shuffle(b, zw, lane0);
++         nir_def *zw1 = nir_shuffle(b, zw, lane1);
++
++         xy = nir_bcsel(b, cond, xy0, xy1);
++         zw = nir_bcsel(b, cond, zw0, zw1);
++
++         cmat = nir_vec4(b,
++            nir_channel(b, xy, 0),
++            nir_channel(b, xy, 1),
++            nir_channel(b, zw, 0),
++            nir_channel(b, zw, 1)
++         );
++      } else if (cmat->num_components == 8 && a_layout == NAK_MAT_16X16) {
++         nir_def *abcd = nir_channels(b, cmat, 0x0f);
++         nir_def *efgh = nir_channels(b, cmat, 0xf0);
++
++         nir_def *abef0 = nir_shuffle(b, abcd, lane0);
++         nir_def *cdgh0 = nir_shuffle(b, abcd, lane1);
++         nir_def *abef1 = nir_shuffle(b, efgh, lane0);
++         nir_def *cdgh1 = nir_shuffle(b, efgh, lane1);
++
++         nir_def *abef = nir_bcsel(b, cond, abef0, abef1);
++         nir_def *cdgh = nir_bcsel(b, cond, cdgh0, cdgh1);
++
++         cmat = nir_vec8(b,
++            nir_channel(b, abef, 0),
++            nir_channel(b, abef, 1),
++            nir_channel(b, cdgh, 0),
++            nir_channel(b, cdgh, 1),
++            nir_channel(b, abef, 2),
++            nir_channel(b, abef, 3),
++            nir_channel(b, cdgh, 2),
++            nir_channel(b, cdgh, 3)
++         );
++      } else if (cmat->num_components == 8 && a_layout == NAK_MAT_16x32_INT8) {
++         nir_def *abef = nir_channels(b, cmat, 0x33);
++         nir_def *cdgh = nir_channels(b, cmat, 0xcc);
++
++         nir_def *abcd0 = nir_shuffle(b, abef, lane0);
++         nir_def *efgh0 = nir_shuffle(b, abef, lane1);
++         nir_def *abcd1 = nir_shuffle(b, cdgh, lane0);
++         nir_def *efgh1 = nir_shuffle(b, cdgh, lane1);
++
++         nir_def *abcd = nir_bcsel(b, cond, abcd0, abcd1);
++         nir_def *efgh = nir_bcsel(b, cond, efgh0, efgh1);
++
++         cmat = nir_vec8(b,
++            nir_channel(b, abcd, 0),
++            nir_channel(b, abcd, 1),
++            nir_channel(b, abcd, 2),
++            nir_channel(b, abcd, 3),
++            nir_channel(b, efgh, 0),
++            nir_channel(b, efgh, 1),
++            nir_channel(b, efgh, 2),
++            nir_channel(b, efgh, 3)
++         );
++      } else {
++         unreachable("unsupported component counts for Matrix layout conversion");
++      }
++   }
++
++   /* If the result type is not smaller, we convert after shuffling */
++   if (!conv_narrows)
++      cmat = nir_build_alu1(b, op, cmat);
++
++   return cmat;
++}
++
++static bool
++lower_cmat_instr(nir_builder *b,
++                 nir_instr *instr,
++                 struct hash_table *type_mapping,
++                 const struct nak_compiler *nak)
++{
++   /* Remap deref types */
++   if (instr->type == nir_instr_type_deref) {
++      nir_deref_instr *deref = nir_instr_as_deref(instr);
++      const struct glsl_type *new_type =
++         remap_matrix_type(type_mapping, deref->type);
++
++      if (new_type != deref->type) {
++         deref->type = new_type;
++         return true;
++      } else {
++         return false;
++      }
++   }
++
++   if (instr->type != nir_instr_type_intrinsic)
++      return false;
++
++   nir_intrinsic_instr *intr = nir_instr_as_intrinsic(instr);
++   b->cursor = nir_before_instr(instr);
++
++   switch (intr->intrinsic) {
++   case nir_intrinsic_cmat_construct: {
++      const unsigned length = get_cmat_length(cmat_src_desc(intr->src[0]));
++      nir_def *r = nir_replicate(b, intr->src[1].ssa, length);
++
++      store_cmat_src(b, intr->src[0], r);
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_load: {
++      const struct glsl_cmat_description desc = cmat_src_desc(intr->src[0]);
++      const unsigned length = get_cmat_length(desc);
++      const enum glsl_matrix_layout layout = nir_intrinsic_matrix_layout(intr);
++
++      nir_deref_instr *deref =
++         nir_instr_as_deref(intr->src[1].ssa->parent_instr);
++      nir_def *stride = intr->src[2].ssa;
++
++      nir_def *vars[NIR_MAX_VEC_COMPONENTS];
++      for (unsigned i = 0; i < length; ++i)
++         vars[i] = nir_undef(b, 1, glsl_base_type_bit_size(desc.element_type));
++
++      nir_def *lane_id = nir_load_subgroup_invocation(b);
++
++      for (unsigned idx = 0; idx < length; idx++) {
++         nir_def *col_offset;
++         nir_def *row_offset;
++
++         compute_matrix_offsets(b, desc, layout, lane_id, idx,
++                                &col_offset, &row_offset);
++
++         row_offset = nir_imul(b, row_offset, stride);
++
++         col_offset = nir_u2uN(b, col_offset, deref->def.bit_size);
++         row_offset = nir_u2uN(b, row_offset, deref->def.bit_size);
++
++         nir_deref_instr *iter_deref =
++            nir_build_deref_ptr_as_array(b, deref, row_offset);
++         iter_deref = nir_build_deref_cast(
++            b, &iter_deref->def, deref->modes,
++            glsl_scalar_type(desc.element_type),
++            glsl_base_type_bit_size(desc.element_type) / 8);
++         iter_deref =
++            nir_build_deref_ptr_as_array(b, iter_deref, col_offset);
++
++         vars[idx] = nir_load_deref(b, iter_deref);
++      }
++
++      nir_def *mat = nir_vec(b, vars, length);
++      store_cmat_src(b, intr->src[0], mat);
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_store: {
++      enum glsl_matrix_layout layout = nir_intrinsic_matrix_layout(intr);
++
++      nir_deref_instr *deref = nir_src_as_deref(intr->src[0]);
++      nir_def *stride = intr->src[2].ssa;
++
++      const struct glsl_cmat_description desc = cmat_src_desc(intr->src[1]);
++      const unsigned length = get_cmat_length(desc);
++      nir_def *src = load_cmat_src(b, intr->src[1]);
++
++      nir_def *vars[NIR_MAX_VEC_COMPONENTS];
++      for (unsigned i = 0; i < length; i++)
++         vars[i] = nir_channel(b, src, i);
++
++      nir_def *lane_id = nir_load_subgroup_invocation(b);
++
++      for (unsigned idx = 0; idx < length; idx++) {
++         nir_def *col_offset;
++         nir_def *row_offset;
++
++         compute_matrix_offsets(b, desc, layout, lane_id, idx,
++                                &col_offset, &row_offset);
++
++         row_offset = nir_imul(b, row_offset, stride);
++
++         col_offset = nir_u2uN(b, col_offset, deref->def.bit_size);
++         row_offset = nir_u2uN(b, row_offset, deref->def.bit_size);
++
++         nir_deref_instr *iter_deref =
++            nir_build_deref_ptr_as_array(b, deref, row_offset);
++         iter_deref = nir_build_deref_cast(
++            b, &iter_deref->def, deref->modes,
++            glsl_scalar_type(desc.element_type),
++            glsl_base_type_bit_size(desc.element_type) / 8);
++         iter_deref =
++            nir_build_deref_ptr_as_array(b, iter_deref, col_offset);
++
++         nir_store_deref(b, iter_deref, vars[idx], 1);
++      }
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_length: {
++      const unsigned length = get_cmat_length(nir_intrinsic_cmat_desc(intr));
++      nir_def_replace(&intr->def, nir_imm_int(b, length));
++      return true;
++   }
++
++   case nir_intrinsic_cmat_muladd: {
++      const struct glsl_cmat_description d_desc = cmat_src_desc(intr->src[0]);
++
++      const struct glsl_cmat_description a_desc = cmat_src_desc(intr->src[1]);
++      const struct glsl_cmat_description b_desc = cmat_src_desc(intr->src[2]);
++      const struct glsl_cmat_description c_desc = cmat_src_desc(intr->src[3]);
++
++      nir_def *cmat_a = load_cmat_src(b, intr->src[1]);
++      nir_def *cmat_b = load_cmat_src(b, intr->src[2]);
++      nir_def *cmat_c = load_cmat_src(b, intr->src[3]);
++
++      nir_def *ret = lower_cmat_muladd(b, intr, cmat_a, cmat_b, cmat_c, a_desc,
++                                       b_desc, c_desc, d_desc, nak->sm);
++      store_cmat_src(b, intr->src[0], ret);
++      nir_instr_remove(&intr->instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_unary_op: {
++      nir_def *src = load_cmat_src(b, intr->src[1]);
++      nir_op op = nir_intrinsic_alu_op(intr);
++
++      nir_def *ret = nir_build_alu1(b, op, src);
++      store_cmat_src(b, intr->src[0], ret);
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_binary_op: {
++      nir_def *src_a = load_cmat_src(b, intr->src[1]);
++      nir_def *src_b = load_cmat_src(b, intr->src[2]);
++      nir_op op = nir_intrinsic_alu_op(intr);
++
++      nir_def *ret = nir_build_alu2(b, op, src_a, src_b);
++      store_cmat_src(b, intr->src[0], ret);
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_scalar_op: {
++      nir_def *src_a = load_cmat_src(b, intr->src[1]);
++      nir_op op = nir_intrinsic_alu_op(intr);
++
++      nir_def *ret = nir_build_alu2(b, op, src_a, intr->src[2].ssa);
++      store_cmat_src(b, intr->src[0], ret);
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_bitcast: {
++      nir_def *mat = load_cmat_src(b, intr->src[1]);
++      store_cmat_src(b, intr->src[0], mat);
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_extract: {
++      nir_def *mat = load_cmat_src(b, intr->src[0]);
++      nir_def *index = intr->src[1].ssa;
++      nir_def *elem = nir_vector_extract(b, mat, index);
++      nir_def_replace(&intr->def, elem);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_insert: {
++      nir_def *elem = intr->src[1].ssa;
++      nir_def *mat = load_cmat_src(b, intr->src[2]);
++      nir_def *index = intr->src[3].ssa;
++
++      nir_def *r = nir_vector_insert(b, mat, elem, index);
++      store_cmat_src(b, intr->src[0], r);
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_copy: {
++      nir_build_copy_deref(b, intr->src[0].ssa, intr->src[1].ssa);
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   case nir_intrinsic_cmat_convert: {
++      struct glsl_cmat_description dst_desc = cmat_src_desc(intr->src[0]);
++      struct glsl_cmat_description src_desc = cmat_src_desc(intr->src[1]);
++
++      nir_def *cmat = load_cmat_src(b, intr->src[1]);
++      nir_def *ret = lower_cmat_convert(b, intr, cmat, src_desc, dst_desc);
++      store_cmat_src(b, intr->src[0], ret);
++
++      nir_instr_remove(instr);
++      return true;
++   }
++
++   default:
++      return false;
++   }
++}
++
++static bool
++lower_cmat_impl(nir_function_impl *impl,
++                struct hash_table *type_mapping,
++                const struct nak_compiler *nak)
++{
++   bool progress = false;
++
++   /* Remap all cmat temp var to array of scalars */
++   nir_foreach_function_temp_variable(var, impl) {
++      const struct glsl_type *new_type =
++         remap_matrix_type(type_mapping, var->type);
++      if (new_type != var->type) {
++         var->type = new_type;
++         progress = true;
++      }
++   }
++
++   nir_builder b = nir_builder_create(impl);
++   nir_foreach_block_reverse_safe(block, impl) {
++      nir_foreach_instr_reverse_safe(instr, block) {
++         if (lower_cmat_instr(&b, instr, type_mapping, nak))
++            progress = true;
++      }
++   }
++
++   return nir_progress(progress, impl, nir_metadata_control_flow);
++}
++
++bool
++nak_nir_lower_cmat(nir_shader *nir, const struct nak_compiler *nak)
++{
++   bool progress = false;
++
++   if (nir->info.stage != MESA_SHADER_COMPUTE ||
++       !nir->info.cs.has_cooperative_matrix)
++      return false;
++
++   struct hash_table *type_mapping = _mesa_pointer_hash_table_create(NULL);
++
++   /* Remap all cmat shader temp var to array of scalars */
++   nir_foreach_variable_with_modes(var, nir, nir_var_shader_temp) {
++      const struct glsl_type *new_type =
++         remap_matrix_type(type_mapping, var->type);
++
++      if (new_type != var->type) {
++         var->type = new_type;
++         progress = true;
++      }
++   }
++
++   nir_foreach_function_impl(impl, nir) {
++      if (lower_cmat_impl(impl, type_mapping, nak))
++         progress = true;
++   }
++
++   return progress;
++}
+diff --git a/src/nouveau/compiler/nak_private.h b/src/nouveau/compiler/nak_private.h
+--- a/src/nouveau/compiler/nak_private.h
++++ b/src/nouveau/compiler/nak_private.h
+@@ -290,6 +290,32 @@ struct nak_nir_ipa_flags {
+    uint32_t pad:26;
+ };
+ 
++enum nak_cmat_type {
++   NAK_CMAT_TYPE_M8N8K16_INT,
++   NAK_CMAT_TYPE_M16N8K16_INT,
++   NAK_CMAT_TYPE_M16N8K32_INT,
++
++   NAK_CMAT_TYPE_M16N8K8_FLOAT,
++   NAK_CMAT_TYPE_M16N8K16_FLOAT,
++
++   /* Software emulated cmat layouts
++    *
++    * Those aren't supported as a single native *MMA invocation on any hardware,
++    * so in order to support those we execute multiple *MMA instructions with a
++    * register layout defined by us.
++    */
++   NAK_CMAT_TYPE_M16N16K32_INT_SW,
++   NAK_CMAT_TYPE_M16N16K16_FLOAT_SW,
++};
++
++struct nak_nir_cmat_mul_add_flags {
++   enum nak_cmat_type cmat_type:3;
++   enum glsl_base_type a_type:5;
++   enum glsl_base_type b_type:5;
++   bool sat:1;
++   uint32_t pad:18;
++};
++
+ bool nak_nir_lower_fs_inputs(nir_shader *nir,
+                              const struct nak_compiler *nak,
+                              const struct nak_fs_key *fs_key);
+@@ -314,6 +340,7 @@ bool nak_nir_mark_lcssa_invariants(nir_shader *nir);
+ bool nak_nir_lower_non_uniform_ldcx(nir_shader *nir, const struct nak_compiler *nak);
+ bool nak_nir_add_barriers(nir_shader *nir, const struct nak_compiler *nak);
+ bool nak_nir_lower_cf(nir_shader *nir);
++bool nak_nir_lower_cmat(nir_shader *shader, const struct nak_compiler *nak);
+ 
+ void nak_optimize_nir(nir_shader *nir, const struct nak_compiler *nak);
+ 
+diff --git a/src/nouveau/vulkan/nvk_physical_device.c b/src/nouveau/vulkan/nvk_physical_device.c
+--- a/src/nouveau/vulkan/nvk_physical_device.c
++++ b/src/nouveau/vulkan/nvk_physical_device.c
+@@ -54,6 +54,7 @@
+ #include "clc597.h"
+ #include "clc5c0.h"
+ #include "clc797.h"
++#include "clc6c0.h"
+ #include "clc997.h"
+ 
+ static uint32_t
+@@ -94,6 +95,7 @@ nvk_get_device_extensions(const struct nvk_instance *instance,
+       .KHR_buffer_device_address = true,
+       .KHR_calibrated_timestamps = true,
+       .KHR_compute_shader_derivatives = info->cls_eng3d >= TURING_A,
++      .KHR_cooperative_matrix = info->cls_eng3d >= TURING_A,
+       .KHR_copy_commands2 = true,
+       .KHR_create_renderpass2 = true,
+       .KHR_dedicated_allocation = true,
+@@ -287,6 +289,9 @@ nvk_get_device_features(const struct nv_device_info *info,
+                         const struct vk_device_extension_table *supported_extensions,
+                         struct vk_features *features)
+ {
++   /* TU11x uses the same shader model as other Turing but don't support the same features. */
++   bool is_tu11x = info->chipset == 0x167 || info->chipset == 0x168;
++
+    *features = (struct vk_features) {
+       /* Vulkan 1.0 */
+       .robustBufferAccess = true,
+@@ -443,6 +448,11 @@ nvk_get_device_features(const struct nv_device_info *info,
+       .hostImageCopy = info->cls_eng3d >= TURING_A,
+       .pushDescriptor = true,
+ 
++      /* VK_KHR_cooperative_matrix */
++      /* TU11X can run coop matrix but the performances are abysal */
++      .cooperativeMatrix = info->cls_eng3d >= TURING_A && !is_tu11x,
++      .cooperativeMatrixRobustBufferAccess = false,
++
+       /* VK_KHR_compute_shader_derivatives */
+       .computeDerivativeGroupQuads = info->cls_eng3d >= TURING_A,
+       .computeDerivativeGroupLinear = info->cls_eng3d >= TURING_A,
+@@ -965,6 +975,9 @@ nvk_get_device_properties(const struct nvk_instance *instance,
+       .defaultRobustnessImages =
+          VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS_2_EXT,
+ 
++      /* VK_KHR_cooperative_matrix */
++      .cooperativeMatrixSupportedStages = VK_SHADER_STAGE_COMPUTE_BIT,
++
+       /* VK_KHR_compute_shader_derivatives */
+       .meshAndTaskShaderDerivatives = false,
+ 
+@@ -1708,3 +1721,150 @@ nvk_GetPhysicalDeviceFragmentShadingRatesKHR(
+ 
+    return vk_outarray_status(&out);
+ }
++
++VKAPI_ATTR VkResult VKAPI_CALL
++nvk_GetPhysicalDeviceCooperativeMatrixPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount,
++                                                    VkCooperativeMatrixPropertiesKHR *pProperties)
++{
++   VK_FROM_HANDLE(nvk_physical_device, pdev, physicalDevice);
++   VK_OUTARRAY_MAKE_TYPED(VkCooperativeMatrixPropertiesKHR, out, pProperties, pPropertyCount);
++
++   if (pdev->info.cls_compute < VOLTA_COMPUTE_A)
++      return VK_SUCCESS;
++
++   if (pdev->info.cls_compute >= TURING_COMPUTE_A) {
++      for (int use_result_f32 = 0; use_result_f32 < 2; use_result_f32++) {
++         const VkComponentTypeKHR input_type_cd = use_result_f32 ? VK_COMPONENT_TYPE_FLOAT32_KHR : VK_COMPONENT_TYPE_FLOAT16_KHR;
++
++         vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++         {
++            *p = (struct VkCooperativeMatrixPropertiesKHR){
++               .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++               .MSize = 16,
++               .NSize = 8,
++               .KSize = 8,
++               .AType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .BType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .CType = input_type_cd,
++               .ResultType = input_type_cd,
++               .saturatingAccumulation = false,
++               .scope = VK_SCOPE_SUBGROUP_KHR
++            };
++         }
++
++         vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++         {
++            *p = (struct VkCooperativeMatrixPropertiesKHR){
++               .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++               .MSize = 16,
++               .NSize = 8,
++               .KSize = 16,
++               .AType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .BType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .CType = input_type_cd,
++               .ResultType = input_type_cd,
++               .saturatingAccumulation = false,
++               .scope = VK_SCOPE_SUBGROUP_KHR
++            };
++         }
++
++         vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++         {
++            *p = (struct VkCooperativeMatrixPropertiesKHR){
++               .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++               .MSize = 16,
++               .NSize = 16,
++               .KSize = 16,
++               .AType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .BType = VK_COMPONENT_TYPE_FLOAT16_KHR,
++               .CType = input_type_cd,
++               .ResultType = input_type_cd,
++               .saturatingAccumulation = false,
++               .scope = VK_SCOPE_SUBGROUP_KHR
++            };
++         }
++      }
++   }
++
++   /* IMMA got added with Turing */
++   if (pdev->info.cls_compute >= TURING_COMPUTE_A) {
++      for (int sat = 0; sat < 2; sat++) {
++         for (unsigned is_signed = 0; is_signed < 2; is_signed++) {
++            const VkComponentTypeKHR input_type_ab = is_signed ? VK_COMPONENT_TYPE_SINT8_KHR  : VK_COMPONENT_TYPE_UINT8_KHR;
++            const VkComponentTypeKHR result_type   = is_signed ? VK_COMPONENT_TYPE_SINT32_KHR : VK_COMPONENT_TYPE_UINT32_KHR;
++
++            /* we don't have hw support for uint32, so we can't saturate on C or D */
++            if (result_type == VK_COMPONENT_TYPE_UINT32_KHR && sat)
++               continue;
++
++            vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++            {
++               *p = (struct VkCooperativeMatrixPropertiesKHR){
++                  .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++                  .MSize = 8,
++                  .NSize = 8,
++                  .KSize = 16,
++                  .AType = input_type_ab,
++                  .BType = input_type_ab,
++                  .CType = result_type,
++                  .ResultType = result_type,
++                  .saturatingAccumulation = sat,
++                  .scope = VK_SCOPE_SUBGROUP_KHR
++               };
++            }
++
++            if (pdev->info.cls_compute >= AMPERE_COMPUTE_A) {
++               vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++               {
++                  *p = (struct VkCooperativeMatrixPropertiesKHR){
++                     .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++                     .MSize = 16,
++                     .NSize = 8,
++                     .KSize = 16,
++                     .AType = input_type_ab,
++                     .BType = input_type_ab,
++                     .CType = result_type,
++                     .ResultType = result_type,
++                     .saturatingAccumulation = sat,
++                     .scope = VK_SCOPE_SUBGROUP_KHR
++                  };
++               }
++            }
++
++            vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++            {
++               *p = (struct VkCooperativeMatrixPropertiesKHR){
++                  .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++                  .MSize = 16,
++                  .NSize = 8,
++                  .KSize = 32,
++                  .AType = input_type_ab,
++                  .BType = input_type_ab,
++                  .CType = result_type,
++                  .ResultType = result_type,
++                  .saturatingAccumulation = sat,
++                  .scope = VK_SCOPE_SUBGROUP_KHR
++               };
++            }
++
++            vk_outarray_append_typed(VkCooperativeMatrixPropertiesKHR, &out, p)
++            {
++               *p = (struct VkCooperativeMatrixPropertiesKHR){
++                  .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
++                  .MSize = 16,
++                  .NSize = 16,
++                  .KSize = 32,
++                  .AType = input_type_ab,
++                  .BType = input_type_ab,
++                  .CType = result_type,
++                  .ResultType = result_type,
++                  .saturatingAccumulation = sat,
++                  .scope = VK_SCOPE_SUBGROUP_KHR
++               };
++            }
++         }
++      }
++   }
++
++   return vk_outarray_status(&out);
++}

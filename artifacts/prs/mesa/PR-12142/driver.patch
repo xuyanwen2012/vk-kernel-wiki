@@ -1,0 +1,184 @@
+diff --git a/src/intel/compiler/brw_compiler.c b/src/intel/compiler/brw_compiler.c
+--- a/src/intel/compiler/brw_compiler.c
++++ b/src/intel/compiler/brw_compiler.c
+@@ -190,6 +190,9 @@ brw_compiler_create(void *mem_ctx, const struct intel_device_info *devinfo)
+       nir_options->lower_bitfield_reverse = devinfo->ver < 7;
+       nir_options->has_iadd3 = devinfo->verx10 >= 125;
+ 
++      nir_options->has_dot_4x8 = devinfo->ver >= 12;
++      nir_options->has_sudot_4x8 = devinfo->ver >= 12;
++
+       nir_options->lower_int64_options = int64_options;
+       nir_options->lower_doubles_options = fp64_options;
+ 
+diff --git a/src/intel/compiler/brw_eu.cpp b/src/intel/compiler/brw_eu.cpp
+--- a/src/intel/compiler/brw_eu.cpp
++++ b/src/intel/compiler/brw_eu.cpp
+@@ -689,6 +689,7 @@ static const struct opcode_desc opcode_descs[] = {
+    { BRW_OPCODE_DPH,      85,  "dph",     2,    1,    GFX_LT(GFX11) },
+    { BRW_OPCODE_DP3,      86,  "dp3",     2,    1,    GFX_LT(GFX11) },
+    { BRW_OPCODE_DP2,      87,  "dp2",     2,    1,    GFX_LT(GFX11) },
++   { BRW_OPCODE_DP4A,     88,  "dp4a",    3,    1,    GFX_GE(GFX12) },
+    { BRW_OPCODE_LINE,     89,  "line",    2,    1,    GFX_LE(GFX10) },
+    { BRW_OPCODE_PLN,      90,  "pln",     2,    1,    GFX_GE(GFX45) & GFX_LE(GFX10) },
+    { BRW_OPCODE_MAD,      91,  "mad",     3,    1,    GFX_GE(GFX6) },
+diff --git a/src/intel/compiler/brw_eu.h b/src/intel/compiler/brw_eu.h
+--- a/src/intel/compiler/brw_eu.h
++++ b/src/intel/compiler/brw_eu.h
+@@ -261,6 +261,7 @@ ALU2(DP4)
+ ALU2(DPH)
+ ALU2(DP3)
+ ALU2(DP2)
++ALU3(DP4A)
+ ALU2(LINE)
+ ALU2(PLN)
+ ALU3(MAD)
+diff --git a/src/intel/compiler/brw_eu_defines.h b/src/intel/compiler/brw_eu_defines.h
+--- a/src/intel/compiler/brw_eu_defines.h
++++ b/src/intel/compiler/brw_eu_defines.h
+@@ -275,6 +275,7 @@ enum opcode {
+    BRW_OPCODE_DPH,
+    BRW_OPCODE_DP3,
+    BRW_OPCODE_DP2,
++   BRW_OPCODE_DP4A, /**< Gfx12+ */
+    BRW_OPCODE_LINE,
+    BRW_OPCODE_PLN, /**< G45+ */
+    BRW_OPCODE_MAD, /**< Gfx6+ */
+diff --git a/src/intel/compiler/brw_eu_emit.c b/src/intel/compiler/brw_eu_emit.c
+--- a/src/intel/compiler/brw_eu_emit.c
++++ b/src/intel/compiler/brw_eu_emit.c
+@@ -1106,6 +1106,7 @@ ALU2(DP4)
+ ALU2(DPH)
+ ALU2(DP3)
+ ALU2(DP2)
++ALU3(DP4A)
+ ALU3(MAD)
+ ALU3F(LRP)
+ ALU1(BFREV)
+diff --git a/src/intel/compiler/brw_eu_validate.c b/src/intel/compiler/brw_eu_validate.c
+--- a/src/intel/compiler/brw_eu_validate.c
++++ b/src/intel/compiler/brw_eu_validate.c
+@@ -2025,6 +2025,18 @@ instruction_restrictions(const struct intel_device_info *devinfo,
+       }
+    }
+ 
++   if (brw_inst_opcode(devinfo, inst) == BRW_OPCODE_DP4A) {
++      /* Page 396 (page 412 of the PDF) of the DG1 PRM volume 2a says:
++       *
++       *    Only one of src0 or src1 operand may be an the (sic) accumulator
++       *    register (acc#).
++       */
++      ERROR_IF(src0_is_acc(devinfo, inst) && src1_is_acc(devinfo, inst),
++               "Only one of src0 or src1 operand may be an accumulator "
++               "register (acc#).");
++
++   }
++
+    return error_msg;
+ }
+ 
+diff --git a/src/intel/compiler/brw_fs_builder.h b/src/intel/compiler/brw_fs_builder.h
+--- a/src/intel/compiler/brw_fs_builder.h
++++ b/src/intel/compiler/brw_fs_builder.h
+@@ -621,6 +621,7 @@ namespace brw {
+       ALU1(FBH)
+       ALU1(FBL)
+       ALU1(FRC)
++      ALU3(DP4A)
+       ALU2(LINE)
+       ALU1(LZD)
+       ALU2(MAC)
+diff --git a/src/intel/compiler/brw_fs_generator.cpp b/src/intel/compiler/brw_fs_generator.cpp
+--- a/src/intel/compiler/brw_fs_generator.cpp
++++ b/src/intel/compiler/brw_fs_generator.cpp
+@@ -2072,6 +2072,11 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width,
+ 	 brw_MACH(p, dst, src[0], src[1]);
+ 	 break;
+ 
++      case BRW_OPCODE_DP4A:
++         assert(devinfo->ver >= 12);
++         brw_DP4A(p, dst, src[0], src[1], src[2]);
++         break;
++
+       case BRW_OPCODE_LINE:
+          brw_LINE(p, dst, src[0], src[1]);
+          break;
+diff --git a/src/intel/compiler/brw_fs_nir.cpp b/src/intel/compiler/brw_fs_nir.cpp
+--- a/src/intel/compiler/brw_fs_nir.cpp
++++ b/src/intel/compiler/brw_fs_nir.cpp
+@@ -1885,6 +1885,39 @@ fs_visitor::nir_emit_alu(const fs_builder &bld, nir_alu_instr *instr,
+       bld.emit(FS_OPCODE_PACK_HALF_2x16_SPLIT, result, op[0], op[1]);
+       break;
+ 
++   case nir_op_sdot_4x8_iadd:
++   case nir_op_sdot_4x8_iadd_sat:
++      inst = bld.DP4A(result,
++                      retype(op[2], BRW_REGISTER_TYPE_D),
++                      retype(op[0], BRW_REGISTER_TYPE_D),
++                      retype(op[1], BRW_REGISTER_TYPE_D));
++
++      if (instr->op == nir_op_sdot_4x8_iadd_sat)
++         inst->saturate = true;
++      break;
++
++   case nir_op_udot_4x8_uadd:
++   case nir_op_udot_4x8_uadd_sat:
++      inst = bld.DP4A(result,
++                      retype(op[2], BRW_REGISTER_TYPE_UD),
++                      retype(op[0], BRW_REGISTER_TYPE_UD),
++                      retype(op[1], BRW_REGISTER_TYPE_UD));
++
++      if (instr->op == nir_op_udot_4x8_uadd_sat)
++         inst->saturate = true;
++      break;
++
++   case nir_op_sudot_4x8_iadd:
++   case nir_op_sudot_4x8_iadd_sat:
++      inst = bld.DP4A(result,
++                      retype(op[2], BRW_REGISTER_TYPE_D),
++                      retype(op[0], BRW_REGISTER_TYPE_D),
++                      retype(op[1], BRW_REGISTER_TYPE_UD));
++
++      if (instr->op == nir_op_sudot_4x8_iadd_sat)
++         inst->saturate = true;
++      break;
++
+    case nir_op_ffma:
+       if (nir_has_any_rounding_mode_enabled(execution_mode)) {
+          brw_rnd_mode rnd =
+diff --git a/src/intel/compiler/brw_ir_performance.cpp b/src/intel/compiler/brw_ir_performance.cpp
+--- a/src/intel/compiler/brw_ir_performance.cpp
++++ b/src/intel/compiler/brw_ir_performance.cpp
+@@ -495,6 +495,13 @@ namespace {
+             return calculate_desc(info, unit_fpu, 0, 2, 0, 0, 2,
+                                   0, 12, 8 /* XXX */, 18 /* XXX */, 0, 0);
+ 
++      case BRW_OPCODE_DP4A:
++         if (devinfo->ver >= 12)
++            return calculate_desc(info, unit_fpu, 0, 2, 1, 0, 2,
++                                  0, 10, 6 /* XXX */, 14 /* XXX */, 0, 0);
++         else
++            abort();
++
+       case SHADER_OPCODE_RCP:
+       case SHADER_OPCODE_RSQ:
+       case SHADER_OPCODE_SQRT:
+diff --git a/src/intel/compiler/brw_shader.cpp b/src/intel/compiler/brw_shader.cpp
+--- a/src/intel/compiler/brw_shader.cpp
++++ b/src/intel/compiler/brw_shader.cpp
+@@ -969,6 +969,7 @@ backend_instruction::can_do_source_mods() const
+    case BRW_OPCODE_ROL:
+    case BRW_OPCODE_ROR:
+    case BRW_OPCODE_SUBB:
++   case BRW_OPCODE_DP4A:
+    case SHADER_OPCODE_BROADCAST:
+    case SHADER_OPCODE_CLUSTER_BROADCAST:
+    case SHADER_OPCODE_MOV_INDIRECT:
+@@ -992,6 +993,7 @@ backend_instruction::can_do_saturate() const
+    case BRW_OPCODE_DP3:
+    case BRW_OPCODE_DP4:
+    case BRW_OPCODE_DPH:
++   case BRW_OPCODE_DP4A:
+    case BRW_OPCODE_F16TO32:
+    case BRW_OPCODE_F32TO16:
+    case BRW_OPCODE_LINE:

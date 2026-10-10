@@ -1,0 +1,26 @@
+repo: mesa/mesa
+pr: 13249
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/13249
+merge_sha: 3072e6e0da5d226700a8d6d0683636b5c7e2f237
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/13249/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_fs.cpp
+  status: modified
+  sha256: 210255a27974171130d45793d9f00c4e5954d7b1a4f76bd6e98c2d3f21039b7d
+- path: src/intel/compiler/brw_private.h
+  status: added
+  sha256: 9c54ea048e2f15a0ab685e6f549c2f4e3d6b9f8d09aa24be99adb9b543a6c56d
+- path: src/intel/compiler/brw_simd_selection.c
+  status: added
+  sha256: 1e3e37779fbb8e38ae683c753d9d2dbec5ebb5c422d8b6ec2c37865c2f98c43f
+- path: src/intel/compiler/meson.build
+  status: modified
+  sha256: fd83c8753400a6f00c415bac4ac659fc7f6244e481cf52669bd95fc6d8537cd1
+- path: src/intel/compiler/test_simd_selection.cpp
+  status: added
+  sha256: b649e4b30c346190c9510185b297cd84055382998bd14885df702354e346f9e3
