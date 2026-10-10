@@ -1,0 +1,2049 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: MIT
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <stdexcept>
+#include <fstream>
+#include <map>
+#include <set>
+#include <vector>
+#include <chrono>
+#include <string.h>
+
+#include <vulkan/vulkan.h>
+
+#if !defined(VK_KHR_shader_bfloat16)
+#define VK_KHR_shader_bfloat16 1
+#define VK_KHR_SHADER_BFLOAT16_SPEC_VERSION                          1
+#define VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME                        "VK_KHR_shader_bfloat16"
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR ((VkStructureType)1000141000)
+#define VK_COMPONENT_TYPE_BFLOAT16_KHR                               ((VkComponentTypeKHR)1000141000)
+#define VK_COMPONENT_TYPE_FLOAT_E4M3_NV                              ((VkComponentTypeKHR)1000491002)
+#define VK_COMPONENT_TYPE_FLOAT_E5M2_NV                              ((VkComponentTypeKHR)1000491003)
+
+typedef struct VkPhysicalDeviceShaderBfloat16FeaturesKHR {
+    VkStructureType                       sType;
+    void*                                 pNext;
+    VkBool32                              shaderBFloat16Type;
+    VkBool32                              shaderBFloat16DotProduct;
+    VkBool32                              shaderBFloat16CooperativeMatrix;
+} VkPhysicalDeviceShaderBfloat16FeaturesKHR;
+#endif
+
+#if !defined(VK_EXT_shader_float8)
+#define VK_EXT_shader_float8 1
+#define VK_EXT_SHADER_FLOAT8_SPEC_VERSION                            1
+#define VK_EXT_SHADER_FLOAT8_EXTENSION_NAME                          "VK_EXT_shader_float8"
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT8_FEATURES_EXT ((VkStructureType)1000567000)
+
+typedef struct VkPhysicalDeviceShaderFloat8FeaturesEXT {
+    VkStructureType                       sType;
+    void*                                 pNext;
+    VkBool32                              shaderFloat8;
+    VkBool32                              shaderFloat8CooperativeMatrix;
+} VkPhysicalDeviceShaderFloat8FeaturesEXT;
+#endif
+
+#if !defined(VK_NV_cooperative_matrix2)
+#define VK_NV_cooperative_matrix2 1
+#define VK_NV_COOPERATIVE_MATRIX_2_SPEC_VERSION 1
+#define VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME "VK_NV_cooperative_matrix2"
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV ((VkStructureType)1000593000)
+#define VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_FLEXIBLE_DIMENSIONS_PROPERTIES_NV ((VkStructureType)1000593001)
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_PROPERTIES_NV ((VkStructureType)1000593002)
+
+typedef struct VkCooperativeMatrixFlexibleDimensionsPropertiesNV {
+    VkStructureType       sType;
+    void*                 pNext;
+    uint32_t              MGranularity;
+    uint32_t              NGranularity;
+    uint32_t              KGranularity;
+    VkComponentTypeKHR    AType;
+    VkComponentTypeKHR    BType;
+    VkComponentTypeKHR    CType;
+    VkComponentTypeKHR    ResultType;
+    VkBool32              saturatingAccumulation;
+    VkScopeKHR            scope;
+    uint32_t              workgroupInvocations;
+} VkCooperativeMatrixFlexibleDimensionsPropertiesNV;
+
+typedef struct VkPhysicalDeviceCooperativeMatrix2FeaturesNV {
+    VkStructureType    sType;
+    void*              pNext;
+    VkBool32           cooperativeMatrixWorkgroupScope;
+    VkBool32           cooperativeMatrixFlexibleDimensions;
+    VkBool32           cooperativeMatrixReductions;
+    VkBool32           cooperativeMatrixConversions;
+    VkBool32           cooperativeMatrixPerElementOperations;
+    VkBool32           cooperativeMatrixTensorAddressing;
+    VkBool32           cooperativeMatrixBlockLoads;
+} VkPhysicalDeviceCooperativeMatrix2FeaturesNV;
+
+typedef struct VkPhysicalDeviceCooperativeMatrix2PropertiesNV {
+    VkStructureType    sType;
+    void*              pNext;
+    uint32_t           cooperativeMatrixWorkgroupScopeMaxWorkgroupSize;
+    uint32_t           cooperativeMatrixFlexibleDimensionsMaxDimension;
+    uint32_t           cooperativeMatrixWorkgroupScopeReservedSharedMemory;
+} VkPhysicalDeviceCooperativeMatrix2PropertiesNV;
+
+typedef VkResult (VKAPI_PTR *PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV)(
+    VkPhysicalDevice physicalDevice,
+    uint32_t* pPropertyCount,
+    VkCooperativeMatrixFlexibleDimensionsPropertiesNV* pProperties);
+#endif
+
+using std::vector;
+using std::set;
+
+#define ARRAY_LENGTH(x) (sizeof(x) / sizeof(x[0]))
+
+
+
+#define CHECK_RESULT(r) do {    \
+    if ((r) != VK_SUCCESS) {    \
+        fprintf(stderr, "CHECK_RESULT failed: VkResult %d at %s:%d\n", (r), __FILE__, __LINE__);  \
+        throw std::runtime_error("Vulkan call failed");  \
+    }   \
+} while (0)
+
+static void printUsage(const char *programName)
+{
+    printf("usage: %s [--correctness] [--device N] [--list-devices] [--dump-properties] [--dim=N] [--repeat=N] [--barrier=on|off] [--load-c=on|off] [--swizzle=N] [--shmem]\n\n", programName);
+}
+
+struct DeviceExtensionSupport
+{
+    bool cooperativeMatrix;
+    bool cooperativeMatrix2;
+    bool bfloat16;
+    bool float8;
+};
+
+static DeviceExtensionSupport getDeviceExtensionSupport(VkPhysicalDevice physicalDevice)
+{
+    DeviceExtensionSupport support = {};
+    VkResult result;
+
+    uint32_t numExtensions = 0;
+    vector<VkExtensionProperties> extensions;
+
+    result = vkEnumerateDeviceExtensionProperties(physicalDevice, NULL, &numExtensions, NULL);
+    CHECK_RESULT(result);
+
+    extensions.resize(numExtensions);
+    result = vkEnumerateDeviceExtensionProperties(physicalDevice, NULL, &numExtensions, extensions.data());
+    CHECK_RESULT(result);
+
+    for (uint32_t j = 0; j < numExtensions; ++j) {
+        if (strcmp(extensions[j].extensionName, VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
+            support.cooperativeMatrix = true;
+        }
+        if (strcmp(extensions[j].extensionName, VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME) == 0) {
+            support.cooperativeMatrix2 = true;
+        }
+        if (strcmp(extensions[j].extensionName, VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME) == 0) {
+            support.bfloat16 = true;
+        }
+        if (strcmp(extensions[j].extensionName, VK_EXT_SHADER_FLOAT8_EXTENSION_NAME) == 0) {
+            support.float8 = true;
+        }
+    }
+
+    return support;
+}
+
+// pasted from Vulkan spec
+int32_t findProperties(const VkPhysicalDeviceMemoryProperties* pMemoryProperties,
+                       uint32_t memoryTypeBitsRequirement,
+                       VkMemoryPropertyFlags requiredProperties) {
+    const uint32_t memoryCount = pMemoryProperties->memoryTypeCount;
+    for (uint32_t memoryIndex = 0; memoryIndex < memoryCount; ++memoryIndex) {
+        const uint32_t memoryTypeBits = (1 << memoryIndex);
+        const bool isRequiredMemoryType = memoryTypeBitsRequirement & memoryTypeBits;
+
+        const VkMemoryPropertyFlags properties =
+            pMemoryProperties->memoryTypes[memoryIndex].propertyFlags;
+        const bool hasRequiredProperties =
+            (properties & requiredProperties) == requiredProperties;
+
+        if (isRequiredMemoryType && hasRequiredProperties)
+            return static_cast<int32_t>(memoryIndex);
+    }
+
+    // failed to find memory type
+    return -1;
+}
+
+enum TestType
+{
+    TT_WORKGROUP = 0,
+    TT_SHARED = 1,
+    TT_COUNT,
+};
+
+struct ComponentTypeInfo {
+    const char *typeName;
+    uint32_t bits;
+};
+static std::map<VkComponentTypeKHR, ComponentTypeInfo> componentTypeInfo
+{
+    {VK_COMPONENT_TYPE_FLOAT16_KHR, { "float16_t",  16 }},
+    {VK_COMPONENT_TYPE_FLOAT32_KHR, { "float32_t",  32 }},
+    {VK_COMPONENT_TYPE_FLOAT64_KHR, { "float64_t",  64 }},
+    {VK_COMPONENT_TYPE_SINT8_KHR,   { "int8_t",     8 }},
+    {VK_COMPONENT_TYPE_SINT16_KHR,  { "int16_t",    16 }},
+    {VK_COMPONENT_TYPE_SINT32_KHR,  { "int32_t",    32 }},
+    {VK_COMPONENT_TYPE_SINT64_KHR,  { "int64_t",    64 }},
+    {VK_COMPONENT_TYPE_UINT8_KHR,   { "uint8_t",    8 }},
+    {VK_COMPONENT_TYPE_UINT16_KHR,  { "uint16_t",   16 }},
+    {VK_COMPONENT_TYPE_UINT32_KHR,  { "uint32_t",   32 }},
+    {VK_COMPONENT_TYPE_UINT64_KHR,  { "uint64_t",   64 }},
+    {VK_COMPONENT_TYPE_BFLOAT16_KHR,{ "bfloat16_t", 16 }},
+    {VK_COMPONENT_TYPE_FLOAT_E5M2_NV,{ "floate5m2_t", 8 }},
+    {VK_COMPONENT_TYPE_FLOAT_E4M3_NV,{ "floate4m3_t", 8 }},
+};
+
+static const char *componentTypeName(VkComponentTypeKHR type)
+{
+    std::map<VkComponentTypeKHR, ComponentTypeInfo>::const_iterator it = componentTypeInfo.find(type);
+    return it != componentTypeInfo.end() ? it->second.typeName : "unknown";
+}
+
+static bool isUvec4AlignedElementCount(VkComponentTypeKHR type, uint32_t elementCount)
+{
+    return (componentTypeInfo[type].bits * elementCount) % 128 == 0;
+}
+
+static const char *scopeName(VkScopeKHR scope)
+{
+    switch (scope) {
+    default:
+        return "unknown";
+    case VK_SCOPE_DEVICE_KHR:
+        return "device";
+    case VK_SCOPE_WORKGROUP_KHR:
+        return "workgroup";
+    case VK_SCOPE_SUBGROUP_KHR:
+        return "subgroup";
+    case VK_SCOPE_QUEUE_FAMILY_KHR:
+        return "queuefamily";
+    }
+}
+
+struct SupportedTypeCombination
+{
+    VkComponentTypeKHR inputType;
+    VkComponentTypeKHR outputType;
+    const char *inputTypeToken;
+    const char *outputTypeToken;
+};
+
+static const SupportedTypeCombination supportedTypeCombinations[] =
+{
+    { VK_COMPONENT_TYPE_BFLOAT16_KHR,    VK_COMPONENT_TYPE_FLOAT32_KHR, "bf16", "fp32" },
+    { VK_COMPONENT_TYPE_FLOAT16_KHR,     VK_COMPONENT_TYPE_FLOAT16_KHR, "fp16", "fp16" },
+    { VK_COMPONENT_TYPE_FLOAT16_KHR,     VK_COMPONENT_TYPE_FLOAT32_KHR, "fp16", "fp32" },
+    { VK_COMPONENT_TYPE_UINT8_KHR,       VK_COMPONENT_TYPE_UINT32_KHR,  "u8",   "u32" },
+    { VK_COMPONENT_TYPE_SINT8_KHR,       VK_COMPONENT_TYPE_SINT32_KHR,  "s8",   "s32" },
+    { VK_COMPONENT_TYPE_FLOAT_E5M2_NV,   VK_COMPONENT_TYPE_FLOAT16_KHR, "e5m2", "fp16" },
+    { VK_COMPONENT_TYPE_FLOAT_E4M3_NV,   VK_COMPONENT_TYPE_FLOAT16_KHR, "e4m3", "fp16" },
+    { VK_COMPONENT_TYPE_FLOAT_E5M2_NV,   VK_COMPONENT_TYPE_FLOAT32_KHR, "e5m2", "fp32" },
+    { VK_COMPONENT_TYPE_FLOAT_E4M3_NV,   VK_COMPONENT_TYPE_FLOAT32_KHR, "e4m3", "fp32" },
+};
+
+static const SupportedTypeCombination *findSupportedTypeCombination(
+    VkComponentTypeKHR AType,
+    VkComponentTypeKHR BType,
+    VkComponentTypeKHR CType,
+    VkComponentTypeKHR ResultType)
+{
+    if (AType != BType || CType != ResultType) {
+        return NULL;
+    }
+
+    for (uint32_t i = 0; i < ARRAY_LENGTH(supportedTypeCombinations); ++i) {
+        if (supportedTypeCombinations[i].inputType == AType &&
+            supportedTypeCombinations[i].outputType == ResultType) {
+            return &supportedTypeCombinations[i];
+        }
+    }
+
+    return NULL;
+}
+
+static const char *shaderPrefix(TestType testType)
+{
+    switch (testType) {
+    default:
+        assert(0);
+        return "";
+    case TT_WORKGROUP:
+        return "workgroup";
+    case TT_SHARED:
+        return "shmem";
+    }
+}
+
+static std::string shaderFileName(TestType testType, const SupportedTypeCombination &types)
+{
+    return std::string("shaders/") + shaderPrefix(testType) + types.inputTypeToken + "_" + types.outputTypeToken + ".spv";
+}
+
+struct CooperativeMatrixTestTarget
+{
+    TestType testType;
+    uint32_t MSize;
+    uint32_t NSize;
+    uint32_t KSize;
+    VkComponentTypeKHR AType;
+    VkComponentTypeKHR BType;
+    VkComponentTypeKHR CType;
+    VkComponentTypeKHR ResultType;
+    VkScopeKHR scope;
+    uint32_t workgroupInvocations;
+    const SupportedTypeCombination *typeCombination;
+};
+
+static const uint32_t workgroupSizesToTest[] = { 256, 128 };
+
+// Gather advertised cooperative matrix shapes into an ordered set before
+// running tests. The set removes duplicate properties while keeping the final
+// iteration order explicit: workgroup before shmem, then input type, accumulator
+// type, descending workgroup size, and finally shape/tie-breaker fields.
+static bool isWorkgroupSizeToTest(uint32_t workgroupInvocations)
+{
+    for (uint32_t i = 0; i < ARRAY_LENGTH(workgroupSizesToTest); ++i) {
+        if (workgroupSizesToTest[i] == workgroupInvocations) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static uint32_t supportedTypeCombinationIndex(const SupportedTypeCombination *typeCombination)
+{
+    for (uint32_t i = 0; i < ARRAY_LENGTH(supportedTypeCombinations); ++i) {
+        if (&supportedTypeCombinations[i] == typeCombination) {
+            return i;
+        }
+    }
+    return ARRAY_LENGTH(supportedTypeCombinations);
+}
+
+static uint32_t inputTypeSortIndex(VkComponentTypeKHR type)
+{
+    switch (type) {
+    case VK_COMPONENT_TYPE_FLOAT16_KHR:   return 0;
+    case VK_COMPONENT_TYPE_UINT8_KHR:     return 1;
+    case VK_COMPONENT_TYPE_SINT8_KHR:     return 2;
+    case VK_COMPONENT_TYPE_BFLOAT16_KHR:  return 3;
+    case VK_COMPONENT_TYPE_FLOAT_E5M2_NV: return 4;
+    case VK_COMPONENT_TYPE_FLOAT_E4M3_NV: return 5;
+    default:                              return 6;
+    }
+}
+
+static uint32_t accumulatorTypeSortIndex(VkComponentTypeKHR type)
+{
+    switch (type) {
+    case VK_COMPONENT_TYPE_FLOAT16_KHR: return 0;
+    case VK_COMPONENT_TYPE_FLOAT32_KHR: return 1;
+    case VK_COMPONENT_TYPE_UINT32_KHR:  return 2;
+    case VK_COMPONENT_TYPE_SINT32_KHR:  return 3;
+    default:                            return 4;
+    }
+}
+
+static uint64_t cooperativeMatrixTileVolume(const CooperativeMatrixTestTarget &target)
+{
+    return (uint64_t)target.MSize * (uint64_t)target.NSize * (uint64_t)target.KSize;
+}
+
+struct CooperativeMatrixTestTargetLess
+{
+    bool operator()(const CooperativeMatrixTestTarget &a, const CooperativeMatrixTestTarget &b) const
+    {
+        uint32_t aInputIndex = inputTypeSortIndex(a.AType);
+        uint32_t bInputIndex = inputTypeSortIndex(b.AType);
+        uint32_t aAccumulatorIndex = accumulatorTypeSortIndex(a.ResultType);
+        uint32_t bAccumulatorIndex = accumulatorTypeSortIndex(b.ResultType);
+        uint32_t aTypeIndex = supportedTypeCombinationIndex(a.typeCombination);
+        uint32_t bTypeIndex = supportedTypeCombinationIndex(b.typeCombination);
+
+        if (a.testType != b.testType) return a.testType < b.testType;
+        if (aInputIndex != bInputIndex) return aInputIndex < bInputIndex;
+        if (a.AType != b.AType) return a.AType < b.AType;
+        if (aAccumulatorIndex != bAccumulatorIndex) return aAccumulatorIndex < bAccumulatorIndex;
+        if (a.workgroupInvocations != b.workgroupInvocations) return a.workgroupInvocations > b.workgroupInvocations;
+        if (aTypeIndex != bTypeIndex) return aTypeIndex < bTypeIndex;
+        if (a.testType == TT_SHARED && b.testType == TT_SHARED) {
+            uint64_t aTileVolume = cooperativeMatrixTileVolume(a);
+            uint64_t bTileVolume = cooperativeMatrixTileVolume(b);
+            if (aTileVolume != bTileVolume) return aTileVolume > bTileVolume;
+            if (a.MSize != b.MSize) return a.MSize > b.MSize;
+            if (a.NSize != b.NSize) return a.NSize > b.NSize;
+            if (a.KSize != b.KSize) return a.KSize > b.KSize;
+        }
+        if (a.MSize != b.MSize) return a.MSize < b.MSize;
+        if (a.NSize != b.NSize) return a.NSize < b.NSize;
+        if (a.KSize != b.KSize) return a.KSize < b.KSize;
+        if (a.BType != b.BType) return a.BType < b.BType;
+        if (a.CType != b.CType) return a.CType < b.CType;
+        if (a.ResultType != b.ResultType) return a.ResultType < b.ResultType;
+        if (a.scope != b.scope) return a.scope < b.scope;
+        return false;
+    }
+};
+
+typedef set<CooperativeMatrixTestTarget, CooperativeMatrixTestTargetLess> CooperativeMatrixTestTargetSet;
+
+static void addCooperativeMatrixTestTarget(
+    CooperativeMatrixTestTargetSet &targets,
+    TestType testType,
+    uint32_t MSize,
+    uint32_t NSize,
+    uint32_t KSize,
+    VkComponentTypeKHR AType,
+    VkComponentTypeKHR BType,
+    VkComponentTypeKHR CType,
+    VkComponentTypeKHR ResultType,
+    VkScopeKHR scope,
+    uint32_t workgroupInvocations)
+{
+    const SupportedTypeCombination *typeCombination =
+        findSupportedTypeCombination(AType, BType, CType, ResultType);
+    if (!typeCombination) {
+        return;
+    }
+
+    CooperativeMatrixTestTarget target = {
+        testType,
+        MSize,
+        NSize,
+        KSize,
+        AType,
+        BType,
+        CType,
+        ResultType,
+        scope,
+        workgroupInvocations,
+        typeCombination,
+    };
+    targets.insert(target);
+}
+
+static void addWorkgroupCooperativeMatrixTestTargets(
+    CooperativeMatrixTestTargetSet &targets,
+    const vector<VkCooperativeMatrixFlexibleDimensionsPropertiesNV> &properties)
+{
+    for (size_t i = 0; i < properties.size(); ++i) {
+        const VkCooperativeMatrixFlexibleDimensionsPropertiesNV *p = &properties[i];
+        if (p->scope != VK_SCOPE_WORKGROUP_KHR ||
+            !isWorkgroupSizeToTest(p->workgroupInvocations)) {
+            continue;
+        }
+
+        addCooperativeMatrixTestTarget(targets,
+                                       TT_WORKGROUP,
+                                       p->MGranularity,
+                                       p->NGranularity,
+                                       p->KGranularity,
+                                       p->AType,
+                                       p->BType,
+                                       p->CType,
+                                       p->ResultType,
+                                       p->scope,
+                                       p->workgroupInvocations);
+    }
+}
+
+static void addSubgroupCooperativeMatrixTestTargets(
+    CooperativeMatrixTestTargetSet &targets,
+    const vector<VkCooperativeMatrixPropertiesKHR> &properties)
+{
+    for (size_t i = 0; i < properties.size(); ++i) {
+        const VkCooperativeMatrixPropertiesKHR *p = &properties[i];
+        if (p->scope != VK_SCOPE_SUBGROUP_KHR) {
+            continue;
+        }
+
+        addCooperativeMatrixTestTarget(targets,
+                                       TT_SHARED,
+                                       p->MSize,
+                                       p->NSize,
+                                       p->KSize,
+                                       p->AType,
+                                       p->BType,
+                                       p->CType,
+                                       p->ResultType,
+                                       p->scope,
+                                       0);
+    }
+}
+
+static void dumpCooperativeMatrixProperties(
+    const vector<VkCooperativeMatrixPropertiesKHR> &properties,
+    const vector<VkCooperativeMatrixFlexibleDimensionsPropertiesNV> &flexibleProperties)
+{
+    printf("\n%s properties: %zu\n", VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME, properties.size());
+    for (size_t i = 0; i < properties.size(); ++i) {
+        const VkCooperativeMatrixPropertiesKHR &p = properties[i];
+        printf("  [%zu] M=%u N=%u K=%u A=%s(%d) B=%s(%d) C=%s(%d) Result=%s(%d) saturating=%u scope=%s(%d)\n",
+               i,
+               p.MSize,
+               p.NSize,
+               p.KSize,
+               componentTypeName(p.AType), p.AType,
+               componentTypeName(p.BType), p.BType,
+               componentTypeName(p.CType), p.CType,
+               componentTypeName(p.ResultType), p.ResultType,
+               p.saturatingAccumulation,
+               scopeName(p.scope), p.scope);
+    }
+
+    printf("\n%s flexible dimension properties: %zu\n", VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME, flexibleProperties.size());
+    for (size_t i = 0; i < flexibleProperties.size(); ++i) {
+        const VkCooperativeMatrixFlexibleDimensionsPropertiesNV &p = flexibleProperties[i];
+        printf("  [%zu] MGranularity=%u NGranularity=%u KGranularity=%u A=%s(%d) B=%s(%d) C=%s(%d) Result=%s(%d) saturating=%u scope=%s(%d) workgroupInvocations=%u\n",
+               i,
+               p.MGranularity,
+               p.NGranularity,
+               p.KGranularity,
+               componentTypeName(p.AType), p.AType,
+               componentTypeName(p.BType), p.BType,
+               componentTypeName(p.CType), p.CType,
+               componentTypeName(p.ResultType), p.ResultType,
+               p.saturatingAccumulation,
+               scopeName(p.scope), p.scope,
+               p.workgroupInvocations);
+    }
+}
+
+struct TestCase
+{
+    TestType testType;
+    VkComponentTypeKHR inputType;
+    VkComponentTypeKHR outputType;
+
+    // MxNxK is the size of the full matrix multiply
+    uint32_t M;
+    uint32_t N;
+    uint32_t K;
+
+    // Each cooperative matrix multiply is lMxlNxlK
+    uint32_t lM;
+    uint32_t lN;
+    uint32_t lK;
+
+    // size of workgroup tile in destination matrix
+    uint32_t TILE_M;
+    uint32_t TILE_N;
+    uint32_t TILE_K;
+
+    bool BColMajor;
+    uint32_t ARowLen;
+    uint32_t ANumRows;
+    uint32_t BRowLen;
+    uint32_t BNumRows;
+};
+
+struct MatrixDesc
+{
+    struct
+    {
+        uint32_t rows, cols;
+    } dims;
+    VkComponentTypeKHR dataType;
+    size_t elementSize;
+    VkDeviceSize bufferSize;
+    uint32_t totalElements;
+
+    // Create a host- and device-local buffer for each input and output.
+    // Descriptors point at the device buffers.
+    VkBuffer hostBuffer;
+    VkDeviceMemory hostMemory;
+    VkBuffer deviceBuffer;
+    VkDeviceMemory deviceMemory;
+    void *ptr;
+
+    bool isFloatType() const
+    {
+        switch (dataType)
+        {
+        default:
+            return false;
+        case VK_COMPONENT_TYPE_FLOAT16_KHR:
+        case VK_COMPONENT_TYPE_FLOAT32_KHR:
+        case VK_COMPONENT_TYPE_FLOAT64_KHR:
+        case VK_COMPONENT_TYPE_BFLOAT16_KHR:
+        case VK_COMPONENT_TYPE_FLOAT_E5M2_NV:
+        case VK_COMPONENT_TYPE_FLOAT_E4M3_NV:
+            return true;
+        }
+    }
+
+    void setDataFloat(uint32_t i, float value)
+    {
+        if (dataType == VK_COMPONENT_TYPE_FLOAT32_KHR)
+        {
+            ((float *)ptr)[i] = value;
+        }
+        else
+        {
+            uint32_t expBits, manBits, byteSize;
+            switch (dataType) {
+            case VK_COMPONENT_TYPE_FLOAT16_KHR:
+                expBits = 5;
+                manBits = 10;
+                byteSize = 2;
+                break;
+            case VK_COMPONENT_TYPE_BFLOAT16_KHR:
+                expBits = 8;
+                manBits = 7;
+                byteSize = 2;
+                break;
+            case VK_COMPONENT_TYPE_FLOAT_E5M2_NV:
+                expBits = 5;
+                manBits = 2;
+                byteSize = 1;
+                break;
+            case VK_COMPONENT_TYPE_FLOAT_E4M3_NV:
+                expBits = 4;
+                manBits = 3;
+                byteSize = 1;
+                break;
+            default:
+                assert(0);
+                break;
+            }
+
+            uint32_t signBit = manBits + expBits;
+
+	        uint32_t intVal = *(uint32_t *)(&value);
+            uint32_t sign = intVal & 0x80000000;
+            int32_t exp = intVal & 0x7F800000;
+            uint32_t mantissa = intVal & 0x007FFFFF;
+            if (exp == 0x7F800000) {
+                if (mantissa != 0) {
+                    exp = (1<<expBits) - 1;
+                    mantissa = (1<<manBits) - 1;
+                    sign = 0;
+                } else {
+                    exp = (1<<expBits) - 1;
+                    mantissa = 0;
+                }
+            } else {
+
+                exp >>= 23;
+                exp -= (1<<(8-1)) - 1;
+                exp += (1<<(expBits-1)) - 1;
+
+                if (exp <= 0) {
+                    // If the denorm is too small, flush it to zero. Otherwise, add a leading one.
+                    if (-exp > (int32_t)manBits) {
+                        value = 0;
+                        exp = 0;
+                    } else {
+                        mantissa |= 1<<23;
+                    }
+                    // RTNE
+                    if ((mantissa & (1<<(24 - manBits - exp)))) {
+                        mantissa++;
+                    }
+                    mantissa += (1<<(23 - manBits - exp)) - 1;
+
+                    // Shift way the LSBs and the negative exponent
+                    mantissa >>= 23 - manBits;
+                    mantissa >>= 1-exp;
+                    exp = 0;
+                } else {
+                    // RTNE
+                    if ((mantissa & (1<<(23 - manBits)))) {
+                        mantissa++;
+                    }
+                    mantissa += (1<<(22 - manBits)) - 1;
+                    if (mantissa & (1<<23)) {
+                        exp += 1;
+                        mantissa = 0;
+                    }
+                    mantissa >>= 23 - manBits;
+                }
+
+                if (exp >= (1<<expBits)-1) {
+                    exp = (1<<expBits) - 1;
+                    mantissa = 0;
+                }
+            }
+            sign >>= 31;
+            sign <<= signBit;
+            exp <<= manBits;
+            uint32_t result = sign | exp | mantissa;
+            assert(result < (1ULL << (byteSize*8)));
+            if (value == 0) {
+                result = sign;
+            }
+            switch (byteSize) {
+            default:
+                // fallthrough
+            case 1:
+                ((uint8_t *)ptr)[i] = (uint8_t)result;
+                break;
+            case 2:
+                ((uint16_t *)ptr)[i] = (uint16_t)result;
+                break;
+            }
+        }
+    }
+
+    float getDataFloat(uint32_t i) const
+    {
+        if (dataType == VK_COMPONENT_TYPE_FLOAT32_KHR)
+        {
+            return ((float *)ptr)[i];
+        }
+        else
+        {
+            uint32_t expBits, manBits, byteSize;
+            switch (dataType) {
+            case VK_COMPONENT_TYPE_FLOAT16_KHR:
+                expBits = 5;
+                manBits = 10;
+                byteSize = 2;
+                break;
+            case VK_COMPONENT_TYPE_BFLOAT16_KHR:
+                expBits = 8;
+                manBits = 7;
+                byteSize = 2;
+                break;
+            case VK_COMPONENT_TYPE_FLOAT_E5M2_NV:
+                expBits = 5;
+                manBits = 2;
+                byteSize = 1;
+                break;
+            case VK_COMPONENT_TYPE_FLOAT_E4M3_NV:
+                expBits = 4;
+                manBits = 3;
+                byteSize = 1;
+                break;
+            default:
+                assert(0);
+                break;
+            }
+
+            uint32_t intVal = 0;
+            switch (byteSize) {
+            default:
+                // fallthrough
+            case 1:
+                intVal = ((uint8_t const *)ptr)[i];
+                break;
+            case 2:
+                intVal = ((uint16_t const *)ptr)[i];
+                break;
+            }
+
+            uint32_t signBit = manBits + expBits;
+            uint32_t signMask = 1 << signBit;
+            uint32_t expMask = (1 << expBits) - 1;
+
+            uint32_t sign = intVal & signMask;
+            uint32_t mantissa = intVal & ((1 << manBits) - 1);
+            int32_t exp = (intVal >> manBits) & expMask;
+
+            if (exp == expMask) {
+                // NaN or +/-infinity, depending on mantissa value
+                exp = 0xFF;
+                if (mantissa != 0) {
+                    mantissa = 0x7FFFFF;
+                } else {
+                    mantissa = 0;
+                }
+            } else {
+                if (exp == 0 && mantissa != 0) {
+                    // Shift the denorm value until it has a leading one, adjusting the exponent.
+                    // Then clear the leading one.
+                    while ((mantissa & (1 << manBits)) == 0) {
+                        mantissa <<= 1;
+                        exp--;
+                    }
+                    exp++;
+                    mantissa &= ~(1 << manBits);
+                }
+                exp -= (1<<(expBits-1)) - 1;
+                exp += (1<<(8-1)) - 1;
+                mantissa <<= 23 - manBits;
+            }
+            exp <<= 23;
+            sign <<= 31 - signBit;
+            uint32_t result = sign | exp | mantissa;
+            float ret = (intVal == 0 || intVal == signMask) ? 0.0f : *(float const *)(&result);
+            return ret;
+        }
+    }
+
+    float getDataFloat(int m, int n, bool colMajor) const
+    {
+        return getDataFloat(colMajor ? (n * dims.rows + m) : (m * dims.cols + n));
+    }
+
+    void setDataInt(uint32_t i, uint32_t value)
+    {
+        assert(componentTypeInfo[dataType].bits == 8 || componentTypeInfo[dataType].bits == 32);
+        switch (dataType) {
+        default: assert(0); // fallthrough
+        case VK_COMPONENT_TYPE_UINT8_KHR:    ((uint8_t  *)ptr)[i] = (uint8_t)value; break;
+        case VK_COMPONENT_TYPE_UINT32_KHR:   ((uint32_t *)ptr)[i] = (uint32_t)value; break;
+        case VK_COMPONENT_TYPE_SINT8_KHR:    ((int8_t   *)ptr)[i] = (int8_t)value; break;
+        case VK_COMPONENT_TYPE_SINT32_KHR:   ((int32_t  *)ptr)[i] = (int32_t)value; break;
+        }
+    }
+
+    uint32_t getDataInt(uint32_t i) const
+    {
+        assert(componentTypeInfo[dataType].bits == 8 || componentTypeInfo[dataType].bits == 32);
+	    switch (dataType) {
+	    default: assert(0); // fallthrough
+	    case VK_COMPONENT_TYPE_UINT8_KHR:	return ((uint8_t  *)ptr)[i];
+	    case VK_COMPONENT_TYPE_UINT32_KHR:	return ((uint32_t *)ptr)[i];
+	    case VK_COMPONENT_TYPE_SINT8_KHR:	return ((int8_t   *)ptr)[i];
+	    case VK_COMPONENT_TYPE_SINT32_KHR:	return ((int32_t  *)ptr)[i];
+	    }
+    }
+
+    uint32_t getDataInt(int m, int n, bool colMajor) const
+    {
+        return getDataInt(colMajor ? (n * dims.rows + m) : (m * dims.cols + n));
+    }
+};
+
+// create storage for a matrix
+void createMatrixDesc(VkDevice device, VkPhysicalDeviceMemoryProperties &memoryProperties, MatrixDesc &m, VkComponentTypeKHR dt, int rows, int cols)
+{
+    VkResult result;
+
+    m.dims.rows = rows;
+    m.dims.cols = cols;
+    m.dataType = dt;
+    m.elementSize = componentTypeInfo[m.dataType].bits / 8;
+    m.totalElements = m.dims.cols * m.dims.rows;
+    m.bufferSize = m.totalElements * m.elementSize;
+
+    VkBufferCreateInfo bufferCreateInfo = {
+        VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        NULL,
+        0,
+        m.bufferSize,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_TRANSFER_SRC_BIT|VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR,
+        VK_SHARING_MODE_EXCLUSIVE,
+        0u,
+        NULL,
+    };
+
+    result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &m.hostBuffer);
+    CHECK_RESULT(result);
+    result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &m.deviceBuffer);
+    CHECK_RESULT(result);
+
+    VkMemoryRequirements memReqs;
+    vkGetBufferMemoryRequirements(device, m.hostBuffer, &memReqs);
+
+    int32_t hostIndex = findProperties(&memoryProperties, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+    int32_t deviceIndex = findProperties(&memoryProperties, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkMemoryAllocateFlagsInfo memAllocateFlagsInfo = {
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+        NULL,
+        VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
+        0,
+    };
+
+    VkMemoryAllocateInfo memAllocateInfo = {
+        VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        &memAllocateFlagsInfo,
+        memReqs.size,
+        (uint32_t)hostIndex,
+    };
+
+    result = vkAllocateMemory(device, &memAllocateInfo, NULL, &m.hostMemory);
+    CHECK_RESULT(result);
+
+    memAllocateInfo.memoryTypeIndex = deviceIndex;
+    result = vkAllocateMemory(device, &memAllocateInfo, NULL, &m.deviceMemory);
+    CHECK_RESULT(result);
+
+    result = vkBindBufferMemory(device, m.hostBuffer, m.hostMemory, 0);
+    CHECK_RESULT(result);
+
+    result = vkBindBufferMemory(device, m.deviceBuffer, m.deviceMemory, 0);
+    CHECK_RESULT(result);
+
+    result = vkMapMemory(device, m.hostMemory, 0, m.bufferSize, 0, &m.ptr);
+    CHECK_RESULT(result);
+}
+
+void setMatrixDescDimensions(MatrixDesc &m, int rows, int cols)
+{
+    uint64_t totalElements = (uint64_t)rows * (uint64_t)cols;
+    assert(totalElements * m.elementSize <= m.bufferSize);
+    m.dims.rows = rows;
+    m.dims.cols = cols;
+    m.totalElements = (uint32_t)totalElements;
+}
+
+// destroy storage for a matrix
+void destroyMatrixDesc(VkDevice device, MatrixDesc &m)
+{
+    vkDestroyBuffer(device, m.hostBuffer, NULL);
+    vkDestroyBuffer(device, m.deviceBuffer, NULL);
+    vkFreeMemory(device, m.hostMemory, NULL);
+    vkFreeMemory(device, m.deviceMemory, NULL);
+}
+
+int main(int argc, char *argv[])
+{
+    bool correctness = false;
+    bool listDevices = false;
+    bool dumpProperties = false;
+    bool hasRequestedPhysicalDevice = false;
+    bool hasRequestedDim = false;
+    bool repeatSpecified = false;
+    uint32_t requestedDim = 0;
+    uint32_t repeatCount = 100;
+    bool barrierEnabled = true;
+    bool loadC = true;
+    bool shmemOnly = false;
+    uint32_t requestedPhysicalDeviceIndex = 0;
+    uint32_t swizzleWidth = 16;
+
+    printUsage(argc > 0 ? argv[0] : "vk_cooperative_matrix_perf");
+
+    for (int arg = 1; arg < argc; ++arg) {
+        if (strcmp(argv[arg], "--correctness") == 0) {
+            correctness = true;
+        } else if (strcmp(argv[arg], "--list-devices") == 0) {
+            listDevices = true;
+        } else if (strcmp(argv[arg], "--shmem") == 0) {
+            shmemOnly = true;
+        } else if (strcmp(argv[arg], "--dump-properties") == 0 ||
+                   strcmp(argv[arg], "--dump-coopmat-properties") == 0) {
+            dumpProperties = true;
+        } else if (strncmp(argv[arg], "--dim=", 6) == 0) {
+            requestedDim = (uint32_t)strtoul(argv[arg] + 6, NULL, 10);
+            if (requestedDim == 0) {
+                fprintf(stderr, "error: --dim must be non-zero\n");
+                return 1;
+            }
+            hasRequestedDim = true;
+        } else if (strcmp(argv[arg], "--repeat") == 0 || strncmp(argv[arg], "--repeat=", 9) == 0) {
+            const char *repeatArg = NULL;
+            if (strcmp(argv[arg], "--repeat") == 0) {
+                if (++arg >= argc) {
+                    fprintf(stderr, "error: --repeat requires a count\n");
+                    return 1;
+                }
+                repeatArg = argv[arg];
+            } else {
+                repeatArg = argv[arg] + 9;
+            }
+
+            char *end = NULL;
+            unsigned long repeat = strtoul(repeatArg, &end, 10);
+            if (end == repeatArg || *end != '\0' || repeat == 0 || repeat > UINT32_MAX) {
+                fprintf(stderr, "error: --repeat requires a non-zero 32-bit count\n");
+                return 1;
+            }
+            repeatCount = (uint32_t)repeat;
+            repeatSpecified = true;
+        } else if (strncmp(argv[arg], "--barrier=", 10) == 0) {
+            const char *barrierArg = argv[arg] + 10;
+            if (strcmp(barrierArg, "on") == 0) {
+                barrierEnabled = true;
+            } else if (strcmp(barrierArg, "off") == 0) {
+                barrierEnabled = false;
+            } else {
+                fprintf(stderr, "error: --barrier requires on or off\n");
+                return 1;
+            }
+        } else if (strncmp(argv[arg], "--load-c=", 9) == 0) {
+            const char *loadCArg = argv[arg] + 9;
+            if (strcmp(loadCArg, "on") == 0) {
+                loadC = true;
+            } else if (strcmp(loadCArg, "off") == 0) {
+                loadC = false;
+            } else {
+                fprintf(stderr, "error: --load-c requires on or off\n");
+                return 1;
+            }
+        } else if (strncmp(argv[arg], "--swizzle=", 10) == 0) {
+            const char *swizzleWidthArg = argv[arg] + 10;
+            char *end = NULL;
+            unsigned long parsedSwizzleWidth = strtoul(swizzleWidthArg, &end, 10);
+            if (end == swizzleWidthArg || *end != '\0' || swizzleWidthArg[0] == '-' || parsedSwizzleWidth > UINT32_MAX) {
+                fprintf(stderr, "error: --swizzle requires a non-negative integer\n");
+                return 1;
+            }
+            swizzleWidth = (uint32_t)parsedSwizzleWidth;
+        } else if (strcmp(argv[arg], "--device") == 0) {
+            if (++arg >= argc) {
+                fprintf(stderr, "error: --device requires an index\n");
+                return 1;
+            }
+            requestedPhysicalDeviceIndex = (uint32_t)strtoul(argv[arg], NULL, 10);
+            hasRequestedPhysicalDevice = true;
+        } else if (strncmp(argv[arg], "--device=", 9) == 0) {
+            requestedPhysicalDeviceIndex = (uint32_t)strtoul(argv[arg] + 9, NULL, 10);
+            hasRequestedPhysicalDevice = true;
+        } else if (strcmp(argv[arg], "--help") == 0 || strcmp(argv[arg], "-h") == 0) {
+            return 0;
+        } else {
+            fprintf(stderr, "error: unknown argument '%s'\n", argv[arg]);
+            return 1;
+        }
+    }
+
+    uint32_t defaultDim = hasRequestedDim ? requestedDim : (correctness ? 256 : 4096);
+    if (correctness && !repeatSpecified) {
+        repeatCount = 1;
+    }
+    const uint32_t dimAlignment = 256;
+    if ((defaultDim % dimAlignment) != 0) {
+        uint32_t roundedDim = (defaultDim + dimAlignment - 1) / dimAlignment * dimAlignment;
+        printf("rounding matrix dimension from %u to %u\n", defaultDim, roundedDim);
+        defaultDim = roundedDim;
+    }
+    printf("dim=%u repeat=%u\n", defaultDim, repeatCount);
+
+    // Initialize Vulkan
+    VkApplicationInfo applicationInfo = {
+        VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        NULL,
+        "Cooperative matrix performance test",
+        1,
+        "none",
+        0,
+        VK_MAKE_VERSION(1, 3, 0),
+    };
+
+    const char *enabledInstanceExtensions[] = { VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME };
+    VkInstanceCreateInfo instanceCreateInfo = {
+        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        NULL,
+        0,
+        &applicationInfo,
+        0,
+        NULL,
+        1,
+        enabledInstanceExtensions,
+    };
+
+    VkResult result;
+    VkInstance instance;
+    result = vkCreateInstance(&instanceCreateInfo, NULL, &instance);
+    CHECK_RESULT(result);
+
+    uint32_t numPhysicalDevices = 0;
+    vector<VkPhysicalDevice> physicalDevices;
+
+    result = vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, NULL);
+    CHECK_RESULT(result);
+
+    if (numPhysicalDevices == 0) {
+        printf("couldn't find any Vulkan physical devices\n");
+        return 0;
+    }
+
+    physicalDevices.resize(numPhysicalDevices);
+    result = vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, &physicalDevices[0]);
+    CHECK_RESULT(result);
+
+    int physicalDeviceIndex = -1;
+
+    bool coopmat2Supported = false;
+    bool bfloat16Supported = false;
+    bool float8Supported = false;
+
+    vector<DeviceExtensionSupport> deviceExtensionSupport(numPhysicalDevices);
+    for (uint32_t i = 0; i < numPhysicalDevices; ++i) {
+        deviceExtensionSupport[i] = getDeviceExtensionSupport(physicalDevices[i]);
+
+        if (listDevices) {
+            VkPhysicalDeviceProperties properties;
+            vkGetPhysicalDeviceProperties(physicalDevices[i], &properties);
+            printf("device %u: %s\n", i, properties.deviceName);
+            printf("  %s: %s\n", VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME, deviceExtensionSupport[i].cooperativeMatrix ? "yes" : "no");
+            printf("  %s: %s\n", VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME, deviceExtensionSupport[i].cooperativeMatrix2 ? "yes" : "no");
+            printf("  %s: %s\n", VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME, deviceExtensionSupport[i].bfloat16 ? "yes" : "no");
+            printf("  %s: %s\n", VK_EXT_SHADER_FLOAT8_EXTENSION_NAME, deviceExtensionSupport[i].float8 ? "yes" : "no");
+        }
+
+        if (!hasRequestedPhysicalDevice && physicalDeviceIndex == -1 && deviceExtensionSupport[i].cooperativeMatrix) {
+            physicalDeviceIndex = i;
+        }
+    }
+
+    if (listDevices) {
+        return 0;
+    }
+
+    if (hasRequestedPhysicalDevice) {
+        if (requestedPhysicalDeviceIndex >= numPhysicalDevices) {
+            fprintf(stderr, "error: --device %u is out of range; found %u physical device(s)\n",
+                    requestedPhysicalDeviceIndex, numPhysicalDevices);
+            return 1;
+        }
+        physicalDeviceIndex = (int)requestedPhysicalDeviceIndex;
+    }
+
+    if (physicalDeviceIndex == -1) {
+        printf("couldn't find physical device that supports VK_KHR_cooperative_matrix\n");
+        return 0;
+    }
+
+    if (!deviceExtensionSupport[physicalDeviceIndex].cooperativeMatrix) {
+        printf("selected physical device %d does not support %s\n",
+               physicalDeviceIndex, VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+        return 0;
+    }
+
+    VkPhysicalDeviceProperties selectedDeviceProperties;
+    vkGetPhysicalDeviceProperties(physicalDevices[physicalDeviceIndex], &selectedDeviceProperties);
+    printf("using physical device %d: %s\n", physicalDeviceIndex, selectedDeviceProperties.deviceName);
+    printf("%s supported\n", VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+
+    coopmat2Supported = deviceExtensionSupport[physicalDeviceIndex].cooperativeMatrix2;
+    bfloat16Supported = deviceExtensionSupport[physicalDeviceIndex].bfloat16;
+    float8Supported = deviceExtensionSupport[physicalDeviceIndex].float8;
+
+    if (coopmat2Supported) {
+        printf("%s supported\n", VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME);
+    }
+    if (bfloat16Supported) {
+        printf("%s supported\n", VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME);
+    }
+    if (float8Supported) {
+        printf("%s supported\n", VK_EXT_SHADER_FLOAT8_EXTENSION_NAME);
+    }
+    VkPhysicalDevice physicalDevice = physicalDevices[physicalDeviceIndex];
+
+    VkPhysicalDeviceSubgroupSizeControlProperties subgroupSizeControlProperties = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES,
+        NULL,
+    };
+    VkPhysicalDeviceProperties2 physicalDeviceProperties2 = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        &subgroupSizeControlProperties,
+    };
+    PFN_vkGetPhysicalDeviceProperties2 pfn_vkGetPhysicalDeviceProperties2 =
+        (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2");
+    if (!pfn_vkGetPhysicalDeviceProperties2) {
+        pfn_vkGetPhysicalDeviceProperties2 =
+            (PFN_vkGetPhysicalDeviceProperties2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceProperties2KHR");
+    }
+    pfn_vkGetPhysicalDeviceProperties2(physicalDevice, &physicalDeviceProperties2);
+
+    uint32_t requiredSubgroupSize = 32;
+    if (requiredSubgroupSize < subgroupSizeControlProperties.minSubgroupSize ||
+        requiredSubgroupSize > subgroupSizeControlProperties.maxSubgroupSize) {
+        requiredSubgroupSize = subgroupSizeControlProperties.minSubgroupSize;
+    }
+    printf("using required subgroup size %u\n", requiredSubgroupSize);
+
+
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    uint32_t numQueueFamilies = 0;
+    vector<VkQueueFamilyProperties> queueFamilies;
+
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &numQueueFamilies, NULL);
+
+    queueFamilies.resize(numQueueFamilies);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &numQueueFamilies, &queueFamilies[0]);
+
+    int queueFamilyIndex = -1;
+
+    for (uint32_t i = 0; i < numQueueFamilies; ++i) {
+        if (queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
+            queueFamilyIndex = i;
+            break;
+        }
+    }
+    if (queueFamilyIndex == -1) {
+        printf("couldn't find compute queue\n");
+        return 0;
+    }
+
+    float queuePriority = 1.0f;
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
+        VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        NULL,
+        0,
+        (uint32_t)queueFamilyIndex,
+        1,
+        &queuePriority,
+    };
+
+    // Query the list of supported cooperative matrix multiply sizes/types.
+    uint32_t numCooperativeMatrixProperties = 0;
+    vector<VkCooperativeMatrixPropertiesKHR> cooperativeMatrixProperties;
+
+    PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR pfn_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR =
+        (PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR");
+
+    result = pfn_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(physicalDevice, &numCooperativeMatrixProperties, NULL);
+    CHECK_RESULT(result);
+
+    cooperativeMatrixProperties.resize(numCooperativeMatrixProperties);
+    for (uint32_t i = 0; i < numCooperativeMatrixProperties; ++i) {
+        cooperativeMatrixProperties[i].sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR;
+        cooperativeMatrixProperties[i].pNext = NULL;
+    }
+
+    result = pfn_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(physicalDevice, &numCooperativeMatrixProperties, cooperativeMatrixProperties.data());
+    CHECK_RESULT(result);
+
+    uint32_t numCooperativeMatrixFlexibleDimensionsProperties = 0;
+    vector<VkCooperativeMatrixFlexibleDimensionsPropertiesNV> cooperativeMatrixFlexibleDimensionsProperties;
+
+    if (coopmat2Supported) {
+        PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV pfn_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV =
+            (PFN_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV");
+
+        result = pfn_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(physicalDevice, &numCooperativeMatrixFlexibleDimensionsProperties, NULL);
+        CHECK_RESULT(result);
+
+        cooperativeMatrixFlexibleDimensionsProperties.resize(numCooperativeMatrixFlexibleDimensionsProperties);
+        for (uint32_t i = 0; i < numCooperativeMatrixFlexibleDimensionsProperties; ++i) {
+            cooperativeMatrixFlexibleDimensionsProperties[i].sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_FLEXIBLE_DIMENSIONS_PROPERTIES_NV;
+            cooperativeMatrixFlexibleDimensionsProperties[i].pNext = NULL;
+        }
+
+        result = pfn_vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(physicalDevice, &numCooperativeMatrixFlexibleDimensionsProperties, cooperativeMatrixFlexibleDimensionsProperties.data());
+        CHECK_RESULT(result);
+    }
+
+    if (dumpProperties) {
+        dumpCooperativeMatrixProperties(cooperativeMatrixProperties, cooperativeMatrixFlexibleDimensionsProperties);
+        return 0;
+    }
+
+    VkPhysicalDeviceCooperativeMatrixFeaturesKHR coopMatFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR,
+        NULL,
+        VK_TRUE, // cooperativeMatrix
+        VK_FALSE, // cooperativeMatrixRobustBufferAccess
+    };
+
+    PFN_vkGetPhysicalDeviceFeatures2 pfn_vkGetPhysicalDeviceFeatures2 =
+        (PFN_vkGetPhysicalDeviceFeatures2)vkGetInstanceProcAddr(instance, "vkGetPhysicalDeviceFeatures2");
+
+    VkPhysicalDeviceShaderBfloat16FeaturesKHR bfloat16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR };
+
+    if (bfloat16Supported) {
+        // The specification allows only one of bfloat16 dot and coopmat to be supported, need to check if vendor really support bfloat16 coopmat.
+        VkPhysicalDeviceFeatures2 physicalFeatures2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &bfloat16Features };
+        pfn_vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalFeatures2);
+
+        if (bfloat16Features.shaderBFloat16CooperativeMatrix == VK_TRUE) {
+            bfloat16Features.pNext = coopMatFeatures.pNext;
+            coopMatFeatures.pNext = &bfloat16Features;
+        }
+    }
+
+    VkPhysicalDeviceShaderFloat8FeaturesEXT float8Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT8_FEATURES_EXT };
+
+    if (float8Supported) {
+        VkPhysicalDeviceFeatures2 physicalFeatures2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &float8Features };
+        pfn_vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalFeatures2);
+
+        if (float8Features.shaderFloat8CooperativeMatrix == VK_TRUE) {
+            float8Features.pNext = coopMatFeatures.pNext;
+            coopMatFeatures.pNext = &float8Features;
+        }
+    }
+
+    VkPhysicalDeviceCooperativeMatrix2FeaturesNV coopmat2Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV };
+
+    if (coopmat2Supported) {
+        coopmat2Features.cooperativeMatrixWorkgroupScope = VK_TRUE;
+        coopmat2Features.cooperativeMatrixFlexibleDimensions = VK_TRUE;
+        coopmat2Features.cooperativeMatrixTensorAddressing = VK_TRUE;
+        coopmat2Features.pNext = coopMatFeatures.pNext;
+        coopMatFeatures.pNext = &coopmat2Features;
+    }
+
+    VkPhysicalDeviceVulkan11Features vulkan11Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, &coopMatFeatures };
+    vulkan11Features.storageBuffer16BitAccess = VK_TRUE;
+
+    VkPhysicalDeviceVulkan12Features vulkan12Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, &vulkan11Features };
+    vulkan12Features.bufferDeviceAddress = VK_TRUE;
+    vulkan12Features.shaderFloat16 = VK_TRUE;
+    vulkan12Features.shaderInt8 = VK_TRUE;
+    vulkan12Features.vulkanMemoryModel = VK_TRUE;
+    vulkan12Features.vulkanMemoryModelDeviceScope = VK_TRUE;
+
+    VkPhysicalDeviceVulkan13Features vulkan13Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, &vulkan12Features };
+    vulkan13Features.maintenance4 = VK_TRUE;
+    vulkan13Features.subgroupSizeControl = VK_TRUE;
+    vulkan13Features.computeFullSubgroups = VK_TRUE;
+
+    std::vector<const char *> enabledDeviceExtensions = { VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME, };
+    if (coopmat2Supported) {
+        enabledDeviceExtensions.push_back(VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME);
+    }
+    if (bfloat16Supported) {
+        enabledDeviceExtensions.push_back(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME);
+    }
+    if (float8Supported) {
+        enabledDeviceExtensions.push_back(VK_EXT_SHADER_FLOAT8_EXTENSION_NAME);
+    }
+
+    VkDeviceCreateInfo deviceCreateInfo = {
+        VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        &vulkan13Features,
+        0,
+        1,
+        &deviceQueueCreateInfo,
+        0,
+        NULL,
+        (uint32_t)enabledDeviceExtensions.size(),
+        enabledDeviceExtensions.data(),
+        NULL,
+    };
+
+    VkDevice device;
+    result = vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device);
+    CHECK_RESULT(result);
+
+    VkQueue queue;
+    vkGetDeviceQueue(device, (uint32_t)queueFamilyIndex, 0, &queue);
+
+    // The shaders use one UBO to pass in all the buffer addresses
+    VkDescriptorSetLayoutBinding layoutBinding = {};
+    layoutBinding.binding = 0;
+    layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding.descriptorCount = 1;
+    layoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        NULL,
+        0,
+        1,
+        &layoutBinding,
+    };
+
+    VkDescriptorSetLayout descriptorSetLayout;
+    result = vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout);
+    CHECK_RESULT(result);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        NULL,
+        0,
+        1,
+        &descriptorSetLayout,
+        0,
+        NULL
+    };
+
+    VkPipelineLayout pipelineLayout;
+    result = vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout);
+    CHECK_RESULT(result);
+
+    VkDescriptorPoolSize poolSizes[1] = { { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 } };
+
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        NULL,
+        VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        1,
+        ARRAY_LENGTH(poolSizes),
+        poolSizes,
+    };
+
+    VkDescriptorPool descriptorPool;
+    result = vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool);
+    CHECK_RESULT(result);
+
+    VkDescriptorSetAllocateInfo setAllocateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        NULL,
+        descriptorPool,
+        1,
+        &descriptorSetLayout,
+    };
+
+    VkDescriptorSet descriptorSet;
+    result = vkAllocateDescriptorSets(device, &setAllocateInfo, &descriptorSet);
+    CHECK_RESULT(result);
+
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {
+        VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        NULL,
+        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        (uint32_t)queueFamilyIndex,
+    };
+
+    VkCommandPool commandPool;
+    result = vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool);
+    CHECK_RESULT(result);
+
+    // The command buffers, one for initializing buffers, one for compute, one
+    // for reading back the results. This lets us time the compute work more
+    // precisely.
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        NULL,
+        commandPool,
+        VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        3,
+    };
+
+    VkCommandBuffer commandBuffers[3];
+    result = vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, commandBuffers);
+    CHECK_RESULT(result);
+
+    CooperativeMatrixTestTargetSet testTargetSet;
+    if (!shmemOnly) {
+        addWorkgroupCooperativeMatrixTestTargets(testTargetSet, cooperativeMatrixFlexibleDimensionsProperties);
+    }
+    addSubgroupCooperativeMatrixTestTargets(testTargetSet, cooperativeMatrixProperties);
+
+    // Loop over the testable cooperative matrix properties.
+    for (CooperativeMatrixTestTargetSet::const_iterator targetIt = testTargetSet.begin(); targetIt != testTargetSet.end(); ++targetIt) {
+        const CooperativeMatrixTestTarget &target = *targetIt;
+        TestType tt = target.testType;
+        uint32_t MSize = target.MSize;
+        uint32_t NSize = target.NSize;
+        uint32_t KSize = target.KSize;
+        VkComponentTypeKHR AType = target.AType;
+        VkComponentTypeKHR BType = target.BType;
+        VkComponentTypeKHR CType = target.CType;
+        VkComponentTypeKHR ResultType = target.ResultType;
+        VkScopeKHR scope = target.scope;
+        uint32_t workgroupSize = tt == TT_WORKGROUP ? target.workgroupInvocations : requiredSubgroupSize * 8;
+
+        if (tt == TT_SHARED && (workgroupSize < 32 || workgroupSize > 256)) {
+            continue;
+        }
+
+        std::string fileName = shaderFileName(tt, *target.typeCombination);
+
+        printf("\nshader: %s\n", fileName.c_str());
+
+        // Load and create the shader module.
+        std::ifstream spirvfile(fileName.c_str(), std::ios::binary | std::ios::ate);
+        std::streampos spirvsize = spirvfile.tellg();
+        if ((int)spirvsize == -1) {
+            printf("SKIP: %s not found (no precompiled shader for this advertised combo)\n", fileName.c_str());
+            continue;
+        }
+        spirvfile.seekg(0, std::ios::beg);
+
+        vector<char> spirv(spirvsize);
+        spirvfile.read(&spirv[0], spirvsize);
+
+        VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+            VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            NULL,
+            0,
+            spirv.size(),
+            (const uint32_t *)&spirv[0],
+        };
+
+        VkShaderModule shaderModule;
+        result = vkCreateShaderModule(device, &shaderModuleCreateInfo, NULL, &shaderModule);
+        CHECK_RESULT(result);
+
+        printf("\ncooperativeMatrixProps = %dx%dx%d   A = %s B = %s C = %s D = %s scope = %s \n",
+                MSize,
+                NSize,
+                KSize,
+                componentTypeInfo[AType].typeName,
+                componentTypeInfo[BType].typeName,
+                componentTypeInfo[CType].typeName,
+                componentTypeInfo[ResultType].typeName,
+                scopeName(scope));
+
+        // For performance, test a 4096x4096x4096 multiply. For correctness,
+        // test 256x256x256 (because the CPU reference computation is so slow).
+        uint32_t defaultM = defaultDim;
+        uint32_t defaultN = defaultDim;
+        uint32_t defaultK = defaultDim;
+
+        typedef struct {
+            unsigned int maxTILE_M;
+            unsigned int maxTILE_N;
+            unsigned int maxTILE_K;
+            unsigned int granularityTILE_M;
+            unsigned int granularityTILE_N;
+        } SubTestParams;
+
+        // TT_SHARED requires a multiple of 128x128 to satisfy the assumptions
+        // of its SSBO->shared memory copy code.
+        SubTestParams subTestParams[] = {
+            { 256, 256, 64, 128, 128 }, // TT_WORKGROUP
+            { 256, 256, 64, 128, 128 }, // TT_SHARED
+        };
+
+        SubTestParams *params = &subTestParams[tt];
+
+        // Allocate matrices large enough for every tile configuration below,
+        // then initialize and upload them once. Individual tests may use a
+        // smaller logical extent when the requested dimensions require
+        // different padding for different tile sizes.
+        const uint32_t allocationM = (defaultM + params->maxTILE_M - 1) / params->maxTILE_M * params->maxTILE_M;
+        const uint32_t allocationN = (defaultN + params->maxTILE_N - 1) / params->maxTILE_N * params->maxTILE_N;
+        const uint32_t allocationK = (defaultK + params->maxTILE_K - 1) / params->maxTILE_K * params->maxTILE_K;
+
+        enum {MAT_A = 0, MAT_B = 1, MAT_C = 2, MAT_D = 3, NUM_MATS = 4};
+        MatrixDesc matrices[NUM_MATS];
+
+        createMatrixDesc(device, memoryProperties, matrices[MAT_A], AType, allocationM, allocationK);
+        createMatrixDesc(device, memoryProperties, matrices[MAT_B], AType, allocationK, allocationN);
+        createMatrixDesc(device, memoryProperties, matrices[MAT_C], ResultType, allocationM, allocationN);
+        createMatrixDesc(device, memoryProperties, matrices[MAT_D], ResultType, allocationM, allocationN);
+
+        // Allocate a buffer to hold device addresses for the four matrices.
+        VkBuffer paramBuffer;
+        VkDeviceMemory paramMemory;
+        void *paramPtr;
+
+        VkBufferCreateInfo bufferCreateInfo = {
+            VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            NULL,
+            0,
+            4*sizeof(VkDeviceAddress),
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_SHARING_MODE_EXCLUSIVE,
+            0u,
+            NULL,
+        };
+
+        result = vkCreateBuffer(device, &bufferCreateInfo, NULL, &paramBuffer);
+        CHECK_RESULT(result);
+
+        VkMemoryRequirements memReqs;
+        vkGetBufferMemoryRequirements(device, paramBuffer, &memReqs);
+
+        int32_t hostIndex = findProperties(&memoryProperties, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+
+        VkMemoryAllocateFlagsInfo memAllocateFlagsInfo = {
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+            NULL,
+            VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
+            0,
+        };
+
+        VkMemoryAllocateInfo memAllocateInfo = {
+            VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            &memAllocateFlagsInfo,
+            memReqs.size,
+            (uint32_t)hostIndex,
+        };
+
+        result = vkAllocateMemory(device, &memAllocateInfo, NULL, &paramMemory);
+        CHECK_RESULT(result);
+
+        result = vkBindBufferMemory(device, paramBuffer, paramMemory, 0);
+        CHECK_RESULT(result);
+
+        result = vkMapMemory(device, paramMemory, 0, bufferCreateInfo.size, 0, &paramPtr);
+        CHECK_RESULT(result);
+
+        PFN_vkGetBufferDeviceAddress pfn_vkGetBufferDeviceAddress =
+            (PFN_vkGetBufferDeviceAddress)vkGetDeviceProcAddr(device, "vkGetBufferDeviceAddress");
+
+        for (int i = 0; i < NUM_MATS; ++i) {
+            MatrixDesc &m = matrices[i];
+
+            VkBufferDeviceAddressInfo info = {
+                VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+                NULL,
+                0,
+            };
+            VkDeviceAddress *addrsInMemory = (VkDeviceAddress *)paramPtr;
+            info.buffer = m.deviceBuffer;
+            VkDeviceAddress addr = pfn_vkGetBufferDeviceAddress(device, &info);
+            addrsInMemory[i] = addr;
+        }
+
+        VkDescriptorBufferInfo bufferDescriptor;
+        bufferDescriptor.buffer = paramBuffer;
+        bufferDescriptor.offset = 0;
+        bufferDescriptor.range = bufferCreateInfo.size;
+
+        VkWriteDescriptorSet writeDescriptorset = {
+            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            NULL,
+            descriptorSet,
+            0, // dstBinding,
+            0, // dstArrayElement
+            1, // descriptorCount
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            NULL,
+            &bufferDescriptor,
+            NULL,
+        };
+
+        vkUpdateDescriptorSets(device, 1, &writeDescriptorset, 0, NULL);
+
+        // Use low-entropy values for correctness to minimize floating-point
+        // precision differences. Performance tests use values uniformly
+        // distributed in [-1, 1]. D is initialized separately for each
+        // correctness test, and C is needed only when the shader loads it.
+        for (uint32_t i = 0; i < NUM_MATS; ++i) {
+            if (i == MAT_D || (!loadC && i == MAT_C)) {
+                continue;
+            }
+
+            MatrixDesc &m = matrices[i];
+            for (uint32_t j = 0; j < m.totalElements; ++j) {
+                if (m.isFloatType()) {
+                    float value = correctness ?
+                        ((float)(rand() & 0x3) - 1.0f) / 2.0f :
+                        2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+                    m.setDataFloat(j, value);
+                } else {
+                    m.setDataInt(j, (rand() & 0xFF) - 128);
+                }
+            }
+        }
+
+        VkCommandBufferBeginInfo commandBufferBeginInfo = {
+            VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            NULL,
+            0,
+            NULL,
+        };
+
+        // Copy invariant inputs to device memory once for all tile configurations.
+        result = vkBeginCommandBuffer(commandBuffers[0], &commandBufferBeginInfo);
+        CHECK_RESULT(result);
+
+        for (uint32_t i = 0; i < NUM_MATS; ++i) {
+            if (i == MAT_D || (!loadC && i == MAT_C)) {
+                continue;
+            }
+
+            MatrixDesc &m = matrices[i];
+            VkBufferCopy copy = { 0, 0, m.bufferSize };
+            vkCmdCopyBuffer(commandBuffers[0], m.hostBuffer, m.deviceBuffer, 1, &copy);
+        }
+
+        result = vkEndCommandBuffer(commandBuffers[0]);
+        CHECK_RESULT(result);
+
+        VkSubmitInfo submitInfo = {
+            VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            NULL,
+            0,
+            NULL,
+            NULL,
+            1,
+            &commandBuffers[0],
+            0,
+            NULL,
+        };
+
+        result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+        CHECK_RESULT(result);
+        result = vkQueueWaitIdle(queue);
+        CHECK_RESULT(result);
+
+        for (unsigned int TILE_M_size = params->granularityTILE_M; TILE_M_size <= params->maxTILE_M; TILE_M_size += params->granularityTILE_M) {
+        for (unsigned int TILE_N_size = params->granularityTILE_N; TILE_N_size <= params->maxTILE_N; TILE_N_size += params->granularityTILE_N) {
+        for (unsigned int bcolmajor = 0; bcolmajor <= 1; ++bcolmajor) {
+        for (unsigned int TILE_K = 16; TILE_K <= params->maxTILE_K; TILE_K *= 2) {
+
+            if (tt == TT_WORKGROUP && (TILE_N_size == 192 || TILE_M_size == 192)) {
+                continue;
+            }
+            if (tt == TT_WORKGROUP && TILE_K < KSize) {
+                continue;
+            }
+
+            bool BColMajor = bcolmajor != 0;
+
+            if (tt == TT_SHARED) {
+                bool aLoadsAligned = isUvec4AlignedElementCount(AType, KSize);
+                bool bLoadsAligned = isUvec4AlignedElementCount(BType, BColMajor ? KSize : NSize);
+
+                // The shmem shader stores A and B through uvec4 shared arrays
+                // and passes uvec4 offsets to coopMatLoad. That only works when
+                // each cooperative-matrix load starts on a 16-byte boundary;
+                // otherwise the scalar element offset would be truncated when
+                // converted to a uvec4 offset. Skip unaligned shapes here rather
+                // than adding a separate scalar shared-memory path to the shader.
+                if (!aLoadsAligned || !bLoadsAligned) {
+                    continue;
+                }
+            }
+
+            TestCase testCase = {
+                (TestType)tt, //TestType testType;
+                AType, // VkComponentTypeKHR inputType;
+                ResultType, // VkComponentTypeKHR outputType;
+
+                // MxNxK is the size of the full matrix multiply
+                defaultM, // uint32_t M;
+                defaultN, // uint32_t N;
+                defaultK, // uint32_t K;
+
+                // Each cooperative matrix multiply is lMxlNxlK
+                MSize, // uint32_t lM;
+                NSize, // uint32_t lN;
+                KSize, // uint32_t lK;
+
+                // size of workgroup tile in destination matrix
+                TILE_M_size, // uint32_t TILE_M;
+                TILE_N_size, // uint32_t TILE_N;
+                TILE_K, // uint32_t TILE_K;
+
+                BColMajor, // bool BColMajor;
+            };
+            float alpha = 2.0f, beta = 3.0f;
+
+            if (tt == TT_SHARED || tt == TT_WORKGROUP) {
+                // These TILE_K sizes happens to perform well on current HW.
+                if (componentTypeInfo[AType].bits == 8) {
+                    if (testCase.TILE_K != 64) {
+                        continue;
+                    }
+                } else if (ResultType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
+                    if (testCase.TILE_K != 32) {
+                        continue;
+                    }
+                } else {
+                    if (testCase.TILE_K != 16) {
+                        continue;
+                    }
+                }
+                // This tile size is too slow and may TDR.
+                if (componentTypeInfo[ResultType].bits == 32 &&
+                    testCase.TILE_M == 256 && testCase.TILE_N == 256) {
+                    continue;
+                }
+            } else {
+                if (testCase.TILE_K != KSize) {
+                    continue;
+                }
+            }
+            // For non-power of two tile sizes, round up the matrix size to
+            // be an even multiple of the tile size.
+            testCase.M = (testCase.M + testCase.TILE_M - 1) / testCase.TILE_M * testCase.TILE_M;
+            testCase.N = (testCase.N + testCase.TILE_N - 1) / testCase.TILE_N * testCase.TILE_N;
+            testCase.K = (testCase.K + testCase.TILE_K - 1) / testCase.TILE_K * testCase.TILE_K;
+
+            testCase.ARowLen = testCase.TILE_K;
+            testCase.ANumRows = testCase.TILE_M;
+            testCase.BRowLen = BColMajor ? testCase.TILE_K : testCase.TILE_N;
+            testCase.BNumRows = BColMajor ? testCase.TILE_N : testCase.TILE_K;
+
+            setMatrixDescDimensions(matrices[MAT_A], testCase.M, testCase.K);
+            setMatrixDescDimensions(matrices[MAT_B], testCase.K, testCase.N);
+            setMatrixDescDimensions(matrices[MAT_C], testCase.M, testCase.N);
+            setMatrixDescDimensions(matrices[MAT_D], testCase.M, testCase.N);
+
+            // Specialize the shader with the matrix sizes, strides, and constants.
+            const uint32_t specData[] = {
+                testCase.lM,
+                testCase.lN,
+                testCase.lK,
+                testCase.TILE_M,
+                testCase.TILE_N,
+                testCase.TILE_K,
+                testCase.K,
+                testCase.K, // stride0
+                testCase.BColMajor ? testCase.K : testCase.N, // stride1
+                testCase.N, // stride2
+                testCase.N, // stride3
+                *(uint32_t *)&alpha,
+                *(uint32_t *)&beta,
+                testCase.BColMajor,
+                testCase.ARowLen,
+                testCase.ANumRows,
+                testCase.BRowLen,
+                testCase.BNumRows,
+                workgroupSize, // invocations per workgroup
+                testCase.M,
+                testCase.N,
+                requiredSubgroupSize,
+                uint32_t(loadC),
+                swizzleWidth,
+            };
+
+#if 0
+            for (int i = 0; i < ARRAY_LENGTH(specData); ++i) {
+                printf("specdata[%d] = %d\n", i, specData[i]);
+            }
+#endif
+
+            VkSpecializationMapEntry entries[] = {
+                {0, sizeof(uint32_t) * 0, sizeof(uint32_t)},
+                {1, sizeof(uint32_t) * 1, sizeof(uint32_t)},
+                {2, sizeof(uint32_t) * 2, sizeof(uint32_t)},
+                {3, sizeof(uint32_t) * 3, sizeof(uint32_t)},
+                {4, sizeof(uint32_t) * 4, sizeof(uint32_t)},
+                {5, sizeof(uint32_t) * 5, sizeof(uint32_t)},
+                {6, sizeof(uint32_t) * 6, sizeof(uint32_t)},
+                {7, sizeof(uint32_t) * 7, sizeof(uint32_t)},
+                {8, sizeof(uint32_t) * 8, sizeof(uint32_t)},
+                {9, sizeof(uint32_t) * 9, sizeof(uint32_t)},
+                {10, sizeof(uint32_t) * 10, sizeof(uint32_t)},
+                {11, sizeof(uint32_t) * 11, sizeof(uint32_t)},
+                {12, sizeof(uint32_t) * 12, sizeof(uint32_t)},
+                {13, sizeof(uint32_t) * 13, sizeof(uint32_t)},
+                {14, sizeof(uint32_t) * 14, sizeof(uint32_t)},
+                {15, sizeof(uint32_t) * 15, sizeof(uint32_t)},
+                {16, sizeof(uint32_t) * 16, sizeof(uint32_t)},
+                {17, sizeof(uint32_t) * 17, sizeof(uint32_t)},
+                {18, sizeof(uint32_t) * 18, sizeof(uint32_t)},
+                {19, sizeof(uint32_t) * 19, sizeof(uint32_t)},
+                {20, sizeof(uint32_t) * 20, sizeof(uint32_t)},
+                {21, sizeof(uint32_t) * 21, sizeof(uint32_t)},
+                {22, sizeof(uint32_t) * 22, sizeof(uint32_t)},
+                {23, sizeof(uint32_t) * 23, sizeof(uint32_t)},
+            };
+
+            VkSpecializationInfo specInfo =
+            {
+                ARRAY_LENGTH(entries),
+                entries,
+                sizeof(specData),
+                specData,
+            };
+
+            VkPipelineShaderStageRequiredSubgroupSizeCreateInfo subgroupSizeCreateInfo = {
+                VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO,
+                NULL,
+                requiredSubgroupSize,
+            };
+
+            VkPipelineShaderStageCreateInfo shaderCreateInfo = {
+                VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                &subgroupSizeCreateInfo,
+                VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT,
+                VK_SHADER_STAGE_COMPUTE_BIT,
+                shaderModule,
+                "main",
+                &specInfo,
+            };
+
+            VkComputePipelineCreateInfo pipelineCreateInfo = {
+                VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+                NULL,
+                0,
+                shaderCreateInfo,
+                pipelineLayout,
+                VK_NULL_HANDLE,
+                0
+            };
+
+            VkPipeline pipeline;
+            result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, NULL, &pipeline);
+            CHECK_RESULT(result);
+
+            if (correctness) {
+                MatrixDesc &m = matrices[MAT_D];
+                for (uint32_t i = 0; i < m.totalElements; ++i) {
+                    if (m.isFloatType()) {
+                        m.setDataFloat(i, 1234.0f);
+                    } else {
+                        m.setDataInt(i, 1234);
+                    }
+                }
+
+                result = vkBeginCommandBuffer(commandBuffers[0], &commandBufferBeginInfo);
+                CHECK_RESULT(result);
+                VkBufferCopy copy = { 0, 0, (VkDeviceSize)m.totalElements * m.elementSize };
+                vkCmdCopyBuffer(commandBuffers[0], m.hostBuffer, m.deviceBuffer, 1, &copy);
+                result = vkEndCommandBuffer(commandBuffers[0]);
+                CHECK_RESULT(result);
+
+                submitInfo.pCommandBuffers = &commandBuffers[0];
+                result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+                CHECK_RESULT(result);
+                result = vkQueueWaitIdle(queue);
+                CHECK_RESULT(result);
+            }
+
+            // Run the shader.
+            result = vkBeginCommandBuffer(commandBuffers[1], &commandBufferBeginInfo);
+            CHECK_RESULT(result);
+
+            vkCmdBindDescriptorSets(commandBuffers[1], VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0u, 1, &descriptorSet, 0u, NULL);
+            vkCmdBindPipeline(commandBuffers[1], VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+
+            for (uint32_t i = 0; i < repeatCount; ++i) {
+                vkCmdDispatch(commandBuffers[1], testCase.N / testCase.TILE_N, testCase.M / testCase.TILE_M, 1);
+                // pipeline barrier. vulkan queue will overlap dispatches otherwise and skew 
+                // single gemm perf data
+                if (barrierEnabled && i + 1 < repeatCount) {
+                    VkMemoryBarrier mb{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+                    mb.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                    mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+                    vkCmdPipelineBarrier(commandBuffers[1],
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        0, 1, &mb, 0, nullptr, 0, nullptr);
+                }
+            }
+
+            result = vkEndCommandBuffer(commandBuffers[1]);
+            CHECK_RESULT(result);
+
+            if (!correctness) {
+                // warmup submits, to get the clocks up before we run the timing
+                submitInfo.pCommandBuffers = &commandBuffers[1];
+                int warmupCount = tt == TT_SHARED ? 5 : 2;
+                for (int i = 0; i < warmupCount; ++i) {
+                    result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+                    CHECK_RESULT(result);
+                    result = vkQueueWaitIdle(queue);
+                    CHECK_RESULT(result);
+                }
+            }
+
+            // Time the submit/wait time for this command buffer.
+            auto beginTime = std::chrono::high_resolution_clock::now();
+
+            submitInfo.pCommandBuffers = &commandBuffers[1];
+            result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+            CHECK_RESULT(result);
+            result = vkQueueWaitIdle(queue);
+            CHECK_RESULT(result);
+
+            auto endTime = std::chrono::high_resolution_clock::now();
+            uint64_t elapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(endTime - beginTime).count();
+            uint64_t flops = 2ULL * (uint64_t)testCase.M * (uint64_t)testCase.N * (uint64_t)testCase.K * (uint64_t)repeatCount;
+            double tflops = (double)flops / (double)(elapsedUs / 1000000.0) / (1000.0*1000.0*1000.0*1000.0);
+
+            printf("TILE_M=%d TILE_N=%d, TILE_K=%d BColMajor=%d workgroupSize=%d ", testCase.TILE_M, testCase.TILE_N, testCase.TILE_K, testCase.BColMajor, workgroupSize);
+            if (tt == TT_WORKGROUP) {
+                printf("swizzle=%u ", swizzleWidth);
+            }
+            if (!correctness) {
+                printf("  %f TFlops\n", tflops);
+            }
+
+            if (correctness)
+            {
+                // Read the result back only when the CPU reference needs it.
+                result = vkBeginCommandBuffer(commandBuffers[2], &commandBufferBeginInfo);
+                CHECK_RESULT(result);
+                {
+                    MatrixDesc &m = matrices[MAT_D];
+                    VkBufferCopy copy = { 0, 0, (VkDeviceSize)m.totalElements * m.elementSize };
+                    vkCmdCopyBuffer(commandBuffers[2], m.deviceBuffer, m.hostBuffer, 1, &copy);
+                }
+                result = vkEndCommandBuffer(commandBuffers[2]);
+                CHECK_RESULT(result);
+
+                submitInfo.pCommandBuffers = &commandBuffers[2];
+                result = vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+                CHECK_RESULT(result);
+                result = vkQueueWaitIdle(queue);
+                CHECK_RESULT(result);
+
+                const MatrixDesc &mat_a = matrices[MAT_A];
+                const MatrixDesc &mat_b = matrices[MAT_B];
+                const MatrixDesc &mat_c = matrices[MAT_C];
+                const MatrixDesc &mat_d = matrices[MAT_D];
+                bool pass = true;
+
+                if (mat_a.isFloatType()) {
+                    for (uint32_t i = 0; i < testCase.M; ++i)
+                    {
+                        for (uint32_t j = 0; j < testCase.N; ++j)
+                        {
+                            float ref = 0;
+                            for (uint32_t k = 0; k < testCase.K; ++k)
+                            {
+                                ref += mat_a.getDataFloat(i, k, false) * mat_b.getDataFloat(k, j, testCase.BColMajor);
+                            }
+
+                            ref = alpha * ref;
+                            if (loadC) {
+                                ref += beta * mat_c.getDataFloat(i, j, false);
+                            }
+
+                            float Dij = mat_d.getDataFloat(i, j, false);
+                            if (ref != Dij) {
+                                pass = false;
+                                printf("error %d %d %f != %f\n", i, j, ref, Dij);
+                            }
+                        }
+                    }
+                } else {
+                    for (uint32_t i = 0; i < testCase.M; ++i)
+                    {
+                        for (uint32_t j = 0; j < testCase.N; ++j)
+                        {
+                            uint32_t ref = 0;
+                            for (uint32_t k = 0; k < testCase.K; ++k)
+                            {
+                                ref += mat_a.getDataInt(i, k, false) * mat_b.getDataInt(k, j, testCase.BColMajor);
+                            }
+
+                            ref = ((int)alpha) * ref;
+                            if (loadC) {
+                                ref += ((int)beta) * mat_c.getDataInt(i, j, false);
+                            }
+
+                            uint32_t Dij = mat_d.getDataInt(i, j, false);
+                            if (ref != Dij) {
+                                pass = false;
+                                printf("error %d %d %d != %d\n", i, j, ref, Dij);
+                            }
+                        }
+                    }
+                }
+                printf("%s\n", pass ? "pass" : "fail");
+            }
+
+            vkDestroyPipeline(device, pipeline, NULL);
+
+        } // TILE_K
+        } // bcolmajor
+        } // TILE_N_size
+        } // TILE_M_size
+
+        for (int i = 0; i < NUM_MATS; ++i) {
+            destroyMatrixDesc(device, matrices[i]);
+        }
+        vkUnmapMemory(device, paramMemory);
+        vkDestroyBuffer(device, paramBuffer, NULL);
+        vkFreeMemory(device, paramMemory, NULL);
+
+        vkDestroyShaderModule(device, shaderModule, NULL);
+    } // testTargets
+
+    printf("\ndone\n");
+
+    return 0;
+}

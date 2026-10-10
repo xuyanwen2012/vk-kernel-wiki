@@ -1,0 +1,23 @@
+repo: jeffbolznv/vk_cooperative_matrix_perf
+url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf
+commit: 6ed40b46bc13a3ffe6ba7123e2a14a72cf8e45b3
+license: MIT
+license_file: artifacts/prs/vk-coopmat-perf/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: shaders/shmem.comp
+  file: shmem.comp
+  sha256: 313edf13fc82c3b1ccd629a5f957d3cccfd1cb02b9e3a79c5ba2f629fc0f904f
+- path: shaders/workgroup.comp
+  file: workgroup.comp
+  sha256: 7c739a2b865dc3c5c781af08d2df7824d558b5f2e43c10cc579a7d2109a7d4f7
+- path: shaders/compile.bat
+  file: compile.bat
+  sha256: c1b99ce0879d29f6483b46c0d7fdce130edf63d7665aba198742bdbfaaf22b02
+- path: src/vk_cooperative_matrix_perf.cpp
+  file: vk_cooperative_matrix_perf.cpp
+  sha256: cd50303a8fe51b6e168b94ef4831d5f8a8539077374dfcf606a11ae786da8877
+- path: README.md
+  file: README.md
+  sha256: eab6c38053d23e5d54692f117d199544c76cb680e773f8eb32cdb2a68c764213

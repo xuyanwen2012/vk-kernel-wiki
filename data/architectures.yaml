@@ -47,6 +47,11 @@ architectures:
             kind: device
           rx-7600:
             kind: device
+      rdna4:
+        kind: generation
+        children:
+          rx-9070-xt:
+            kind: device
 
   intel:
     kind: vendor
@@ -62,6 +67,8 @@ architectures:
   nvidia:
     kind: vendor
     children:
+      rtx-4070:
+        kind: device
       rtx-4070-ti-super:
         kind: device
       jetson-orin:

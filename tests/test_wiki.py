@@ -1371,7 +1371,7 @@ class ArchitectureQueryTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         info = json.loads(proc.stdout)
         self.assertEqual(info["anc"], ["rdna3", "amd"])
-        self.assertEqual(info["desc"], ["rdna3", "radeon-780m", "rx-7900-xtx", "rx-7600"])
+        self.assertEqual(info["desc"], ["rdna3", "radeon-780m", "rx-7900-xtx", "rx-7600", "rdna4", "rx-9070-xt"])
         self.assertEqual(sum(1 for k in info["kinds"].values() if k == "vendor"), 6)
         # A vendor without children is a reserved node, never a device.
         reserved = [n for n in info["childless"] if info["kinds"][n] == "vendor"]

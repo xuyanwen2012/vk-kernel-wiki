@@ -139,3 +139,12 @@ bundles:
   files:
   - skills/vulkan-optimize/optimization-handbook.md
   - skills/vulkan-optimize/kernel-opt.md
+- id: vk-coopmat-perf-gemm
+  ledger: vk-coopmat-perf
+  commit: 6ed40b46bc13a3ffe6ba7123e2a14a72cf8e45b3
+  files:
+  - shaders/shmem.comp
+  - shaders/workgroup.comp
+  - shaders/compile.bat
+  - src/vk_cooperative_matrix_perf.cpp
+  - README.md

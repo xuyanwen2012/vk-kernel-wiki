@@ -30,6 +30,11 @@ rdna3:
   - RDNA3
   - GFX11
 
+rdna4:
+  - "RDNA 4"
+  - RDNA4
+  - GFX12
+
 xe2:
   - Xe2
   - Battlemage
@@ -56,6 +61,11 @@ rx-7600:
   - Navi33
   - gfx1102
 
+rx-9070-xt:
+  - "RX 9070 XT"
+  - "Radeon RX 9070 XT"
+  - gfx1201
+
 arc-b580:
   - B580
   - "Arc B580"
@@ -63,6 +73,10 @@ arc-b580:
 arc-pro-b70:
   - B70
   - "Arc Pro B70"
+
+rtx-4070:
+  - "RTX 4070"
+  - "GeForce RTX 4070"
 
 rtx-4070-ti-super:
   - "4070 Ti SUPER"
@@ -91,6 +105,12 @@ cooperative-matrix:
   - VK_EXT_cooperative_matrix_maintenance1
   - VK_QCOM_cooperative_matrix_conversion
   - vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR
+  - WMMA
+  - "wave matrix multiply accumulate"
+  - "matrix cores"
+  - DPAS
+  - XMX
+  - "tensor cores"
 
 int8-cooperative-matrix:
   - "int8 coopmat"
@@ -117,6 +137,8 @@ coopmat-fp32-accumulator:
 subgroup-size:
   - "subgroup size"
   - gl_SubgroupSize
+  - wave32
+  - "wave size"
 
 subgroup-size-control:
   - "subgroup size control"

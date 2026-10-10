@@ -1,0 +1,17 @@
+repo: jeffbolznv/vk_cooperative_matrix_perf
+pr: 12
+url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/12
+merge_sha: cc3f225f90f98d1dae5c1c9ac07b339ada2a029a
+license: MIT
+license_file: artifacts/prs/vk-coopmat-perf/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/jeffbolznv/vk_cooperative_matrix_perf/pulls/12/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: shaders/shmem.comp
+  status: modified
+  sha256: 6f9b450faf44f4347145e0962e2d205de11611d4a7290e601ca7749455b95782
+- path: shaders/tiled.comp
+  status: removed
+  sha256: d3495bd1b31632e43f5a61c52c5955154d9573285554654e3ffdc5bbca2f6f8f
