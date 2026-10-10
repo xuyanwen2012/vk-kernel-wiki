@@ -4,7 +4,7 @@
 > Built for retrieval by LLM agents. See [CLAUDE.md](CLAUDE.md) for schema and authoring rules.
 > This repository is a Claude Code skill; see [SKILL.md](SKILL.md).
 
-**Current corpus:** 801 pages: 5 source-measurement pages, 58 document pages (34 official documents: Khronos Vulkan, GLSL and Vulkan Guide specification text and extension proposals, the Intel DPAS instruction specification, Mesa documentation and release notes, NVIDIA driver release notes; 9 pages quoting other projects' source files, tests and code samples; 14 vendor and project articles, guides, slide decks and framework release notes; 1 paper), 11 blog pages (benchmark posts, write-ups and upstream issue threads), 713 upstream pull-request pages generated from seven repositories (`ggml-org/llama.cpp` Vulkan backend: 405 and `Tencent/ncnn` Vulkan layers: 103, both merged up to 2026-10-05; `mesa/mesa` Vulkan drivers and compilers, RADV / ACO, ANV, NVK / NAK, Turnip / ir3 and Panvk, with the common cooperative-matrix lowering: 169; `alibaba/MNN` Vulkan backend: 10; `jeffbolznv/vk_cooperative_matrix_perf`, NVIDIA's cooperative-matrix benchmark: 10; `KhronosGroup/glslang`: 8; `KhronosGroup/SPIRV-Tools`: 8; these five searched up to 2026-10-10), 607 of them with the upstream patches saved under `artifacts/`, and 14 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 1 language). Measured scope: the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. Nothing in the corpus is measured for another device, driver version or date. The other sources now span more vendors: document, blog and pull-request pages quote Khronos, AMD, Intel, NVIDIA, Qualcomm and Arm material and carry nodes of all five vendors, but they are verbatim excerpts of what their authors wrote, not measurements made for this wiki. Counts come from `python3 scripts/repo_status.py`.
+**Current corpus:** 811 pages: 12 source-measurement pages, 58 document pages (34 official documents: Khronos Vulkan, GLSL and Vulkan Guide specification text and extension proposals, the Intel DPAS instruction specification, Mesa documentation and release notes, NVIDIA driver release notes; 9 pages quoting other projects' source files, tests and code samples; 14 vendor and project articles, guides, slide decks and framework release notes; 1 paper), 11 blog pages (benchmark posts, write-ups and upstream issue threads), 713 upstream pull-request pages generated from seven repositories (`ggml-org/llama.cpp` Vulkan backend: 405 and `Tencent/ncnn` Vulkan layers: 103, both merged up to 2026-10-05; `mesa/mesa` Vulkan drivers and compilers, RADV / ACO, ANV, NVK / NAK, Turnip / ir3 and Panvk, with the common cooperative-matrix lowering: 169; `alibaba/MNN` Vulkan backend: 10; `jeffbolznv/vk_cooperative_matrix_perf`, NVIDIA's cooperative-matrix benchmark: 10; `KhronosGroup/glslang`: 8; `KhronosGroup/SPIRV-Tools`: 8; these five searched up to 2026-10-10), 607 of them with the upstream patches saved under `artifacts/`, and 17 wiki pages (2 hardware, 6 technique, 4 pattern, 3 kernel, 1 language, 1 migration). Measured scope: first-party measurement pages exist for seven devices; driver and date below are each page's `driver` and `measured_at` fields. The AMD Radeon 780M (device node `radeon-780m`) has the full set, six pages, all on RADV Mesa 25.2.7: device properties (2026-09-01), the 4w and 8da4w linear kernels and attention (2026-09-27), end-to-end prefill (2026-09-28) and the fused attention kernel (2026-10-05). The other six devices have one page each, holding the fused-attention campaign result only: Radeon RX 7600 (`rx-7600`, RADV Mesa 26.2.3, 2026-10-06), Radeon RX 7900 XTX (`rx-7900-xtx`, AMDVLK 2025.Q2.1, 2026-10-08), Arc B580 (`arc-b580`, ANV Mesa 26.2.3, 2026-10-09), Arc Pro B70 (`arc-pro-b70`, ANV Mesa 26.2.3, 2026-10-09), RTX 4070 Ti SUPER (`rtx-4070-ti-super`, NVIDIA 615.71.09, 2026-10-09) and Jetson Orin Nano (`jetson-orin`, NVIDIA 595.78, 2026-10-09). Kernel and hardware synthesis pages exist only for the 780M; the corpus has no device-properties, linear-kernel or stand-alone end-to-end measurement page for the other six devices. Three wiki pages are written from the fused-attention measurements across devices (`technique-fused-attention-kernel`, `pattern-invalid-usage-that-passes-tests`, `migration-rdna3-to-xe2`); the other 13 hardware, technique, pattern and kernel pages are tagged `radeon-780m` alone. Do not transfer a number from one device to another: each figure holds for the device, driver version and date on its page. For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. Nothing in the corpus is measured for any other device, driver version or date. The other sources now span more vendors: document, blog and pull-request pages quote Khronos, AMD, Intel, NVIDIA, Qualcomm and Arm material and carry nodes of all five vendors, but they are verbatim excerpts of what their authors wrote, not measurements made for this wiki. Counts come from `python3 scripts/repo_status.py`.
 
 ## Query Tools
 
@@ -52,7 +52,7 @@ The tree in [data/architectures.yaml](data/architectures.yaml) is the single sou
   - `bifrost`: generation without a device node
 - `samsung`: reserved, no devices
 
-28 nodes: 6 vendors, 10 generations, 12 devices. Every measurement page and every hardware, technique, pattern and kernel page is tagged with the device node `radeon-780m` only; the language page is tagged `rdna3`. Every other node has document, blog or pull-request pages at most (five device nodes have none: `rx-7600`, `rtx-4070-ti-super`, `jetson-orin`, `adreno-840`, `mali-g1`); the per-node list is [queries/by-architecture.md](queries/by-architecture.md).
+28 nodes: 6 vendors, 10 generations, 12 devices. Seven device nodes have a measurement page: `radeon-780m` (6) and `rx-7600`, `rx-7900-xtx`, `arc-b580`, `arc-pro-b70`, `rtx-4070-ti-super`, `jetson-orin` (1 each, the fused-attention campaign result). The hardware and kernel pages and 8 of the technique and pattern pages are tagged `radeon-780m` only; `technique-fused-attention-kernel` is tagged with all seven measured devices and `pattern-invalid-usage-that-passes-tests` with six of them (not `arc-pro-b70`); `migration-rdna3-to-xe2` names generations in `from_arch` / `to_arch` and has no `architectures` field, so `--architecture` does not return it (use `--type migration`); the language page is tagged `rdna3`. Every other node has document, blog or pull-request pages at most (two device nodes have none: `adreno-840`, `mali-g1`); the per-node list is [queries/by-architecture.md](queries/by-architecture.md).
 
 ## Hardware Features
 
@@ -67,7 +67,7 @@ Directory: `wiki/hardware/`.
 
 ## Optimization Techniques
 
-Directory: `wiki/techniques/`. All five pages are `source-reported`: no source page holds an A/B measurement that isolates the technique.
+Directory: `wiki/techniques/`. The first five pages are `source-reported` and for the Radeon 780M only: no source page holds an A/B measurement that isolates the technique. `technique-fused-attention-kernel` is `verified`: its evidence is the seven fused-attention measurement pages, each comparing the fused kernel with its three-kernel parent on one device.
 
 | Page | Path |
 |---|---|
@@ -76,6 +76,7 @@ Directory: `wiki/techniques/`. All five pages are `source-reported`: no source p
 | `technique-workgroup-tile-sizing` | [wiki/techniques/workgroup-tile-sizing.md](wiki/techniques/workgroup-tile-sizing.md) |
 | `technique-causal-truncation` | [wiki/techniques/causal-truncation.md](wiki/techniques/causal-truncation.md) |
 | `technique-full-a-map` | [wiki/techniques/full-a-map.md](wiki/techniques/full-a-map.md) |
+| `technique-fused-attention-kernel` | [wiki/techniques/fused-attention-kernel.md](wiki/techniques/fused-attention-kernel.md) |
 
 ## Kernel Case Studies
 
@@ -96,6 +97,7 @@ Directory: `wiki/patterns/`.
 | `pattern-unaligned-m-fallback` | [wiki/patterns/unaligned-m-fallback.md](wiki/patterns/unaligned-m-fallback.md) | source-reported |
 | `pattern-sdpa-release-gap` | [wiki/patterns/sdpa-release-gap.md](wiki/patterns/sdpa-release-gap.md) | source-reported |
 | `pattern-coopmat-name-check-false-failure` | [wiki/patterns/coopmat-name-check-false-failure.md](wiki/patterns/coopmat-name-check-false-failure.md) | source-reported |
+| `pattern-invalid-usage-that-passes-tests` | [wiki/patterns/invalid-usage-that-passes-tests.md](wiki/patterns/invalid-usage-that-passes-tests.md) | verified |
 
 ## Language Guides
 
@@ -103,7 +105,13 @@ Directory: `wiki/patterns/`.
 
 ## Migration Notes
 
-No pages yet. Directory: `wiki/migration/`.
+Directory: `wiki/migration/`.
+
+| Page | Path | From | To | Confidence |
+|---|---|---|---|---|
+| `migration-rdna3-to-xe2` | [wiki/migration/rdna3-to-xe2.md](wiki/migration/rdna3-to-xe2.md) | `rdna3` | `xe2` | verified |
+
+`migration-rdna3-to-xe2` covers one kernel, the fused attention kernel, ported to the Arc B580 and confirmed on the Arc Pro B70 (ANV Mesa 26.2.3); the linear kernels are not covered.
 
 ## Sources
 
@@ -116,6 +124,13 @@ First-party measurements, directory `sources/measurements/`. Device, driver and 
 | `meas-780m-8da4w-port` | [sources/measurements/780m-8da4w-port.md](sources/measurements/780m-8da4w-port.md) | `radeon-780m` | RADV Mesa 25.2.7 (version attributed from the install history) | 2026-09-27 | https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae; in this repository: `sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt` |
 | `meas-780m-sdpa-port` | [sources/measurements/780m-sdpa-port.md](sources/measurements/780m-sdpa-port.md) | `radeon-780m` | RADV Mesa 25.2.7 (version attributed from the install history) | 2026-09-27 | https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae; in this repository: `sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt` |
 | `meas-780m-e2e-prefill` | [sources/measurements/780m-e2e-prefill.md](sources/measurements/780m-e2e-prefill.md) | `radeon-780m` | RADV Mesa 25.2.7 | 2026-09-28 | https://github.com/sarc-acl/executorch at commit ef079ac41fd09f01656e1ab46c87ca85be6c54ae |
+| `meas-780m-fused-attention` | [sources/measurements/780m-fused-attention.md](sources/measurements/780m-fused-attention.md) | `radeon-780m` | RADV Mesa 25.2.7 | 2026-10-05 | https://github.com/sarc-acl/executorch at commit 71b43d903d8be69b351c3a5538c86ca473cba00c |
+| `meas-rx7600-fused-attention` | [sources/measurements/rx7600-fused-attention.md](sources/measurements/rx7600-fused-attention.md) | `rx-7600` | RADV Mesa 26.2.3 | 2026-10-06 | https://github.com/sarc-acl/executorch at commit c4d7451c5da8b37948e3f252968ddd9b08de353b |
+| `meas-7900xtx-fused-attention` | [sources/measurements/7900xtx-fused-attention.md](sources/measurements/7900xtx-fused-attention.md) | `rx-7900-xtx` | AMDVLK 2025.Q2.1 | 2026-10-08 | https://github.com/sarc-acl/executorch at commit 82aaec9983f940cf50dfff30b93e8ecece90917d |
+| `meas-b580-fused-port` | [sources/measurements/b580-fused-port.md](sources/measurements/b580-fused-port.md) | `arc-b580` | ANV Mesa 26.2.3 | 2026-10-09 | https://github.com/sarc-acl/executorch at commit a434a49623600f168089173a964efc79661ac286; one file at commit 319e2ad34e28bcb77691036c7966ac9867e60065 |
+| `meas-b70-fused-port` | [sources/measurements/b70-fused-port.md](sources/measurements/b70-fused-port.md) | `arc-pro-b70` | ANV Mesa 26.2.3 | 2026-10-09 | https://github.com/sarc-acl/executorch at commit c3d67a82125eee10edc14e5e4abdb931166f29fc |
+| `meas-4070ti-fused-port` | [sources/measurements/4070ti-fused-port.md](sources/measurements/4070ti-fused-port.md) | `rtx-4070-ti-super` | NVIDIA 615.71.09 | 2026-10-09 | https://github.com/sarc-acl/executorch at commit 8f8c44e22e2d8c62a6a192f00e252f8768486b0d |
+| `meas-orin-fused-port` | [sources/measurements/orin-fused-port.md](sources/measurements/orin-fused-port.md) | `jetson-orin` | NVIDIA 595.78 | 2026-10-09 | https://github.com/sarc-acl/executorch at commit da92b4b3ceec6e6cf09759c6ed8d7fc25c92aedb |
 
 `sources/prs/` holds 713 generated pull-request pages (`llama-cpp/` 405, `mesa/` 169, `ncnn/` 103, `mnn/` 10, `vk-coopmat-perf/` 10, `glslang/` 8, `spirv-tools/` 8); they are listed in [queries/by-repo.md](queries/by-repo.md), not here. 
 

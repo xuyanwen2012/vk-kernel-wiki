@@ -128,6 +128,7 @@ Path: `amd` > `rdna3` > `radeon-780m`
 | [Radeon 780M 4w linear coopmat port to release 1.5 (sarc-1.5-bootstrap): microbench, correctness, end-to-end prefill](../sources/measurements/780m-4w-bootstrap.md) | `sources/measurements/780m-4w-bootstrap.md` |
 | [Radeon 780M 8da4w (dq8ca) linear coopmat port to release 1.5 (sarc-1.5-8da4w-port): microbench, correctness, production-diff, end-to-end prefill](../sources/measurements/780m-8da4w-port.md) | `sources/measurements/780m-8da4w-port.md` |
 | [Radeon 780M end-to-end 2048-token LLM prefill: SARC 1.5-r2 vs stock ExecuTorch 1.5 (sarc-1.5-e2e-benchmark campaign e2e-1.5-2026-09-28)](../sources/measurements/780m-e2e-prefill.md) | `sources/measurements/780m-e2e-prefill.md` |
+| [Radeon 780M: fused attention kernel (fused3, one-pass form, fused3sb subgroup barriers), gains over the parent and gate outcomes (sarc-1.5-780m-prefill-refine, rounds 2 and 3)](../sources/measurements/780m-fused-attention.md) | `sources/measurements/780m-fused-attention.md` |
 | [Radeon 780M SDPA prefill port to release 1.5: gap report, SDPA correctness, and end-to-end prefill with the SDPA rows (sarc-1.5-sdpa-port, 2026-09-27)](../sources/measurements/780m-sdpa-port.md) | `sources/measurements/780m-sdpa-port.md` |
 | [Vulkan device properties of the Radeon 780M on RADV Mesa 25.2.7 (vulkaninfo profile export)](../sources/measurements/780m-vulkaninfo.md) | `sources/measurements/780m-vulkaninfo.md` |
 | [Cooperative matrix on the Radeon 780M (RDNA3 iGPU) with RADV Mesa 25.2.7](../wiki/hardware/cooperative-matrix-rdna3.md) | `wiki/hardware/cooperative-matrix-rdna3.md` |
@@ -136,12 +137,14 @@ Path: `amd` > `rdna3` > `radeon-780m`
 | [8da4w linear (dynamic int8 activations, 4-bit weights) cooperative-matrix kernel on the Radeon 780M: sarc_linear_dq8ca_coopmat_zpg t128x64k32g42s32](../wiki/kernels/linear-8da4w-780m.md) | `wiki/kernels/linear-8da4w-780m.md` |
 | [Prefill attention (SDPA) cooperative-matrix kernels on the Radeon 780M: sarc_sdpa_qk_coopmat t128x64k32g22s64, sarc_sdpa_av_coopmat t64x64k32g22s64 and the truncated softmax](../wiki/kernels/sdpa-prefill-780m.md) | `wiki/kernels/sdpa-prefill-780m.md` |
 | [Correctness harness reports FAILED because the kernel name lacks the substring coopmat (Radeon 780M, 8da4w)](../wiki/patterns/coopmat-name-check-false-failure.md) | `wiki/patterns/coopmat-name-check-false-failure.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
 | [End-to-end prefill gap between two releases with matching linear kernels, attributed by the gap report to the SDPA kernels (Radeon 780M)](../wiki/patterns/sdpa-release-gap.md) | `wiki/patterns/sdpa-release-gap.md` |
 | [SARC linear speedup disappears at a prompt length that is not tile-aligned (Radeon 780M)](../wiki/patterns/unaligned-m-fallback.md) | `wiki/patterns/unaligned-m-fallback.md` |
 | [Causal-tail truncation in the attention-weight softmax (sarc_sdpa_attn_weights_softmax) on the Radeon 780M](../wiki/techniques/causal-truncation.md) | `wiki/techniques/causal-truncation.md` |
 | [texture3d output drain staged in the dead A shared-memory region (CSH_IN_ASH) on the Radeon 780M](../wiki/techniques/drain-in-a-staging.md) | `wiki/techniques/drain-in-a-staging.md` |
 | [fp32 accumulator matrix for fp16 cooperative-matrix operands (ACC_FP32) on the Radeon 780M](../wiki/techniques/fp32-accumulation.md) | `wiki/techniques/fp32-accumulation.md` |
 | [Full A map (A_MAP_FULL) in the 8da4w zpg cooperative-matrix linear kernel on the Radeon 780M](../wiki/techniques/full-a-map.md) | `wiki/techniques/full-a-map.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 | [Output tile per workgroup (WG_TILE_M x WG_TILE_N) in the Radeon 780M cooperative-matrix kernels](../wiki/techniques/workgroup-tile-sizing.md) | `wiki/techniques/workgroup-tile-sizing.md` |
 
 #### `rx-7900-xtx` (device)
@@ -152,6 +155,9 @@ Path: `amd` > `rdna3` > `rx-7900-xtx`
 |------|------|
 | [Using the Matrix Cores of AMD RDNA 4 architecture GPUs (GPUOpen)](../sources/docs/gpuopen-matrix-cores-rdna4.md) | `sources/docs/gpuopen-matrix-cores-rdna4.md` |
 | [How to accelerate AI applications on RDNA 3 using WMMA (GPUOpen)](../sources/docs/gpuopen-wmma-on-rdna3.md) | `sources/docs/gpuopen-wmma-on-rdna3.md` |
+| [Radeon RX 7900 XTX on AMDVLK: fused attention kernel (fused3sb, two-pass variants) rejected on performance against the three cooperative-matrix attention kernels (sarc-1.5-7900xtx-prefill-refine, candidate 2)](../sources/measurements/7900xtx-fused-attention.md) | `sources/measurements/7900xtx-fused-attention.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 #### `rx-7600` (device)
 
@@ -159,7 +165,9 @@ Path: `amd` > `rdna3` > `rx-7600`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Radeon RX 7600: fused attention kernel (fused3) against the three attention kernels, and the subgroup-barrier copy fused3sb (sarc-1.5-rx7600-prefill-refine, candidates 2 and M2a)](../sources/measurements/rx7600-fused-attention.md) | `sources/measurements/rx7600-fused-attention.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 ### `rdna4` (generation)
 
@@ -299,6 +307,9 @@ Path: `intel` > `xe2` > `arc-b580`
 |------|------|
 | [llama.cpp discussion 13530: Vulkan VK_KHR_cooperative_matrix performance of Intel Xe2 arch GPUs (B580 & LNL)](../sources/blogs/llama-cpp-discussion-13530-intel-xe2-coopmat.md) | `sources/blogs/llama-cpp-discussion-13530-intel-xe2-coopmat.md` |
 | [llama.cpp issue 22034: Device Lost on Intel dGPU using Vulkan backend](../sources/blogs/llama-cpp-issue-22034-intel-device-lost.md) | `sources/blogs/llama-cpp-issue-22034-intel-device-lost.md` |
+| [Arc B580: multi-subgroup fused attention kernel (8 x 16 x 16 matrices, subgroups of 16) against the tuned three-kernel parent; straight-port compiler statistics; full-subgroups defect F1 (sarc-1.5-b580-fused-port)](../sources/measurements/b580-fused-port.md) | `sources/measurements/b580-fused-port.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 #### `arc-pro-b70` (device)
 
@@ -307,6 +318,8 @@ Path: `intel` > `xe2` > `arc-pro-b70`
 | Page | Path |
 |------|------|
 | [llama.cpp issue 22034: Device Lost on Intel dGPU using Vulkan backend](../sources/blogs/llama-cpp-issue-22034-intel-device-lost.md) | `sources/blogs/llama-cpp-issue-22034-intel-device-lost.md` |
+| [Arc Pro B70: the Arc B580's multi-subgroup fused attention kernel brought over unchanged (byte-identical SPIR-V), against the tuned three-kernel parent (sarc-1.5-b70-fused-port)](../sources/measurements/b70-fused-port.md) | `sources/measurements/b70-fused-port.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 ### `arc-a770` (device)
 
@@ -382,7 +395,9 @@ Path: `nvidia` > `rtx-4070-ti-super`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [RTX 4070 Ti SUPER: fused attention kernel (fused3sb, one-pass, with a one-full-subgroup run-time guard) against the tuned three-kernel parent (sarc-1.5-4070ti-fused-port)](../sources/measurements/4070ti-fused-port.md) | `sources/measurements/4070ti-fused-port.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 ### `jetson-orin` (device)
 
@@ -390,7 +405,9 @@ Path: `nvidia` > `jetson-orin`
 
 | Page | Path |
 |------|------|
-| _None_ | |
+| [Jetson Orin Nano: fused attention kernel (fused3sb with a one-full-subgroup guard), one-pass against two-pass per head dimension, against the tuned three-kernel parent (sarc-1.5-orin-fused-port)](../sources/measurements/orin-fused-port.md) | `sources/measurements/orin-fused-port.md` |
+| [Invalid Vulkan usage that passes every test: unsynchronised shared memory, missing full-subgroups flag, shared memory above the limit](../wiki/patterns/invalid-usage-that-passes-tests.md) | `wiki/patterns/invalid-usage-that-passes-tests.md` |
+| [Fused attention kernel: QK^T, softmax and attn*V in one compute shader](../wiki/techniques/fused-attention-kernel.md) | `wiki/techniques/fused-attention-kernel.md` |
 
 ### `turing` (generation)
 

@@ -8,6 +8,7 @@ Path: `amd` > `rdna3` > `radeon-780m`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
+| [Radeon 780M: fused attention kernel (fused3, one-pass form, fused3sb subgroup barriers), gains over the parent and gate outcomes (sarc-1.5-780m-prefill-refine, rounds 2 and 3)](../sources/measurements/780m-fused-attention.md) | RADV Mesa 25.2.7 | 2026-10-05 | `sources/measurements/780m-fused-attention.md` |
 | [Radeon 780M end-to-end 2048-token LLM prefill: SARC 1.5-r2 vs stock ExecuTorch 1.5 (sarc-1.5-e2e-benchmark campaign e2e-1.5-2026-09-28)](../sources/measurements/780m-e2e-prefill.md) | RADV Mesa 25.2.7 | 2026-09-28 | `sources/measurements/780m-e2e-prefill.md` |
 | [Radeon 780M SDPA prefill port to release 1.5: gap report, SDPA correctness, and end-to-end prefill with the SDPA rows (sarc-1.5-sdpa-port, 2026-09-27)](../sources/measurements/780m-sdpa-port.md) | RADV Mesa 25.2.7 | 2026-09-27 | `sources/measurements/780m-sdpa-port.md` |
 | [Radeon 780M 8da4w (dq8ca) linear coopmat port to release 1.5 (sarc-1.5-8da4w-port): microbench, correctness, production-diff, end-to-end prefill](../sources/measurements/780m-8da4w-port.md) | RADV Mesa 25.2.7 | 2026-09-27 | `sources/measurements/780m-8da4w-port.md` |
@@ -20,7 +21,7 @@ Path: `amd` > `rdna3` > `rx-7900-xtx`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [Radeon RX 7900 XTX on AMDVLK: fused attention kernel (fused3sb, two-pass variants) rejected on performance against the three cooperative-matrix attention kernels (sarc-1.5-7900xtx-prefill-refine, candidate 2)](../sources/measurements/7900xtx-fused-attention.md) | AMDVLK 2025.Q2.1 | 2026-10-08 | `sources/measurements/7900xtx-fused-attention.md` |
 
 ## `rx-7600`
 
@@ -28,7 +29,7 @@ Path: `amd` > `rdna3` > `rx-7600`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [Radeon RX 7600: fused attention kernel (fused3) against the three attention kernels, and the subgroup-barrier copy fused3sb (sarc-1.5-rx7600-prefill-refine, candidates 2 and M2a)](../sources/measurements/rx7600-fused-attention.md) | RADV Mesa 26.2.3 | 2026-10-06 | `sources/measurements/rx7600-fused-attention.md` |
 
 ## `rx-9070-xt`
 
@@ -44,7 +45,7 @@ Path: `intel` > `xe2` > `arc-b580`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [Arc B580: multi-subgroup fused attention kernel (8 x 16 x 16 matrices, subgroups of 16) against the tuned three-kernel parent; straight-port compiler statistics; full-subgroups defect F1 (sarc-1.5-b580-fused-port)](../sources/measurements/b580-fused-port.md) | ANV Mesa 26.2.3 | 2026-10-09 | `sources/measurements/b580-fused-port.md` |
 
 ## `arc-pro-b70`
 
@@ -52,7 +53,7 @@ Path: `intel` > `xe2` > `arc-pro-b70`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [Arc Pro B70: the Arc B580's multi-subgroup fused attention kernel brought over unchanged (byte-identical SPIR-V), against the tuned three-kernel parent (sarc-1.5-b70-fused-port)](../sources/measurements/b70-fused-port.md) | ANV Mesa 26.2.3 | 2026-10-09 | `sources/measurements/b70-fused-port.md` |
 
 ## `arc-a770`
 
@@ -76,7 +77,7 @@ Path: `nvidia` > `rtx-4070-ti-super`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [RTX 4070 Ti SUPER: fused attention kernel (fused3sb, one-pass, with a one-full-subgroup run-time guard) against the tuned three-kernel parent (sarc-1.5-4070ti-fused-port)](../sources/measurements/4070ti-fused-port.md) | NVIDIA 615.71.09 | 2026-10-09 | `sources/measurements/4070ti-fused-port.md` |
 
 ## `jetson-orin`
 
@@ -84,7 +85,7 @@ Path: `nvidia` > `jetson-orin`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|
-| _None_ | | | |
+| [Jetson Orin Nano: fused attention kernel (fused3sb with a one-full-subgroup guard), one-pass against two-pass per head dimension, against the tuned three-kernel parent (sarc-1.5-orin-fused-port)](../sources/measurements/orin-fused-port.md) | NVIDIA 595.78 | 2026-10-09 | `sources/measurements/orin-fused-port.md` |
 
 ## `adreno-840`
 
