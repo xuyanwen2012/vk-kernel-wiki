@@ -1,0 +1,14 @@
+repo: mesa/mesa
+pr: 35564
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35564
+merge_sha: 29c599ffeaa5fda7abe8c5a49547900aea4a978b
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/35564/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/vulkan/anv_private.h
+  status: modified
+  sha256: 175cad8a4b2631570b58f5ed09898ba96e78a10be6eb4f56a65dc70887b5f70e

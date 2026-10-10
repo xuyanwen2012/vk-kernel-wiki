@@ -1,0 +1,82 @@
+diff --git a/src/freedreno/ir3/ir3.c b/src/freedreno/ir3/ir3.c
+--- a/src/freedreno/ir3/ir3.c
++++ b/src/freedreno/ir3/ir3.c
+@@ -598,7 +598,8 @@ ir3_collect_info(struct ir3_shader_variant *v)
+       info->max_reg = MAX2(info->max_reg, min_reg_count - 1);
+ 
+    /* TODO this is different for earlier gens, but earlier gens don't use this */
+-   info->subgroup_size = v->info.double_threadsize ? 128 : 64;
++   info->subgroup_size = compiler->info->threadsize_base *
++                         (info->double_threadsize ? 2 : 1);
+ 
+    unsigned reg_independent_max_waves =
+       ir3_get_reg_independent_max_waves(v, info->double_threadsize);
+diff --git a/src/freedreno/ir3/ir3_compiler.c b/src/freedreno/ir3/ir3_compiler.c
+--- a/src/freedreno/ir3/ir3_compiler.c
++++ b/src/freedreno/ir3/ir3_compiler.c
+@@ -423,6 +423,9 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+          dev_info->threadsize_base * dev_info->max_waves;
+       if ((compiler->gen >= 6) && dev_info->props.supports_double_threadsize)
+          compiler->nir_options.max_workgroup_invocations *= 2;
++
++      compiler->max_variable_workgroup_size =
++         compiler->nir_options.max_workgroup_invocations;
+    }
+ 
+    if (options->lower_base_vertex) {
+diff --git a/src/freedreno/ir3/ir3_nir.c b/src/freedreno/ir3/ir3_nir.c
+--- a/src/freedreno/ir3/ir3_nir.c
++++ b/src/freedreno/ir3/ir3_nir.c
+@@ -1053,7 +1053,7 @@ ir3_nir_post_finalize(struct ir3_shader *shader)
+       nir_lower_subgroups_options options = {
+             .subgroup_size = subgroup_size,
+             .ballot_bit_size = 32,
+-            .ballot_components = max_subgroup_size / 32,
++            .ballot_components = MAX2(1, max_subgroup_size / 32),
+             .lower_to_scalar = true,
+             .lower_vote_feq = true,
+             .lower_vote_ieq = true,
+diff --git a/src/freedreno/vulkan/tu_acceleration_structure.cc b/src/freedreno/vulkan/tu_acceleration_structure.cc
+--- a/src/freedreno/vulkan/tu_acceleration_structure.cc
++++ b/src/freedreno/vulkan/tu_acceleration_structure.cc
+@@ -408,7 +408,8 @@ tu_CmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t inf
+    tu_save_compute_state(cmd, &state);
+ 
+    struct vk_acceleration_structure_build_args args = {
+-      .subgroup_size = device->physical_device->info->props.supports_double_threadsize ? 128 : 64,
++      .subgroup_size = device->physical_device->info->threadsize_base *
++                       (device->physical_device->info->props.supports_double_threadsize ? 2 : 1),
+       .bvh_bounds_offset = offsetof(tu_accel_struct_header, aabb),
+       .emit_markers = false,
+       .radix_sort_64 = device->radix_sort,
+@@ -562,7 +563,8 @@ tu_GetAccelerationStructureBuildSizesKHR(VkDevice _device, VkAccelerationStructu
+    init_radix_sort(device);
+ 
+    struct vk_acceleration_structure_build_args args = {
+-      .subgroup_size = device->physical_device->info->props.supports_double_threadsize ? 128 : 64,
++      .subgroup_size = device->physical_device->info->threadsize_base *
++                       (device->physical_device->info->props.supports_double_threadsize ? 2 : 1),
+       .radix_sort_64 = device->radix_sort,
+    };
+ 
+diff --git a/src/freedreno/vulkan/tu_shader.cc b/src/freedreno/vulkan/tu_shader.cc
+--- a/src/freedreno/vulkan/tu_shader.cc
++++ b/src/freedreno/vulkan/tu_shader.cc
+@@ -2096,7 +2096,7 @@ tu6_emit_xs_constants(
+ 
+    /* emit statically-known FS driver param */
+    if (stage == MESA_SHADER_FRAGMENT && const_state->driver_params_ubo.size > 0) {
+-      uint32_t data[4] = {xs->info.double_threadsize ? 128 : 64, 0, 0, 0};
++      uint32_t data[4] = {xs->info.subgroup_size, 0, 0, 0};
+       uint32_t size = ARRAY_SIZE(data);
+ 
+       /* A7XX TODO: Emit data via sub_cs instead of NOP */
+@@ -2129,7 +2129,7 @@ tu6_emit_xs_constants(
+          tu_cs_emit(cs, CP_LOAD_STATE6_1_EXT_SRC_ADDR(0));
+          tu_cs_emit(cs, CP_LOAD_STATE6_2_EXT_SRC_ADDR_HI(0));
+ 
+-         tu_cs_emit(cs, xs->info.double_threadsize ? 128 : 64);
++         tu_cs_emit(cs, xs->info.subgroup_size);
+          tu_cs_emit(cs, 0);
+          tu_cs_emit(cs, 0);
+          tu_cs_emit(cs, 0);

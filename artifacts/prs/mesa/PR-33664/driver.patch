@@ -1,0 +1,908 @@
+diff --git a/src/intel/compiler/brw_eu_defines.h b/src/intel/compiler/brw_eu_defines.h
+--- a/src/intel/compiler/brw_eu_defines.h
++++ b/src/intel/compiler/brw_eu_defines.h
+@@ -115,14 +115,14 @@ enum ENUM_PACKED brw_horizontal_stride {
+    BRW_HORIZONTAL_STRIDE_4 = 3,
+ };
+ 
+-enum ENUM_PACKED gfx10_align1_3src_src_horizontal_stride {
++enum ENUM_PACKED brw_align1_3src_src_horizontal_stride {
+    BRW_ALIGN1_3SRC_SRC_HORIZONTAL_STRIDE_0 = 0,
+    BRW_ALIGN1_3SRC_SRC_HORIZONTAL_STRIDE_1 = 1,
+    BRW_ALIGN1_3SRC_SRC_HORIZONTAL_STRIDE_2 = 2,
+    BRW_ALIGN1_3SRC_SRC_HORIZONTAL_STRIDE_4 = 3,
+ };
+ 
+-enum ENUM_PACKED gfx10_align1_3src_dst_horizontal_stride {
++enum ENUM_PACKED brw_align1_3src_dst_horizontal_stride {
+    BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_1 = 0,
+    BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_2 = 1,
+ };
+@@ -798,12 +798,12 @@ enum ENUM_PACKED brw_reg_file {
+    UNIFORM, /* prog_data->params[reg] */
+ };
+ 
+-/* CNL adds Align1 support for 3-src instructions. Bit 35 of the instruction
++/* Align1 support for 3-src instructions. Bit 35 of the instruction
+  * word is "Execution Datatype" which controls whether the instruction operates
+  * on float or integer types. The register arguments have fields that offer
+  * more fine control their respective types.
+  */
+-enum ENUM_PACKED gfx10_align1_3src_exec_type {
++enum ENUM_PACKED brw_align1_3src_exec_type {
+    BRW_ALIGN1_3SRC_EXEC_TYPE_INT   = 0,
+    BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT = 1,
+ };
+@@ -843,7 +843,7 @@ enum ENUM_PACKED brw_vertical_stride {
+    BRW_VERTICAL_STRIDE_ONE_DIMENSIONAL = 0xF,
+ };
+ 
+-enum ENUM_PACKED gfx10_align1_3src_vertical_stride {
++enum ENUM_PACKED brw_align1_3src_vertical_stride {
+    BRW_ALIGN1_3SRC_VERTICAL_STRIDE_0 = 0,
+    BRW_ALIGN1_3SRC_VERTICAL_STRIDE_1 = 1,
+    BRW_ALIGN1_3SRC_VERTICAL_STRIDE_2 = 1,
+diff --git a/src/intel/compiler/brw_eu_emit.c b/src/intel/compiler/brw_eu_emit.c
+--- a/src/intel/compiler/brw_eu_emit.c
++++ b/src/intel/compiler/brw_eu_emit.c
+@@ -508,7 +508,7 @@ brw_alu2(struct brw_codegen *p, unsigned opcode,
+    return insn;
+ }
+ 
+-static enum gfx10_align1_3src_vertical_stride
++static enum brw_align1_3src_vertical_stride
+ to_3src_align1_vstride(const struct intel_device_info *devinfo,
+                        enum brw_vertical_stride vstride)
+ {
+@@ -531,8 +531,20 @@ to_3src_align1_vstride(const struct intel_device_info *devinfo,
+    }
+ }
+ 
++static enum brw_align1_3src_dst_horizontal_stride
++to_3src_align1_dst_hstride(enum brw_horizontal_stride hstride)
++{
++   switch (hstride) {
++   case BRW_HORIZONTAL_STRIDE_1:
++      return BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_1;
++   case BRW_HORIZONTAL_STRIDE_2:
++      return BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_2;
++   default:
++      unreachable("invalid hstride");
++   }
++}
+ 
+-static enum gfx10_align1_3src_src_horizontal_stride
++static enum brw_align1_3src_src_horizontal_stride
+ to_3src_align1_hstride(enum brw_horizontal_stride hstride)
+ {
+    switch (hstride) {
+@@ -596,9 +608,10 @@ brw_alu3(struct brw_codegen *p, unsigned opcode, struct brw_reg dest,
+       brw_eu_inst_set_3src_a1_dst_reg_file(devinfo, inst, phys_file(dest));
+       brw_eu_inst_set_3src_dst_reg_nr(devinfo, inst, phys_nr(devinfo, dest));
+       brw_eu_inst_set_3src_a1_dst_subreg_nr(devinfo, inst, phys_subnr(devinfo, dest) / 8);
+-      brw_eu_inst_set_3src_a1_dst_hstride(devinfo, inst, BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_1);
++      brw_eu_inst_set_3src_a1_dst_hstride(devinfo, inst,
++                                          to_3src_align1_dst_hstride(dest.hstride));
+ 
+-      if (brw_type_is_float(dest.type)) {
++      if (brw_type_is_float_or_bfloat(dest.type)) {
+          brw_eu_inst_set_3src_a1_exec_type(devinfo, inst,
+                                         BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT);
+       } else {
+@@ -758,7 +771,7 @@ brw_dpas_three_src(struct brw_codegen *p, enum opcode opcode,
+    brw_eu_inst_set_dpas_3src_dst_reg_nr(devinfo, inst, phys_nr(devinfo, dest));
+    brw_eu_inst_set_dpas_3src_dst_subreg_nr(devinfo, inst, phys_subnr(devinfo, dest));
+ 
+-   if (brw_type_is_float(dest.type)) {
++   if (brw_type_is_float_or_bfloat(dest.type)) {
+       brw_eu_inst_set_dpas_3src_exec_type(devinfo, inst,
+                                        BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT);
+    } else {
+diff --git a/src/intel/compiler/brw_eu_inst.h b/src/intel/compiler/brw_eu_inst.h
+--- a/src/intel/compiler/brw_eu_inst.h
++++ b/src/intel/compiler/brw_eu_inst.h
+@@ -532,10 +532,10 @@ brw_eu_inst_set_3src_a1_##reg##_type(const struct intel_device_info *devinfo, \
+                                      brw_eu_inst *inst,                       \
+                                      enum brw_reg_type type)                  \
+ {                                                                             \
+-   UNUSED enum gfx10_align1_3src_exec_type exec_type =                        \
+-      (enum gfx10_align1_3src_exec_type)                                      \
++   UNUSED enum brw_align1_3src_exec_type exec_type =                          \
++      (enum brw_align1_3src_exec_type)                                        \
+           brw_eu_inst_3src_a1_exec_type(devinfo, inst);                       \
+-   if (brw_type_is_float(type)) {                                             \
++   if (brw_type_is_float_or_bfloat(type)) {                                   \
+       assert(exec_type == BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT);                   \
+    } else {                                                                   \
+       assert(exec_type == BRW_ALIGN1_3SRC_EXEC_TYPE_INT);                     \
+@@ -548,8 +548,8 @@ static inline enum brw_reg_type                                               \
+ brw_eu_inst_3src_a1_##reg##_type(const struct intel_device_info *devinfo,     \
+                                  const brw_eu_inst *inst)                     \
+ {                                                                             \
+-   enum gfx10_align1_3src_exec_type exec_type =                               \
+-      (enum gfx10_align1_3src_exec_type)                                      \
++   enum brw_align1_3src_exec_type exec_type =                                 \
++      (enum brw_align1_3src_exec_type)                                        \
+          brw_eu_inst_3src_a1_exec_type(devinfo, inst);                        \
+    unsigned hw_type = brw_eu_inst_3src_a1_##reg##_hw_type(devinfo, inst);     \
+    return brw_type_decode_for_3src(devinfo, hw_type, exec_type);              \
+@@ -643,10 +643,10 @@ brw_eu_inst_set_dpas_3src_##reg##_type(const struct intel_device_info *devinfo,
+                                        brw_eu_inst *inst,                     \
+                                        enum brw_reg_type type)                \
+ {                                                                             \
+-   UNUSED enum gfx10_align1_3src_exec_type exec_type =                        \
+-      (enum gfx10_align1_3src_exec_type)                                      \
++   UNUSED enum brw_align1_3src_exec_type exec_type =                          \
++      (enum brw_align1_3src_exec_type)                                        \
+          brw_eu_inst_dpas_3src_exec_type(devinfo, inst);                      \
+-   if (brw_type_is_float(type)) {                                             \
++   if (brw_type_is_float_or_bfloat(type)) {                                   \
+       assert(exec_type == BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT);                   \
+    } else {                                                                   \
+       assert(exec_type == BRW_ALIGN1_3SRC_EXEC_TYPE_INT);                     \
+@@ -659,8 +659,8 @@ static inline enum brw_reg_type                                               \
+ brw_eu_inst_dpas_3src_##reg##_type(const struct intel_device_info *devinfo,   \
+                                    const brw_eu_inst *inst)                   \
+ {                                                                             \
+-   enum gfx10_align1_3src_exec_type exec_type =                               \
+-      (enum gfx10_align1_3src_exec_type)                                      \
++   enum brw_align1_3src_exec_type exec_type =                                 \
++      (enum brw_align1_3src_exec_type)                                        \
+          brw_eu_inst_dpas_3src_exec_type(devinfo, inst);                      \
+    unsigned hw_type = brw_eu_inst_dpas_3src_##reg##_hw_type(devinfo, inst);   \
+    return brw_type_decode_for_3src(devinfo, hw_type, exec_type);              \
+diff --git a/src/intel/compiler/brw_eu_validate.c b/src/intel/compiler/brw_eu_validate.c
+--- a/src/intel/compiler/brw_eu_validate.c
++++ b/src/intel/compiler/brw_eu_validate.c
+@@ -407,6 +407,7 @@ execution_type_for_type(enum brw_reg_type type)
+       return type;
+ 
+    case BRW_TYPE_VF:
++   case BRW_TYPE_BF:
+       return BRW_TYPE_F;
+ 
+    case BRW_TYPE_Q:
+@@ -424,8 +425,9 @@ execution_type_for_type(enum brw_reg_type type)
+    case BRW_TYPE_V:
+    case BRW_TYPE_UV:
+       return BRW_TYPE_W;
++
+    default:
+-      unreachable("invalid type");
++      return BRW_TYPE_INVALID;
+    }
+ }
+ 
+@@ -563,6 +565,43 @@ is_mixed_float(const brw_hw_decoded_inst *inst)
+           types_are_mixed_float(src1_type, dst_type);
+ }
+ 
++static bool
++is_pure_bfloat(const brw_hw_decoded_inst *inst)
++{
++   if (inst_is_send(inst))
++      return false;
++
++   if (inst->num_sources == 0 && !inst->has_dst)
++      return false;
++
++   for (int i = 0; i < inst->num_sources; i++) {
++      if (!brw_type_is_bfloat(inst->src[i].type))
++         return false;
++   }
++
++   if (inst->has_dst && !brw_type_is_bfloat(inst->dst.type))
++      return false;
++
++   return true;
++}
++
++static bool
++is_mixed_bfloat(const brw_hw_decoded_inst *inst)
++{
++   if (inst_is_send(inst))
++      return false;
++
++   const int operands = inst->num_sources + inst->has_dst;
++
++   int bfloat = 0;
++   for (int i = 0; i < inst->num_sources; i++)
++      bfloat += brw_type_is_bfloat(inst->src[i].type);
++   if (inst->has_dst)
++      bfloat += brw_type_is_bfloat(inst->dst.type);
++
++   return bfloat > 0 && bfloat != operands;
++}
++
+ /**
+  * Returns whether an instruction is an explicit or implicit conversion
+  * to/from byte.
+@@ -623,6 +662,10 @@ general_restrictions_based_on_operand_types(const struct brw_isa_info *isa,
+ 
+    enum brw_reg_type dst_type = inst->dst.type;
+ 
++   ERROR_IF(brw_type_is_bfloat(dst_type) &&
++            !devinfo->has_bfloat16,
++            "Bfloat destination, but platform does not support it");
++
+    ERROR_IF(dst_type == BRW_TYPE_DF &&
+             !devinfo->has_64bit_float,
+             "64-bit float destination, but platform does not support it");
+@@ -635,6 +678,10 @@ general_restrictions_based_on_operand_types(const struct brw_isa_info *isa,
+    for (unsigned s = 0; s < inst->num_sources; s++) {
+       enum brw_reg_type src_type = inst->src[s].type;
+ 
++      ERROR_IF(brw_type_is_bfloat(src_type) &&
++               !devinfo->has_bfloat16,
++               "Bfloat source, but platform does not support it");
++
+       ERROR_IF(src_type == BRW_TYPE_DF &&
+                !devinfo->has_64bit_float,
+                "64-bit float source, but platform does not support it");
+@@ -841,7 +888,7 @@ general_restrictions_based_on_operand_types(const struct brw_isa_info *isa,
+     * override the general rule for the ratio of sizes of the destination type
+     * and the execution type. We will add validation for those in a later patch.
+     */
+-   bool validate_dst_size_and_exec_size_ratio = !is_mixed_float(inst);
++   bool validate_dst_size_and_exec_size_ratio = !is_mixed_float(inst) && !is_mixed_bfloat(inst);
+ 
+    if (validate_dst_size_and_exec_size_ratio &&
+        exec_type_size > dst_type_size) {
+@@ -1015,6 +1062,21 @@ general_restrictions_on_region_parameters(const struct brw_isa_info *isa,
+    return error_msg;
+ }
+ 
++static bool
++is_multiplier_instruction(const brw_hw_decoded_inst *inst)
++{
++   /* TODO: Complete this list. */
++   switch (inst->opcode) {
++   case BRW_OPCODE_MUL:
++   case BRW_OPCODE_MAC:
++   case BRW_OPCODE_MACH:
++   case BRW_OPCODE_MAD:
++      return true;
++   default:
++      return false;
++   }
++}
++
+ static struct string
+ special_restrictions_for_mixed_float_mode(const struct brw_isa_info *isa,
+                                           const brw_hw_decoded_inst *inst)
+@@ -1023,6 +1085,60 @@ special_restrictions_for_mixed_float_mode(const struct brw_isa_info *isa,
+ 
+    struct string error_msg = { .str = NULL, .len = 0 };
+ 
++   ERROR_IF(is_pure_bfloat(inst),
++            "Instructions with pure bfloat16 operands are not supported.");
++
++   if (is_mixed_bfloat(inst)) {
++      ERROR_IF(devinfo->ver < 20 && inst->exec_size > 8,
++               "Execution size must not be greater than 8 in Gfx12.");
++      ERROR_IF(devinfo->ver >= 20 && inst->exec_size > 16,
++               "Execution size must not be greater than 8 in Gfx20+.");
++
++      for (int i = 0; i < inst->num_sources; i++) {
++         ERROR_IF(brw_type_is_bfloat(inst->src[i].type) &&
++                  src_has_scalar_region(inst, i),
++                  "Broadcast of bfloat16 scalar is not supported.");
++      }
++
++      if (is_multiplier_instruction(inst)) {
++         if (inst->num_sources == 2) {
++            ERROR_IF(brw_type_is_bfloat(inst->src[1].type),
++                     "Bfloat16 not allowed in Src1 of 2-source instructions involving multiplier.");
++         } else if (inst->num_sources == 3) {
++            ERROR_IF(brw_type_is_bfloat(inst->src[2].type),
++                     "Bfloat16 not allowed in Src2 of 3-source instructions involving multiplier.");
++         }
++      }
++
++      const unsigned half_offset = REG_SIZE * reg_unit(devinfo) / 2;
++
++      if (inst->has_dst && brw_type_is_bfloat(inst->dst.type)) {
++         unsigned dst_stride = inst->dst.hstride;
++         bool dst_is_packed = is_packed(inst->exec_size * dst_stride, inst->exec_size, dst_stride);
++
++         if (dst_is_packed) {
++            ERROR_IF(inst->dst.subnr != 0 && inst->dst.subnr != half_offset,
++                     "Packed bfloat16 destination must have register offset 0 or half of GRF register.");
++         } else {
++            /* Offset in the restriction text is in terms of elements. */
++            const unsigned elem_size = brw_type_size_bytes(inst->dst.type);
++            ERROR_IF(dst_stride != 2 || (inst->dst.subnr != 0 &&
++                                         inst->dst.subnr != 1 * elem_size),
++                     "Unpacked bfloat16 destination must have stride 2 and register offset 0 or 1.");
++         }
++      }
++
++      for (int i = 0; i < inst->num_sources; i++) {
++         if (brw_type_is_bfloat(inst->src[i].type)) {
++            bool src_is_packed = is_packed(inst->src[i].vstride, inst->src[i].width, inst->src[i].hstride);
++            ERROR_IF(!src_is_packed,
++                     "Bfloat16 source must be packed");
++            ERROR_IF(inst->src[i].subnr != 0 && inst->src[i].subnr != half_offset,
++                     "Bfloat16 source must have register offset 0 or half of GRF register.");
++         }
++      }
++   }
++
+    const unsigned opcode = inst->opcode;
+    if (inst->num_sources >= 3)
+       return error_msg;
+@@ -1639,13 +1755,18 @@ special_requirements_for_handling_double_precision_data_types(
+        *
+        * "Vx1 and VxH indirect addressing for Float, Half-Float, Double-Float and
+        *  Quad-Word data must not be used."
++       *
++       * and
++       *
++       * "Vx1 and VxH indirect addressing for BFloat16 (...) data
++       *  must not be used."
+        */
+       if (devinfo->verx10 >= 125 &&
+-          (brw_type_is_float(type) || brw_type_size_bytes(type) == 8)) {
++          (brw_type_is_float_or_bfloat(type) || brw_type_size_bytes(type) == 8)) {
+          ERROR_IF(address_mode == BRW_ADDRESS_REGISTER_INDIRECT_REGISTER &&
+                   vstride == BRW_VERTICAL_STRIDE_ONE_DIMENSIONAL,
+                   "Vx1 and VxH indirect addressing for Float, Half-Float, "
+-                  "Double-Float and Quad-Word data must not be used");
++                  "Double-Float, Quad-Word, and Bfloat16 data must not be used");
+       }
+    }
+ 
+@@ -2419,6 +2540,16 @@ scalar_register_restrictions(const struct brw_isa_info *isa,
+    return error_msg;
+ }
+ 
++static unsigned
++DST_STRIDE_3SRC(unsigned hstride)
++{
++   switch (hstride) {
++   case BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_1: return 1;
++   case BRW_ALIGN1_3SRC_DST_HORIZONTAL_STRIDE_2: return 2;
++   }
++   unreachable("invalid hstride");
++}
++
+ static unsigned
+ VSTRIDE_3SRC(unsigned vstride)
+ {
+@@ -2431,6 +2562,18 @@ VSTRIDE_3SRC(unsigned vstride)
+    unreachable("invalid vstride");
+ }
+ 
++static inline unsigned
++brw_implied_width_for_3src_a1(unsigned v, unsigned h)
++{
++   /* "Regioning Rules for Align1 Ternary Operations" */
++
++   /* TODO: Add remaining rules and de-duplicate with brw_disasm.c */
++
++   if (v == 0) return 1;
++   if (h == 0) return v;
++   return v/h;
++}
++
+ static struct string
+ brw_hw_decode_inst(const struct brw_isa_info *isa,
+                    brw_hw_decoded_inst *inst,
+@@ -2607,7 +2750,7 @@ brw_hw_decode_inst(const struct brw_isa_info *isa,
+          inst->dst.type = brw_eu_inst_3src_a1_dst_type(devinfo, raw);
+          inst->dst.nr = brw_eu_inst_3src_dst_reg_nr(devinfo, raw);
+          inst->dst.subnr = brw_eu_inst_3src_a1_dst_subreg_nr(devinfo, raw) * 8;
+-         inst->dst.hstride = STRIDE(brw_eu_inst_3src_a1_dst_hstride(devinfo, raw));
++         inst->dst.hstride = DST_STRIDE_3SRC(brw_eu_inst_3src_a1_dst_hstride(devinfo, raw));
+ 
+          inst->src[0].file = brw_eu_inst_3src_a1_src0_reg_file(devinfo, raw);
+          inst->src[0].type = brw_eu_inst_3src_a1_src0_type(devinfo, raw);
+@@ -2618,6 +2761,7 @@ brw_hw_decode_inst(const struct brw_isa_info *isa,
+             inst->src[0].subnr = brw_eu_inst_3src_a1_src0_subreg_nr(devinfo, raw);
+             inst->src[0].vstride = VSTRIDE_3SRC(brw_eu_inst_3src_a1_src0_vstride(devinfo, raw));
+             inst->src[0].hstride = STRIDE(brw_eu_inst_3src_a1_src0_hstride(devinfo, raw));
++            inst->src[0].width = brw_implied_width_for_3src_a1(inst->src[0].vstride, inst->src[0].hstride);
+          }
+ 
+          inst->src[1].file = brw_eu_inst_3src_a1_src1_reg_file(devinfo, raw);
+@@ -2628,6 +2772,7 @@ brw_hw_decode_inst(const struct brw_isa_info *isa,
+          inst->src[1].subnr = brw_eu_inst_3src_a1_src1_subreg_nr(devinfo, raw);
+          inst->src[1].vstride = VSTRIDE_3SRC(brw_eu_inst_3src_a1_src1_vstride(devinfo, raw));
+          inst->src[1].hstride = STRIDE(brw_eu_inst_3src_a1_src1_hstride(devinfo, raw));
++         inst->src[1].width = brw_implied_width_for_3src_a1(inst->src[1].vstride, inst->src[1].hstride);
+ 
+          inst->src[2].file = brw_eu_inst_3src_a1_src2_reg_file(devinfo, raw);
+          inst->src[2].type = brw_eu_inst_3src_a1_src2_type(devinfo, raw);
+@@ -2637,6 +2782,7 @@ brw_hw_decode_inst(const struct brw_isa_info *isa,
+             inst->src[2].nr = brw_eu_inst_3src_src2_reg_nr(devinfo, raw);
+             inst->src[2].subnr = brw_eu_inst_3src_a1_src2_subreg_nr(devinfo, raw);
+             inst->src[2].hstride = STRIDE(brw_eu_inst_3src_a1_src2_hstride(devinfo, raw));
++            inst->src[2].width = brw_implied_width_for_3src_a1(inst->src[2].vstride, inst->src[2].hstride);
+          }
+ 
+       } else {
+diff --git a/src/intel/compiler/brw_gram.y b/src/intel/compiler/brw_gram.y
+--- a/src/intel/compiler/brw_gram.y
++++ b/src/intel/compiler/brw_gram.y
+@@ -356,6 +356,7 @@ i965_asm_set_instruction_options(struct brw_codegen *p,
+ %token <integer> TYPE_Q TYPE_UQ
+ %token <integer> TYPE_V TYPE_UV
+ %token <integer> TYPE_F TYPE_HF
++%token <integer> TYPE_BF
+ %token <integer> TYPE_DF
+ %token <integer> TYPE_VF
+ 
+@@ -1883,6 +1884,7 @@ reg_type:
+    | TYPE_UQ   { $$ = BRW_TYPE_UQ; }
+    | TYPE_Q    { $$ = BRW_TYPE_Q;  }
+    | TYPE_HF   { $$ = BRW_TYPE_HF; }
++   | TYPE_BF   { $$ = BRW_TYPE_BF; }
+    ;
+ 
+ imm_type:
+diff --git a/src/intel/compiler/brw_inst.cpp b/src/intel/compiler/brw_inst.cpp
+--- a/src/intel/compiler/brw_inst.cpp
++++ b/src/intel/compiler/brw_inst.cpp
+@@ -1031,7 +1031,7 @@ get_exec_type(const brw_inst *inst)
+          if (brw_type_size_bytes(t) > brw_type_size_bytes(exec_type))
+             exec_type = t;
+          else if (brw_type_size_bytes(t) == brw_type_size_bytes(exec_type) &&
+-                  brw_type_is_float(t))
++                  brw_type_is_float_or_bfloat(t))
+             exec_type = t;
+       }
+    }
+@@ -1089,7 +1089,7 @@ has_dst_aligned_region_restriction(const intel_device_info *devinfo,
+     * simulator suggest that only 32x32-bit integer multiplication is
+     * restricted.
+     */
+-   const bool is_dword_multiply = !brw_type_is_float(exec_type) &&
++   const bool is_dword_multiply = brw_type_is_int(exec_type) &&
+       ((inst->opcode == BRW_OPCODE_MUL &&
+         MIN2(brw_type_size_bytes(inst->src[0].type), brw_type_size_bytes(inst->src[1].type)) >= 4) ||
+        (inst->opcode == BRW_OPCODE_MAD &&
+diff --git a/src/intel/compiler/brw_lower_scoreboard.cpp b/src/intel/compiler/brw_lower_scoreboard.cpp
+--- a/src/intel/compiler/brw_lower_scoreboard.cpp
++++ b/src/intel/compiler/brw_lower_scoreboard.cpp
+@@ -83,7 +83,7 @@ namespace {
+             if (inst->src[i].file != BAD_FILE &&
+                 !inst->is_control_source(i)) {
+                const brw_reg_type t = inst->src[i].type;
+-               has_int_src |= !brw_type_is_float(t);
++               has_int_src |= brw_type_is_int(t);
+                has_long_src |= brw_type_size_bytes(t) >= 8;
+             }
+          }
+@@ -116,7 +116,7 @@ namespace {
+    inferred_exec_pipe(const struct intel_device_info *devinfo, const brw_inst *inst)
+    {
+       const brw_reg_type t = get_exec_type(inst);
+-      const bool is_dword_multiply = !brw_type_is_float(t) &&
++      const bool is_dword_multiply = brw_type_is_int(t) &&
+          ((inst->opcode == BRW_OPCODE_MUL &&
+            MIN2(brw_type_size_bytes(inst->src[0].type),
+                 brw_type_size_bytes(inst->src[1].type)) >= 4) ||
+@@ -156,7 +156,7 @@ namespace {
+          assert(devinfo->has_64bit_float || devinfo->has_64bit_int ||
+                 devinfo->has_integer_dword_mul);
+          return TGL_PIPE_LONG;
+-      } else if (brw_type_is_float(inst->dst.type))
++      } else if (brw_type_is_float_or_bfloat(inst->dst.type))
+          return TGL_PIPE_FLOAT;
+       else
+          return TGL_PIPE_INT;
+diff --git a/src/intel/compiler/brw_reg.h b/src/intel/compiler/brw_reg.h
+--- a/src/intel/compiler/brw_reg.h
++++ b/src/intel/compiler/brw_reg.h
+@@ -363,6 +363,7 @@ get_exec_type(const enum brw_reg_type type)
+    case BRW_TYPE_UV:
+       return BRW_TYPE_UW;
+    case BRW_TYPE_VF:
++   case BRW_TYPE_BF:
+       return BRW_TYPE_F;
+    default:
+       return type;
+diff --git a/src/intel/compiler/brw_reg_type.c b/src/intel/compiler/brw_reg_type.c
+--- a/src/intel/compiler/brw_reg_type.c
++++ b/src/intel/compiler/brw_reg_type.c
+@@ -46,6 +46,9 @@ brw_type_encode(const struct intel_device_info *devinfo,
+                                : devinfo->has_64bit_float))
+       return INVALID_HW_REG_TYPE;
+ 
++   if (brw_type_is_bfloat(type) && !devinfo->has_bfloat16)
++      return INVALID_HW_REG_TYPE;
++
+    if (devinfo->ver >= 12) {
+       if (brw_type_is_vector_imm(type))
+          return type & ~(BRW_TYPE_VECTOR | BRW_TYPE_SIZE_MASK);
+@@ -121,8 +124,9 @@ brw_type_decode(const struct intel_device_info *devinfo,
+          else if (file == IMM)
+             return (t & BRW_TYPE_BASE_SINT) ? BRW_TYPE_V : BRW_TYPE_UV;
+       }
+-      /* signed-integer floats -> no */
+-      if ((t & BRW_TYPE_BASE_MASK) == BRW_TYPE_BASE_MASK)
++      if (brw_type_is_bfloat(t) && !devinfo->has_bfloat16)
++         return BRW_TYPE_INVALID;
++      if (brw_type_is_float_or_bfloat(t) && brw_type_size_bits(t) < 16)
+          return BRW_TYPE_INVALID;
+       return t;
+    } else if (devinfo->ver >= 11) {
+@@ -191,6 +195,9 @@ unsigned
+ brw_type_encode_for_3src(const struct intel_device_info *devinfo,
+                          enum brw_reg_type type)
+ {
++   if (brw_type_is_bfloat(type) && !devinfo->has_bfloat16)
++      return INVALID_HW_REG_TYPE;
++
+    if (devinfo->ver >= 12) {
+       /* size mask and SINT type bit match exactly */
+       return type & 0b111;
+@@ -238,7 +245,7 @@ brw_type_decode_for_3src(const struct intel_device_info *devinfo,
+       unsigned base_field = hw_type & BRW_TYPE_BASE_MASK;
+       if (exec_type == BRW_ALIGN1_3SRC_EXEC_TYPE_FLOAT) {
+          base_field |= BRW_TYPE_BASE_FLOAT;
+-         if (base_field & BRW_TYPE_BASE_SINT)
++         if (base_field == BRW_TYPE_BASE_BFLOAT && !devinfo->has_bfloat16)
+             return BRW_TYPE_INVALID;
+       }
+       return (enum brw_reg_type) (base_field | size_field);
+@@ -288,6 +295,8 @@ brw_reg_type_to_letters(enum brw_reg_type type)
+       [BRW_TYPE_F]  = "F",
+       [BRW_TYPE_DF] = "DF",
+ 
++      [BRW_TYPE_BF] = "BF",
++
+       [BRW_TYPE_UV] = "UV",
+       [BRW_TYPE_V]  = "V",
+       [BRW_TYPE_VF] = "VF",
+diff --git a/src/intel/compiler/brw_reg_type.h b/src/intel/compiler/brw_reg_type.h
+--- a/src/intel/compiler/brw_reg_type.h
++++ b/src/intel/compiler/brw_reg_type.h
+@@ -42,8 +42,8 @@ struct intel_device_info;
+  * Enum for register/value types throughout the compiler.
+  *
+  * Bits 1:0 is the size of the type as a U2 'n' where size = 8 * 2^n.
+- * Bit 3 is set for signed integer types (B/W/D/Q/V/UV).
+- * Bit 4 is set for floating point types.  Unsigned types have neither set.
++ * Bits 3:4 is set to identify base type: unsigned integer, signed integer,
++ * regular floating point and bfloat.
+  * Bit 5 is set for vector immediates.
+  *
+  * While this is inspired by the Tigerlake encodings (and nir_alu_type),
+@@ -74,18 +74,23 @@ enum PACKED brw_reg_type {
+    BRW_TYPE_DF = 0b01011,
+    /** @} */
+ 
++   /** Floating point types (bfloat variants): 16-bit @{ */
++   BRW_TYPE_BF  = 0b01101,
++   /** @} */
++
+    /** Vector immediate types */
+    BRW_TYPE_UV = 0b10001,
+    BRW_TYPE_V  = 0b10101,
+    BRW_TYPE_VF = 0b11010,
+    /** @} */
+ 
+-   BRW_TYPE_SIZE_MASK  = 0b00011, /* type is (8 << x) bits */
+-   BRW_TYPE_BASE_MASK  = 0b01100, /* base types expressed in these bits */
+-   BRW_TYPE_BASE_UINT  = 0b00000, /* unsigned types have no base bits set */
+-   BRW_TYPE_BASE_SINT  = 0b00100, /* type has a signed integer base type */
+-   BRW_TYPE_BASE_FLOAT = 0b01000, /* type has a floating point base type */
+-   BRW_TYPE_VECTOR     = 0b10000, /* type is a vector immediate */
++   BRW_TYPE_SIZE_MASK   = 0b00011, /* type is (8 << x) bits */
++   BRW_TYPE_BASE_MASK   = 0b01100, /* base types expressed in these bits */
++   BRW_TYPE_BASE_UINT   = 0b00000, /* unsigned types have no base bits set */
++   BRW_TYPE_BASE_SINT   = 0b00100, /* type has a signed integer base type */
++   BRW_TYPE_BASE_FLOAT  = 0b01000, /* type has a floating point base type */
++   BRW_TYPE_BASE_BFLOAT = 0b01100, /* type has a floating point (bfloat variant) base type */
++   BRW_TYPE_VECTOR      = 0b10000, /* type is a vector immediate */
+ 
+    BRW_TYPE_INVALID    = 0b11111,
+    BRW_TYPE_LAST       = BRW_TYPE_INVALID,
+@@ -97,10 +102,22 @@ brw_type_is_float(enum brw_reg_type t)
+    return (t & BRW_TYPE_BASE_MASK) == BRW_TYPE_BASE_FLOAT;
+ }
+ 
++static inline bool
++brw_type_is_bfloat(enum brw_reg_type t)
++{
++   return (t & BRW_TYPE_BASE_MASK) == BRW_TYPE_BASE_BFLOAT;
++}
++
++static inline bool
++brw_type_is_float_or_bfloat(enum brw_reg_type t)
++{
++   return brw_type_is_float(t) || brw_type_is_bfloat(t);
++}
++
+ static inline bool
+ brw_type_is_uint(enum brw_reg_type t)
+ {
+-   return (t & BRW_TYPE_BASE_MASK) == 0;
++   return (t & BRW_TYPE_BASE_MASK) == BRW_TYPE_BASE_UINT;
+ }
+ 
+ static inline bool
+@@ -112,7 +129,7 @@ brw_type_is_sint(enum brw_reg_type t)
+ static inline bool
+ brw_type_is_int(enum brw_reg_type t)
+ {
+-   return !brw_type_is_float(t);
++   return brw_type_is_uint(t) || brw_type_is_sint(t);
+ }
+ 
+ static inline bool
+diff --git a/src/intel/compiler/brw_validate.cpp b/src/intel/compiler/brw_validate.cpp
+--- a/src/intel/compiler/brw_validate.cpp
++++ b/src/intel/compiler/brw_validate.cpp
+@@ -345,9 +345,9 @@ brw_validate(const brw_shader &s)
+                brw_type_is_int(inst->src[1].type) +
+                brw_type_is_int(inst->src[2].type);
+             const unsigned float_sources =
+-               brw_type_is_float(inst->src[0].type) +
+-               brw_type_is_float(inst->src[1].type) +
+-               brw_type_is_float(inst->src[2].type);
++               brw_type_is_float_or_bfloat(inst->src[0].type) +
++               brw_type_is_float_or_bfloat(inst->src[1].type) +
++               brw_type_is_float_or_bfloat(inst->src[2].type);
+ 
+             fsv_assert((integer_sources == 3 && float_sources == 0) ||
+                        (integer_sources == 0 && float_sources == 3));
+diff --git a/src/intel/compiler/test_eu_validate.cpp b/src/intel/compiler/test_eu_validate.cpp
+--- a/src/intel/compiler/test_eu_validate.cpp
++++ b/src/intel/compiler/test_eu_validate.cpp
+@@ -105,15 +105,13 @@ INSTANTIATE_TEST_SUITE_P(
+ );
+ 
+ static bool
+-validate(struct brw_codegen *p)
++validate(struct brw_codegen *p, char **error = nullptr)
+ {
+    const bool print = getenv("TEST_DEBUG");
+    struct disasm_info *disasm = disasm_initialize(p->isa, NULL);
+ 
+-   if (print) {
+-      disasm_new_inst_group(disasm, 0);
+-      disasm_new_inst_group(disasm, p->next_insn_offset);
+-   }
++   struct inst_group *group = disasm_new_inst_group(disasm, 0);
++   disasm_new_inst_group(disasm, p->next_insn_offset);
+ 
+    bool ret = brw_validate_instructions(p->isa, p->store, 0,
+                                         p->next_insn_offset, disasm);
+@@ -121,7 +119,9 @@ validate(struct brw_codegen *p)
+    if (print) {
+       dump_assembly(p->store, 0, p->next_insn_offset, disasm, NULL);
+    }
+-   ralloc_free(disasm);
++
++   if (error)
++      *error = group->error;
+ 
+    return ret;
+ }
+@@ -443,6 +443,7 @@ TEST_P(validation_test, invalid_type_encoding_3src_a1)
+       { BRW_TYPE_UD, E(INT),   true  },
+       { BRW_TYPE_W,  E(INT),   true  },
+       { BRW_TYPE_UW, E(INT),   true  },
++      { BRW_TYPE_BF, E(FLOAT), devinfo.has_bfloat16 },
+ 
+       /* There are no ternary instructions that can operate on B-type sources
+        * on Gfx11-12. Src1/Src2 cannot be B-typed either.
+@@ -469,13 +470,17 @@ TEST_P(validation_test, invalid_type_encoding_3src_a1)
+          }
+ 
+          struct brw_reg g = retype(g0, test_case[i].type);
+-         if (!brw_type_is_int(test_case[i].type)) {
++         if (brw_type_is_bfloat(test_case[i].type)) {
++            /* BF is more restrictive, so ensure the instruction is valid. */
++            brw_MAD(p, retype(g, BRW_TYPE_F), g, g, retype(g, BRW_TYPE_F));
++         } else if (!brw_type_is_int(test_case[i].type)) {
+             brw_MAD(p, g, g, g, g);
+          } else {
+             brw_BFE(p, g, g, g, g);
+          }
+ 
+-         EXPECT_TRUE(validate(p));
++         char *error = NULL;
++         EXPECT_TRUE(validate(p, &error)) << "Unexpected validation failure: " << error;
+ 
+          clear_instructions(p);
+       }
+@@ -2384,7 +2389,9 @@ TEST_P(validation_test, qword_low_power_no_indirect_addressing)
+       if (intel_device_info_is_9lp(&devinfo)) {
+          EXPECT_EQ(inst[i].expected_result, validate(p));
+       } else {
+-         EXPECT_TRUE(validate(p));
++         char *error = nullptr;
++         EXPECT_TRUE(validate(p, &error))
++            << "Test index = " << i << " failed to validate: " << error;
+       }
+ 
+       clear_instructions(p);
+@@ -3717,3 +3724,163 @@ TEST_P(validation_test, scalar_register_restrictions)
+       clear_instructions(p);
+    }
+ }
++
++TEST_P(validation_test, bfloat_restrictions)
++{
++   /* Restrictions from ACM PRM, vol. 9, section "Register Region
++    * Restrictions", sub-section 7.
++    */
++
++   if (!devinfo.has_bfloat16)
++      return;
++
++   struct test {
++      const char *error_pattern;
++      enum opcode opcode;
++      unsigned exec_size;
++      brw_reg dst, src0, src1, src2;
++   };
++
++   const char *PASS = nullptr;
++
++   const struct test tests[] = {
++      { PASS,
++        BRW_OPCODE_MOV, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0) },
++
++      { "pure bfloat16 operands are not supported",
++        BRW_OPCODE_MOV, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0) },
++
++      { "Execution size must not be greater than",
++        BRW_OPCODE_MOV, 16 * reg_unit(&devinfo),
++                        brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                        brw_grf(BRW_TYPE_F,  20, 0, 1,1,0) },
++
++      { PASS,
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "pure bfloat16 operands are not supported",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 30, 0, 1,1,0) },
++
++      { "Broadcast of bfloat16 scalar is not supported",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 30, 0, 0,1,0) },
++
++      { PASS,
++        BRW_OPCODE_MUL, 8, brw_grf(BRW_TYPE_BF, 10, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "Bfloat16 not allowed in Src1 of 2-source instructions involving multiplier",
++        BRW_OPCODE_MUL, 8, brw_grf(BRW_TYPE_BF, 10, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 30, 0, 1,1,0) },
++
++      { PASS,
++        BRW_OPCODE_MAD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 30, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  40, 0, 1,1,0) },
++
++      { "Bfloat16 not allowed in Src2 of 3-source instructions involving multiplier",
++        BRW_OPCODE_MAD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 40, 0, 1,1,0) },
++
++      { PASS,
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 1, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "Unpacked bfloat16 destination must have stride 2 and register offset 0 or 1",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 3, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { PASS,
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 8 * reg_unit(&devinfo), 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "Packed bfloat16 destination must have register offset 0 or half of GRF register",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 1, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "Bfloat16 source must be packed",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 0, 2,1,2),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { PASS,
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 8 * reg_unit(&devinfo), 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++
++      { "Bfloat16 source must have register offset 0 or half of GRF register",
++        BRW_OPCODE_ADD, 8, brw_grf(BRW_TYPE_BF, 10, 0, 1,1,0),
++                           brw_grf(BRW_TYPE_BF, 20, 5, 1,1,0),
++                           brw_grf(BRW_TYPE_F,  30, 0, 1,1,0) },
++   };
++
++   for (unsigned i = 0; i < ARRAY_SIZE(tests); i++) {
++      const struct test &t = tests[i];
++
++      switch (tests[i].opcode) {
++      case BRW_OPCODE_MOV:
++         brw_MOV(p, t.dst, t.src0);
++         break;
++      case BRW_OPCODE_ADD:
++         brw_ADD(p, t.dst, t.src0, t.src1);
++         break;
++      case BRW_OPCODE_MUL:
++         brw_MUL(p, t.dst, t.src0, t.src1);
++         break;
++      case BRW_OPCODE_MAD:
++         brw_MAD(p, t.dst, t.src0, t.src1, t.src2);
++         break;
++      default:
++         unreachable("unexpected opcode in tests");
++      }
++
++      if (tests[i].opcode == BRW_OPCODE_MAD) {
++         brw_eu_inst_set_3src_exec_size(&devinfo, last_inst, cvt(t.exec_size) - 1);
++      } else {
++         brw_eu_inst_set_exec_size(&devinfo, last_inst, cvt(t.exec_size) - 1);
++      }
++
++      /* TODO: Expand this test logic to check validation error to other
++       * tests.
++       */
++
++      char *error = nullptr;
++      bool valid = validate(p, &error);
++
++      if (t.error_pattern) {
++         EXPECT_FALSE(valid)
++            << "Test vector index = " << i << " expected to "
++            << "fail validation with error containing: '" << t.error_pattern << "' "
++            << "but succeeded instead.";
++
++         if (error) {
++            EXPECT_TRUE(strstr(error, t.error_pattern))
++               << "Test vector index = " << i << " expected to "
++               << "fail validation with error containing: '" << t.error_pattern << "' "
++               << "but error was: '" << error << "'.";
++         }
++      } else {
++         EXPECT_TRUE(valid)
++            << "Test vector index = " << i << " expected to succeed "
++            << "but failed validation with error: '" << error << "'.";
++      }
++
++      clear_instructions(p);
++   }
++}
+diff --git a/src/intel/dev/intel_device_info.c b/src/intel/dev/intel_device_info.c
+--- a/src/intel/dev/intel_device_info.c
++++ b/src/intel/dev/intel_device_info.c
+@@ -1045,6 +1045,7 @@ static const struct intel_device_info intel_device_info_sg1 = {
+    .has_llc = false,                                            \
+    .has_ray_tracing = true,                                     \
+    .has_mesh_shading = true,                                    \
++   .has_bfloat16 = true,                                        \
+    .has_coarse_pixel_primitive_and_cb = true,                   \
+    .needs_null_push_constant_tbimr_workaround = true,           \
+    .simulator_id = 29
+diff --git a/src/intel/dev/intel_device_info.py b/src/intel/dev/intel_device_info.py
+--- a/src/intel/dev/intel_device_info.py
++++ b/src/intel/dev/intel_device_info.py
+@@ -277,6 +277,7 @@ Struct("intel_device_info",
+         Member("bool", "has_64bit_float", compiler_field=True),
+         Member("bool", "has_64bit_float_via_math_pipe", compiler_field=True),
+         Member("bool", "has_64bit_int", compiler_field=True),
++        Member("bool", "has_bfloat16", compiler_field=True),
+         Member("bool", "has_integer_dword_mul", compiler_field=True),
+         Member("bool", "supports_simd16_3src", compiler_field=True),
+         Member("bool", "disable_ccs_repack"),

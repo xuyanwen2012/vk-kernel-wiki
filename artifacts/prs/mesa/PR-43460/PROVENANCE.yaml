@@ -1,0 +1,17 @@
+repo: mesa/mesa
+pr: 43460
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43460
+merge_sha: bc949698bd708df93e8a12bd01f1acd1829a63fb
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/43460/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/nak/api.rs
+  status: modified
+  sha256: 8c32f927aa9cb6d19183dd5d7737e453263bccb39a56effba6eb02953535c7d2
+- path: src/nouveau/vulkan/nvk_shader.c
+  status: modified
+  sha256: 1fd4336dea85936e3168321af05bb20f03c155035db3ebc504a4bd73ab315bfe

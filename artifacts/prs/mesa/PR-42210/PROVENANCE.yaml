@@ -1,0 +1,20 @@
+repo: mesa/mesa
+pr: 42210
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42210
+merge_sha: fa73219978f86c7a2508a7e47aa7ce7d3e076bd4
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/42210/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/bifrost/valhall/test/test-lower-constants.cpp
+  status: modified
+  sha256: 6e90105d14053534971720c5e7529ef9a518082d777ca469c0c255fb4f98f458
+- path: src/panfrost/compiler/bifrost/valhall/va_lower_constants.c
+  status: modified
+  sha256: b4543657446b341fdaabf5f0b93363ecda6ec12f89d11a1db0c8f3964404cce3
+- path: src/panfrost/vulkan/panvk_vX_physical_device.c
+  status: modified
+  sha256: 4fe498847c7bcbebab0dbef692cc26af5dbc587b332145801514286d9d9f3532

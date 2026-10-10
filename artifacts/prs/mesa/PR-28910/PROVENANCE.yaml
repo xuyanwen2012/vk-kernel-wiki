@@ -1,0 +1,41 @@
+repo: mesa/mesa
+pr: 28910
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/28910
+merge_sha: 07855b0431cab4a96c4273d1757c1d6f5a09aca6
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/28910/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/elk/elk_compiler.h
+  status: modified
+  sha256: 9593ba2a6ec0b97663d45f51b99b4dc5dfbbd241ff821b70b7e01337563d9063
+- path: src/intel/compiler/brw_compiler.h
+  status: modified
+  sha256: eb2d16599dc344ef593cd81229e0bc016b8a03a9e669f2b6d709680957d6d532
+- path: src/intel/dev/xe/intel_device_info.c
+  status: modified
+  sha256: 2776728503f029bb85700ad1660a6b2af04c16c153a8a9f19b3e88225d372779
+- path: src/intel/dev/intel_device_info.c
+  status: modified
+  sha256: 21578b59f1d82bf10abb410faecc726129831566d65716b45cfb8becc5a6fc9c
+- path: src/intel/dev/intel_device_info.h
+  status: modified
+  sha256: e1f9396d8f9adf9a07bc3a848036edb622f428702a297f4cabadce39d13e95d5
+- path: src/intel/vulkan/anv_device.c
+  status: modified
+  sha256: ce61e1d6220a671350fbbc191e087e5f38d3f7ea8e24de1038616417eb276470
+- path: src/intel/vulkan/anv_pipeline.c
+  status: modified
+  sha256: 72a515a08ac8df382119a62de33003851f434cdb51b3c5efcd5f7db24402f7be
+- path: src/intel/vulkan/genX_cmd_compute.c
+  status: modified
+  sha256: fb7fa63966f292511d7206a2107942a68ce3943e9e5ef5f88a72b1cb523503c3
+- path: src/intel/vulkan/genX_pipeline.c
+  status: modified
+  sha256: b431b3cacc92ea8e6ae05e9ba072ec47b376ee3005a334cc98a72e32d547ae5b
+- path: src/intel/vulkan/genX_simple_shader.c
+  status: modified
+  sha256: 9ae674f79a135ba5ae3010a3016c4a82c02e5cdaa59ce17b26dd59426d3c82e4

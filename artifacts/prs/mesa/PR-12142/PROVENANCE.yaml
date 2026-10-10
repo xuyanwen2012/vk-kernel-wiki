@@ -1,0 +1,44 @@
+repo: mesa/mesa
+pr: 12142
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/12142
+merge_sha: fe956d0182aeb54d03fdc69711ceae15cc29168a
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/12142/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_compiler.c
+  status: modified
+  sha256: e3f18d19aa80cbb656adfe7ca0fb1e7ae7ea804e69c1e67f2ee195e2819d77c8
+- path: src/intel/compiler/brw_eu.cpp
+  status: modified
+  sha256: e6f71d8a65d270436e2736b823d87f11dcf1b83823f842fb60b22cdb8e4ea64b
+- path: src/intel/compiler/brw_eu.h
+  status: modified
+  sha256: d7d4260f1259286087d6fb8c41238eec39b5397b36b943de29f43d22c45f6496
+- path: src/intel/compiler/brw_eu_defines.h
+  status: modified
+  sha256: 397c735e8ef86cf0bbf9f14f1dc0996809871e3ca39f980849ec4938dd67be38
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: e7cd20bbc82c22a533e81cde9256f2ddcee08102444a4ef5b077aab6e6c976df
+- path: src/intel/compiler/brw_eu_validate.c
+  status: modified
+  sha256: 2f5dc9712d13824e84ce103f81e78934f6a9f3258355c790a44614eecb77ac09
+- path: src/intel/compiler/brw_fs_builder.h
+  status: modified
+  sha256: bd6588dea0e0c6959d7d7e2504909faa5c62a49c00f10dd316ab689adfc5750d
+- path: src/intel/compiler/brw_fs_generator.cpp
+  status: modified
+  sha256: dbf42edbdf1b9004ec93eb1b526b313ea33c2678266ca547caab207e47f62331
+- path: src/intel/compiler/brw_fs_nir.cpp
+  status: modified
+  sha256: dfc2ca2e1f6af3e0ab605923b06309ce6e6ba4487420406caa23bd0eacda4836
+- path: src/intel/compiler/brw_ir_performance.cpp
+  status: modified
+  sha256: 2d985f19338526c1afb05c36eac31c6fd81273903de284dccaf3a13339b87c53
+- path: src/intel/compiler/brw_shader.cpp
+  status: modified
+  sha256: 9d5f5897db1b310b7a0bc92e1b852ac131b4be12360bf6920c8c031a79642671

@@ -1,0 +1,359 @@
+diff --git a/src/intel/compiler/elk/elk_compiler.h b/src/intel/compiler/elk/elk_compiler.h
+--- a/src/intel/compiler/elk/elk_compiler.h
++++ b/src/intel/compiler/elk/elk_compiler.h
+@@ -1652,46 +1652,6 @@ void elk_debug_key_recompile(const struct elk_compiler *c, void *log,
+                              const struct elk_base_prog_key *old_key,
+                              const struct elk_base_prog_key *key);
+ 
+-/* Shared Local Memory Size is specified as powers of two,
+- * and also have a Gen-dependent minimum value if not zero.
+- */
+-static inline uint32_t
+-elk_calculate_slm_size(unsigned gen, uint32_t bytes)
+-{
+-   assert(bytes <= 64 * 1024);
+-   if (bytes > 0)
+-      return MAX2(util_next_power_of_two(bytes), gen >= 9 ? 1024 : 4096);
+-   else
+-      return 0;
+-}
+-
+-static inline uint32_t
+-elk_encode_slm_size(unsigned gen, uint32_t bytes)
+-{
+-   uint32_t slm_size = 0;
+-
+-   /* Shared Local Memory is specified as powers of two, and encoded in
+-    * INTERFACE_DESCRIPTOR_DATA with the following representations:
+-    *
+-    * Size   | 0 kB | 1 kB | 2 kB | 4 kB | 8 kB | 16 kB | 32 kB | 64 kB |
+-    * -------------------------------------------------------------------
+-    * Gfx7-8 |    0 | none | none |    1 |    2 |     4 |     8 |    16 |
+-    * -------------------------------------------------------------------
+-    * Gfx9+  |    0 |    1 |    2 |    3 |    4 |     5 |     6 |     7 |
+-    */
+-
+-   if (bytes > 0) {
+-      slm_size = elk_calculate_slm_size(gen, bytes);
+-      assert(util_is_power_of_two_nonzero(slm_size));
+-
+-      assert(slm_size >= 4096);
+-      /* Convert to the pre-Gfx9 representation. */
+-      slm_size = slm_size / 4096;
+-   }
+-
+-   return slm_size;
+-}
+-
+ unsigned
+ elk_cs_push_const_total_size(const struct elk_cs_prog_data *cs_prog_data,
+                              unsigned threads);
+diff --git a/src/intel/compiler/brw_compiler.h b/src/intel/compiler/brw_compiler.h
+--- a/src/intel/compiler/brw_compiler.h
++++ b/src/intel/compiler/brw_compiler.h
+@@ -1556,52 +1556,6 @@ void brw_debug_key_recompile(const struct brw_compiler *c, void *log,
+                              const struct brw_base_prog_key *old_key,
+                              const struct brw_base_prog_key *key);
+ 
+-/* Shared Local Memory Size is specified as powers of two,
+- * and also have a Gen-dependent minimum value if not zero.
+- */
+-static inline uint32_t
+-intel_calculate_slm_size(unsigned gen, uint32_t bytes)
+-{
+-   assert(bytes <= 64 * 1024);
+-   if (bytes > 0)
+-      return MAX2(util_next_power_of_two(bytes), gen >= 9 ? 1024 : 4096);
+-   else
+-      return 0;
+-}
+-
+-static inline uint32_t
+-encode_slm_size(unsigned gen, uint32_t bytes)
+-{
+-   uint32_t slm_size = 0;
+-
+-   /* Shared Local Memory is specified as powers of two, and encoded in
+-    * INTERFACE_DESCRIPTOR_DATA with the following representations:
+-    *
+-    * Size   | 0 kB | 1 kB | 2 kB | 4 kB | 8 kB | 16 kB | 32 kB | 64 kB |
+-    * -------------------------------------------------------------------
+-    * Gfx7-8 |    0 | none | none |    1 |    2 |     4 |     8 |    16 |
+-    * -------------------------------------------------------------------
+-    * Gfx9+  |    0 |    1 |    2 |    3 |    4 |     5 |     6 |     7 |
+-    */
+-
+-   if (bytes > 0) {
+-      slm_size = intel_calculate_slm_size(gen, bytes);
+-      assert(util_is_power_of_two_nonzero(slm_size));
+-
+-      if (gen >= 9) {
+-         /* Turn an exponent of 10 (1024 kB) into 1. */
+-         assert(slm_size >= 1024);
+-         slm_size = ffs(slm_size) - 10;
+-      } else {
+-         assert(slm_size >= 4096);
+-         /* Convert to the pre-Gfx9 representation. */
+-         slm_size = slm_size / 4096;
+-      }
+-   }
+-
+-   return slm_size;
+-}
+-
+ unsigned
+ brw_cs_push_const_total_size(const struct brw_cs_prog_data *cs_prog_data,
+                              unsigned threads);
+diff --git a/src/intel/dev/xe/intel_device_info.c b/src/intel/dev/xe/intel_device_info.c
+--- a/src/intel/dev/xe/intel_device_info.c
++++ b/src/intel/dev/xe/intel_device_info.c
+@@ -201,9 +201,9 @@ xe_compute_topology(struct intel_device_info * devinfo,
+       devinfo->max_subslices_per_slice = 6;
+    }
+    devinfo->max_eus_per_subslice = 16;
+-   devinfo->subslice_slice_stride = 1;
+-   devinfo->eu_slice_stride = DIV_ROUND_UP(16 * 4, 8);
+-   devinfo->eu_subslice_stride = DIV_ROUND_UP(16, 8);
++   devinfo->subslice_slice_stride = DIV_ROUND_UP(devinfo->max_slices, 8);
++   devinfo->eu_slice_stride = DIV_ROUND_UP(devinfo->max_eus_per_subslice * devinfo->max_subslices_per_slice, 8);
++   devinfo->eu_subslice_stride = DIV_ROUND_UP(devinfo->max_eus_per_subslice, 8);
+ 
+    assert((sizeof(uint32_t) * 8) >= devinfo->max_subslices_per_slice);
+    assert((sizeof(uint32_t) * 8) >= devinfo->max_eus_per_subslice);
+diff --git a/src/intel/dev/intel_device_info.c b/src/intel/dev/intel_device_info.c
+--- a/src/intel/dev/intel_device_info.c
++++ b/src/intel/dev/intel_device_info.c
+@@ -1338,6 +1338,37 @@ intel_device_info_update_l3_banks(struct intel_device_info *devinfo)
+    }
+ }
+ 
++/* Returns the number of EUs of the first subslice enabled */
++uint32_t
++intel_device_info_get_eu_count_first_subslice(const struct intel_device_info *devinfo)
++{
++   uint32_t first_subslice, first_slice, offset, i;
++   uint32_t eu_count = 0;
++
++   first_slice = ffs(devinfo->slice_masks);
++   first_slice--;
++   offset = first_slice * devinfo->subslice_slice_stride;
++
++   for (i = 0; i < DIV_ROUND_UP(devinfo->max_subslices_per_slice, 8); i++) {
++      first_subslice = ffs(devinfo->subslice_masks[offset + i]);
++
++      if (first_subslice == 0)
++         continue;
++
++      break;
++   }
++
++   assert(first_subslice > 0);
++   first_subslice--;
++   offset = first_slice * devinfo->eu_slice_stride +
++            first_subslice * devinfo->eu_subslice_stride;
++   for (i = 0; i < DIV_ROUND_UP(devinfo->max_eus_per_subslice, 8); i++)
++      eu_count += __builtin_popcount(devinfo->eu_masks[offset + i]);
++
++   assert(eu_count > 0);
++   return eu_count;
++}
++
+ /* Generate mask from the device data. */
+ static void
+ fill_masks(struct intel_device_info *devinfo)
+@@ -1950,3 +1981,33 @@ intel_device_info_wa_stepping(struct intel_device_info *devinfo)
+    return INTEL_STEPPING_RELEASE;
+ }
+ 
++uint32_t
++intel_device_info_get_max_slm_size(const struct intel_device_info *devinfo)
++{
++   uint32_t k_bytes = 0;
++
++   if (devinfo->verx10 >= 200) {
++      k_bytes = intel_device_info_get_max_preferred_slm_size(devinfo);
++   } else {
++      k_bytes = 64;
++   }
++
++   return k_bytes * 1024;
++}
++
++uint32_t
++intel_device_info_get_max_preferred_slm_size(const struct intel_device_info *devinfo)
++{
++   uint32_t k_bytes = 0;
++
++   if (devinfo->verx10 >= 200) {
++      if (intel_needs_workaround(devinfo, 16018610683))
++         k_bytes = 128;
++      else
++         k_bytes = 160;
++   } else {
++      k_bytes = 128;
++   }
++
++   return k_bytes * 1024;
++}
+diff --git a/src/intel/dev/intel_device_info.h b/src/intel/dev/intel_device_info.h
+--- a/src/intel/dev/intel_device_info.h
++++ b/src/intel/dev/intel_device_info.h
+@@ -195,6 +195,7 @@ void intel_device_info_topology_reset_masks(struct intel_device_info *devinfo);
+ void intel_device_info_topology_update_counts(struct intel_device_info *devinfo);
+ void intel_device_info_update_pixel_pipes(struct intel_device_info *devinfo, uint8_t *subslice_masks);
+ void intel_device_info_update_l3_banks(struct intel_device_info *devinfo);
++uint32_t intel_device_info_get_eu_count_first_subslice(const struct intel_device_info *devinfo);
+ void intel_device_info_update_cs_workgroup_threads(struct intel_device_info *devinfo);
+ bool intel_device_info_compute_system_memory(struct intel_device_info *devinfo, bool update);
+ void intel_device_info_update_after_hwconfig(struct intel_device_info *devinfo);
+@@ -210,6 +211,9 @@ void intel_device_info_update_after_hwconfig(struct intel_device_info *devinfo);
+ 
+ enum intel_wa_steppings intel_device_info_wa_stepping(struct intel_device_info *devinfo);
+ 
++uint32_t intel_device_info_get_max_slm_size(const struct intel_device_info *devinfo);
++uint32_t intel_device_info_get_max_preferred_slm_size(const struct intel_device_info *devinfo);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/intel/vulkan/anv_device.c b/src/intel/vulkan/anv_device.c
+--- a/src/intel/vulkan/anv_device.c
++++ b/src/intel/vulkan/anv_device.c
+@@ -1338,7 +1338,7 @@ get_properties(const struct anv_physical_device *pdevice,
+       .maxFragmentOutputAttachments             = 8,
+       .maxFragmentDualSrcAttachments            = 1,
+       .maxFragmentCombinedOutputResources       = MAX_RTS + max_ssbos + max_images,
+-      .maxComputeSharedMemorySize               = 64 * 1024,
++      .maxComputeSharedMemorySize               = intel_device_info_get_max_slm_size(&pdevice->info),
+       .maxComputeWorkGroupCount                 = { 65535, 65535, 65535 },
+       .maxComputeWorkGroupInvocations           = max_workgroup_size,
+       .maxComputeWorkGroupSize = {
+diff --git a/src/intel/vulkan/anv_pipeline.c b/src/intel/vulkan/anv_pipeline.c
+--- a/src/intel/vulkan/anv_pipeline.c
++++ b/src/intel/vulkan/anv_pipeline.c
+@@ -29,6 +29,7 @@
+ 
+ #include "util/mesa-sha1.h"
+ #include "util/os_time.h"
++#include "common/intel_compute_slm.h"
+ #include "common/intel_l3_config.h"
+ #include "common/intel_sample_positions.h"
+ #include "compiler/brw_disasm.h"
+@@ -1162,7 +1163,7 @@ anv_pipeline_lower_nir(struct anv_pipeline *pipeline,
+          const unsigned chunk_size = 16;
+          const unsigned shared_size = ALIGN(nir->info.shared_size, chunk_size);
+          assert(shared_size <=
+-                intel_calculate_slm_size(compiler->devinfo->ver, nir->info.shared_size));
++                intel_compute_slm_calculate_size(compiler->devinfo->ver, nir->info.shared_size));
+ 
+          NIR_PASS(_, nir, nir_zero_initialize_shared_memory,
+                   shared_size, chunk_size);
+diff --git a/src/intel/vulkan/genX_cmd_compute.c b/src/intel/vulkan/genX_cmd_compute.c
+--- a/src/intel/vulkan/genX_cmd_compute.c
++++ b/src/intel/vulkan/genX_cmd_compute.c
+@@ -30,6 +30,7 @@
+ #include "vk_util.h"
+ 
+ #include "common/intel_aux_map.h"
++#include "common/intel_compute_slm.h"
+ #include "genxml/gen_macros.h"
+ #include "genxml/genX_pack.h"
+ #include "genxml/genX_rt_pack.h"
+@@ -283,8 +284,12 @@ get_interface_descriptor_data(struct anv_cmd_buffer *cmd_buffer,
+       .BindingTableEntryCount = devinfo->verx10 == 125 ?
+          0 : 1 + MIN2(shader->bind_map.surface_count, 30),
+       .NumberofThreadsinGPGPUThreadGroup = dispatch->threads,
+-      .SharedLocalMemorySize = encode_slm_size(GFX_VER, prog_data->base.total_shared),
+-      .PreferredSLMAllocationSize = preferred_slm_allocation_size(devinfo),
++      .SharedLocalMemorySize = intel_compute_slm_encode_size(GFX_VER, prog_data->base.total_shared),
++      .PreferredSLMAllocationSize =
++         intel_compute_preferred_slm_calc_encode_size(devinfo,
++                                                      prog_data->base.total_shared,
++                                                      dispatch->group_size,
++                                                      dispatch->simd_size),
+       .NumberOfBarriers = prog_data->uses_barrier,
+    };
+ }
+diff --git a/src/intel/vulkan/genX_pipeline.c b/src/intel/vulkan/genX_pipeline.c
+--- a/src/intel/vulkan/genX_pipeline.c
++++ b/src/intel/vulkan/genX_pipeline.c
+@@ -27,6 +27,7 @@
+ #include "genxml/genX_pack.h"
+ #include "genxml/genX_rt_pack.h"
+ 
++#include "common/intel_compute_slm.h"
+ #include "common/intel_genX_state_brw.h"
+ #include "common/intel_l3_config.h"
+ #include "common/intel_sample_positions.h"
+@@ -1792,9 +1793,12 @@ emit_task_state(struct anv_graphics_pipeline *pipeline)
+ 
+       task.NumberofBarriers                  = task_prog_data->base.uses_barrier;
+       task.SharedLocalMemorySize             =
+-         encode_slm_size(GFX_VER, task_prog_data->base.base.total_shared);
++         intel_compute_slm_encode_size(GFX_VER, task_prog_data->base.base.total_shared);
+       task.PreferredSLMAllocationSize        =
+-         preferred_slm_allocation_size(devinfo);
++         intel_compute_preferred_slm_calc_encode_size(devinfo,
++                                                      task_prog_data->base.base.total_shared,
++                                                      task_dispatch.group_size,
++                                                      task_dispatch.simd_size);
+ 
+       /*
+        * 3DSTATE_TASK_SHADER_DATA.InlineData[0:1] will be used for an address
+@@ -1873,9 +1877,12 @@ emit_mesh_state(struct anv_graphics_pipeline *pipeline)
+ 
+       mesh.NumberofBarriers                  = mesh_prog_data->base.uses_barrier;
+       mesh.SharedLocalMemorySize             =
+-         encode_slm_size(GFX_VER, mesh_prog_data->base.base.total_shared);
++         intel_compute_slm_encode_size(GFX_VER, mesh_prog_data->base.base.total_shared);
+       mesh.PreferredSLMAllocationSize        =
+-         preferred_slm_allocation_size(devinfo);
++         intel_compute_preferred_slm_calc_encode_size(devinfo,
++                                                      mesh_prog_data->base.base.total_shared,
++                                                      mesh_dispatch.group_size,
++                                                      mesh_dispatch.simd_size);
+ 
+       /*
+        * 3DSTATE_MESH_SHADER_DATA.InlineData[0:1] will be used for an address
+@@ -2080,7 +2087,7 @@ genX(compute_pipeline_emit)(struct anv_compute_pipeline *pipeline)
+          0 : 1 + MIN2(pipeline->cs->bind_map.surface_count, 30),
+       .BarrierEnable          = cs_prog_data->uses_barrier,
+       .SharedLocalMemorySize  =
+-         encode_slm_size(GFX_VER, cs_prog_data->base.total_shared),
++         intel_compute_slm_encode_size(GFX_VER, cs_prog_data->base.total_shared),
+ 
+       .ConstantURBEntryReadOffset = 0,
+       .ConstantURBEntryReadLength = cs_prog_data->push.per_thread.regs,
+diff --git a/src/intel/vulkan/genX_simple_shader.c b/src/intel/vulkan/genX_simple_shader.c
+--- a/src/intel/vulkan/genX_simple_shader.c
++++ b/src/intel/vulkan/genX_simple_shader.c
+@@ -30,6 +30,7 @@
+ 
+ #include "genxml/gen_macros.h"
+ #include "genxml/genX_pack.h"
++#include "common/intel_compute_slm.h"
+ #include "common/intel_genX_state_brw.h"
+ 
+ static void
+@@ -580,8 +581,8 @@ genX(emit_simple_shader_dispatch)(struct anv_simple_shader *state,
+             .BindingTablePointer               = 0,
+             .BindingTableEntryCount            = 0,
+             .NumberofThreadsinGPGPUThreadGroup = dispatch.threads,
+-            .SharedLocalMemorySize             = encode_slm_size(GFX_VER,
+-                                                                 prog_data->base.total_shared),
++            .SharedLocalMemorySize             = intel_compute_slm_encode_size(GFX_VER,
++                                                                               prog_data->base.total_shared),
+             .NumberOfBarriers                  = prog_data->uses_barrier,
+          };
+       }
+@@ -649,8 +650,8 @@ genX(emit_simple_shader_dispatch)(struct anv_simple_shader *state,
+          .SamplerCount                          = 0,
+          .BindingTableEntryCount                = 0,
+          .BarrierEnable                         = prog_data->uses_barrier,
+-         .SharedLocalMemorySize                 = encode_slm_size(GFX_VER,
+-                                                                  prog_data->base.total_shared),
++         .SharedLocalMemorySize                 = intel_compute_slm_encode_size(GFX_VER,
++                                                                                prog_data->base.total_shared),
+ 
+          .ConstantURBEntryReadOffset            = 0,
+          .ConstantURBEntryReadLength            = prog_data->push.per_thread.regs,

@@ -1,0 +1,152 @@
+diff --git a/src/intel/compiler/brw_eu_defines.h b/src/intel/compiler/brw_eu_defines.h
+--- a/src/intel/compiler/brw_eu_defines.h
++++ b/src/intel/compiler/brw_eu_defines.h
+@@ -462,6 +462,11 @@ enum opcode {
+     */
+    SHADER_OPCODE_MEMORY_FENCE,
+ 
++   /**
++    * Scheduling-only fence.
++    */
++   FS_OPCODE_SCHEDULING_FENCE,
++
+    SHADER_OPCODE_GEN4_SCRATCH_READ,
+    SHADER_OPCODE_GEN4_SCRATCH_WRITE,
+    SHADER_OPCODE_GEN7_SCRATCH_READ,
+diff --git a/src/intel/compiler/brw_fs.cpp b/src/intel/compiler/brw_fs.cpp
+--- a/src/intel/compiler/brw_fs.cpp
++++ b/src/intel/compiler/brw_fs.cpp
+@@ -8721,3 +8721,11 @@ brw_fs_test_dispatch_packing(const fs_builder &bld)
+       set_predicate(BRW_PREDICATE_NORMAL, bld.emit(BRW_OPCODE_WHILE));
+    }
+ }
++
++unsigned
++fs_visitor::workgroup_size() const
++{
++   assert(stage == MESA_SHADER_COMPUTE);
++   const struct brw_cs_prog_data *cs = brw_cs_prog_data(prog_data);
++   return cs->local_size[0] * cs->local_size[1] * cs->local_size[2];
++}
+diff --git a/src/intel/compiler/brw_fs.h b/src/intel/compiler/brw_fs.h
+--- a/src/intel/compiler/brw_fs.h
++++ b/src/intel/compiler/brw_fs.h
+@@ -411,6 +411,8 @@ private:
+    void lower_mul_dword_inst(fs_inst *inst, bblock_t *block);
+    void lower_mul_qword_inst(fs_inst *inst, bblock_t *block);
+    void lower_mulh_inst(fs_inst *inst, bblock_t *block);
++
++   unsigned workgroup_size() const;
+ };
+ 
+ /**
+diff --git a/src/intel/compiler/brw_fs_generator.cpp b/src/intel/compiler/brw_fs_generator.cpp
+--- a/src/intel/compiler/brw_fs_generator.cpp
++++ b/src/intel/compiler/brw_fs_generator.cpp
+@@ -2177,6 +2177,11 @@ fs_generator::generate_code(const cfg_t *cfg, int dispatch_width,
+          send_count++;
+          break;
+ 
++      case FS_OPCODE_SCHEDULING_FENCE:
++         if (unlikely(debug_flag))
++            disasm_info->use_tail = true;
++         break;
++
+       case SHADER_OPCODE_INTERLOCK:
+          assert(devinfo->gen >= 9);
+          /* The interlock is basically a memory fence issued via sendc */
+diff --git a/src/intel/compiler/brw_fs_nir.cpp b/src/intel/compiler/brw_fs_nir.cpp
+--- a/src/intel/compiler/brw_fs_nir.cpp
++++ b/src/intel/compiler/brw_fs_nir.cpp
+@@ -3720,6 +3720,15 @@ fs_visitor::nir_emit_cs_intrinsic(const fs_builder &bld,
+ 
+    switch (instr->intrinsic) {
+    case nir_intrinsic_control_barrier:
++      /* The whole workgroup fits in a single HW thread, so all the
++       * invocations are already executed lock-step.  Instead of an actual
++       * barrier just emit a scheduling fence, that will generate no code.
++       */
++      if (workgroup_size() <= dispatch_width) {
++         bld.exec_all().group(1, 0).emit(FS_OPCODE_SCHEDULING_FENCE);
++         break;
++      }
++
+       emit_barrier();
+       cs_prog_data->uses_barrier = true;
+       break;
+@@ -4239,25 +4248,32 @@ fs_visitor::nir_emit_intrinsic(const fs_builder &bld, nir_intrinsic_instr *instr
+          l3_fence = modes & (nir_var_shader_out |
+                              nir_var_mem_ssbo |
+                              nir_var_mem_global);
+-         /* Prior to gen11, we only have one kind of fence. */
+-         slm_fence = devinfo->gen >= 11 && (modes & nir_var_mem_shared);
+-         l3_fence |= devinfo->gen < 11 && (modes & nir_var_mem_shared);
++         slm_fence = modes & nir_var_mem_shared;
+       } else {
+-         if (devinfo->gen >= 11) {
+-            l3_fence = instr->intrinsic != nir_intrinsic_memory_barrier_shared;
+-            slm_fence = instr->intrinsic == nir_intrinsic_group_memory_barrier ||
+-                        instr->intrinsic == nir_intrinsic_memory_barrier ||
+-                        instr->intrinsic == nir_intrinsic_memory_barrier_shared;
+-         } else {
+-            /* Prior to gen11, we only have one kind of fence. */
+-            l3_fence = true;
+-            slm_fence = false;
+-         }
++         l3_fence = instr->intrinsic != nir_intrinsic_memory_barrier_shared;
++         slm_fence = instr->intrinsic == nir_intrinsic_group_memory_barrier ||
++                     instr->intrinsic == nir_intrinsic_memory_barrier ||
++                     instr->intrinsic == nir_intrinsic_memory_barrier_shared;
+       }
+ 
+       if (stage != MESA_SHADER_COMPUTE)
+          slm_fence = false;
+ 
++      /* If the workgroup fits in a single HW thread, the messages for SLM are
++       * processed in-order and the shader itself is already synchronized so
++       * the memory fence is not necessary.
++       *
++       * TODO: Check if applies for many HW threads sharing same Data Port.
++       */
++      if (slm_fence && workgroup_size() <= dispatch_width)
++         slm_fence = false;
++
++      /* Prior to Gen11, there's only L3 fence, so emit that instead. */
++      if (slm_fence && devinfo->gen < 11) {
++         slm_fence = false;
++         l3_fence = true;
++      }
++
+       /* Be conservative in Gen11+ and always stall in a fence.  Since there
+        * are two different fences, and shader might want to synchronize
+        * between them.
+@@ -4287,6 +4303,9 @@ fs_visitor::nir_emit_intrinsic(const fs_builder &bld, nir_intrinsic_instr *instr
+             ->size_written = 2 * REG_SIZE;
+       }
+ 
++      if (!l3_fence && !slm_fence)
++         ubld.emit(FS_OPCODE_SCHEDULING_FENCE);
++
+       break;
+    }
+ 
+diff --git a/src/intel/compiler/brw_shader.cpp b/src/intel/compiler/brw_shader.cpp
+--- a/src/intel/compiler/brw_shader.cpp
++++ b/src/intel/compiler/brw_shader.cpp
+@@ -323,6 +323,8 @@ brw_instruction_name(const struct gen_device_info *devinfo, enum opcode op)
+       return "typed_surface_write_logical";
+    case SHADER_OPCODE_MEMORY_FENCE:
+       return "memory_fence";
++   case FS_OPCODE_SCHEDULING_FENCE:
++      return "scheduling_fence";
+    case SHADER_OPCODE_INTERLOCK:
+       /* For an interlock we actually issue a memory fence via sendc. */
+       return "interlock";
+@@ -1076,6 +1078,7 @@ backend_instruction::has_side_effects() const
+    case TCS_OPCODE_RELEASE_INPUT:
+    case SHADER_OPCODE_RND_MODE:
+    case SHADER_OPCODE_FLOAT_CONTROL_MODE:
++   case FS_OPCODE_SCHEDULING_FENCE:
+       return true;
+    default:
+       return eot;

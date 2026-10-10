@@ -1,0 +1,116 @@
+repo: mesa/mesa
+pr: 25994
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/25994
+merge_sha: 2e75d71c1faa737ef3290ff1e9cb4851762fa381
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/25994/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_compiler.c
+  status: modified
+  sha256: 8d4e5f62d3425e319644033307576e85155352e442228e301b82ca4abecb1332
+- path: src/intel/compiler/brw_compiler.h
+  status: modified
+  sha256: d2226f9ee442e9720d2ab17f0f4c2f40d3379a56a62c5be3da1edd1533287001
+- path: src/intel/compiler/brw_eu.c
+  status: modified
+  sha256: ae9f81c14a68c8125bddc4b508268de68707adc9a5aa67b108dc6676fbdd19ec
+- path: src/intel/compiler/brw_eu.h
+  status: modified
+  sha256: f9f27f08a17b119bc5ccbaa917571139ce8322604452641470a8eebe600de5d6
+- path: src/intel/compiler/brw_eu_defines.h
+  status: modified
+  sha256: ba6b66b7674a4b3276d0e05b002d3463e1c345972c802c416b48de4811b10d53
+- path: src/intel/compiler/brw_eu_emit.c
+  status: modified
+  sha256: 77d27dea797506991c8afbab2749376248a539d4d0458a73892a2fab7ea7c429
+- path: src/intel/compiler/brw_eu_validate.c
+  status: modified
+  sha256: f7929ab6f2a282f0328e296cc08e0de031e8e7798d42e1bc438ef3110af96d40
+- path: src/intel/compiler/brw_fs.cpp
+  status: modified
+  sha256: b4691aa96f282852c277ef9cdf1c2803127b6ad7289e9e10cc91d963c61ebc48
+- path: src/intel/compiler/brw_fs.h
+  status: modified
+  sha256: 2cdc2a817e80b92424ed6575e049a63be5ec6533b524d5aff313d6619e696b1d
+- path: src/intel/compiler/brw_fs_builder.h
+  status: modified
+  sha256: c69ba91563fcdd71af9abac0363a7eb2960d868af97bdd3a12b0260b726e2633
+- path: src/intel/compiler/brw_fs_generator.cpp
+  status: modified
+  sha256: 18ffe78898a9f6698719cefc425148f49de064359bc557306831d7b54775a26f
+- path: src/intel/compiler/brw_fs_lower_dpas.cpp
+  status: added
+  sha256: 91af04a9da58f34b52c35dfaad15f4d4fd18a5a2d1e31adc217a1b8c2b409c50
+- path: src/intel/compiler/brw_fs_lower_regioning.cpp
+  status: modified
+  sha256: 86bcb6e3fc7da470d07e6ce8e01144f12ea5b5aef1ffb9ab956e8e9a5e40130d
+- path: src/intel/compiler/brw_fs_nir.cpp
+  status: modified
+  sha256: 0a0200d2ce0d3fa1bdd4f4ffd2fbf46cc3ac10df9294042336b655210981004f
+- path: src/intel/compiler/brw_fs_scoreboard.cpp
+  status: modified
+  sha256: c2c15ba46f4ec7dc1102364bde580007b1e098992a326f255aae6a0561299769
+- path: src/intel/compiler/brw_inst.h
+  status: modified
+  sha256: 948b4fbe9c443a3d73b3a1df339f0feac77214d839f39ca0c305b226e3138fb9
+- path: src/intel/compiler/brw_ir.h
+  status: modified
+  sha256: 4e53555d2f2946a4d7618492fa6edfee53d9e232aa3a44452be27bbf9c0f708a
+- path: src/intel/compiler/brw_ir_fs.h
+  status: modified
+  sha256: 8a26ec3167c7fbde176c95832717bb5d3428cc6a32237b7c0d1a7b27389c2fb1
+- path: src/intel/compiler/brw_ir_performance.cpp
+  status: modified
+  sha256: 767a53804ce2af6765dcc1fe31b1b26d27746a41530af808a69c63b9eba5824f
+- path: src/intel/compiler/brw_nir.h
+  status: modified
+  sha256: df57a407ad792cc0a4666d02714a454823818ef7b07b5c4e2838f342f8a8be5f
+- path: src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+  status: added
+  sha256: 98089ca05baf271ff9a852e4ad5f834b807c41f2c7d3c452f097a2af77b23a01
+- path: src/intel/compiler/brw_schedule_instructions.cpp
+  status: modified
+  sha256: 996ba7a64840abb938584e98a30ab84fb703c8300182444e93aa336a71cb26d2
+- path: src/intel/compiler/brw_shader.cpp
+  status: modified
+  sha256: 5dd7a0c45baa3681c6a327297ec17194a96ac25500a5cefcbfe941276914c756
+- path: src/intel/compiler/meson.build
+  status: modified
+  sha256: 89dea3d9063a80d622c49a9f96cfea46fd1dc597246dce3c7e3fc90fd8567569
+- path: src/intel/compiler/test_eu_validate.cpp
+  status: modified
+  sha256: d9e89629ba78b3c54d8fe012332098cfa0f8ebc4be69c9c98181c104dcfde9e3
+- path: src/intel/dev/intel_device_info.c
+  status: modified
+  sha256: 7a24685437aa92888d951ef2c4efe5c675b6641d9c5ae3246b0e888ef493e2bf
+- path: src/intel/dev/intel_device_info.h
+  status: modified
+  sha256: 194f79b72098e15f5abea1df58d9a7aa93a649f48d4b5b9874d6aaadfda8957a
+- path: src/intel/vulkan/anv_device.c
+  status: modified
+  sha256: 93cdaf1307acfb1f4836082e7735820784cc1401f100bf9a99137e572c3ca94b
+- path: src/intel/vulkan/anv_genX.h
+  status: modified
+  sha256: 4e0c2b6239fcfef91101d0ea35e575b48f04875e124303e3989db89ff61480b5
+- path: src/intel/vulkan/anv_pipeline.c
+  status: modified
+  sha256: 4c4194236ceaa1933159dc2b33c3bc495f4fbc45e2c06513b071ef2ef5778978
+- path: src/intel/vulkan/anv_private.h
+  status: modified
+  sha256: 1cd730e661e117ab1435494d2dfcec2409e38183c0822db629042d3fb4ebd32f
+- path: src/intel/vulkan/genX_cmd_buffer.c
+  status: modified
+  sha256: 0f12d7a14c11dd699299d923c012d6390be30864504b59cb82e46d287d9df09e
+- path: src/intel/vulkan/genX_gpu_memcpy.c
+  status: modified
+  sha256: bf859af12bb1711b8ad4c2cfeb7b0d064ee352c3581c0a7da8f88a838483ac03
+- path: src/intel/vulkan/genX_init_state.c
+  status: modified
+  sha256: 14a49db35e61a96366ef3646a9e3446e57bca3a34619b632334f6e39897f0b18
+omitted_files:
+- path: src/intel/compiler/brw_disasm.c
+  reason: the file header carries its own permission notice (Copyright 2008 Keith Packard, an HPND-style notice), not the MIT text the ledger states

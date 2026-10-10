@@ -1,0 +1,1940 @@
+diff --git a/src/nouveau/compiler/nak/builder.rs b/src/nouveau/compiler/nak/builder.rs
+--- a/src/nouveau/compiler/nak/builder.rs
++++ b/src/nouveau/compiler/nak/builder.rs
+@@ -217,6 +217,31 @@ pub trait SSABuilder: Builder {
+         dst
+     }
+ 
++    fn hadd2(&mut self, x: Src, y: Src) -> SSARef {
++        let dst = self.alloc_ssa(RegFile::GPR, 1);
++        self.push_op(OpHAdd2 {
++            dst: dst.into(),
++            srcs: [x, y],
++            saturate: false,
++            ftz: false,
++            f32: false,
++        });
++        dst
++    }
++
++    fn hset2(&mut self, cmp_op: FloatCmpOp, x: Src, y: Src) -> SSARef {
++        let dst = self.alloc_ssa(RegFile::GPR, 1);
++        self.push_op(OpHSet2 {
++            dst: dst.into(),
++            set_op: PredSetOp::And,
++            cmp_op: cmp_op,
++            srcs: [x, y],
++            ftz: false,
++            accum: SrcRef::True.into(),
++        });
++        dst
++    }
++
+     fn dsetp(&mut self, cmp_op: FloatCmpOp, x: Src, y: Src) -> SSARef {
+         let dst = self.alloc_ssa(RegFile::Pred, 1);
+         self.push_op(OpDSetP {
+diff --git a/src/nouveau/compiler/nak/encode_sm70.rs b/src/nouveau/compiler/nak/encode_sm70.rs
+--- a/src/nouveau/compiler/nak/encode_sm70.rs
++++ b/src/nouveau/compiler/nak/encode_sm70.rs
+@@ -11,12 +11,14 @@ struct ALURegRef {
+     pub reg: RegRef,
+     pub abs: bool,
+     pub neg: bool,
++    pub swizzle: SrcSwizzle,
+ }
+ 
+ struct ALUCBufRef {
+     pub cb: CBufRef,
+     pub abs: bool,
+     pub neg: bool,
++    pub swizzle: SrcSwizzle,
+ }
+ 
+ enum ALUSrc {
+@@ -72,6 +74,7 @@ impl ALUSrc {
+                     reg: reg,
+                     abs: src_mod_has_abs(src.src_mod),
+                     neg: src_mod_has_neg(src.src_mod),
++                    swizzle: src.src_swizzle,
+                 };
+                 match reg.file() {
+                     RegFile::GPR => ALUSrc::Reg(alu_ref),
+@@ -81,6 +84,7 @@ impl ALUSrc {
+             }
+             SrcRef::Imm32(i) => {
+                 assert!(src.src_mod.is_none());
++                assert!(src.src_swizzle.is_none());
+                 ALUSrc::Imm32(i)
+             }
+             SrcRef::CBuf(cb) => {
+@@ -88,6 +92,7 @@ impl ALUSrc {
+                     cb: cb,
+                     abs: src_mod_has_abs(src.src_mod),
+                     neg: src_mod_has_neg(src.src_mod),
++                    swizzle: src.src_swizzle,
+                 };
+                 ALUSrc::CBuf(alu_ref)
+             }
+@@ -265,16 +270,43 @@ impl SM70Instr {
+         self.set_bar_reg(range, *src.src_ref.as_reg().unwrap());
+     }
+ 
++    fn set_swizzle(&mut self, range: Range<usize>, swizzle: SrcSwizzle) {
++        assert!(range.len() == 2);
++
++        self.set_field(
++            range,
++            match swizzle {
++                SrcSwizzle::None => 0x00_u8,
++                SrcSwizzle::Xx => 0x02_u8,
++                SrcSwizzle::Yy => 0x03_u8,
++            },
++        );
++    }
++
+     fn set_alu_reg(
+         &mut self,
+         range: Range<usize>,
+         abs_bit: usize,
+         neg_bit: usize,
++        swizzle_range: Range<usize>,
++        is_fp16_alu: bool,
++        has_mod: bool,
+         reg: &ALURegRef,
+     ) {
+         self.set_reg(range, reg.reg);
+-        self.set_bit(abs_bit, reg.abs);
+-        self.set_bit(neg_bit, reg.neg);
++
++        if has_mod {
++            self.set_bit(abs_bit, reg.abs);
++            self.set_bit(neg_bit, reg.neg);
++        } else {
++            assert!(!reg.abs && !reg.neg);
++        }
++
++        if is_fp16_alu {
++            self.set_swizzle(swizzle_range, reg.swizzle);
++        } else {
++            assert!(reg.swizzle == SrcSwizzle::None);
++        }
+     }
+ 
+     fn set_alu_ureg(
+@@ -282,11 +314,25 @@ impl SM70Instr {
+         range: Range<usize>,
+         abs_bit: usize,
+         neg_bit: usize,
++        swizzle_range: Range<usize>,
++        is_fp16_alu: bool,
++        has_mod: bool,
+         reg: &ALURegRef,
+     ) {
+         self.set_ureg(range, reg.reg);
+-        self.set_bit(abs_bit, reg.abs);
+-        self.set_bit(neg_bit, reg.neg);
++
++        if has_mod {
++            self.set_bit(abs_bit, reg.abs);
++            self.set_bit(neg_bit, reg.neg);
++        } else {
++            assert!(!reg.abs && !reg.neg);
++        }
++
++        if is_fp16_alu {
++            self.set_swizzle(swizzle_range, reg.swizzle);
++        } else {
++            assert!(reg.swizzle == SrcSwizzle::None);
++        }
+     }
+ 
+     fn set_alu_cb(
+@@ -294,11 +340,25 @@ impl SM70Instr {
+         range: Range<usize>,
+         abs_bit: usize,
+         neg_bit: usize,
++        swizzle_range: Range<usize>,
++        is_fp16_alu: bool,
++        has_mod: bool,
+         cb: &ALUCBufRef,
+     ) {
+         self.set_src_cb(range, &cb.cb);
+-        self.set_bit(abs_bit, cb.abs);
+-        self.set_bit(neg_bit, cb.neg);
++
++        if has_mod {
++            self.set_bit(abs_bit, cb.abs);
++            self.set_bit(neg_bit, cb.neg);
++        } else {
++            assert!(!cb.abs && !cb.neg);
++        }
++
++        if is_fp16_alu {
++            self.set_swizzle(swizzle_range, cb.swizzle);
++        } else {
++            assert!(cb.swizzle == SrcSwizzle::None);
++        }
+     }
+ 
+     fn set_alu_reg_src(
+@@ -306,40 +366,82 @@ impl SM70Instr {
+         range: Range<usize>,
+         abs_bit: usize,
+         neg_bit: usize,
++        swizzle_range: Range<usize>,
++        is_fp16_alu: bool,
++        has_mod: bool,
+         src: &ALUSrc,
+     ) {
+         match src {
+             ALUSrc::None => (),
+-            ALUSrc::Reg(reg) => self.set_alu_reg(range, abs_bit, neg_bit, reg),
+-            _ => panic!("Invalid ALU src0"),
++            ALUSrc::Reg(reg) => self.set_alu_reg(
++                range,
++                abs_bit,
++                neg_bit,
++                swizzle_range,
++                is_fp16_alu,
++                has_mod,
++                reg,
++            ),
++            _ => panic!("Invalid ALU src"),
+         }
+     }
+ 
+-    fn encode_alu(
++    fn encode_alu_base(
+         &mut self,
+         opcode: u16,
+         dst: Option<Dst>,
+         src0: ALUSrc,
+         src1: ALUSrc,
+         src2: ALUSrc,
++        is_fp16_alu: bool,
+     ) {
+         if let Some(dst) = dst {
+             self.set_dst(dst);
+         }
+ 
+-        self.set_alu_reg_src(24..32, 73, 72, &src0);
++        // For opcodes like OpHAdd, both sources support full modifiers and swizzle,
++        // even when we use a form where the two sources go in src0 and src2.
++        // For OpHFma, however, which uses both src1 and src2, only src1 supports modifiers.
++        let src2_has_mod = !is_fp16_alu || matches!(src1, ALUSrc::None);
++
++        self.set_alu_reg_src(24..32, 73, 72, 74..76, is_fp16_alu, true, &src0);
+ 
+         let form = match &src2 {
+             ALUSrc::None | ALUSrc::Reg(_) => {
+-                self.set_alu_reg_src(64..72, 74, 75, &src2);
++                self.set_alu_reg_src(
++                    64..72,
++                    74,
++                    75,
++                    81..83,
++                    is_fp16_alu,
++                    src2_has_mod,
++                    &src2,
++                );
++
+                 match &src1 {
+                     ALUSrc::None => 1_u8, // form
+                     ALUSrc::Reg(reg1) => {
+-                        self.set_alu_reg(32..40, 62, 63, reg1);
++                        self.set_alu_reg(
++                            32..40,
++                            62,
++                            63,
++                            60..62,
++                            is_fp16_alu,
++                            true,
++                            reg1,
++                        );
+                         1_u8 // form
+                     }
+                     ALUSrc::UReg(reg1) => {
+-                        self.set_alu_ureg(32..40, 62, 63, reg1);
++                        self.set_alu_ureg(
++                            32..40,
++                            62,
++                            63,
++                            60..62,
++                            is_fp16_alu,
++                            true,
++                            reg1,
++                        );
+                         6_u8 // form
+                     }
+                     ALUSrc::Imm32(imm) => {
+@@ -347,25 +449,73 @@ impl SM70Instr {
+                         4_u8 // form
+                     }
+                     ALUSrc::CBuf(cb) => {
+-                        self.set_alu_cb(38..59, 62, 63, cb);
++                        self.set_alu_cb(
++                            38..59,
++                            62,
++                            63,
++                            60..62,
++                            is_fp16_alu,
++                            true,
++                            cb,
++                        );
+                         5_u8 // form
+                     }
+                 }
+             }
+             ALUSrc::UReg(reg2) => {
+-                self.set_alu_ureg(32..40, 62, 63, reg2);
+-                self.set_alu_reg_src(64..72, 74, 75, &src1);
++                self.set_alu_ureg(
++                    32..40,
++                    62,
++                    63,
++                    60..62,
++                    is_fp16_alu,
++                    src2_has_mod,
++                    reg2,
++                );
++                self.set_alu_reg_src(
++                    64..72,
++                    74,
++                    75,
++                    81..83,
++                    is_fp16_alu,
++                    true,
++                    &src1,
++                );
+                 7_u8 // form
+             }
+             ALUSrc::Imm32(imm) => {
+                 self.set_src_imm(32..64, imm);
+-                self.set_alu_reg_src(64..72, 74, 75, &src1);
++                self.set_alu_reg_src(
++                    64..72,
++                    74,
++                    75,
++                    81..83,
++                    is_fp16_alu,
++                    true,
++                    &src1,
++                );
+                 2_u8 // form
+             }
+             ALUSrc::CBuf(cb) => {
+                 // TODO set_src_cx
+-                self.set_alu_cb(38..59, 62, 63, cb);
+-                self.set_alu_reg_src(64..72, 74, 75, &src1);
++                self.set_alu_cb(
++                    38..59,
++                    62,
++                    63,
++                    60..62,
++                    is_fp16_alu,
++                    src2_has_mod,
++                    cb,
++                );
++                self.set_alu_reg_src(
++                    64..72,
++                    74,
++                    75,
++                    81..83,
++                    is_fp16_alu,
++                    true,
++                    &src1,
++                );
+                 3_u8 // form
+             }
+         };
+@@ -374,6 +524,28 @@ impl SM70Instr {
+         self.set_field(9..12, form);
+     }
+ 
++    fn encode_alu(
++        &mut self,
++        opcode: u16,
++        dst: Option<Dst>,
++        src0: ALUSrc,
++        src1: ALUSrc,
++        src2: ALUSrc,
++    ) {
++        self.encode_alu_base(opcode, dst, src0, src1, src2, false);
++    }
++
++    fn encode_fp16_alu(
++        &mut self,
++        opcode: u16,
++        dst: Option<Dst>,
++        src0: ALUSrc,
++        src1: ALUSrc,
++        src2: ALUSrc,
++    ) {
++        self.encode_alu_base(opcode, dst, src0, src1, src2, true);
++    }
++
+     fn set_instr_deps(&mut self, deps: &InstrDeps) {
+         self.set_field(105..109, deps.delay);
+         self.set_bit(109, deps.yld);
+@@ -643,6 +815,159 @@ impl SM70Instr {
+         self.set_pred_src(87..90, 90, op.accum);
+     }
+ 
++    fn encode_hadd2(&mut self, op: &OpHAdd2) {
++        match op.srcs[1].src_ref {
++            SrcRef::Reg(_) | SrcRef::Zero => {
++                self.encode_fp16_alu(
++                    0x030,
++                    Some(op.dst),
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::from_src(&op.srcs[1]),
++                    ALUSrc::None,
++                );
++            }
++            _ => {
++                self.encode_fp16_alu(
++                    0x030,
++                    Some(op.dst),
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::None,
++                    ALUSrc::from_src(&op.srcs[1]),
++                );
++            }
++        }
++
++        self.set_bit(77, op.saturate);
++        self.set_bit(78, op.f32);
++        self.set_bit(80, op.ftz);
++        self.set_bit(85, false); // .BF16_V2 (SM90+)
++    }
++
++    fn encode_hfma2(&mut self, op: &OpHFma2) {
++        // HFMA2 doesn't have fneg and fabs on SRC2.
++        assert!(op.srcs[2].src_mod.is_none());
++
++        self.encode_fp16_alu(
++            0x031,
++            Some(op.dst),
++            ALUSrc::from_src(&op.srcs[0]),
++            ALUSrc::from_src(&op.srcs[1]),
++            ALUSrc::from_src(&op.srcs[2]),
++        );
++
++        self.set_bit(76, op.dnz);
++        self.set_bit(77, op.saturate);
++        self.set_bit(78, op.f32);
++        self.set_bit(79, false); // .RELU (SM86+)
++        self.set_bit(80, op.ftz);
++        self.set_bit(85, false); // .BF16_V2 (SM86+)
++    }
++
++    fn encode_hmul2(&mut self, op: &OpHMul2) {
++        self.encode_fp16_alu(
++            0x032,
++            Some(op.dst),
++            ALUSrc::from_src(&op.srcs[0]),
++            ALUSrc::from_src(&op.srcs[1]),
++            ALUSrc::None,
++        );
++
++        self.set_bit(76, op.dnz);
++        self.set_bit(77, op.saturate);
++        self.set_bit(78, false); // .F32 (SM70-SM75)
++        self.set_bit(79, false); // .RELU (SM86+)
++        self.set_bit(80, op.ftz);
++        self.set_bit(85, false); // .BF16_V2 (SM90+)
++    }
++
++    fn encode_hset2(&mut self, op: &OpHSet2) {
++        match op.srcs[1].src_ref {
++            SrcRef::Reg(_) | SrcRef::Zero => {
++                self.encode_fp16_alu(
++                    0x033,
++                    Some(op.dst),
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::from_src(&op.srcs[1]),
++                    ALUSrc::None,
++                );
++            }
++            _ => {
++                self.encode_fp16_alu(
++                    0x033,
++                    Some(op.dst),
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::None,
++                    ALUSrc::from_src(&op.srcs[1]),
++                );
++            }
++        }
++
++        self.set_bit(65, false); // .BF16_V2 (SM90+)
++        self.set_pred_set_op(69..71, op.set_op);
++
++        // This differentiate between integer and fp16 output
++        self.set_bit(71, true); // .BF
++        self.set_float_cmp_op(76..80, op.cmp_op);
++        self.set_bit(80, op.ftz);
++
++        self.set_pred_src(87..90, 90, op.accum);
++    }
++
++    fn encode_hsetp2(&mut self, op: &OpHSetP2) {
++        match op.srcs[1].src_ref {
++            SrcRef::Reg(_) | SrcRef::Zero => {
++                self.encode_fp16_alu(
++                    0x034,
++                    None,
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::from_src(&op.srcs[1]),
++                    ALUSrc::None,
++                );
++            }
++            _ => {
++                self.encode_fp16_alu(
++                    0x034,
++                    None,
++                    ALUSrc::from_src(&op.srcs[0]),
++                    ALUSrc::None,
++                    ALUSrc::from_src(&op.srcs[1]),
++                );
++            }
++        }
++
++        self.set_bit(65, false); // .BF16_V2 (SM90+)
++        self.set_pred_set_op(69..71, op.set_op);
++        self.set_bit(71, op.horizontal); // .H_AND
++        self.set_float_cmp_op(76..80, op.cmp_op);
++        self.set_bit(80, op.ftz);
++
++        self.set_pred_dst(81..84, op.dsts[0]);
++        self.set_pred_dst(84..87, op.dsts[1]);
++
++        self.set_pred_src(87..90, 90, op.accum);
++    }
++
++    fn encode_hmnmx2(&mut self, op: &OpHMnMx2) {
++        assert!(self.sm >= 80);
++
++        self.encode_fp16_alu(
++            0x040,
++            Some(op.dst),
++            ALUSrc::from_src(&op.srcs[0]),
++            ALUSrc::from_src(&op.srcs[1]),
++            ALUSrc::None,
++        );
++
++        // This differentiate between integer and fp16 output
++        self.set_bit(78, false); // .F32 (SM86)
++        self.set_bit(80, op.ftz);
++        self.set_bit(81, false); // .NAN
++        self.set_bit(82, false); // .XORSIGN
++        self.set_bit(85, false); // .BF16_V2
++
++        self.set_pred_src(87..90, 90, op.min);
++    }
++
+     fn encode_bmsk(&mut self, op: &OpBMsk) {
+         self.encode_alu(
+             0x01b,
+@@ -2014,6 +2339,12 @@ impl SM70Instr {
+             Op::DFma(op) => si.encode_dfma(op),
+             Op::DMul(op) => si.encode_dmul(op),
+             Op::DSetP(op) => si.encode_dsetp(op),
++            Op::HAdd2(op) => si.encode_hadd2(op),
++            Op::HFma2(op) => si.encode_hfma2(op),
++            Op::HMul2(op) => si.encode_hmul2(op),
++            Op::HSet2(op) => si.encode_hset2(op),
++            Op::HSetP2(op) => si.encode_hsetp2(op),
++            Op::HMnMx2(op) => si.encode_hmnmx2(op),
+             Op::MuFu(op) => si.encode_mufu(op),
+             Op::BMsk(op) => si.encode_bmsk(op),
+             Op::BRev(op) => si.encode_brev(op),
+diff --git a/src/nouveau/compiler/nak/from_nir.rs b/src/nouveau/compiler/nak/from_nir.rs
+--- a/src/nouveau/compiler/nak/from_nir.rs
++++ b/src/nouveau/compiler/nak/from_nir.rs
+@@ -464,33 +464,38 @@ impl<'a> ShaderFromNir<'a> {
+                     let s = usize::from(alu_src.swizzle[0]);
+                     srcs.push(ssa[s].into());
+                 }
+-                8 => {
+-                    assert!(comps <= 4);
+-                    let s = alu_src.swizzle[0];
+-                    let dw = ssa[usize::from(s / 4)];
+-
+-                    let mut prmt = [4_u8; 4];
+-                    for c in 0..comps {
+-                        let cs = alu_src.swizzle[usize::from(c)];
+-                        assert!(s / 4 == cs / 4);
+-                        prmt[usize::from(c)] = cs;
++                8 | 16 => {
++                    let num_bytes = usize::from(comps * (bit_size / 8));
++                    assert!(num_bytes <= 4);
++
++                    let mut bytes = [0_u8; 4];
++                    for c in 0..usize::from(comps) {
++                        let cs = alu_src.swizzle[c];
++                        if bit_size == 8 {
++                            bytes[c] = cs;
++                        } else {
++                            bytes[c * 2 + 0] = cs * 2 + 0;
++                            bytes[c * 2 + 1] = cs * 2 + 1;
++                        }
+                     }
+-                    srcs.push(b.prmt(dw.into(), 0.into(), prmt).into());
+-                }
+-                16 => {
+-                    assert!(comps <= 2);
+-                    let s = alu_src.swizzle[0];
+-                    let dw = ssa[usize::from(s / 2)];
+ 
++                    let mut prmt_srcs = [Src::new_zero(); 4];
+                     let mut prmt = [0_u8; 4];
+-                    for c in 0..comps {
+-                        let cs = alu_src.swizzle[usize::from(c)];
+-                        assert!(s / 2 == cs / 2);
+-                        prmt[usize::from(c) * 2 + 0] = cs * 2 + 0;
+-                        prmt[usize::from(c) * 2 + 1] = cs * 2 + 1;
++                    for b in 0..num_bytes {
++                        for (ds, s) in prmt_srcs.iter_mut().enumerate() {
++                            let dw = ssa[usize::from(bytes[b] / 4)];
++                            if s.is_zero() {
++                                *s = dw.into();
++                            } else if *s != Src::from(dw) {
++                                continue;
++                            }
++                            prmt[usize::from(b)] =
++                                (ds as u8) * 4 + (bytes[b] % 4);
++                            break;
++                        }
+                     }
+-                    // TODO: Some ops can handle swizzles
+-                    srcs.push(b.prmt(dw.into(), 0.into(), prmt).into());
++
++                    srcs.push(b.prmt4(prmt_srcs, prmt).into());
+                 }
+                 32 => {
+                     assert!(comps == 1);
+@@ -506,6 +511,16 @@ impl<'a> ShaderFromNir<'a> {
+             }
+         }
+ 
++        // Restricts an F16v2 source to just x if the ALU op is single-component. This
++        // must only be called for per-component sources (see nir_op_info::output_sizes
++        // for more details).
++        let restrict_f16v2_src = |mut src: Src| {
++            if alu.def.num_components == 1 {
++                src.src_swizzle = SrcSwizzle::Xx;
++            }
++            src
++        };
++
+         let dst: SSARef = match alu.op {
+             nir_op_b2b1 => {
+                 assert!(alu.get_src(0).bit_size() == 32);
+@@ -519,6 +534,7 @@ impl<'a> ShaderFromNir<'a> {
+                 let hi = b.copy(0.into());
+                 [lo[0], hi[0]].into()
+             }
++            nir_op_b2f16 => b.sel(srcs[0].bnot(), 0.into(), 0x3c00.into()),
+             nir_op_b2f32 => {
+                 b.sel(srcs[0].bnot(), 0.0_f32.into(), 1.0_f32.into())
+             }
+@@ -683,7 +699,7 @@ impl<'a> ShaderFromNir<'a> {
+             }
+             nir_op_fabs | nir_op_fadd | nir_op_fneg => {
+                 let (x, y) = match alu.op {
+-                    nir_op_fabs => (srcs[0].fabs(), 0.0_f32.into()),
++                    nir_op_fabs => (srcs[0].fabs(), 0.into()),
+                     nir_op_fadd => (srcs[0], srcs[1]),
+                     nir_op_fneg => (Src::new_zero().fneg(), srcs[0].fneg()),
+                     _ => panic!("Unhandled case"),
+@@ -706,6 +722,19 @@ impl<'a> ShaderFromNir<'a> {
+                         rnd_mode: self.float_ctl[ftype].rnd_mode,
+                         ftz: self.float_ctl[ftype].ftz,
+                     });
++                } else if alu.def.bit_size() == 16 {
++                    assert!(
++                        self.float_ctl[ftype].rnd_mode == FRndMode::NearestEven
++                    );
++
++                    dst = b.alloc_ssa(RegFile::GPR, 1);
++                    b.push_op(OpHAdd2 {
++                        dst: dst.into(),
++                        srcs: [restrict_f16v2_src(x), restrict_f16v2_src(y)],
++                        saturate: self.try_saturate_alu_dst(&alu.def),
++                        ftz: self.float_ctl[ftype].ftz,
++                        f32: false,
++                    });
+                 } else {
+                     panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+@@ -713,7 +742,6 @@ impl<'a> ShaderFromNir<'a> {
+             }
+             nir_op_fceil | nir_op_ffloor | nir_op_fround_even
+             | nir_op_ftrunc => {
+-                assert!(alu.def.bit_size() == 32);
+                 let dst = b.alloc_ssa(RegFile::GPR, 1);
+                 let ty = FloatType::from_bits(alu.def.bit_size().into());
+                 let rnd_mode = match alu.op {
+@@ -725,6 +753,9 @@ impl<'a> ShaderFromNir<'a> {
+                 };
+                 let ftz = self.float_ctl[ty].ftz;
+                 if b.sm() >= 70 {
++                    assert!(
++                        alu.def.bit_size() == 32 || alu.def.bit_size() == 16
++                    );
+                     b.push_op(OpFRnd {
+                         dst: dst.into(),
+                         src: srcs[0],
+@@ -734,6 +765,7 @@ impl<'a> ShaderFromNir<'a> {
+                         ftz,
+                     });
+                 } else {
++                    assert!(alu.def.bit_size() == 32);
+                     b.push_op(OpF2F {
+                         dst: dst.into(),
+                         src: srcs[0],
+@@ -759,8 +791,9 @@ impl<'a> ShaderFromNir<'a> {
+                     _ => panic!("Usupported float comparison"),
+                 };
+ 
+-                let dst = b.alloc_ssa(RegFile::Pred, 1);
++                let dst = b.alloc_ssa(RegFile::Pred, alu.def.num_components);
+                 if alu.get_src(0).bit_size() == 64 {
++                    assert!(alu.def.num_components == 1);
+                     b.push_op(OpDSetP {
+                         dst: dst.into(),
+                         set_op: PredSetOp::And,
+@@ -769,6 +802,7 @@ impl<'a> ShaderFromNir<'a> {
+                         accum: SrcRef::True.into(),
+                     });
+                 } else if alu.get_src(0).bit_size() == 32 {
++                    assert!(alu.def.num_components == 1);
+                     b.push_op(OpFSetP {
+                         dst: dst.into(),
+                         set_op: PredSetOp::And,
+@@ -777,6 +811,30 @@ impl<'a> ShaderFromNir<'a> {
+                         accum: SrcRef::True.into(),
+                         ftz: self.float_ctl[src_type].ftz,
+                     });
++                } else if alu.get_src(0).bit_size() == 16 {
++                    assert!(
++                        alu.def.num_components == 1
++                            || alu.def.num_components == 2
++                    );
++
++                    let dsts = if alu.def.num_components == 2 {
++                        [dst[0].into(), dst[1].into()]
++                    } else {
++                        [dst[0].into(), Dst::None]
++                    };
++
++                    b.push_op(OpHSetP2 {
++                        dsts,
++                        set_op: PredSetOp::And,
++                        cmp_op: cmp_op,
++                        srcs: [
++                            restrict_f16v2_src(srcs[0]),
++                            restrict_f16v2_src(srcs[1]),
++                        ],
++                        accum: SrcRef::True.into(),
++                        ftz: self.float_ctl[src_type].ftz,
++                        horizontal: false,
++                    });
+                 } else {
+                     panic!(
+                         "Unsupported float type: f{}",
+@@ -809,6 +867,24 @@ impl<'a> ShaderFromNir<'a> {
+                         ftz: self.float_ctl[ftype].ftz,
+                         dnz: false,
+                     });
++                } else if alu.def.bit_size() == 16 {
++                    assert!(
++                        self.float_ctl[ftype].rnd_mode == FRndMode::NearestEven
++                    );
++
++                    dst = b.alloc_ssa(RegFile::GPR, 1);
++                    b.push_op(OpHFma2 {
++                        dst: dst.into(),
++                        srcs: [
++                            restrict_f16v2_src(srcs[0]),
++                            restrict_f16v2_src(srcs[1]),
++                            restrict_f16v2_src(srcs[2]),
++                        ],
++                        saturate: self.try_saturate_alu_dst(&alu.def),
++                        ftz: self.float_ctl[ftype].ftz,
++                        dnz: false,
++                        f32: false,
++                    });
+                 } else {
+                     panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+@@ -852,6 +928,17 @@ impl<'a> ShaderFromNir<'a> {
+                         min: (alu.op == nir_op_fmin).into(),
+                         ftz: self.float_ctl.fp32.ftz,
+                     });
++                } else if alu.def.bit_size() == 16 {
++                    dst = b.alloc_ssa(RegFile::GPR, 1);
++                    b.push_op(OpHMnMx2 {
++                        dst: dst.into(),
++                        srcs: [
++                            restrict_f16v2_src(srcs[0]),
++                            restrict_f16v2_src(srcs[1]),
++                        ],
++                        min: (alu.op == nir_op_fmin).into(),
++                        ftz: self.float_ctl.fp16.ftz,
++                    });
+                 } else {
+                     panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+@@ -878,6 +965,22 @@ impl<'a> ShaderFromNir<'a> {
+                         ftz: self.float_ctl[ftype].ftz,
+                         dnz: false,
+                     });
++                } else if alu.def.bit_size() == 16 {
++                    assert!(
++                        self.float_ctl[ftype].rnd_mode == FRndMode::NearestEven
++                    );
++
++                    dst = b.alloc_ssa(RegFile::GPR, 1);
++                    b.push_op(OpHMul2 {
++                        dst: dst.into(),
++                        srcs: [
++                            restrict_f16v2_src(srcs[0]),
++                            restrict_f16v2_src(srcs[1]),
++                        ],
++                        saturate: self.try_saturate_alu_dst(&alu.def),
++                        ftz: self.float_ctl[ftype].ftz,
++                        dnz: false,
++                    });
+                 } else {
+                     panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+@@ -935,11 +1038,11 @@ impl<'a> ShaderFromNir<'a> {
+                 b.mufu(MuFuOp::Rsq, srcs[0])
+             }
+             nir_op_fsat => {
+-                assert!(alu.def.bit_size() == 32);
++                let ftype = FloatType::from_bits(alu.def.bit_size().into());
++
+                 if self.alu_src_is_saturated(&alu.srcs_as_slice()[0]) {
+                     b.copy(srcs[0])
+-                } else {
+-                    let ftype = FloatType::from_bits(alu.def.bit_size().into());
++                } else if alu.def.bit_size() == 32 {
+                     let dst = b.alloc_ssa(RegFile::GPR, 1);
+                     b.push_op(OpFAdd {
+                         dst: dst.into(),
+@@ -949,6 +1052,22 @@ impl<'a> ShaderFromNir<'a> {
+                         ftz: self.float_ctl[ftype].ftz,
+                     });
+                     dst
++                } else if alu.def.bit_size() == 16 {
++                    assert!(
++                        self.float_ctl[ftype].rnd_mode == FRndMode::NearestEven
++                    );
++
++                    let dst = b.alloc_ssa(RegFile::GPR, 1);
++                    b.push_op(OpHAdd2 {
++                        dst: dst.into(),
++                        srcs: [restrict_f16v2_src(srcs[0]), 0.into()],
++                        saturate: true,
++                        ftz: self.float_ctl[ftype].ftz,
++                        f32: false,
++                    });
++                    dst
++                } else {
++                    panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+             }
+             nir_op_fsign => {
+@@ -963,6 +1082,17 @@ impl<'a> ShaderFromNir<'a> {
+                     let lz = b.fset(FloatCmpOp::OrdLt, srcs[0], 0.into());
+                     let gz = b.fset(FloatCmpOp::OrdGt, srcs[0], 0.into());
+                     b.fadd(gz.into(), Src::from(lz).fneg())
++                } else if alu.def.bit_size() == 16 {
++                    let x = restrict_f16v2_src(srcs[0]);
++
++                    let lz = restrict_f16v2_src(
++                        b.hset2(FloatCmpOp::OrdLt, x, 0.into()).into(),
++                    );
++                    let gz = restrict_f16v2_src(
++                        b.hset2(FloatCmpOp::OrdGt, x, 0.into()).into(),
++                    );
++
++                    b.hadd2(gz, lz.fneg())
+                 } else {
+                     panic!("Unsupported float type: f{}", alu.def.bit_size());
+                 }
+diff --git a/src/nouveau/compiler/nak/ir.rs b/src/nouveau/compiler/nak/ir.rs
+--- a/src/nouveau/compiler/nak/ir.rs
++++ b/src/nouveau/compiler/nak/ir.rs
+@@ -1036,6 +1036,8 @@ pub enum SrcType {
+     SSA,
+     GPR,
+     ALU,
++    F16,
++    F16v2,
+     F32,
+     F64,
+     I32,
+@@ -1044,10 +1046,35 @@ pub enum SrcType {
+     Bar,
+ }
+ 
++#[derive(Clone, Copy, PartialEq)]
++#[allow(dead_code)]
++pub enum SrcSwizzle {
++    None,
++    Xx,
++    Yy,
++}
++
++impl SrcSwizzle {
++    pub fn is_none(&self) -> bool {
++        matches!(self, SrcSwizzle::None)
++    }
++}
++
++impl fmt::Display for SrcSwizzle {
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        match self {
++            SrcSwizzle::None => Ok(()),
++            SrcSwizzle::Xx => write!(f, ".xx"),
++            SrcSwizzle::Yy => write!(f, ".yy"),
++        }
++    }
++}
++
+ #[derive(Clone, Copy, PartialEq)]
+ pub struct Src {
+     pub src_ref: SrcRef,
+     pub src_mod: SrcMod,
++    pub src_swizzle: SrcSwizzle,
+ }
+ 
+ impl Src {
+@@ -1067,6 +1094,7 @@ impl Src {
+         Src {
+             src_ref: self.src_ref,
+             src_mod: self.src_mod.fabs(),
++            src_swizzle: self.src_swizzle,
+         }
+     }
+ 
+@@ -1074,6 +1102,7 @@ impl Src {
+         Src {
+             src_ref: self.src_ref,
+             src_mod: self.src_mod.fneg(),
++            src_swizzle: self.src_swizzle,
+         }
+     }
+ 
+@@ -1081,6 +1110,7 @@ impl Src {
+         Src {
+             src_ref: self.src_ref,
+             src_mod: self.src_mod.ineg(),
++            src_swizzle: self.src_swizzle,
+         }
+     }
+ 
+@@ -1088,6 +1118,75 @@ impl Src {
+         Src {
+             src_ref: self.src_ref,
+             src_mod: self.src_mod.bnot(),
++            src_swizzle: self.src_swizzle,
++        }
++    }
++
++    pub fn fold_imm(&self, src_type: SrcType) -> Src {
++        let SrcRef::Imm32(mut u) = self.src_ref else {
++            return *self;
++        };
++
++        if self.src_mod.is_none() && self.src_swizzle.is_none() {
++            return *self;
++        }
++
++        assert!(src_type == SrcType::F16v2 || self.src_swizzle.is_none());
++
++        u = match src_type {
++            SrcType::F16 => {
++                let low = u & 0xFFFF;
++
++                match self.src_mod {
++                    SrcMod::None => low,
++                    SrcMod::FAbs => low & !(1_u32 << 15),
++                    SrcMod::FNeg => low ^ (1_u32 << 15),
++                    SrcMod::FNegAbs => low | (1_u32 << 15),
++                    _ => panic!("Not a float source modifier"),
++                }
++            }
++            SrcType::F16v2 => {
++                let u = match self.src_swizzle {
++                    SrcSwizzle::None => u,
++                    SrcSwizzle::Xx => (u << 16) | (u & 0xffff),
++                    SrcSwizzle::Yy => (u & 0xffff0000) | (u >> 16),
++                };
++
++                match self.src_mod {
++                    SrcMod::None => u,
++                    SrcMod::FAbs => u & 0x7FFF7FFF,
++                    SrcMod::FNeg => u ^ 0x80008000,
++                    SrcMod::FNegAbs => u | 0x80008000,
++                    _ => panic!("Not a float source modifier"),
++                }
++            }
++            SrcType::F32 | SrcType::F64 => match self.src_mod {
++                SrcMod::None => u,
++                SrcMod::FAbs => u & !(1_u32 << 31),
++                SrcMod::FNeg => u ^ (1_u32 << 31),
++                SrcMod::FNegAbs => u | (1_u32 << 31),
++                _ => panic!("Not a float source modifier"),
++            },
++            SrcType::I32 => match self.src_mod {
++                SrcMod::None => u,
++                SrcMod::INeg => -(u as i32) as u32,
++                _ => panic!("Not an integer source modifier"),
++            },
++            SrcType::B32 => match self.src_mod {
++                SrcMod::None => u,
++                SrcMod::BNot => !u,
++                _ => panic!("Not a bitwise source modifier"),
++            },
++            _ => {
++                assert!(self.src_mod.is_none());
++                u
++            }
++        };
++
++        Src {
++            src_mod: SrcMod::None,
++            src_ref: u.into(),
++            src_swizzle: SrcSwizzle::None,
+         }
+     }
+ 
+@@ -1193,13 +1292,10 @@ impl Src {
+     }
+ 
+     pub fn is_fneg_zero(&self, src_type: SrcType) -> bool {
+-        match self.src_ref {
+-            SrcRef::Zero | SrcRef::Imm32(0) => {
+-                matches!(self.src_mod, SrcMod::FNeg | SrcMod::FNegAbs)
+-            }
+-            SrcRef::Imm32(0x80000000) => {
+-                src_type == SrcType::F32 && self.src_mod.is_none()
+-            }
++        match self.fold_imm(src_type).src_ref {
++            SrcRef::Imm32(0x00008000) => src_type == SrcType::F16,
++            SrcRef::Imm32(0x80000000) => src_type == SrcType::F32,
++            SrcRef::Imm32(0x80008000) => src_type == SrcType::F16v2,
+             _ => false,
+         }
+     }
+@@ -1225,7 +1321,7 @@ impl Src {
+                 )
+             }
+             SrcType::ALU => self.src_mod.is_none() && self.src_ref.is_alu(),
+-            SrcType::F32 | SrcType::F64 => {
++            SrcType::F16 | SrcType::F32 | SrcType::F64 | SrcType::F16v2 => {
+                 match self.src_mod {
+                     SrcMod::None
+                     | SrcMod::FAbs
+@@ -1270,6 +1366,7 @@ impl<T: Into<SrcRef>> From<T> for Src {
+         Src {
+             src_ref: value.into(),
+             src_mod: SrcMod::None,
++            src_swizzle: SrcSwizzle::None,
+         }
+     }
+ }
+@@ -1277,12 +1374,14 @@ impl<T: Into<SrcRef>> From<T> for Src {
+ impl fmt::Display for Src {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         match self.src_mod {
+-            SrcMod::None => write!(f, "{}", self.src_ref),
+-            SrcMod::FAbs => write!(f, "|{}|", self.src_ref),
+-            SrcMod::FNeg => write!(f, "-{}", self.src_ref),
+-            SrcMod::FNegAbs => write!(f, "-|{}|", self.src_ref),
+-            SrcMod::INeg => write!(f, "-{}", self.src_ref),
+-            SrcMod::BNot => write!(f, "!{}", self.src_ref),
++            SrcMod::None => write!(f, "{}{}", self.src_ref, self.src_swizzle),
++            SrcMod::FAbs => write!(f, "|{}{}|", self.src_ref, self.src_swizzle),
++            SrcMod::FNeg => write!(f, "-{}{}", self.src_ref, self.src_swizzle),
++            SrcMod::FNegAbs => {
++                write!(f, "-|{}{}|", self.src_ref, self.src_swizzle)
++            }
++            SrcMod::INeg => write!(f, "-{}{}", self.src_ref, self.src_swizzle),
++            SrcMod::BNot => write!(f, "!{}{}", self.src_ref, self.src_swizzle),
+         }
+     }
+ }
+@@ -2597,6 +2696,186 @@ impl DisplayOp for OpDSetP {
+ }
+ impl_display_for_op!(OpDSetP);
+ 
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHAdd2 {
++    pub dst: Dst,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 2],
++
++    pub saturate: bool,
++    pub ftz: bool,
++    pub f32: bool,
++}
++
++impl DisplayOp for OpHAdd2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let sat = if self.saturate { ".sat" } else { "" };
++        let f32 = if self.f32 { ".f32" } else { "" };
++        write!(f, "hadd2{sat}{f32}")?;
++        if self.ftz {
++            write!(f, ".ftz")?;
++        }
++        write!(f, " {} {}", self.srcs[0], self.srcs[1])
++    }
++}
++impl_display_for_op!(OpHAdd2);
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHSet2 {
++    pub dst: Dst,
++
++    pub set_op: PredSetOp,
++    pub cmp_op: FloatCmpOp,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 2],
++
++    #[src_type(Pred)]
++    pub accum: Src,
++
++    pub ftz: bool,
++}
++
++impl DisplayOp for OpHSet2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let ftz = if self.ftz { ".ftz" } else { "" };
++        write!(f, "hset2{}{ftz}", self.cmp_op)?;
++        if !self.set_op.is_trivial(&self.accum) {
++            write!(f, "{}", self.set_op)?;
++        }
++        write!(f, " {} {}", self.srcs[0], self.srcs[1])?;
++        if !self.set_op.is_trivial(&self.accum) {
++            write!(f, " {}", self.accum)?;
++        }
++        Ok(())
++    }
++}
++impl_display_for_op!(OpHSet2);
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHSetP2 {
++    pub dsts: [Dst; 2],
++
++    pub set_op: PredSetOp,
++    pub cmp_op: FloatCmpOp,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 2],
++
++    #[src_type(Pred)]
++    pub accum: Src,
++
++    pub ftz: bool,
++
++    // When not set, each dsts get the result of each lanes.
++    // When set, the first dst gets the result of both lanes (res0 && res1)
++    // and the second dst gets the negation !(res0 && res1)
++    // before applying the accumulator.
++    pub horizontal: bool,
++}
++
++impl DisplayOp for OpHSetP2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let ftz = if self.ftz { ".ftz" } else { "" };
++        write!(f, "hsetp2{}{ftz}", self.cmp_op)?;
++        if !self.set_op.is_trivial(&self.accum) {
++            write!(f, "{}", self.set_op)?;
++        }
++        write!(f, " {} {}", self.srcs[0], self.srcs[1])?;
++        if !self.set_op.is_trivial(&self.accum) {
++            write!(f, " {}", self.accum)?;
++        }
++        Ok(())
++    }
++}
++impl_display_for_op!(OpHSetP2);
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHMul2 {
++    pub dst: Dst,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 2],
++
++    pub saturate: bool,
++    pub ftz: bool,
++    pub dnz: bool,
++}
++
++impl DisplayOp for OpHMul2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let sat = if self.saturate { ".sat" } else { "" };
++        write!(f, "hmul2{sat}")?;
++        if self.dnz {
++            write!(f, ".dnz")?;
++        } else if self.ftz {
++            write!(f, ".ftz")?;
++        }
++        write!(f, " {} {}", self.srcs[0], self.srcs[1])
++    }
++}
++impl_display_for_op!(OpHMul2);
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHFma2 {
++    pub dst: Dst,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 3],
++
++    pub saturate: bool,
++    pub ftz: bool,
++    pub dnz: bool,
++    pub f32: bool,
++}
++
++impl DisplayOp for OpHFma2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let sat = if self.saturate { ".sat" } else { "" };
++        let f32 = if self.f32 { ".f32" } else { "" };
++        write!(f, "hfma2{sat}{f32}")?;
++        if self.dnz {
++            write!(f, ".dnz")?;
++        } else if self.ftz {
++            write!(f, ".ftz")?;
++        }
++        write!(f, " {} {} {}", self.srcs[0], self.srcs[1], self.srcs[2])
++    }
++}
++impl_display_for_op!(OpHFma2);
++
++#[repr(C)]
++#[derive(SrcsAsSlice, DstsAsSlice)]
++pub struct OpHMnMx2 {
++    pub dst: Dst,
++
++    #[src_type(F16v2)]
++    pub srcs: [Src; 2],
++
++    #[src_type(Pred)]
++    pub min: Src,
++
++    pub ftz: bool,
++}
++
++impl DisplayOp for OpHMnMx2 {
++    fn fmt_op(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        let ftz = if self.ftz { ".ftz" } else { "" };
++        write!(
++            f,
++            "hmnmx2{ftz} {} {} {}",
++            self.srcs[0], self.srcs[1], self.min
++        )
++    }
++}
++impl_display_for_op!(OpHMnMx2);
++
+ #[repr(C)]
+ #[derive(SrcsAsSlice, DstsAsSlice)]
+ pub struct OpBMsk {
+@@ -3148,7 +3427,7 @@ impl SrcsAsSlice for OpF2F {
+ 
+     fn src_types(&self) -> SrcTypeList {
+         let src_type = match self.src_type {
+-            FloatType::F16 => SrcType::ALU,
++            FloatType::F16 => SrcType::F16,
+             FloatType::F32 => SrcType::F32,
+             FloatType::F64 => SrcType::F64,
+         };
+@@ -3198,7 +3477,7 @@ impl SrcsAsSlice for OpF2I {
+ 
+     fn src_types(&self) -> SrcTypeList {
+         let src_type = match self.src_type {
+-            FloatType::F16 => SrcType::ALU,
++            FloatType::F16 => SrcType::F16,
+             FloatType::F32 => SrcType::F32,
+             FloatType::F64 => SrcType::F64,
+         };
+@@ -3318,7 +3597,7 @@ impl SrcsAsSlice for OpFRnd {
+ 
+     fn src_types(&self) -> SrcTypeList {
+         let src_type = match self.src_type {
+-            FloatType::F16 => SrcType::ALU,
++            FloatType::F16 => SrcType::F16,
+             FloatType::F32 => SrcType::F32,
+             FloatType::F64 => SrcType::F64,
+         };
+@@ -4900,6 +5179,12 @@ pub enum Op {
+     DMnMx(OpDMnMx),
+     DMul(OpDMul),
+     DSetP(OpDSetP),
++    HAdd2(OpHAdd2),
++    HFma2(OpHFma2),
++    HMul2(OpHMul2),
++    HSet2(OpHSet2),
++    HSetP2(OpHSetP2),
++    HMnMx2(OpHMnMx2),
+     BMsk(OpBMsk),
+     BRev(OpBRev),
+     Bfe(OpBfe),
+@@ -5335,6 +5620,12 @@ impl Instr {
+             | Op::FMul(_)
+             | Op::FSet(_)
+             | Op::FSetP(_)
++            | Op::HAdd2(_)
++            | Op::HFma2(_)
++            | Op::HMul2(_)
++            | Op::HSet2(_)
++            | Op::HSetP2(_)
++            | Op::HMnMx2(_)
+             | Op::FSwzAdd(_) => true,
+ 
+             // Multi-function unit is variable latency
+diff --git a/src/nouveau/compiler/nak/legalize.rs b/src/nouveau/compiler/nak/legalize.rs
+--- a/src/nouveau/compiler/nak/legalize.rs
++++ b/src/nouveau/compiler/nak/legalize.rs
+@@ -48,6 +48,8 @@ fn copy_alu_src(b: &mut impl SSABuilder, src: &mut Src, src_type: SrcType) {
+         SrcType::GPR
+         | SrcType::ALU
+         | SrcType::F32
++        | SrcType::F16
++        | SrcType::F16v2
+         | SrcType::I32
+         | SrcType::B32 => b.alloc_ssa(RegFile::GPR, 1),
+         SrcType::F64 => b.alloc_ssa(RegFile::GPR, 2),
+@@ -161,35 +163,54 @@ fn copy_alu_src_if_f20_overflow(
+     }
+ }
+ 
++fn copy_alu_src_and_lower_fmod(
++    b: &mut impl SSABuilder,
++    src: &mut Src,
++    src_type: SrcType,
++) {
++    match src_type {
++        SrcType::F16 | SrcType::F16v2 => {
++            let val = b.alloc_ssa(RegFile::GPR, 1);
++            b.push_op(OpHAdd2 {
++                dst: val.into(),
++                srcs: [Src::new_zero().fneg(), *src],
++                saturate: false,
++                ftz: false,
++                f32: false,
++            });
++            *src = val.into();
++        }
++        SrcType::F32 => {
++            let val = b.alloc_ssa(RegFile::GPR, 1);
++            b.push_op(OpFAdd {
++                dst: val.into(),
++                srcs: [Src::new_zero().fneg(), *src],
++                saturate: false,
++                rnd_mode: FRndMode::NearestEven,
++                ftz: false,
++            });
++            *src = val.into();
++        }
++        SrcType::F64 => {
++            let val = b.alloc_ssa(RegFile::GPR, 2);
++            b.push_op(OpDAdd {
++                dst: val.into(),
++                srcs: [Src::new_zero().fneg(), *src],
++                rnd_mode: FRndMode::NearestEven,
++            });
++            *src = val.into();
++        }
++        _ => panic!("Invalid ffabs srouce type"),
++    }
++}
++
+ fn copy_alu_src_if_fabs(
+     b: &mut impl SSABuilder,
+     src: &mut Src,
+     src_type: SrcType,
+ ) {
+     if src.src_mod.has_fabs() {
+-        match src_type {
+-            SrcType::F32 => {
+-                let val = b.alloc_ssa(RegFile::GPR, 1);
+-                b.push_op(OpFAdd {
+-                    dst: val.into(),
+-                    srcs: [Src::new_zero().fneg(), *src],
+-                    saturate: false,
+-                    rnd_mode: FRndMode::NearestEven,
+-                    ftz: false,
+-                });
+-                *src = val.into();
+-            }
+-            SrcType::F64 => {
+-                let val = b.alloc_ssa(RegFile::GPR, 2);
+-                b.push_op(OpDAdd {
+-                    dst: val.into(),
+-                    srcs: [Src::new_zero().fneg(), *src],
+-                    rnd_mode: FRndMode::NearestEven,
+-                });
+-                *src = val.into();
+-            }
+-            _ => panic!("Invalid ffabs srouce type"),
+-        }
++        copy_alu_src_and_lower_fmod(b, src, src_type);
+     }
+ }
+ 
+@@ -431,6 +452,8 @@ fn legalize_sm50_instr(
+                         assert!(src_is_reg(src));
+                     }
+                     SrcType::ALU
++                    | SrcType::F16
++                    | SrcType::F16v2
+                     | SrcType::F32
+                     | SrcType::F64
+                     | SrcType::I32
+@@ -497,6 +520,49 @@ fn legalize_sm70_instr(
+             }
+             copy_alu_src_if_not_reg(b, src0, SrcType::F32);
+         }
++        Op::HAdd2(op) => {
++            let [ref mut src0, ref mut src1] = op.srcs;
++            swap_srcs_if_not_reg(src0, src1);
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++        }
++        Op::HFma2(op) => {
++            let [ref mut src0, ref mut src1, ref mut src2] = op.srcs;
++            swap_srcs_if_not_reg(src0, src1);
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++            copy_alu_src_if_not_reg(b, src1, SrcType::F16v2);
++            copy_alu_src_if_both_not_reg(b, src1, src2, SrcType::F16v2);
++
++            // HFMA2 doesn't have fabs or fneg on SRC2.
++            if !src2.src_mod.is_none() {
++                copy_alu_src_and_lower_fmod(b, src2, SrcType::F16v2);
++            }
++        }
++        Op::HMul2(op) => {
++            let [ref mut src0, ref mut src1] = op.srcs;
++            swap_srcs_if_not_reg(src0, src1);
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++        }
++        Op::HSet2(op) => {
++            let [ref mut src0, ref mut src1] = op.srcs;
++            if !src_is_reg(src0) && src_is_reg(src1) {
++                std::mem::swap(src0, src1);
++                op.cmp_op = op.cmp_op.flip();
++            }
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++        }
++        Op::HSetP2(op) => {
++            let [ref mut src0, ref mut src1] = op.srcs;
++            if !src_is_reg(src0) && src_is_reg(src1) {
++                std::mem::swap(src0, src1);
++                op.cmp_op = op.cmp_op.flip();
++            }
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++        }
++        Op::HMnMx2(op) => {
++            let [ref mut src0, ref mut src1] = op.srcs;
++            swap_srcs_if_not_reg(src0, src1);
++            copy_alu_src_if_not_reg(b, src0, SrcType::F16v2);
++        }
+         Op::MuFu(_) => (), // Nothing to do
+         Op::DAdd(op) => {
+             let [ref mut src0, ref mut src1] = op.srcs;
+@@ -721,6 +787,8 @@ fn legalize_sm70_instr(
+                         assert!(src_is_reg(src));
+                     }
+                     SrcType::ALU
++                    | SrcType::F16
++                    | SrcType::F16v2
+                     | SrcType::F32
+                     | SrcType::F64
+                     | SrcType::I32
+@@ -753,32 +821,7 @@ fn legalize_instr(
+ 
+     let src_types = instr.src_types();
+     for (i, src) in instr.srcs_mut().iter_mut().enumerate() {
+-        if let SrcRef::Imm32(u) = &mut src.src_ref {
+-            *u = match src_types[i] {
+-                SrcType::F32 | SrcType::F64 => match src.src_mod {
+-                    SrcMod::None => *u,
+-                    SrcMod::FAbs => *u & !(1_u32 << 31),
+-                    SrcMod::FNeg => *u ^ !(1_u32 << 31),
+-                    SrcMod::FNegAbs => *u | !(1_u32 << 31),
+-                    _ => panic!("Not a float source modifier"),
+-                },
+-                SrcType::I32 => match src.src_mod {
+-                    SrcMod::None => *u,
+-                    SrcMod::INeg => -(*u as i32) as u32,
+-                    _ => panic!("Not an integer source modifier"),
+-                },
+-                SrcType::B32 => match src.src_mod {
+-                    SrcMod::None => *u,
+-                    SrcMod::BNot => !*u,
+-                    _ => panic!("Not a bitwise source modifier"),
+-                },
+-                _ => {
+-                    assert!(src.src_mod.is_none());
+-                    *u
+-                }
+-            };
+-            src.src_mod = SrcMod::None;
+-        }
++        *src = src.fold_imm(src_types[i]);
+     }
+ 
+     let mut vec_src_map: HashMap<SSARef, SSARef> = HashMap::new();
+diff --git a/src/nouveau/compiler/nak/opt_copy_prop.rs b/src/nouveau/compiler/nak/opt_copy_prop.rs
+--- a/src/nouveau/compiler/nak/opt_copy_prop.rs
++++ b/src/nouveau/compiler/nak/opt_copy_prop.rs
+@@ -10,8 +10,18 @@ struct CopyEntry {
+     src: Src,
+ }
+ 
++struct PrmtEntry {
++    srcs: [Src; 2],
++    selection: u16,
++}
++
++enum CopyPropEntry {
++    Copy(CopyEntry),
++    Prmt(PrmtEntry),
++}
++
+ struct CopyPropPass {
+-    ssa_map: HashMap<SSAValue, CopyEntry>,
++    ssa_map: HashMap<SSAValue, CopyPropEntry>,
+ }
+ 
+ impl CopyPropPass {
+@@ -23,13 +33,17 @@ impl CopyPropPass {
+ 
+     fn add_copy(&mut self, dst: SSAValue, src_type: SrcType, src: Src) {
+         assert!(src.src_ref.get_reg().is_none());
+-        self.ssa_map.insert(
+-            dst,
+-            CopyEntry {
+-                src_type: src_type,
+-                src: src,
+-            },
++        self.ssa_map
++            .insert(dst, CopyPropEntry::Copy(CopyEntry { src_type, src }));
++    }
++
++    fn add_prmt(&mut self, dst: SSAValue, srcs: [Src; 2], selection: u16) {
++        assert!(
++            srcs[0].src_ref.get_reg().is_none()
++                && srcs[1].src_ref.get_reg().is_none()
+         );
++        self.ssa_map
++            .insert(dst, CopyPropEntry::Prmt(PrmtEntry { srcs, selection }));
+     }
+ 
+     fn add_fp64_copy(&mut self, dst: &SSARef, src: Src) {
+@@ -44,6 +58,7 @@ impl CopyPropPass {
+                 let hi32 = Src {
+                     src_ref: SrcRef::CBuf(cb.offset(4)),
+                     src_mod: src.src_mod,
++                    src_swizzle: src.src_swizzle,
+                 };
+                 self.add_copy(dst[0], SrcType::ALU, lo32);
+                 self.add_copy(dst[1], SrcType::F64, hi32);
+@@ -54,6 +69,7 @@ impl CopyPropPass {
+                 let hi32 = Src {
+                     src_ref: ssa[1].into(),
+                     src_mod: src.src_mod,
++                    src_swizzle: src.src_swizzle,
+                 };
+                 self.add_copy(dst[0], SrcType::ALU, lo32);
+                 self.add_copy(dst[1], SrcType::F64, hi32);
+@@ -62,7 +78,7 @@ impl CopyPropPass {
+         }
+     }
+ 
+-    fn get_copy(&self, dst: &SSAValue) -> Option<&CopyEntry> {
++    fn get_copy(&self, dst: &SSAValue) -> Option<&CopyPropEntry> {
+         self.ssa_map.get(dst)
+     }
+ 
+@@ -73,9 +89,9 @@ impl CopyPropPass {
+                 _ => return,
+             };
+ 
+-            let entry = match self.get_copy(src_ssa) {
+-                Some(e) => e,
+-                None => return,
++            let Some(CopyPropEntry::Copy(entry)) = self.get_copy(src_ssa)
++            else {
++                return;
+             };
+ 
+             match entry.src.src_ref {
+@@ -108,9 +124,8 @@ impl CopyPropPass {
+ 
+         for c in 0..src_ssa.comps() {
+             let c_ssa = &mut src_ssa[usize::from(c)];
+-            let entry = match self.get_copy(c_ssa) {
+-                Some(e) => e,
+-                None => continue,
++            let Some(CopyPropEntry::Copy(entry)) = self.get_copy(c_ssa) else {
++                continue;
+             };
+ 
+             if entry.src.src_mod.is_none() {
+@@ -150,9 +165,10 @@ impl CopyPropPass {
+             };
+ 
+             for c in 0..usize::from(src_ssa.comps()) {
+-                let entry = match self.get_copy(&src_ssa[c]) {
+-                    Some(e) => e,
+-                    None => return,
++                let Some(CopyPropEntry::Copy(entry)) =
++                    self.get_copy(&src_ssa[c])
++                else {
++                    return;
+                 };
+ 
+                 match entry.src.src_ref {
+@@ -179,13 +195,86 @@ impl CopyPropPass {
+                 None => return,
+             };
+ 
+-            // If there are modifiers, the source types have to match
+-            if !entry.src.src_mod.is_none() && entry.src_type != src_type {
+-                return;
+-            }
++            match entry {
++                CopyPropEntry::Copy(entry) => {
++                    // If there are modifiers, the source types have to match
++                    if !entry.src.src_mod.is_none()
++                        && entry.src_type != src_type
++                    {
++                        return;
++                    }
++
++                    src.src_ref = entry.src.src_ref;
++                    src.src_mod = entry.src.src_mod.modify(src.src_mod);
++                }
++                CopyPropEntry::Prmt(entry) => {
++                    // Turn the swizzle into a permute. For F16, we use Xx to indicate
++                    // that it only takes the bottom 16 bits.
++                    let swizzle_prmt: [u8; 4] = match src_type {
++                        SrcType::F16 => [0, 1, 0, 1],
++                        SrcType::F16v2 => match src.src_swizzle {
++                            SrcSwizzle::None => [0, 1, 2, 3],
++                            SrcSwizzle::Xx => [0, 1, 0, 1],
++                            SrcSwizzle::Yy => [2, 3, 2, 3],
++                        },
++                        _ => [0, 1, 2, 3],
++                    };
++
++                    let mut entry_src_idx = None;
++                    let mut combined = [0_u8; 4];
++
++                    for i in 0..4 {
++                        let val = ((entry.selection >> (swizzle_prmt[i] * 4))
++                            & 0xF) as u8;
++
++                        // If we have a sign extension, we cannot simplify it.
++                        if val & 8 != 0 {
++                            return;
++                        }
++
++                        let target_src_idx = val / 4;
+ 
+-            src.src_ref = entry.src.src_ref;
+-            src.src_mod = entry.src.src_mod.modify(src.src_mod);
++                        // Ensure we are using the same source, we cannot combine
++                        // multiple sources.
++                        if entry_src_idx.is_none() {
++                            entry_src_idx = Some(target_src_idx);
++                        } else if entry_src_idx != Some(target_src_idx) {
++                            return;
++                        }
++
++                        combined[i] = val & 0x3;
++                    }
++
++                    let entry_src_idx = usize::from(entry_src_idx.unwrap());
++                    let entry_src = entry.srcs[entry_src_idx];
++
++                    // See if that permute is a valid swizzle
++                    let new_swizzle = match src_type {
++                        SrcType::F16 => {
++                            if combined != [0, 1, 0, 1] {
++                                return;
++                            }
++                            SrcSwizzle::None
++                        }
++                        SrcType::F16v2 => match combined {
++                            [0, 1, 2, 3] => SrcSwizzle::None,
++                            [0, 1, 0, 1] => SrcSwizzle::Xx,
++                            [2, 3, 2, 3] => SrcSwizzle::Yy,
++                            _ => return,
++                        },
++                        _ => {
++                            if combined != [0, 1, 2, 3] {
++                                return;
++                            }
++                            SrcSwizzle::None
++                        }
++                    };
++
++                    src.src_ref = entry_src.src_ref;
++                    src.src_mod = entry_src.src_mod.modify(src.src_mod);
++                    src.src_swizzle = new_swizzle;
++                }
++            }
+         }
+     }
+ 
+@@ -203,7 +292,7 @@ impl CopyPropPass {
+             // any copies with source modifiers in the low bits and apply
+             // source modifiers as needed when propagating the high bits.
+             let lo_entry_or_none = self.get_copy(&src_ssa[0]);
+-            if let Some(lo_entry) = lo_entry_or_none {
++            if let Some(CopyPropEntry::Copy(lo_entry)) = lo_entry_or_none {
+                 if lo_entry.src.src_mod.is_none() {
+                     if let SrcRef::SSA(lo_entry_ssa) = lo_entry.src.src_ref {
+                         src_ssa[0] = lo_entry_ssa[0];
+@@ -213,7 +302,7 @@ impl CopyPropPass {
+             }
+ 
+             let hi_entry_or_none = self.get_copy(&src_ssa[1]);
+-            if let Some(hi_entry) = hi_entry_or_none {
++            if let Some(CopyPropEntry::Copy(hi_entry)) = hi_entry_or_none {
+                 if hi_entry.src.src_mod.is_none()
+                     || hi_entry.src_type == SrcType::F64
+                 {
+@@ -225,11 +314,11 @@ impl CopyPropPass {
+                 }
+             }
+ 
+-            let Some(lo_entry) = lo_entry_or_none else {
++            let Some(CopyPropEntry::Copy(lo_entry)) = lo_entry_or_none else {
+                 return;
+             };
+ 
+-            let Some(hi_entry) = hi_entry_or_none else {
++            let Some(CopyPropEntry::Copy(hi_entry)) = hi_entry_or_none else {
+                 return;
+             };
+ 
+@@ -289,6 +378,8 @@ impl CopyPropPass {
+                 self.prop_to_gpr_src(src);
+             }
+             SrcType::ALU
++            | SrcType::F16
++            | SrcType::F16v2
+             | SrcType::F32
+             | SrcType::I32
+             | SrcType::B32
+@@ -304,6 +395,19 @@ impl CopyPropPass {
+ 
+     fn try_add_instr(&mut self, instr: &Instr) {
+         match &instr.op {
++            Op::HAdd2(add) => {
++                let dst = add.dst.as_ssa().unwrap();
++                assert!(dst.comps() == 1);
++                let dst = dst[0];
++
++                if !add.saturate {
++                    if add.srcs[0].is_fneg_zero(SrcType::F16v2) {
++                        self.add_copy(dst, SrcType::F16v2, add.srcs[1]);
++                    } else if add.srcs[1].is_fneg_zero(SrcType::F16v2) {
++                        self.add_copy(dst, SrcType::F16v2, add.srcs[0]);
++                    }
++                }
++            }
+             Op::FAdd(add) => {
+                 let dst = add.dst.as_ssa().unwrap();
+                 assert!(dst.comps() == 1);
+@@ -415,6 +519,12 @@ impl CopyPropPass {
+                     }
+                     if is_imm {
+                         self.add_copy(dst[0], SrcType::GPR, imm.into());
++                    } else {
++                        self.add_prmt(
++                            dst[0],
++                            prmt.srcs,
++                            sel.try_into().unwrap(),
++                        );
+                     }
+                 }
+             }
+diff --git a/src/nouveau/compiler/nak_nir.c b/src/nouveau/compiler/nak_nir.c
+--- a/src/nouveau/compiler/nak_nir.c
++++ b/src/nouveau/compiler/nak_nir.c
+@@ -55,6 +55,39 @@ nak_nir_workgroup_has_one_subgroup(const nir_shader *nir)
+    }
+ }
+ 
++static uint8_t
++vectorize_filter_cb(const nir_instr *instr, const void *_data)
++{
++   if (instr->type != nir_instr_type_alu)
++      return 0;
++
++   const nir_alu_instr *alu = nir_instr_as_alu(instr);
++
++   const unsigned bit_size = nir_alu_instr_is_comparison(alu)
++                             ? alu->src[0].src.ssa->bit_size
++                             : alu->def.bit_size;
++
++   switch (alu->op) {
++   case nir_op_fadd:
++   case nir_op_fsub:
++   case nir_op_fabs:
++   case nir_op_fneg:
++   case nir_op_feq:
++   case nir_op_fge:
++   case nir_op_flt:
++   case nir_op_fneu:
++   case nir_op_fmul:
++   case nir_op_ffma:
++   case nir_op_fsign:
++   case nir_op_fsat:
++   case nir_op_fmax:
++   case nir_op_fmin:
++      return bit_size == 16 ? 2 : 1;
++   default:
++      return 1;
++   }
++}
++
+ static void
+ optimize_nir(nir_shader *nir, const struct nak_compiler *nak, bool allow_copies)
+ {
+@@ -95,7 +128,8 @@ optimize_nir(nir_shader *nir, const struct nak_compiler *nak, bool allow_copies)
+       OPT(nir, nir_opt_dead_write_vars);
+       OPT(nir, nir_opt_combine_stores, nir_var_all);
+ 
+-      OPT(nir, nir_lower_alu_to_scalar, NULL, NULL);
++      OPT(nir, nir_lower_alu_width, vectorize_filter_cb, NULL);
++      OPT(nir, nir_opt_vectorize, vectorize_filter_cb, NULL);
+       OPT(nir, nir_lower_phis_to_scalar, false);
+       OPT(nir, nir_lower_frexp);
+       OPT(nir, nir_copy_prop);
+@@ -146,14 +180,20 @@ nak_optimize_nir(nir_shader *nir, const struct nak_compiler *nak)
+ }
+ 
+ static unsigned
+-lower_bit_size_cb(const nir_instr *instr, void *_data)
++lower_bit_size_cb(const nir_instr *instr, void *data)
+ {
++   const struct nak_compiler *nak = data;
++
+    switch (instr->type) {
+    case nir_instr_type_alu: {
+       nir_alu_instr *alu = nir_instr_as_alu(instr);
+       if (nir_op_infos[alu->op].is_conversion)
+          return 0;
+ 
++      const unsigned bit_size = nir_alu_instr_is_comparison(alu)
++                                ? alu->src[0].src.ssa->bit_size
++                                : alu->def.bit_size;
++
+       switch (alu->op) {
+       case nir_op_bit_count:
+       case nir_op_ufind_msb:
+@@ -164,17 +204,40 @@ lower_bit_size_cb(const nir_instr *instr, void *_data)
+           * source.
+           */
+          return alu->src[0].src.ssa->bit_size == 32 ? 0 : 32;
++
++      case nir_op_fabs:
++      case nir_op_fadd:
++      case nir_op_fneg:
++      case nir_op_feq:
++      case nir_op_fge:
++      case nir_op_flt:
++      case nir_op_fneu:
++      case nir_op_fmul:
++      case nir_op_ffma:
++      case nir_op_ffmaz:
++      case nir_op_fsign:
++      case nir_op_fsat:
++      case nir_op_fceil:
++      case nir_op_ffloor:
++      case nir_op_fround_even:
++      case nir_op_ftrunc:
++         if (bit_size == 16  && nak->sm >= 70)
++            return 0;
++         break;
++
++      case nir_op_fmax:
++      case nir_op_fmin:
++         if (bit_size == 16 && nak->sm >= 80)
++            return 0;
++         break;
++
+       default:
+          break;
+       }
+ 
+-      const unsigned bit_size = nir_alu_instr_is_comparison(alu)
+-                                ? alu->src[0].src.ssa->bit_size
+-                                : alu->def.bit_size;
+       if (bit_size >= 32)
+          return 0;
+ 
+-      /* TODO: Some hardware has native 16-bit support */
+       if (bit_size & (8 | 16))
+          return 32;
+ 
+diff --git a/src/nouveau/vulkan/nvk_physical_device.c b/src/nouveau/vulkan/nvk_physical_device.c
+--- a/src/nouveau/vulkan/nvk_physical_device.c
++++ b/src/nouveau/vulkan/nvk_physical_device.c
+@@ -325,6 +325,7 @@ nvk_get_device_features(const struct nv_device_info *info,
+       .shaderBufferInt64Atomics = info->cls_eng3d >= MAXWELL_A &&
+                                   nvk_use_nak(info),
+       .shaderSharedInt64Atomics = false, /* TODO */
++      .shaderFloat16 = info->sm >= 70 && nvk_use_nak(info),
+       .shaderInt8 = true,
+       .descriptorIndexing = true,
+       .shaderInputAttachmentArrayDynamicIndexing = true,
+@@ -783,13 +784,13 @@ nvk_get_device_properties(const struct nvk_instance *instance,
+       .shaderDenormPreserveFloat16 = true,
+       .shaderDenormPreserveFloat32 = true,
+       .shaderDenormPreserveFloat64 = true,
+-      .shaderDenormFlushToZeroFloat16 = true,
++      .shaderDenormFlushToZeroFloat16 = false,
+       .shaderDenormFlushToZeroFloat32 = true,
+       .shaderDenormFlushToZeroFloat64 = false,
+       .shaderRoundingModeRTEFloat16 = true,
+       .shaderRoundingModeRTEFloat32 = true,
+       .shaderRoundingModeRTEFloat64 = true,
+-      .shaderRoundingModeRTZFloat16 = true,
++      .shaderRoundingModeRTZFloat16 = false,
+       .shaderRoundingModeRTZFloat32 = true,
+       .shaderRoundingModeRTZFloat64 = true,
+       .maxUpdateAfterBindDescriptorsInAllPools = UINT32_MAX,
+diff --git a/src/nouveau/vulkan/nvk_shader.c b/src/nouveau/vulkan/nvk_shader.c
+--- a/src/nouveau/vulkan/nvk_shader.c
++++ b/src/nouveau/vulkan/nvk_shader.c
+@@ -129,6 +129,7 @@ nvk_get_spirv_options(struct vk_physical_device *vk_pdev,
+          .device_group = true,
+          .draw_parameters = true,
+          .float_controls = true,
++         .float16 = true,
+          .float64 = true,
+          .fragment_barycentric = true,
+          .geometry_streams = true,

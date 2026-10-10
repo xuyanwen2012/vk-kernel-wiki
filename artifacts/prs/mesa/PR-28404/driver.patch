@@ -1,0 +1,160 @@
+diff --git a/src/intel/compiler/brw_eu_emit.c b/src/intel/compiler/brw_eu_emit.c
+--- a/src/intel/compiler/brw_eu_emit.c
++++ b/src/intel/compiler/brw_eu_emit.c
+@@ -787,8 +787,8 @@ brw_dpas_three_src(struct brw_codegen *p, enum gfx12_systolic_depth opcode,
+    assert(dest.file == BRW_GENERAL_REGISTER_FILE);
+    brw_inst_set_dpas_3src_dst_reg_file(devinfo, inst,
+                                        BRW_GENERAL_REGISTER_FILE);
+-   brw_inst_set_dpas_3src_dst_reg_nr(devinfo, inst, dest.nr);
+-   brw_inst_set_dpas_3src_dst_subreg_nr(devinfo, inst, dest.subnr);
++   brw_inst_set_dpas_3src_dst_reg_nr(devinfo, inst, phys_nr(devinfo, dest));
++   brw_inst_set_dpas_3src_dst_subreg_nr(devinfo, inst, phys_subnr(devinfo, dest));
+ 
+    if (brw_reg_type_is_floating_point(dest.type)) {
+       brw_inst_set_dpas_3src_exec_type(devinfo, inst,
+@@ -811,21 +811,21 @@ brw_dpas_three_src(struct brw_codegen *p, enum gfx12_systolic_depth opcode,
+            src0.nr == BRW_ARF_NULL));
+ 
+    brw_inst_set_dpas_3src_src0_reg_file(devinfo, inst, src0.file);
+-   brw_inst_set_dpas_3src_src0_reg_nr(devinfo, inst, src0.nr);
+-   brw_inst_set_dpas_3src_src0_subreg_nr(devinfo, inst, src0.subnr);
++   brw_inst_set_dpas_3src_src0_reg_nr(devinfo, inst, phys_nr(devinfo, src0));
++   brw_inst_set_dpas_3src_src0_subreg_nr(devinfo, inst, phys_subnr(devinfo, src0));
+ 
+    assert(src1.file == BRW_GENERAL_REGISTER_FILE);
+ 
+    brw_inst_set_dpas_3src_src1_reg_file(devinfo, inst, src1.file);
+-   brw_inst_set_dpas_3src_src1_reg_nr(devinfo, inst, src1.nr);
+-   brw_inst_set_dpas_3src_src1_subreg_nr(devinfo, inst, src1.subnr);
++   brw_inst_set_dpas_3src_src1_reg_nr(devinfo, inst, phys_nr(devinfo, src1));
++   brw_inst_set_dpas_3src_src1_subreg_nr(devinfo, inst, phys_subnr(devinfo, src1));
+    brw_inst_set_dpas_3src_src1_subbyte(devinfo, inst, BRW_SUB_BYTE_PRECISION_NONE);
+ 
+    assert(src2.file == BRW_GENERAL_REGISTER_FILE);
+ 
+    brw_inst_set_dpas_3src_src2_reg_file(devinfo, inst, src2.file);
+-   brw_inst_set_dpas_3src_src2_reg_nr(devinfo, inst, src2.nr);
+-   brw_inst_set_dpas_3src_src2_subreg_nr(devinfo, inst, src2.subnr);
++   brw_inst_set_dpas_3src_src2_reg_nr(devinfo, inst, phys_nr(devinfo, src2));
++   brw_inst_set_dpas_3src_src2_subreg_nr(devinfo, inst, phys_subnr(devinfo, src2));
+    brw_inst_set_dpas_3src_src2_subbyte(devinfo, inst, BRW_SUB_BYTE_PRECISION_NONE);
+ 
+    return inst;
+diff --git a/src/intel/compiler/brw_eu_validate.c b/src/intel/compiler/brw_eu_validate.c
+--- a/src/intel/compiler/brw_eu_validate.c
++++ b/src/intel/compiler/brw_eu_validate.c
+@@ -2161,10 +2161,15 @@ instruction_restrictions(const struct brw_isa_info *isa,
+       const unsigned ops_per_chan =
+          MAX2(1, 32 / MAX2(src1_bits_per_element, src2_bits_per_element));
+ 
+-      ERROR_IF(brw_inst_exec_size(devinfo, inst) != BRW_EXECUTE_8,
+-               "DPAS execution size must be 8.");
++      if (devinfo->ver < 20) {
++         ERROR_IF(brw_inst_exec_size(devinfo, inst) != BRW_EXECUTE_8,
++                  "DPAS execution size must be 8.");
++      } else {
++         ERROR_IF(brw_inst_exec_size(devinfo, inst) != BRW_EXECUTE_16,
++                  "DPAS execution size must be 16.");
++      }
+ 
+-      const unsigned exec_size = 8;
++      const unsigned exec_size = devinfo->ver < 20 ? 8 : 16;
+ 
+       const unsigned dst_subnr  = brw_inst_dpas_3src_dst_subreg_nr(devinfo, inst);
+       const unsigned src0_subnr = brw_inst_dpas_3src_src0_subreg_nr(devinfo, inst);
+diff --git a/src/intel/compiler/brw_fs_builder.h b/src/intel/compiler/brw_fs_builder.h
+--- a/src/intel/compiler/brw_fs_builder.h
++++ b/src/intel/compiler/brw_fs_builder.h
+@@ -771,7 +771,7 @@ namespace brw {
+       DPAS(const fs_reg &dst, const fs_reg &src0, const fs_reg &src1, const fs_reg &src2,
+            unsigned sdepth, unsigned rcount) const
+       {
+-         assert(_dispatch_width == 8);
++         assert(_dispatch_width == 8 * reg_unit(shader->devinfo));
+          assert(sdepth == 8);
+          assert(rcount == 1 || rcount == 2 || rcount == 4 || rcount == 8);
+ 
+diff --git a/src/intel/compiler/brw_fs_lower_regioning.cpp b/src/intel/compiler/brw_fs_lower_regioning.cpp
+--- a/src/intel/compiler/brw_fs_lower_regioning.cpp
++++ b/src/intel/compiler/brw_fs_lower_regioning.cpp
+@@ -550,6 +550,12 @@ namespace {
+          ibld.at(block, inst->next).MOV(subscript(inst->dst, raw_type, j),
+                                         subscript(tmp, raw_type, j));
+ 
++      /* If the destination was an accumulator, after lowering it will be a
++       * GRF. Clear writes_accumulator for the instruction.
++       */
++      if (inst->dst.is_accumulator())
++         inst->writes_accumulator = false;
++
+       /* Point the original instruction at the temporary, making sure to keep
+        * any destination modifiers in the instruction.
+        */
+diff --git a/src/intel/compiler/brw_fs_nir.cpp b/src/intel/compiler/brw_fs_nir.cpp
+--- a/src/intel/compiler/brw_fs_nir.cpp
++++ b/src/intel/compiler/brw_fs_nir.cpp
+@@ -4516,11 +4516,11 @@ fs_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
+          brw_type_for_nir_type(devinfo, nir_intrinsic_src_type(instr));
+ 
+       dest = retype(dest, dest_type);
+-      fs_reg src2 = retype(get_nir_src(ntb, instr->src[2]), dest_type);
++      fs_reg src0 = retype(get_nir_src(ntb, instr->src[0]), dest_type);
+       const fs_reg dest_hf = dest;
+ 
+-      fs_builder bld8 = bld.exec_all().group(8, 0);
+       fs_builder bld16 = bld.exec_all().group(16, 0);
++      fs_builder bldn = devinfo->ver >= 20 ? bld16 : bld.exec_all().group(8, 0);
+ 
+       /* DG2 cannot have the destination or source 0 of DPAS be float16. It is
+        * still advantageous to support these formats for memory and bandwidth
+@@ -4530,26 +4530,26 @@ fs_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
+        */
+       if (devinfo->verx10 == 125 && dest_type == BRW_REGISTER_TYPE_HF &&
+           !s.compiler->lower_dpas) {
+-         dest = bld8.vgrf(BRW_REGISTER_TYPE_F, rcount);
++         dest = bldn.vgrf(BRW_REGISTER_TYPE_F, rcount);
+ 
+-         if (src2.file != ARF) {
+-            const fs_reg src2_hf = src2;
++         if (src0.file != ARF) {
++            const fs_reg src0_hf = src0;
+ 
+-            src2 = bld8.vgrf(BRW_REGISTER_TYPE_F, rcount);
++            src0 = bldn.vgrf(BRW_REGISTER_TYPE_F, rcount);
+ 
+             for (unsigned i = 0; i < 4; i++) {
+-               bld16.MOV(byte_offset(src2, REG_SIZE * i * 2),
+-                         byte_offset(src2_hf, REG_SIZE * i));
++               bld16.MOV(byte_offset(src0, REG_SIZE * i * 2),
++                         byte_offset(src0_hf, REG_SIZE * i));
+             }
+          } else {
+-            src2 = retype(src2, BRW_REGISTER_TYPE_F);
++            src0 = retype(src0, BRW_REGISTER_TYPE_F);
+          }
+       }
+ 
+-      bld8.DPAS(dest,
+-                src2,
++      bldn.DPAS(dest,
++                src0,
++                retype(get_nir_src(ntb, instr->src[2]), src_type),
+                 retype(get_nir_src(ntb, instr->src[1]), src_type),
+-                retype(get_nir_src(ntb, instr->src[0]), src_type),
+                 sdepth,
+                 rcount)
+          ->saturate = nir_intrinsic_saturate(instr);
+diff --git a/src/intel/compiler/brw_nir_lower_cooperative_matrix.c b/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+--- a/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
++++ b/src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+@@ -649,9 +649,9 @@ lower_cmat_instr(nir_builder *b, nir_instr *instr, void *_state)
+       nir_def *result =
+          nir_dpas_intel(b,
+                         packing_factor * glsl_base_type_get_bit_size(dst_desc.element_type),
++                        nir_load_deref(b, accum_slice),
+                         nir_load_deref(b, A_slice),
+                         nir_load_deref(b, B_slice),
+-                        nir_load_deref(b, accum_slice),
+                         .dest_type = nir_get_nir_type_for_glsl_base_type(dst_desc.element_type),
+                         .src_type = nir_get_nir_type_for_glsl_base_type(src_desc.element_type),
+                         .saturate = nir_intrinsic_saturate(intrin),

@@ -1,0 +1,55 @@
+diff --git a/src/intel/compiler/brw/brw_from_nir.cpp b/src/intel/compiler/brw/brw_from_nir.cpp
+--- a/src/intel/compiler/brw/brw_from_nir.cpp
++++ b/src/intel/compiler/brw/brw_from_nir.cpp
+@@ -4255,11 +4255,10 @@ brw_from_nir_emit_cs_intrinsic(nir_to_brw_state &ntb,
+       const unsigned dpas_exec_size = devinfo->ver >= 20 ? 16 : 8;
+       brw_builder bldn = bld.exec_all().group(dpas_exec_size, 0);
+ 
+-      /* DPAS uses a different source order: Accumulator, B, A. */
+       bldn.DPAS(retype(dest,   dest_type),
+                 retype(src[0], dest_type),
+-                retype(src[2], src_type),
+                 retype(src[1], src_type),
++                retype(src[2], src_type),
+                 sdepth,
+                 rcount)
+          ->saturate = nir_intrinsic_saturate(instr);
+diff --git a/src/intel/compiler/brw/brw_nir_lower_cooperative_matrix.c b/src/intel/compiler/brw/brw_nir_lower_cooperative_matrix.c
+--- a/src/intel/compiler/brw/brw_nir_lower_cooperative_matrix.c
++++ b/src/intel/compiler/brw/brw_nir_lower_cooperative_matrix.c
+@@ -861,8 +861,8 @@ lower_cmat_instr(nir_builder *b, nir_instr *instr, void *_state)
+          nir_dpas_intel(b,
+                         dst_info->packing_factor * glsl_base_type_get_bit_size(dst_info->desc.element_type),
+                         nir_load_deref(b, accum_slice),
+-                        nir_load_deref(b, A_slice),
+                         nir_load_deref(b, B_slice),
++                        nir_load_deref(b, A_slice),
+                         .dest_base_type = dst_type,
+                         .src_base_type = src_type,
+                         .saturate = nir_intrinsic_saturate(intrin),
+diff --git a/src/intel/compiler/brw/brw_nir_opt_systolic_vectorize.c b/src/intel/compiler/brw/brw_nir_opt_systolic_vectorize.c
+--- a/src/intel/compiler/brw/brw_nir_opt_systolic_vectorize.c
++++ b/src/intel/compiler/brw/brw_nir_opt_systolic_vectorize.c
+@@ -587,8 +587,8 @@ emit_dpas(const struct intel_device_info *devinfo,
+     */
+    nir_def *result = nir_dpas_intel(&b, XEHP_SYSTOLIC_CHANNEL_BITS,
+                                     nir_load_deref(&b, deref_d),
+-                                    nir_load_deref(&b, deref_a),
+                                     nir_load_deref(&b, deref_b),
++                                    nir_load_deref(&b, deref_a),
+                                     .dest_base_type = GLSL_TYPE_INT,
+                                     .src_base_type = GLSL_TYPE_INT8,
+                                     .saturate = false,
+diff --git a/src/intel/compiler/jay/jay_from_nir.c b/src/intel/compiler/jay/jay_from_nir.c
+--- a/src/intel/compiler/jay/jay_from_nir.c
++++ b/src/intel/compiler/jay/jay_from_nir.c
+@@ -1393,8 +1393,7 @@ jay_emit_dpas(struct nir_to_jay_state *nj, nir_intrinsic_instr *intr)
+       jay_as_gpr(b, nj_src(intr->src[2])),
+    };
+ 
+-   /* Jay follows HW source order. */
+-   jay_DPAS(b, dst, src[0], src[2], src[1], nir_intrinsic_systolic_depth(intr),
++   jay_DPAS(b, dst, src[0], src[1], src[2], nir_intrinsic_systolic_depth(intr),
+             nir_intrinsic_repeat_count(intr),
+             jay_type_for_glsl_base_type(nir_intrinsic_dest_base_type(intr)),
+             jay_type_for_glsl_base_type(nir_intrinsic_src_base_type(intr)),

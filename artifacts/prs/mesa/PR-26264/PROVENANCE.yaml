@@ -1,0 +1,44 @@
+repo: mesa/mesa
+pr: 26264
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26264
+merge_sha: 62006c2f96a158500f636d470bfa313837897d4b
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/26264/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/meson.build
+  status: modified
+  sha256: bb9ac8e658e011fe2228bbe8cb00d5e69940adb215e0a02e2cddcd031099f441
+- path: src/nouveau/compiler/nak_builder.rs
+  status: modified
+  sha256: ed525c86f55b94912b7876211e6b4baca2c184b25f841a77d6ec08ba86f257cd
+- path: src/nouveau/compiler/nak_encode_sm70.rs
+  status: modified
+  sha256: c067f3efc9c81161390f7cfbea8c6da1c0a50bb08bd6bbf44cd0c5569c72cb42
+- path: src/nouveau/compiler/nak_from_nir.rs
+  status: modified
+  sha256: 6cc33aa8d1580938c03525f7e22b3b14101a18d3ad3f013ae8ba2021fab4b6e3
+- path: src/nouveau/compiler/nak_ir.rs
+  status: modified
+  sha256: a224a6e27e4dd0777dae05b08a8a7109dab67b5938737e360bda5be1eea7d624
+- path: src/nouveau/compiler/nak_nir.c
+  status: modified
+  sha256: 5aed8ded3d1a4a499a749589b285e6d50e218274ce2ff732f202007ce77a4d49
+- path: src/nouveau/compiler/nak_nir_lower_scan_reduce.c
+  status: added
+  sha256: 3c3655f57671bf4b36c683df72939370e863ea8ad59b2990f6343ac156330b39
+- path: src/nouveau/compiler/nak_private.h
+  status: modified
+  sha256: 1cd070912e8111af36b5f53d94969a7c90b23651a52a201a173588b492ce3861
+- path: src/nouveau/vulkan/meson.build
+  status: modified
+  sha256: 72665ce2dba992d34d8831f6afffb6f52b9ba13e6bf81bb9680794d71310ef8d
+- path: src/nouveau/vulkan/nvk_physical_device.c
+  status: modified
+  sha256: a7b8e729fab8207b5ce07be5e966071da3c21bea5ff8a20bcc41b2f413f81891
+- path: src/nouveau/vulkan/nvk_shader.c
+  status: modified
+  sha256: ea6850737a03582991192387b4717e6b4205fe767612dbb00711235ef0569013

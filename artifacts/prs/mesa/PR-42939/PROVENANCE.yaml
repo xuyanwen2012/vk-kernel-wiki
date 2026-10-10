@@ -1,0 +1,44 @@
+repo: mesa/mesa
+pr: 42939
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42939
+merge_sha: 817eb9548fd8d4ad6545dab9e45dd639c1f160cb
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/42939/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw/brw_compiler.c
+  status: modified
+  sha256: 74bcc39ef65449b187d73ec1e9c15b93688518073f0d9f8ff267725a1fd76eaa
+- path: src/intel/compiler/brw/brw_compiler.h
+  status: modified
+  sha256: 11b5cddcf7223ac2f25da92264ebb5dd652a789572d64f4a67cf3e5d374f5877
+- path: src/intel/compiler/brw/brw_nir.c
+  status: modified
+  sha256: 2823f1d8f89d58e8455b922072e2712f80b69c067119107b1b649acc3f8eb99c
+- path: src/intel/compiler/brw/brw_nir_lower_ray_queries.c
+  status: modified
+  sha256: dfa1a2ad0bfb2fbb967cf20d638508af9530470bcc8cebee0ec832a22467b150
+- path: src/intel/compiler/brw/brw_private.h
+  status: modified
+  sha256: be2f67a12137f11fce704b3b0ed602ba7794ac2ac1737634eb0ee4d19055dd8d
+- path: src/intel/compiler/elk/elk_compiler.c
+  status: modified
+  sha256: 0cad12fbd9d2b10f86882d5debf22a741a27a263cbfe994f6b082d45e234034f
+- path: src/intel/compiler/elk/elk_compiler.h
+  status: modified
+  sha256: 39f999a5990f5903d2d222e1c13a881fa3311a9236503de1969f0af9427ba0f5
+- path: src/intel/compiler/elk/elk_nir.c
+  status: modified
+  sha256: 2540369e6cd5948c48247063a779794e72079a4be57a121a69668a8f7b9edd4c
+- path: src/intel/compiler/jay/jay_nir.c
+  status: modified
+  sha256: 95f8d5742bc3870affc9803955a4b01e0e9c525545c88a883cdd59d2a6dbd88f
+- path: src/intel/vulkan/anv_physical_device.c
+  status: modified
+  sha256: 5512ffc258eae2e64da2ac551800f1235b593bb6ab96c0ca11343c4dc2c63c20
+- path: src/intel/vulkan/anv_shader_compile.c
+  status: modified
+  sha256: 8b7faf3f320879925c14487f2fe690be58f877e1685634e662cf8b1101082848

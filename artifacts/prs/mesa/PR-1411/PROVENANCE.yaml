@@ -1,0 +1,47 @@
+repo: mesa/mesa
+pr: 1411
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/1411
+merge_sha: d10de2530976ed3aba9c5d077e2edb141f71e7dd
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/1411/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_compiler.h
+  status: modified
+  sha256: d5802ec385f93f9aa4250810f470a791957d1d48c1664ad17c88d452cf92332e
+- path: src/intel/compiler/brw_fs.cpp
+  status: modified
+  sha256: bba2819c0e96fc4f1d5c85d2438abe5c9b56c69134f2e3e4f1ed4c58eaba08cf
+- path: src/intel/compiler/brw_fs_nir.cpp
+  status: modified
+  sha256: 18dfa2aeca40a34846a74691ff11ab72935221b0caaa414a13c8fe74db686a3f
+- path: src/intel/compiler/brw_nir.c
+  status: modified
+  sha256: 2473c828a744e19505ddeaf994415f96eb1720bdb7e9b8be9127adcc91f6ac87
+- path: src/intel/compiler/brw_nir.h
+  status: modified
+  sha256: e346f7b3ac9b150de330e11daa9919dd92dc761cf9cf5abc9d2f3f0dc5e56003
+- path: src/intel/compiler/brw_shader.cpp
+  status: modified
+  sha256: cd4a0c2bcbe47d330c2ecf4883fc02c3b866c0e837c09f71ebfa32a20c83079c
+- path: src/intel/compiler/brw_vec4.cpp
+  status: modified
+  sha256: b567b0beef5f4877091967b898a2641da28c57729cba11e8376e61732a431d32
+- path: src/intel/compiler/brw_vec4_gs_visitor.cpp
+  status: modified
+  sha256: a1e450957286ba683954621d4606b1edf60bb7c7b963d01dca9e99015632eeef
+- path: src/intel/compiler/brw_vec4_tcs.cpp
+  status: modified
+  sha256: d4a27a4947dcf6bb0b9022ab97da871031cc7e9723a3f7b5ce612e2ca4d19b6c
+- path: src/intel/vulkan/anv_device.c
+  status: modified
+  sha256: 2056e9b783de28da6263b3113dcafc4e9fa6ef2b0bd93e4a4238223f3261f3b6
+- path: src/intel/vulkan/anv_extensions.py
+  status: modified
+  sha256: 49fc270d1c58553d90a0c50862cf2ff9c05d32f270437758b0fb848976d05572
+- path: src/intel/vulkan/anv_pipeline.c
+  status: modified
+  sha256: 89b51c440a16d7015801da403c1969b5cbab92d0f7b6ac68b3153fe77e25bdcd

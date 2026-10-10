@@ -1,0 +1,38 @@
+repo: mesa/mesa
+pr: 38586
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/38586
+merge_sha: 43b85b151b418a815fe91a3c12d03a4fbf3c62f9
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/38586/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/bifrost/bifrost_compile.h
+  status: modified
+  sha256: 0fc6ff1676a4f4541b9a2d808ea7bdcaf230329c848bb6cce5a49d2e4c2e8ae5
+- path: src/panfrost/compiler/bifrost/bifrost_nir.c
+  status: modified
+  sha256: 1ed2034611a3bad071a6500dd5ed0915f8c70d7f4b0f9f668a726b4d5e951913
+- path: src/panfrost/compiler/pan_compiler.c
+  status: modified
+  sha256: 31a508f41184930626d28e45c9773eafaac9f672ed8b71d395ce8c33f49b3cc9
+- path: src/panfrost/compiler/pan_compiler.h
+  status: modified
+  sha256: 1840c0de48c439ad4d4b165f83e572901f1748fc25b2e33a2949a1acba9428a3
+- path: src/panfrost/vulkan/bifrost/panvk_vX_meta_desc_copy.c
+  status: modified
+  sha256: e46dc39431946cad596fed25d30e1d0b56e3ede74fc5b678aadaf2baef1cc46a
+- path: src/panfrost/vulkan/csf/panvk_vX_cmd_dispatch.c
+  status: modified
+  sha256: 829928c4efff61f43c184cf850ae9c4567f364600ed22d03b413f1e6cb2764c2
+- path: src/panfrost/vulkan/csf/panvk_vX_cmd_precomp.c
+  status: modified
+  sha256: e0c3461ee75ed046ca941c171eda2328c9a302e0531b574a2c865fe779303210
+- path: src/panfrost/vulkan/panvk_vX_cmd_frame_shaders.c
+  status: modified
+  sha256: 4c49bb36bdd734b31a08c78d1509750b8252e98d2f2c69b6dba54bfc9429112d
+- path: src/panfrost/vulkan/panvk_vX_shader.c
+  status: modified
+  sha256: 726d27e3cf59df7af07488b408d2949b7f87bfcdb1e61de26de709b1869e7bae

@@ -1,0 +1,29 @@
+repo: mesa/mesa
+pr: 32710
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/32710
+merge_sha: d46b80249bd207ce460b74a9aa1e58cd584f58b2
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/32710/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/valhall/va_pack.c
+  status: modified
+  sha256: 9f9cd097a9cf9c30dad9bbdf0633fb31d939e2a20a518db360f0ffa8b72447dd
+- path: src/panfrost/compiler/IR_pseudo.xml
+  status: modified
+  sha256: f5e6e2839a018ce2f87d5beb09aca53757af0f9a5783d06fb5683cd8951a0d8c
+- path: src/panfrost/compiler/bi_pressure_schedule.c
+  status: modified
+  sha256: 32b29c6ad6871bcb744c54fa40ba30c6f0da5bebb63151617e830b7218b47ab4
+- path: src/panfrost/compiler/bi_printer.c.py
+  status: modified
+  sha256: 0a950c898297e305686000b68db2afcb225507ef941718e863f6eed774715a6d
+- path: src/panfrost/compiler/bifrost_compile.c
+  status: modified
+  sha256: ab1c06f9e55388c04d4a628787ede399f54ac5f42b5d15e67031c7f6a1832d02
+- path: src/panfrost/vulkan/panvk_physical_device.c
+  status: modified
+  sha256: a0787e097f7e3bc56f38dd9c1cd259649d55fb6ca70bebff9dc528625446e381

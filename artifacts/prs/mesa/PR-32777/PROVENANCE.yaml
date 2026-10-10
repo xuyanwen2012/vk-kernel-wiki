@@ -1,0 +1,44 @@
+repo: mesa/mesa
+pr: 32777
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/32777
+merge_sha: 0d8b165f11e622716d520741aaea7729c9b47855
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/32777/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/nak/from_nir.rs
+  status: modified
+  sha256: 0cc7acf345205f6e2a277f2a3ee6a4d01f4e7610113ffc0a3df404c15c3f5e1c
+- path: src/nouveau/compiler/nak/ir.rs
+  status: modified
+  sha256: c384b91605e80ea8856e9a3458d63090ed6e863263e893783ea33e7e4dc7096c
+- path: src/nouveau/compiler/nak/opt_instr_sched_common.rs
+  status: modified
+  sha256: bfcee573eea33ecce250908af4739c87e0bb5fe1eebb8fa262692ea45f8401ba
+- path: src/nouveau/compiler/nak/sm70_encode.rs
+  status: modified
+  sha256: 3688c5793b12882ab3ccee31c728aecd97c3efaca6e90e8e0321c2cbe0a5363d
+- path: src/nouveau/compiler/nak/sm75_instr_latencies.rs
+  status: modified
+  sha256: f0f1867f40e430bc723e2108940269b7efc259de300e0ed3b653329bc589cd66
+- path: src/nouveau/compiler/nak/sm80_instr_latencies.rs
+  status: modified
+  sha256: eb7b44c532714a2663cbe45712d0d9c430df9cd32f2dd7bde81a9efc6654a8ac
+- path: src/nouveau/compiler/meson.build
+  status: modified
+  sha256: 5ede1008d5113e27d5d9b6bffa1837d72af48cc876289e674bd0a4aa2b1b24dc
+- path: src/nouveau/compiler/nak_nir.c
+  status: modified
+  sha256: 8b4809861cb69c48a909931d3ddba082a4e0c4875efbb65075c4640c381374cb
+- path: src/nouveau/compiler/nak_nir_lower_cmat.c
+  status: added
+  sha256: 900fae980e565b0ef572fac6ce65e8758d04eb9d8f4243479acf74379c8bdbdd
+- path: src/nouveau/compiler/nak_private.h
+  status: modified
+  sha256: 0fce5745fa986d568ca627e39077162fc8abbe1eae00b0348320538364ee0983
+- path: src/nouveau/vulkan/nvk_physical_device.c
+  status: modified
+  sha256: 9c9bfd73f882f13fb0c8cec8fb7f3218f794949d56e77f7b06b3992e41cc76a8

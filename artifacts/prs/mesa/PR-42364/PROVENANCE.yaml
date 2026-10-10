@@ -1,0 +1,14 @@
+repo: mesa/mesa
+pr: 42364
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42364
+merge_sha: a8f4c069a7eaacde0bfb1ec3ee349f2fe881a734
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/42364/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw/brw_lower_dpas.cpp
+  status: modified
+  sha256: 3a61a6ea22969f84edf93239ecdfa7ded8d62736ba48b8d79188035e07180e0f

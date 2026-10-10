@@ -1,0 +1,428 @@
+diff --git a/src/panfrost/compiler/valhall/va_pack.c b/src/panfrost/compiler/valhall/va_pack.c
+--- a/src/panfrost/compiler/valhall/va_pack.c
++++ b/src/panfrost/compiler/valhall/va_pack.c
+@@ -531,6 +531,10 @@ va_pack_alu(const bi_instr *I)
+       hex |= ((uint64_t)I->texture_index) << 20;
+       break;
+ 
++   case BI_OPCODE_WMASK:
++      hex |= ((uint64_t)I->subgroup) << 36;
++      break;
++
+    case BI_OPCODE_ZS_EMIT:
+       if (I->stencil)
+          hex |= (1 << 24);
+diff --git a/src/panfrost/compiler/IR_pseudo.xml b/src/panfrost/compiler/IR_pseudo.xml
+--- a/src/panfrost/compiler/IR_pseudo.xml
++++ b/src/panfrost/compiler/IR_pseudo.xml
+@@ -191,5 +191,6 @@
+     <src start="0"/>
+   </ins>
+ 
++  <ins name="MEMORY_BARRIER" pseudo="true" unit="NONE"/>
+ 
+ </bifrost>
+diff --git a/src/panfrost/compiler/bi_pressure_schedule.c b/src/panfrost/compiler/bi_pressure_schedule.c
+--- a/src/panfrost/compiler/bi_pressure_schedule.c
++++ b/src/panfrost/compiler/bi_pressure_schedule.c
+@@ -85,6 +85,8 @@ create_dag(bi_context *ctx, bi_block *block, void *memctx)
+       bi_foreach_dest(I, d)
+          last_write[I->dest[d].value] = node;
+ 
++      add_dep(node, preload);
++
+       switch (bi_opcode_props[I->op].message) {
+       case BIFROST_MESSAGE_LOAD:
+          /* Regular memory loads needs to be serialized against
+@@ -146,21 +148,22 @@ create_dag(bi_context *ctx, bi_block *block, void *memctx)
+          break;
+       }
+ 
+-      add_dep(node, preload);
+-
+       if (I->op == BI_OPCODE_DISCARD_F32) {
+          /* Serialize against ATEST */
+          add_dep(node, coverage);
+          coverage = node;
+-
+-         /* Also serialize against memory and barriers */
++      }
++      if (I->op == BI_OPCODE_DISCARD_F32 ||
++          I->op == BI_OPCODE_MEMORY_BARRIER) {
++         /* Serialize against memory operations and barriers */
+          add_dep(node, memory_load);
+          add_dep(node, memory_store);
+          memory_load = node;
+          memory_store = node;
+-      } else if ((I->op == BI_OPCODE_PHI) ||
+-                 (I->op == BI_OPCODE_MOV_I32 &&
+-                  I->src[0].type == BI_INDEX_REGISTER)) {
++      }
++      if ((I->op == BI_OPCODE_PHI) ||
++          (I->op == BI_OPCODE_MOV_I32 &&
++           I->src[0].type == BI_INDEX_REGISTER)) {
+          preload = node;
+       }
+    }
+diff --git a/src/panfrost/compiler/bi_printer.c.py b/src/panfrost/compiler/bi_printer.c.py
+--- a/src/panfrost/compiler/bi_printer.c.py
++++ b/src/panfrost/compiler/bi_printer.c.py
+@@ -49,7 +49,7 @@ static const char *
+ bir_fau_name(unsigned fau_idx)
+ {
+     const char *names[] = {
+-            "zero", "lane-id", "wrap-id", "core-id", "fb-extent",
++            "zero", "lane-id", "warp-id", "core-id", "fb-extent",
+             "atest-param", "sample-pos", "reserved",
+             "blend_descriptor_0", "blend_descriptor_1",
+             "blend_descriptor_2", "blend_descriptor_3",
+diff --git a/src/panfrost/compiler/bifrost_compile.c b/src/panfrost/compiler/bifrost_compile.c
+--- a/src/panfrost/compiler/bifrost_compile.c
++++ b/src/panfrost/compiler/bifrost_compile.c
+@@ -1759,6 +1759,18 @@ bi_emit_derivative(bi_builder *b, bi_index dst, nir_intrinsic_instr *instr,
+    bi_fadd_to(b, sz, dst, right, bi_neg(left));
+ }
+ 
++static enum bi_subgroup
++bi_subgroup_from_cluster_size(unsigned cluster_size)
++{
++   switch (cluster_size) {
++   case 2: return BI_SUBGROUP_SUBGROUP2;
++   case 4: return BI_SUBGROUP_SUBGROUP4;
++   case 8: return BI_SUBGROUP_SUBGROUP8;
++   case 16: return BI_SUBGROUP_SUBGROUP16;
++   default: unreachable("Unsupported cluster size");
++   }
++}
++
+ static void
+ bi_emit_intrinsic(bi_builder *b, nir_intrinsic_instr *instr)
+ {
+@@ -1841,15 +1853,36 @@ bi_emit_intrinsic(bi_builder *b, nir_intrinsic_instr *instr)
+       break;
+ 
+    case nir_intrinsic_barrier:
+-      if (nir_intrinsic_execution_scope(instr) != SCOPE_NONE) {
+-         assert(b->shader->stage != MESA_SHADER_FRAGMENT);
+-         assert(nir_intrinsic_execution_scope(instr) > SCOPE_SUBGROUP &&
+-                "todo: subgroup barriers (different divergence rules)");
++      switch (nir_intrinsic_execution_scope(instr)) {
++      case SCOPE_NONE:
++         /*
++          * No execution barrier, and we don't have to do anything for memory
++          * barriers (see SCOPE_WORKGROUP case.)
++          */
++         break;
++
++      case SCOPE_SUBGROUP:
++         /*
++          * To implement a subgroup barrier, we only need to prevent the
++          * scheduler from reordering memory operations around the barrier.
++          * Avail and vis are trivially established.
++          */
++         bi_memory_barrier(b);
++         break;
++
++      case SCOPE_WORKGROUP:
++         assert(b->shader->stage == MESA_SHADER_COMPUTE);
+          bi_barrier(b);
++         /*
++          * Blob doesn't seem to do anything for memory barriers, so no need to
++          * check nir_intrinsic_memory_scope().
++          */
++         break;
++
++      default:
++         unreachable("Unsupported barrier scope");
+       }
+-      /* Blob doesn't seem to do anything for memory barriers, so no need to
+-       * check nir_intrinsic_memory_scope().
+-       */
++
+       break;
+ 
+    case nir_intrinsic_shared_atomic: {
+@@ -1998,6 +2031,26 @@ bi_emit_intrinsic(bi_builder *b, nir_intrinsic_instr *instr)
+       bi_mov_i32_to(b, dst, bi_fau(BIR_FAU_LANE_ID, false));
+       break;
+ 
++   case nir_intrinsic_ballot:
++   case nir_intrinsic_ballot_relaxed: {
++      enum bi_subgroup subgroup =
++         bi_subgroup_from_cluster_size(pan_subgroup_size(b->shader->arch));
++      bi_wmask_to(b, dst, bi_src_index(&instr->src[0]), subgroup, 0);
++      break;
++   }
++
++   case nir_intrinsic_read_invocation: {
++      enum bi_inactive_result inactive_result = BI_INACTIVE_RESULT_ZERO;
++      enum bi_lane_op lane_op = BI_LANE_OP_NONE;
++      enum bi_subgroup subgroup =
++         bi_subgroup_from_cluster_size(pan_subgroup_size(b->shader->arch));
++      bi_clper_i32_to(b, dst,
++                      bi_src_index(&instr->src[0]),
++                      bi_src_index(&instr->src[1]),
++                      inactive_result, lane_op, subgroup);
++      break;
++   }
++
+    case nir_intrinsic_load_local_invocation_id:
+       bi_collect_v3i32_to(b, dst,
+                           bi_u16_to_u32(b, bi_half(bi_preload(b, 55), 0)),
+@@ -2057,6 +2110,15 @@ bi_emit_intrinsic(bi_builder *b, nir_intrinsic_instr *instr)
+       break;
+    }
+ 
++   case nir_intrinsic_as_uniform:
++      /*
++       * We don't have uniform registers (registers shared by all threads in the
++       * warp) like some other hardware does so this is just a simple mov for
++       * us.
++       */
++      bi_mov_i32_to(b, dst, bi_src_index(&instr->src[0]));
++      break;
++
+    default:
+       fprintf(stderr, "Unhandled intrinsic %s\n",
+               nir_intrinsic_infos[instr->intrinsic].name);
+@@ -5164,6 +5226,70 @@ bi_lower_load_output(nir_builder *b, nir_intrinsic_instr *intr,
+    return true;
+ }
+ 
++static bool
++bi_lower_subgroups(nir_builder *b, nir_intrinsic_instr *intr, void *data)
++{
++   unsigned int gpu_id = *(unsigned int *)data;
++   unsigned int arch = pan_arch(gpu_id);
++
++   b->cursor = nir_before_instr(&intr->instr);
++
++   nir_def *val = NULL;
++   switch (intr->intrinsic) {
++   case nir_intrinsic_vote_any:
++      val = nir_ine_imm(b, nir_ballot(b, 1, 32, intr->src[0].ssa), 0);
++      break;
++
++   case nir_intrinsic_vote_all:
++      val = nir_ieq_imm(b, nir_ballot(b, 1, 32, nir_inot(b, intr->src[0].ssa)), 0);
++      break;
++
++   case nir_intrinsic_load_subgroup_id: {
++      nir_def *local_id = nir_load_local_invocation_id(b);
++      nir_def *local_size = nir_load_workgroup_size(b);
++      /* local_id.x + local_size.x * (local_id.y + local_size.y * local_id.z) */
++      nir_def *flat_local_id =
++         nir_iadd(b,
++            nir_channel(b, local_id, 0),
++            nir_imul(b,
++               nir_channel(b, local_size, 0),
++               nir_iadd(b,
++                  nir_channel(b, local_id, 1),
++                  nir_imul(b,
++                     nir_channel(b, local_size, 1),
++                     nir_channel(b, local_id, 2)))));
++      /*
++       * nir_udiv_imm with a power of two divisor, which pan_subgroup_size is,
++       * will construct a right shift instead of an udiv.
++       */
++      val = nir_udiv_imm(b, flat_local_id, pan_subgroup_size(arch));
++      break;
++   }
++
++   case nir_intrinsic_load_subgroup_size:
++      val = nir_imm_int(b, pan_subgroup_size(arch));
++      break;
++
++   case nir_intrinsic_load_num_subgroups: {
++      uint32_t subgroup_size = pan_subgroup_size(arch);
++      assert(!b->shader->info.workgroup_size_variable);
++      uint32_t workgroup_size =
++         b->shader->info.workgroup_size[0] *
++         b->shader->info.workgroup_size[1] *
++         b->shader->info.workgroup_size[2];
++      uint32_t num_subgroups = DIV_ROUND_UP(workgroup_size, subgroup_size);
++      val = nir_imm_int(b, num_subgroups);
++      break;
++   }
++
++   default:
++      return false;
++   }
++
++   nir_def_rewrite_uses(&intr->def, val);
++   return true;
++}
++
+ bool
+ bifrost_nir_lower_load_output(nir_shader *nir)
+ {
+@@ -5289,6 +5415,44 @@ bifrost_preprocess_nir(nir_shader *nir, unsigned gpu_id)
+    if (pan_arch(gpu_id) < 9)
+       NIR_PASS(_, nir, pan_nir_lower_image_ms);
+ 
++   /*
++    * TODO: we can implement certain operations (notably reductions, scans,
++    * certain shuffles, etc) more efficiently than nir_lower_subgroups. Moreover
++    * we can implement reductions and scans on f16vec2 values without splitting
++    * to scalar first.
++    */
++   bool lower_subgroups_progress = false;
++   NIR_PASS(lower_subgroups_progress, nir, nir_lower_subgroups,
++      &(nir_lower_subgroups_options) {
++         .subgroup_size = pan_subgroup_size(pan_arch(gpu_id)),
++         .ballot_bit_size = 32,
++         .ballot_components = 1,
++         .lower_to_scalar = true,
++         .lower_vote_eq = true,
++         .lower_vote_bool_eq = true,
++         .lower_first_invocation_to_ballot = true,
++         .lower_read_first_invocation = true,
++         .lower_subgroup_masks = true,
++         .lower_relative_shuffle = true,
++         .lower_shuffle = true,
++         .lower_quad = true,
++         .lower_quad_broadcast_dynamic = true,
++         .lower_quad_vote = true,
++         .lower_elect = true,
++         .lower_rotate_to_shuffle = true,
++         .lower_rotate_clustered_to_shuffle = true,
++         .lower_inverse_ballot = true,
++         .lower_reduce = true,
++         .lower_boolean_reduce = true,
++         .lower_boolean_shuffle = true,
++      });
++   /* nir_lower_subgroups creates new vars, clean them up. */
++   if (lower_subgroups_progress)
++      NIR_PASS(_, nir, nir_lower_vars_to_ssa);
++
++   NIR_PASS(_, nir, nir_shader_intrinsics_pass, bi_lower_subgroups,
++            nir_metadata_control_flow, &gpu_id);
++
+    NIR_PASS(_, nir, nir_lower_alu_to_scalar, bi_scalarize_filter, NULL);
+    NIR_PASS(_, nir, nir_lower_load_const_to_scalar);
+    NIR_PASS(_, nir, nir_lower_phis_to_scalar, true);
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -213,6 +213,7 @@ get_device_extensions(const struct panvk_physical_device *device,
+       .KHR_shader_float16_int8 = true,
+       .KHR_shader_non_semantic_info = true,
+       .KHR_shader_relaxed_extended_instruction = true,
++      .KHR_shader_subgroup_rotate = true,
+       .KHR_storage_buffer_storage_class = true,
+ #ifdef PANVK_USE_WSI_PLATFORM
+       .KHR_swapchain = true,
+@@ -244,6 +245,7 @@ get_device_extensions(const struct panvk_physical_device *device,
+       .EXT_sampler_filter_minmax = arch >= 10,
+       .EXT_scalar_block_layout = true,
+       .EXT_shader_module_identifier = true,
++      .EXT_subgroup_size_control = true,
+       .EXT_tooling_info = true,
+       .GOOGLE_decorate_string = true,
+       .GOOGLE_hlsl_functionality1 = true,
+@@ -345,7 +347,7 @@ get_features(const struct panvk_physical_device *device,
+       .vulkanMemoryModelAvailabilityVisibilityChains = false,
+       .shaderOutputViewportIndex = false,
+       .shaderOutputLayer = false,
+-      .subgroupBroadcastDynamicId = false,
++      .subgroupBroadcastDynamicId = true,
+ 
+       /* Vulkan 1.3 */
+       .robustImageAccess = true,
+@@ -355,8 +357,8 @@ get_features(const struct panvk_physical_device *device,
+       .privateData = true,
+       .shaderDemoteToHelperInvocation = false,
+       .shaderTerminateInvocation = false,
+-      .subgroupSizeControl = false,
+-      .computeFullSubgroups = false,
++      .subgroupSizeControl = true,
++      .computeFullSubgroups = true,
+       .synchronization2 = true,
+       .textureCompressionASTC_HDR = false,
+       .shaderZeroInitializeWorkgroupMemory = true,
+@@ -364,6 +366,10 @@ get_features(const struct panvk_physical_device *device,
+       .shaderIntegerDotProduct = false,
+       .maintenance4 = false,
+ 
++      /* Vulkan 1.4 */
++      .shaderSubgroupRotate = true,
++      .shaderSubgroupRotateClustered = true,
++
+       /* VK_EXT_graphics_pipeline_library */
+       .graphicsPipelineLibrary = true,
+ 
+@@ -416,11 +422,15 @@ get_features(const struct panvk_physical_device *device,
+ }
+ 
+ static uint32_t
+-get_vk_version()
++get_vk_version(unsigned arch)
+ {
+    const uint32_t version_override = vk_get_version_override();
+    if (version_override)
+       return version_override;
++
++   if (arch >= 10)
++      return VK_MAKE_API_VERSION(0, 1, 1, VK_HEADER_VERSION);
++
+    return VK_MAKE_API_VERSION(0, 1, 0, VK_HEADER_VERSION);
+ }
+ 
+@@ -442,7 +452,7 @@ get_device_properties(const struct panvk_instance *instance,
+    assert(arch > 8 || device->kmod.props.max_threads_per_wg <= 1024);
+ 
+    *properties = (struct vk_properties){
+-      .apiVersion = get_vk_version(),
++      .apiVersion = get_vk_version(arch),
+       .driverVersion = vk_get_driver_version(),
+       .vendorID = ARM_VENDOR_ID,
+ 
+@@ -672,9 +682,29 @@ get_device_properties(const struct panvk_instance *instance,
+ 
+       /* Vulkan 1.1 properties */
+       /* XXX: 1.1 support */
+-      .subgroupSize = 8,
+-      .subgroupSupportedStages = 0,
+-      .subgroupSupportedOperations = 0,
++      .subgroupSize = pan_subgroup_size(arch),
++      /* We only support VS, FS, and CS.
++       *
++       * The HW may spawn VS invocations for non-existing indices, which could
++       * be observed through subgroup ops (though the user can observe them
++       * through infinte loops anyway), so subgroup ops can't be supported in
++       * VS.
++       *
++       * In FS, voting and potentially other subgroup ops are currently broken,
++       * so we don't report support for this stage either.
++       */
++      .subgroupSupportedStages = VK_SHADER_STAGE_COMPUTE_BIT,
++      .subgroupSupportedOperations =
++         VK_SUBGROUP_FEATURE_BASIC_BIT |
++         VK_SUBGROUP_FEATURE_VOTE_BIT |
++         VK_SUBGROUP_FEATURE_ARITHMETIC_BIT |
++         VK_SUBGROUP_FEATURE_BALLOT_BIT |
++         VK_SUBGROUP_FEATURE_SHUFFLE_BIT |
++         VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT |
++         VK_SUBGROUP_FEATURE_CLUSTERED_BIT |
++         VK_SUBGROUP_FEATURE_QUAD_BIT |
++         VK_SUBGROUP_FEATURE_ROTATE_BIT |
++         VK_SUBGROUP_FEATURE_ROTATE_CLUSTERED_BIT,
+       .subgroupQuadOperationsInAllStages = false,
+       .pointClippingBehavior = VK_POINT_CLIPPING_BEHAVIOR_ALL_CLIP_PLANES,
+       .maxMultiviewViewCount = arch >= 10 ? 8 : 0,
+@@ -744,10 +774,11 @@ get_device_properties(const struct panvk_instance *instance,
+       /* Vulkan 1.3 properties */
+       /* XXX: 1.3 support */
+       /* XXX: VK_EXT_subgroup_size_control */
+-      .minSubgroupSize = 8,
+-      .maxSubgroupSize = 8,
+-      .maxComputeWorkgroupSubgroups = 48,
+-      .requiredSubgroupSizeStages = VK_SHADER_STAGE_ALL,
++      .minSubgroupSize = pan_subgroup_size(arch),
++      .maxSubgroupSize = pan_subgroup_size(arch),
++      .maxComputeWorkgroupSubgroups =
++         device->kmod.props.max_threads_per_wg / pan_subgroup_size(arch),
++      .requiredSubgroupSizeStages = VK_SHADER_STAGE_COMPUTE_BIT,
+       /* XXX: VK_EXT_inline_uniform_block */
+       .maxInlineUniformBlockSize = MAX_INLINE_UNIFORM_BLOCK_SIZE,
+       .maxPerStageDescriptorInlineUniformBlocks =

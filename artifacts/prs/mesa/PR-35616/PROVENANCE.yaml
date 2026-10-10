@@ -1,0 +1,23 @@
+repo: mesa/mesa
+pr: 35616
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/35616
+merge_sha: 6842a8179fe66e8c730672b4ce1ec9ff5ffc04dd
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/35616/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw_from_nir.cpp
+  status: modified
+  sha256: 3f8d772f45f6bcaa4e9bfc09cfeaf15e28e27ff264b82cd1499e84ffa5246ee3
+- path: src/intel/compiler/brw_nir_lower_cooperative_matrix.c
+  status: modified
+  sha256: f03573988a80e28f55f809a0d4a889a35fa80f88263c023182152f8d83cb0556
+- path: src/intel/dev/intel_device_info.c
+  status: modified
+  sha256: a02961d814a42a6bd5b8122de832fdb3e4642bc4072dcd99883c25d969624e06
+- path: src/intel/dev/intel_device_info.py
+  status: modified
+  sha256: f0d7f46e52d720fffa31689a19115c3aa8f3aa2971818b15b6819eb75b0ebb71

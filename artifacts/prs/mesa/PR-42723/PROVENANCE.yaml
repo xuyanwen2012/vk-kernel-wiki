@@ -1,0 +1,44 @@
+repo: mesa/mesa
+pr: 42723
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42723
+merge_sha: 8b1b2aa47cdb63e99829d6171f3c72ddbb1c4080
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/42723/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/panfrost/compiler/bifrost/valhall/ISA.xml
+  status: modified
+  sha256: 30a3f40823100da88519aa3e4a8182641a0074d4128fb3a253f9926873f3d62e
+- path: src/panfrost/compiler/bifrost/bi_ra.c
+  status: modified
+  sha256: d40131e97e16e860bf09cb6671b352c7db03efc9336f4810609c68e162fa4677
+- path: src/panfrost/compiler/bifrost/bifrost_compile.c
+  status: modified
+  sha256: 244c571e909b57d56a062c9c0fda9c008ca8c58d3afd11dae1bfe82dfd6710a5
+- path: src/panfrost/vulkan/meson.build
+  status: modified
+  sha256: 91b3a123d2f3cd1805371ec8b1ca4afe16c3f6baaa8ccbbc38314233da52801d
+- path: src/panfrost/vulkan/panvk_device.h
+  status: modified
+  sha256: f814f00dae9aff9337429a3c73bcfcf78b20e78ae61de25d964d3feaf3d503b1
+- path: src/panfrost/vulkan/panvk_nir.h
+  status: added
+  sha256: e10322109c19b11990daebaf008b3150b16411d022ea9e921486228314538c56
+- path: src/panfrost/vulkan/panvk_nir_lower_cooperative_matrix.c
+  status: added
+  sha256: c84a9c729846f88fabd28cea8035e52d394e08c45007e7401260e6ae149f5f5a
+- path: src/panfrost/vulkan/panvk_nir_lower_tile_image.c
+  status: modified
+  sha256: 9901002f29d10103390c238fb6e8b291de57a3066a054714b0697b7851d444c4
+- path: src/panfrost/vulkan/panvk_physical_device.c
+  status: modified
+  sha256: 36c3141a70bb415de980d6894d94ad64bfbf3e7dcbf27a62cf6f715f5480ca0c
+- path: src/panfrost/vulkan/panvk_vX_physical_device.c
+  status: modified
+  sha256: 2962651e987373dfbd8c794fe49414355815c0ea02c318dd7f76cb2f93adc818
+- path: src/panfrost/vulkan/panvk_vX_shader.c
+  status: modified
+  sha256: 93de0adcda49b146fd16d032db8dfc33d7b0e13499c2af8411aa54a617284212

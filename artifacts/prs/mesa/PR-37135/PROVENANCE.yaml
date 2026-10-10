@@ -1,0 +1,29 @@
+repo: mesa/mesa
+pr: 37135
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37135
+merge_sha: 5bb463bb48a2c5041618d6102d648025a8a9e276
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/37135/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/nak/hw_runner.rs
+  status: modified
+  sha256: 552bd6817d16207d3ebd446a75ba2b582523e66cae7744fa64a3b19ba2bd499f
+- path: src/nouveau/compiler/nak/qmd.rs
+  status: modified
+  sha256: f3d024ae0e92de225d2db064e5184fc3fa463c83b20bfdd35068fd14e2d9b80f
+- path: src/nouveau/compiler/nak.h
+  status: modified
+  sha256: dcb3824db1224633227d8e58dcd2c53830cb9258d73e6a14fa4ae6c1f8f96bb1
+- path: src/nouveau/vulkan/nvk_cmd_dispatch.c
+  status: modified
+  sha256: 82053bf02b5836f5d409a96249e3411d8f9400491b1d37aca3b4eeacce0a454b
+- path: src/nouveau/vulkan/nvk_indirect_execution_set.c
+  status: modified
+  sha256: f24edb22cbdb4c717080724589b01ed1b85a3c26c6fb1767253b27fcbd81da82
+- path: src/nouveau/vulkan/nvk_physical_device.c
+  status: modified
+  sha256: a93c7a7cac88a90c5e290788c9b6aa85c5858290f6615edc7cd6ec059138e25b

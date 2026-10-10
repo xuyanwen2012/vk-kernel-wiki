@@ -1,0 +1,35 @@
+repo: mesa/mesa
+pr: 37998
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37998
+merge_sha: d06aff224388ffbaa281c84db8f1922ec0e8bbf9
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/37998/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/nouveau/compiler/nak/from_nir.rs
+  status: modified
+  sha256: c9bcc2e576d5a4560febedead3d3e59d0a9ea74526143b1c42a0d540c5f77050
+- path: src/nouveau/compiler/nak/ir.rs
+  status: modified
+  sha256: 0669a66d52c2cf2f9fd292a98a370b82199f2509ed52566ad55f6f46b6ccc90d
+- path: src/nouveau/compiler/nak/opt_instr_sched_common.rs
+  status: modified
+  sha256: b1e74291282243a2078dab7a4fcdf13e4f209a9a29bc246764488f4ee913c9ac
+- path: src/nouveau/compiler/nak/sm120_instr_latencies.rs
+  status: modified
+  sha256: fed016e22884d44baac6c687729c2acf75f10f2389aa840cc0674f81672e2be4
+- path: src/nouveau/compiler/nak/sm70_encode.rs
+  status: modified
+  sha256: db0c988acdaae0ed929e0f25a0899d70f8e2b615540d8a55db9fa292d02e7bd8
+- path: src/nouveau/compiler/nak/sm75_instr_latencies.rs
+  status: modified
+  sha256: a1de116e54dbad47eeef5dc82e2958ca9bd66dbd531fbe7e2be5b4b9abcd3ae8
+- path: src/nouveau/compiler/nak/sm80_instr_latencies.rs
+  status: modified
+  sha256: b087c9cd48734b69c1813395922df7bfbdd7bb251de341c23d843fe065ca0c0e
+- path: src/nouveau/compiler/nak_nir_lower_cmat.c
+  status: modified
+  sha256: 0b100fb5f7832ff53df8e30722963385ab8cd6c2ddfaf6969b16708df50edfae

@@ -1,0 +1,876 @@
+diff --git a/src/amd/common/ac_nir_lower_ngg.c b/src/amd/common/ac_nir_lower_ngg.c
+--- a/src/amd/common/ac_nir_lower_ngg.c
++++ b/src/amd/common/ac_nir_lower_ngg.c
+@@ -183,7 +183,7 @@ summarize_repack(nir_builder *b, nir_ssa_def *packed_counts, unsigned num_lds_dw
+ 
+    nir_ssa_def *lane_id = nir_load_subgroup_invocation(b);
+    nir_ssa_def *shift = nir_iadd_imm_nuw(b, nir_imul_imm(b, lane_id, -4u), num_lds_dwords * 16);
+-   bool use_dot = b->shader->options->has_dot_4x8;
++   bool use_dot = b->shader->options->has_udot_4x8;
+ 
+    if (num_lds_dwords == 1) {
+       nir_ssa_def *dot_op = !use_dot ? NULL : nir_ushr(b, nir_ushr(b, nir_imm_int(b, 0x01010101), shift), shift);
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -86,7 +86,8 @@ radv_get_nir_options(struct radv_physical_device *device)
+       .lower_iadd_sat = device->rad_info.chip_class <= GFX8,
+       .has_fsub = true,
+       .has_isub = true,
+-      .has_dot_4x8 = device->rad_info.has_accelerated_dot_product,
++      .has_sdot_4x8 = device->rad_info.has_accelerated_dot_product,
++      .has_udot_4x8 = device->rad_info.has_accelerated_dot_product,
+       .has_dot_2x16 = device->rad_info.has_accelerated_dot_product,
+       .use_scoped_barrier = true,
+       .max_unroll_iterations = 32,
+diff --git a/src/freedreno/ir3/tests/disasm.c b/src/freedreno/ir3/tests/disasm.c
+--- a/src/freedreno/ir3/tests/disasm.c
++++ b/src/freedreno/ir3/tests/disasm.c
+@@ -127,9 +127,20 @@ static const struct test {
+    INSTR_6XX(63820005_10315030, "mad.f32 r1.y, (neg)c12.x, r1.x, c12.y"),
+    INSTR_6XX(62050009_00091000, "mad.u24 r2.y, c0.x, r2.z, r2.y"),
+    INSTR_6XX(61828008_00081033, "madsh.m16 r2.x, c12.w, r1.y, r2.x"),
+-   INSTR_6XX(65900820_100cb008, "(nop3) shlg.b16 hr8.x, 8, hr8.x, 12"), /* (nop3) shlg.b16 hr8.x, (r)8, (r)hr8.x, 12; */
+-   INSTR_6XX(65ae085c_0002a001, "(nop3) shlg.b16 hr23.x, hr0.y, hr23.x, hr0.z"), /* not seen in blob */
+-   INSTR_6XX(65900820_0c0aac05, "(nop3) shlg.b16 hr8.x, hc<a0.x + 5>, hr8.x, hc<a0.x + 10>"), /* not seen in blob */
++   INSTR_6XX(65900820_100cb008, "(nop3) shlg hr8.x, 8, hr8.x, 12"), /* (nop3) shlg.b16 hr8.x, (r)8, (r)hr8.x, 12; */
++   INSTR_6XX(65ae085c_0002a001, "(nop3) shlg hr23.x, hr0.y, hr23.x, hr0.z"), /* not seen in blob */
++   INSTR_6XX(65900820_0c0aac05, "(nop3) shlg hr8.x, hc<a0.x + 5>, hr8.x, hc<a0.x + 10>"), /* not seen in blob */
++   INSTR_6XX(65ae0c5c_0002a001, "(nop3) shlg r23.x, r0.y, r23.x, r0.z"), /* (nop3) shlg.b32 r23.x, (r)r0.y, (r)r23.x, r0.z */
++   INSTR_6XX(64018802_0002e003, "(nop3) shrm hr0.z, (neg)hr0.w, hr0.w, hr0.z"),
++   INSTR_6XX(64818802_0002e003, "(nop3) shlm hr0.z, (neg)hr0.w, hr0.w, hr0.z"),
++   INSTR_6XX(65018802_0002e003, "(nop3) shrg hr0.z, (neg)hr0.w, hr0.w, hr0.z"),
++   INSTR_6XX(66018802_0002e003, "(nop3) andg hr0.z, (neg)hr0.w, hr0.w, hr0.z"),
++   INSTR_6XX(67018802_1002e003, "(nop3) wmm hr0.z, (neg)hr0.w, hr0.w, 2"), /* (nop3) wmm.f16f16 hr0.z, (abs)(r)hr0.w, (r)hr0.w, 2 */
++   INSTR_6XX(67018c02_1002e003, "(nop3) wmm.accu hr0.z, (neg)hr0.w, hr0.w, 2"),
++   INSTR_6XX(6701c802_9002a003, "(nop3) wmm r0.z, r0.w, r0.w, 2"), /* (nop3) wmm.f32f32 r0.z, (r)r0.w, (r)r0.w, 2 */
++   /* custom test with qcom_dot8 function from cl_qcom_dot_product8 */
++   INSTR_6XX(66818c02_0002e003, "(sat)(nop3) dp2acc.mixed.low r0.z, r0.w, r0.w, r0.z"), /* (nop3) dp2acc (sat)r0.z, (signed)(low)(r)r0.w, (low)(r)r0.w, r0.z */
++   INSTR_6XX(6681c802_8002a003, "(nop3) dp4acc.unsigned.low r0.z, r0.w, r0.w, (neg)r0.z"), /* (nop3) dp4acc r0.z, (unsigned)(r)r0.w, (r)r0.w, (neg)r0.z */
+ 
+    /* cat4 */
+    INSTR_6XX(8010000a_00000003, "rcp r2.z, r0.w"),
+diff --git a/src/freedreno/ir3/disasm-a3xx.c b/src/freedreno/ir3/disasm-a3xx.c
+--- a/src/freedreno/ir3/disasm-a3xx.c
++++ b/src/freedreno/ir3/disasm-a3xx.c
+@@ -258,7 +258,15 @@ static const struct opc_info {
+    OPC(3, OPC_SEL_F32,      sel.f32),
+    OPC(3, OPC_SAD_S16,      sad.s16),
+    OPC(3, OPC_SAD_S32,      sad.s32),
+-   OPC(3, OPC_SHLG_B16,     shlg.b16),
++   OPC(3, OPC_SHRM,         shrm),
++   OPC(3, OPC_SHLM,         shlm),
++   OPC(3, OPC_SHRG,         shrg),
++   OPC(3, OPC_SHLG,         shlg),
++   OPC(3, OPC_ANDG,         andg),
++   OPC(3, OPC_DP2ACC,       dp2acc),
++   OPC(3, OPC_DP4ACC,       dp4acc),
++   OPC(3, OPC_WMM,          wmm),
++   OPC(3, OPC_WMM_ACCU,     wmm.accu),
+ 
+    /* category 4: */
+    OPC(4, OPC_RCP,          rcp),
+diff --git a/src/freedreno/ir3/instr-a3xx.h b/src/freedreno/ir3/instr-a3xx.h
+--- a/src/freedreno/ir3/instr-a3xx.h
++++ b/src/freedreno/ir3/instr-a3xx.h
+@@ -198,7 +198,15 @@ typedef enum {
+    OPC_SEL_F32         = _OPC(3, 13),
+    OPC_SAD_S16         = _OPC(3, 14),
+    OPC_SAD_S32         = _OPC(3, 15),
+-   OPC_SHLG_B16        = _OPC(3, 16),
++   OPC_SHRM            = _OPC(3, 16),
++   OPC_SHLM            = _OPC(3, 17),
++   OPC_SHRG            = _OPC(3, 18),
++   OPC_SHLG            = _OPC(3, 19),
++   OPC_ANDG            = _OPC(3, 20),
++   OPC_DP2ACC          = _OPC(3, 21),
++   OPC_DP4ACC          = _OPC(3, 22),
++   OPC_WMM             = _OPC(3, 23),
++   OPC_WMM_ACCU        = _OPC(3, 24),
+ 
+    /* category 4: */
+    OPC_RCP             = _OPC(4, 0),
+diff --git a/src/freedreno/ir3/ir3.c b/src/freedreno/ir3/ir3.c
+--- a/src/freedreno/ir3/ir3.c
++++ b/src/freedreno/ir3/ir3.c
+@@ -922,12 +922,29 @@ ir3_valid_flags(struct ir3_instruction *instr, unsigned n, unsigned flags)
+       valid_flags =
+          ir3_cat3_absneg(instr->opc) | IR3_REG_RELATIV | IR3_REG_SHARED;
+ 
+-      if (instr->opc == OPC_SHLG_B16) {
++      switch (instr->opc) {
++      case OPC_SHRM:
++      case OPC_SHLM:
++      case OPC_SHRG:
++      case OPC_SHLG:
++      case OPC_ANDG: {
+          valid_flags |= IR3_REG_IMMED;
+-         /* shlg.b16 can be RELATIV+CONST but not CONST: */
++         /* Can be RELATIV+CONST but not CONST: */
+          if (flags & IR3_REG_RELATIV)
+             valid_flags |= IR3_REG_CONST;
+-      } else {
++         break;
++      }
++      case OPC_WMM:
++      case OPC_WMM_ACCU: {
++         valid_flags = IR3_REG_SHARED;
++         if (n == 2)
++            valid_flags = IR3_REG_CONST;
++         break;
++      }
++      case OPC_DP2ACC:
++      case OPC_DP4ACC:
++         break;
++      default:
+          valid_flags |= IR3_REG_CONST;
+       }
+ 
+diff --git a/src/freedreno/ir3/ir3.h b/src/freedreno/ir3/ir3.h
+--- a/src/freedreno/ir3/ir3.h
++++ b/src/freedreno/ir3/ir3.h
+@@ -329,6 +329,16 @@ struct ir3_instruction {
+             IR3_COND_NE = 5,
+          } condition;
+       } cat2;
++      struct {
++         enum {
++            IR3_SRC_UNSIGNED = 0,
++            IR3_SRC_MIXED = 1,
++         } signedness;
++         enum {
++            IR3_SRC_PACKED_LOW = 0,
++            IR3_SRC_PACKED_HIGH = 1,
++         } packed;
++      } cat3;
+       struct {
+          unsigned samp, tex;
+          unsigned tex_base : 3;
+@@ -1383,7 +1393,13 @@ ir3_cat3_absneg(opc_t opc)
+    case OPC_SEL_B16:
+    case OPC_SEL_B32:
+ 
+-   case OPC_SHLG_B16:
++   case OPC_SHRM:
++   case OPC_SHLM:
++   case OPC_SHRG:
++   case OPC_SHLG:
++   case OPC_ANDG:
++   case OPC_WMM:
++   case OPC_WMM_ACCU:
+ 
+    default:
+       return 0;
+@@ -1407,6 +1423,8 @@ ir3_output_conv_type(struct ir3_instruction *instr, bool *can_fold)
+    case OPC_BARY_F:
+    case OPC_MAD_F32:
+    case OPC_MAD_F16:
++   case OPC_WMM:
++   case OPC_WMM_ACCU:
+       return TYPE_F32;
+ 
+    case OPC_ADD_U:
+@@ -1423,6 +1441,11 @@ ir3_output_conv_type(struct ir3_instruction *instr, bool *can_fold)
+    case OPC_SHR_B:
+    case OPC_ASHR_B:
+    case OPC_MAD_U24:
++   case OPC_SHRM:
++   case OPC_SHLM:
++   case OPC_SHRG:
++   case OPC_SHLG:
++   case OPC_ANDG:
+    /* Comparison ops zero-extend/truncate their results, so consider them as
+     * unsigned here.
+     */
+@@ -2213,6 +2236,8 @@ INSTR3(MAD_U24)
+ INSTR3(MAD_S24)
+ INSTR3(MAD_F16)
+ INSTR3(MAD_F32)
++INSTR3(DP2ACC)
++INSTR3(DP4ACC)
+ /* NOTE: SEL_B32 checks for zero vs nonzero */
+ INSTR3(SEL_B16)
+ INSTR3(SEL_B32)
+diff --git a/src/freedreno/ir3/ir3_compiler.c b/src/freedreno/ir3/ir3_compiler.c
+--- a/src/freedreno/ir3/ir3_compiler.c
++++ b/src/freedreno/ir3/ir3_compiler.c
+@@ -69,6 +69,123 @@ ir3_compiler_destroy(struct ir3_compiler *compiler)
+    ralloc_free(compiler);
+ }
+ 
++static const nir_shader_compiler_options options = {
++   .lower_fpow = true,
++   .lower_scmp = true,
++   .lower_flrp16 = true,
++   .lower_flrp32 = true,
++   .lower_flrp64 = true,
++   .lower_ffract = true,
++   .lower_fmod = true,
++   .lower_fdiv = true,
++   .lower_isign = true,
++   .lower_ldexp = true,
++   .lower_uadd_carry = true,
++   .lower_usub_borrow = true,
++   .lower_mul_high = true,
++   .lower_mul_2x32_64 = true,
++   .fuse_ffma16 = true,
++   .fuse_ffma32 = true,
++   .fuse_ffma64 = true,
++   .vertex_id_zero_based = true,
++   .lower_extract_byte = true,
++   .lower_extract_word = true,
++   .lower_insert_byte = true,
++   .lower_insert_word = true,
++   .lower_helper_invocation = true,
++   .lower_bitfield_insert_to_shifts = true,
++   .lower_bitfield_extract_to_shifts = true,
++   .lower_pack_half_2x16 = true,
++   .lower_pack_snorm_4x8 = true,
++   .lower_pack_snorm_2x16 = true,
++   .lower_pack_unorm_4x8 = true,
++   .lower_pack_unorm_2x16 = true,
++   .lower_unpack_half_2x16 = true,
++   .lower_unpack_snorm_4x8 = true,
++   .lower_unpack_snorm_2x16 = true,
++   .lower_unpack_unorm_4x8 = true,
++   .lower_unpack_unorm_2x16 = true,
++   .lower_pack_split = true,
++   .use_interpolated_input_intrinsics = true,
++   .lower_rotate = true,
++   .lower_to_scalar = true,
++   .has_imul24 = true,
++   .has_fsub = true,
++   .has_isub = true,
++   .lower_wpos_pntc = true,
++   .lower_cs_local_index_from_id = true,
++
++   /* Only needed for the spirv_to_nir() pass done in ir3_cmdline.c
++    * but that should be harmless for GL since 64b is not
++    * supported there.
++    */
++   .lower_int64_options = (nir_lower_int64_options)~0,
++   .lower_uniforms_to_ubo = true,
++   .use_scoped_barrier = true,
++};
++
++/* we don't want to lower vertex_id to _zero_based on newer gpus: */
++static const nir_shader_compiler_options options_a6xx = {
++   .lower_fpow = true,
++   .lower_scmp = true,
++   .lower_flrp16 = true,
++   .lower_flrp32 = true,
++   .lower_flrp64 = true,
++   .lower_ffract = true,
++   .lower_fmod = true,
++   .lower_fdiv = true,
++   .lower_isign = true,
++   .lower_ldexp = true,
++   .lower_uadd_carry = true,
++   .lower_usub_borrow = true,
++   .lower_mul_high = true,
++   .lower_mul_2x32_64 = true,
++   .fuse_ffma16 = true,
++   .fuse_ffma32 = true,
++   .fuse_ffma64 = true,
++   .vertex_id_zero_based = false,
++   .lower_extract_byte = true,
++   .lower_extract_word = true,
++   .lower_insert_byte = true,
++   .lower_insert_word = true,
++   .lower_helper_invocation = true,
++   .lower_bitfield_insert_to_shifts = true,
++   .lower_bitfield_extract_to_shifts = true,
++   .lower_pack_half_2x16 = true,
++   .lower_pack_snorm_4x8 = true,
++   .lower_pack_snorm_2x16 = true,
++   .lower_pack_unorm_4x8 = true,
++   .lower_pack_unorm_2x16 = true,
++   .lower_unpack_half_2x16 = true,
++   .lower_unpack_snorm_4x8 = true,
++   .lower_unpack_snorm_2x16 = true,
++   .lower_unpack_unorm_4x8 = true,
++   .lower_unpack_unorm_2x16 = true,
++   .lower_pack_split = true,
++   .use_interpolated_input_intrinsics = true,
++   .lower_rotate = true,
++   .vectorize_io = true,
++   .lower_to_scalar = true,
++   .has_imul24 = true,
++   .has_fsub = true,
++   .has_isub = true,
++   .max_unroll_iterations = 32,
++   .force_indirect_unrolling = nir_var_all,
++   .lower_wpos_pntc = true,
++   .lower_cs_local_index_from_id = true,
++
++   /* Only needed for the spirv_to_nir() pass done in ir3_cmdline.c
++    * but that should be harmless for GL since 64b is not
++    * supported there.
++    */
++   .lower_int64_options = (nir_lower_int64_options)~0,
++   .lower_uniforms_to_ubo = true,
++   .lower_device_index_to_zero = true,
++   .use_scoped_barrier = true,
++   .has_udot_4x8 = true,
++   .has_sudot_4x8 = true,
++};
++
+ struct ir3_compiler *
+ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+                     bool robust_ubo_access)
+@@ -97,6 +214,8 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+ 
+    compiler->max_variable_workgroup_size = 1024;
+ 
++   const struct fd_dev_info *dev_info = fd_dev_info(compiler->dev_id);
++
+    if (compiler->gen >= 6) {
+       compiler->samgq_workaround = true;
+       /* a6xx split the pipeline state into geometry and fragment state, in
+@@ -126,14 +245,14 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+       /* TODO: implement private memory on earlier gen's */
+       compiler->has_pvtmem = true;
+ 
+-      compiler->tess_use_shared =
+-            fd_dev_info(compiler->dev_id)->a6xx.tess_use_shared;
++      compiler->tess_use_shared = dev_info->a6xx.tess_use_shared;
++
++      compiler->storage_16bit = dev_info->a6xx.storage_16bit;
+ 
+-      compiler->storage_16bit =
+-            fd_dev_info(compiler->dev_id)->a6xx.storage_16bit;
++      compiler->has_getfiberid = dev_info->a6xx.has_getfiberid;
+ 
+-      compiler->has_getfiberid =
+-            fd_dev_info(compiler->dev_id)->a6xx.has_getfiberid;
++      compiler->has_dp2acc = dev_info->a6xx.has_dp2acc;
++      compiler->has_dp4acc = dev_info->a6xx.has_dp4acc;
+    } else {
+       compiler->max_const_pipeline = 512;
+       compiler->max_const_geom = 512;
+@@ -147,8 +266,7 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+    }
+ 
+    if (compiler->gen >= 6) {
+-      compiler->reg_size_vec4 =
+-            fd_dev_info(compiler->dev_id)->a6xx.reg_size_vec4;
++      compiler->reg_size_vec4 = dev_info->a6xx.reg_size_vec4;
+    } else if (compiler->gen >= 4) {
+       /* On a4xx-a5xx, using r24.x and above requires using the smallest
+        * threadsize.
+@@ -192,7 +310,21 @@ ir3_compiler_create(struct fd_device *dev, const struct fd_dev_id *dev_id,
+ 
+    compiler->bool_type = (compiler->gen >= 5) ? TYPE_U16 : TYPE_U32;
+ 
++   if (compiler->gen >= 6) {
++      compiler->nir_options = options_a6xx;
++      compiler->nir_options.has_udot_4x8 = dev_info->a6xx.has_dp2acc;
++      compiler->nir_options.has_sudot_4x8 = dev_info->a6xx.has_dp2acc;
++   } else {
++      compiler->nir_options = options;
++   }
++
+    ir3_disk_cache_init(compiler);
+ 
+    return compiler;
+ }
++
++const nir_shader_compiler_options *
++ir3_get_compiler_options(struct ir3_compiler *compiler)
++{
++   return &compiler->nir_options;
++}
+diff --git a/src/freedreno/ir3/ir3_compiler.h b/src/freedreno/ir3/ir3_compiler.h
+--- a/src/freedreno/ir3/ir3_compiler.h
++++ b/src/freedreno/ir3/ir3_compiler.h
+@@ -27,6 +27,7 @@
+ #ifndef IR3_COMPILER_H_
+ #define IR3_COMPILER_H_
+ 
++#include "compiler/nir/nir.h"
+ #include "util/disk_cache.h"
+ #include "util/log.h"
+ 
+@@ -45,6 +46,8 @@ struct ir3_compiler {
+ 
+    struct disk_cache *disk_cache;
+ 
++   struct nir_shader_compiler_options nir_options;
++
+    /* If true, UBO accesses are assumed to be bounds-checked as defined by
+     * VK_EXT_robustness2 and optimizations may have to be more conservative.
+     */
+@@ -169,6 +172,9 @@ struct ir3_compiler {
+    /* MAX_COMPUTE_VARIABLE_GROUP_INVOCATIONS_ARB */
+    uint32_t max_variable_workgroup_size;
+ 
++   bool has_dp2acc;
++   bool has_dp4acc;
++
+    /* Type to use for 1b nir bools: */
+    type_t bool_type;
+ };
+@@ -186,6 +192,9 @@ bool ir3_disk_cache_retrieve(struct ir3_compiler *compiler,
+ void ir3_disk_cache_store(struct ir3_compiler *compiler,
+                           struct ir3_shader_variant *v);
+ 
++const nir_shader_compiler_options *
++ir3_get_compiler_options(struct ir3_compiler *compiler);
++
+ int ir3_compile_shader_nir(struct ir3_compiler *compiler,
+                            struct ir3_shader_variant *so);
+ 
+diff --git a/src/freedreno/ir3/ir3_compiler_nir.c b/src/freedreno/ir3/ir3_compiler_nir.c
+--- a/src/freedreno/ir3/ir3_compiler_nir.c
++++ b/src/freedreno/ir3/ir3_compiler_nir.c
+@@ -289,6 +289,76 @@ resize_shift_amount(struct ir3_context *ctx, struct ir3_instruction *src,
+    return ir3_COV(ctx->block, src, TYPE_U32, TYPE_U16);
+ }
+ 
++static void
++emit_alu_dot_4x8_as_dp4acc(struct ir3_context *ctx, nir_alu_instr *alu,
++                           struct ir3_instruction **dst,
++                           struct ir3_instruction **src)
++{
++   struct ir3_instruction *accumulator = NULL;
++   if (alu->op == nir_op_udot_4x8_uadd_sat) {
++      accumulator = create_immed(ctx->block, 0);
++   } else {
++      accumulator = src[2];
++   }
++
++   dst[0] = ir3_DP4ACC(ctx->block, src[0], 0, src[1], 0, accumulator, 0);
++
++   if (alu->op == nir_op_udot_4x8_uadd ||
++       alu->op == nir_op_udot_4x8_uadd_sat) {
++      dst[0]->cat3.signedness = IR3_SRC_UNSIGNED;
++   } else {
++      dst[0]->cat3.signedness = IR3_SRC_MIXED;
++   }
++
++   /* For some reason (sat) doesn't work in unsigned case so
++    * we have to emulate it.
++    */
++   if (alu->op == nir_op_udot_4x8_uadd_sat) {
++      dst[0] = ir3_ADD_U(ctx->block, dst[0], 0, src[2], 0);
++      dst[0]->flags |= IR3_INSTR_SAT;
++   } else if (alu->op == nir_op_sudot_4x8_iadd_sat) {
++      dst[0]->flags |= IR3_INSTR_SAT;
++   }
++}
++
++static void
++emit_alu_dot_4x8_as_dp2acc(struct ir3_context *ctx, nir_alu_instr *alu,
++                           struct ir3_instruction **dst,
++                           struct ir3_instruction **src)
++{
++   int signedness;
++   if (alu->op == nir_op_udot_4x8_uadd ||
++       alu->op == nir_op_udot_4x8_uadd_sat) {
++      signedness = IR3_SRC_UNSIGNED;
++   } else {
++      signedness = IR3_SRC_MIXED;
++   }
++
++   struct ir3_instruction *accumulator = NULL;
++   if (alu->op == nir_op_udot_4x8_uadd_sat ||
++       alu->op == nir_op_sudot_4x8_iadd_sat) {
++      accumulator = create_immed(ctx->block, 0);
++   } else {
++      accumulator = src[2];
++   }
++
++   dst[0] = ir3_DP2ACC(ctx->block, src[0], 0, src[1], 0, accumulator, 0);
++   dst[0]->cat3.packed = IR3_SRC_PACKED_LOW;
++   dst[0]->cat3.signedness = signedness;
++
++   dst[0] = ir3_DP2ACC(ctx->block, src[0], 0, src[1], 0, dst[0], 0);
++   dst[0]->cat3.packed = IR3_SRC_PACKED_HIGH;
++   dst[0]->cat3.signedness = signedness;
++
++   if (alu->op == nir_op_udot_4x8_uadd_sat) {
++      dst[0] = ir3_ADD_U(ctx->block, dst[0], 0, src[2], 0);
++      dst[0]->flags |= IR3_INSTR_SAT;
++   } else if (alu->op == nir_op_sudot_4x8_iadd_sat) {
++      dst[0] = ir3_ADD_S(ctx->block, dst[0], 0, src[2], 0);
++      dst[0]->flags |= IR3_INSTR_SAT;
++   }
++}
++
+ static void
+ emit_alu(struct ir3_context *ctx, nir_alu_instr *alu)
+ {
+@@ -744,6 +814,31 @@ emit_alu(struct ir3_context *ctx, nir_alu_instr *alu)
+       dst[0] = ir3_BFREV_B(b, src[0], 0);
+       break;
+ 
++   case nir_op_uadd_sat:
++      dst[0] = ir3_ADD_U(b, src[0], 0, src[1], 0);
++      dst[0]->flags |= IR3_INSTR_SAT;
++      break;
++   case nir_op_iadd_sat:
++      dst[0] = ir3_ADD_S(b, src[0], 0, src[1], 0);
++      dst[0]->flags |= IR3_INSTR_SAT;
++      break;
++
++   case nir_op_udot_4x8_uadd:
++   case nir_op_udot_4x8_uadd_sat:
++   case nir_op_sudot_4x8_iadd:
++   case nir_op_sudot_4x8_iadd_sat: {
++      if (ctx->compiler->has_dp4acc) {
++         emit_alu_dot_4x8_as_dp4acc(ctx, alu, dst, src);
++      } else if (ctx->compiler->has_dp2acc) {
++         emit_alu_dot_4x8_as_dp2acc(ctx, alu, dst, src);
++      } else {
++         ir3_context_error(ctx, "ALU op should have been lowered: %s\n",
++                           nir_op_infos[alu->op].name);
++      }
++
++      break;
++   }
++
+    default:
+       ir3_context_error(ctx, "Unhandled ALU op: %s\n",
+                         nir_op_infos[alu->op].name);
+diff --git a/src/freedreno/ir3/ir3_lexer.l b/src/freedreno/ir3/ir3_lexer.l
+--- a/src/freedreno/ir3/ir3_lexer.l
++++ b/src/freedreno/ir3/ir3_lexer.l
+@@ -244,7 +244,15 @@ static int parse_reg(const char *str)
+ "sel.f32"                         return TOKEN(T_OP_SEL_F32);
+ "sad.s16"                         return TOKEN(T_OP_SAD_S16);
+ "sad.s32"                         return TOKEN(T_OP_SAD_S32);
+-"shlg.b16"                        return TOKEN(T_OP_SHLG_B16);
++"shrm"                            return TOKEN(T_OP_SHRM);
++"shlm"                            return TOKEN(T_OP_SHLM);
++"shrg"                            return TOKEN(T_OP_SHRG);
++"shlg"                            return TOKEN(T_OP_SHLG);
++"andg"                            return TOKEN(T_OP_ANDG);
++"dp2acc"                          return TOKEN(T_OP_DP2ACC);
++"dp4acc"                          return TOKEN(T_OP_DP4ACC);
++"wmm"                             return TOKEN(T_OP_WMM);
++"wmm.accu"                        return TOKEN(T_OP_WMM_ACCU);
+ 
+                                   /* category 4: */
+ "rcp"                             return TOKEN(T_OP_RCP);
+@@ -383,6 +391,11 @@ static int parse_reg(const char *str)
+ "untyped"                         return TOKEN(T_UNTYPED);
+ "typed"                           return TOKEN(T_TYPED);
+ 
++"unsigned"                        return TOKEN(T_UNSIGNED);
++"mixed"                           return TOKEN(T_MIXED);
++"low"                             return TOKEN(T_LOW);
++"high"                            return TOKEN(T_HIGH);
++
+ "1d"                              return TOKEN(T_1D);
+ "2d"                              return TOKEN(T_2D);
+ "3d"                              return TOKEN(T_3D);
+diff --git a/src/freedreno/ir3/ir3_nir.c b/src/freedreno/ir3/ir3_nir.c
+--- a/src/freedreno/ir3/ir3_nir.c
++++ b/src/freedreno/ir3/ir3_nir.c
+@@ -31,129 +31,6 @@
+ #include "ir3_nir.h"
+ #include "ir3_shader.h"
+ 
+-static const nir_shader_compiler_options options = {
+-   .lower_fpow = true,
+-   .lower_scmp = true,
+-   .lower_flrp16 = true,
+-   .lower_flrp32 = true,
+-   .lower_flrp64 = true,
+-   .lower_ffract = true,
+-   .lower_fmod = true,
+-   .lower_fdiv = true,
+-   .lower_isign = true,
+-   .lower_ldexp = true,
+-   .lower_uadd_carry = true,
+-   .lower_usub_borrow = true,
+-   .lower_mul_high = true,
+-   .lower_mul_2x32_64 = true,
+-   .fuse_ffma16 = true,
+-   .fuse_ffma32 = true,
+-   .fuse_ffma64 = true,
+-   .vertex_id_zero_based = true,
+-   .lower_extract_byte = true,
+-   .lower_extract_word = true,
+-   .lower_insert_byte = true,
+-   .lower_insert_word = true,
+-   .lower_helper_invocation = true,
+-   .lower_bitfield_insert_to_shifts = true,
+-   .lower_bitfield_extract_to_shifts = true,
+-   .lower_pack_half_2x16 = true,
+-   .lower_pack_snorm_4x8 = true,
+-   .lower_pack_snorm_2x16 = true,
+-   .lower_pack_unorm_4x8 = true,
+-   .lower_pack_unorm_2x16 = true,
+-   .lower_unpack_half_2x16 = true,
+-   .lower_unpack_snorm_4x8 = true,
+-   .lower_unpack_snorm_2x16 = true,
+-   .lower_unpack_unorm_4x8 = true,
+-   .lower_unpack_unorm_2x16 = true,
+-   .lower_pack_split = true,
+-   .use_interpolated_input_intrinsics = true,
+-   .lower_rotate = true,
+-   .lower_to_scalar = true,
+-   .has_imul24 = true,
+-   .has_fsub = true,
+-   .has_isub = true,
+-   .lower_wpos_pntc = true,
+-   .lower_cs_local_index_from_id = true,
+-
+-   /* Only needed for the spirv_to_nir() pass done in ir3_cmdline.c
+-    * but that should be harmless for GL since 64b is not
+-    * supported there.
+-    */
+-   .lower_int64_options = (nir_lower_int64_options)~0,
+-   .lower_uniforms_to_ubo = true,
+-   .use_scoped_barrier = true,
+-};
+-
+-/* we don't want to lower vertex_id to _zero_based on newer gpus: */
+-static const nir_shader_compiler_options options_a6xx = {
+-   .lower_fpow = true,
+-   .lower_scmp = true,
+-   .lower_flrp16 = true,
+-   .lower_flrp32 = true,
+-   .lower_flrp64 = true,
+-   .lower_ffract = true,
+-   .lower_fmod = true,
+-   .lower_fdiv = true,
+-   .lower_isign = true,
+-   .lower_ldexp = true,
+-   .lower_uadd_carry = true,
+-   .lower_usub_borrow = true,
+-   .lower_mul_high = true,
+-   .lower_mul_2x32_64 = true,
+-   .fuse_ffma16 = true,
+-   .fuse_ffma32 = true,
+-   .fuse_ffma64 = true,
+-   .vertex_id_zero_based = false,
+-   .lower_extract_byte = true,
+-   .lower_extract_word = true,
+-   .lower_insert_byte = true,
+-   .lower_insert_word = true,
+-   .lower_helper_invocation = true,
+-   .lower_bitfield_insert_to_shifts = true,
+-   .lower_bitfield_extract_to_shifts = true,
+-   .lower_pack_half_2x16 = true,
+-   .lower_pack_snorm_4x8 = true,
+-   .lower_pack_snorm_2x16 = true,
+-   .lower_pack_unorm_4x8 = true,
+-   .lower_pack_unorm_2x16 = true,
+-   .lower_unpack_half_2x16 = true,
+-   .lower_unpack_snorm_4x8 = true,
+-   .lower_unpack_snorm_2x16 = true,
+-   .lower_unpack_unorm_4x8 = true,
+-   .lower_unpack_unorm_2x16 = true,
+-   .lower_pack_split = true,
+-   .use_interpolated_input_intrinsics = true,
+-   .lower_rotate = true,
+-   .vectorize_io = true,
+-   .lower_to_scalar = true,
+-   .has_imul24 = true,
+-   .has_fsub = true,
+-   .has_isub = true,
+-   .max_unroll_iterations = 32,
+-   .force_indirect_unrolling = nir_var_all,
+-   .lower_wpos_pntc = true,
+-   .lower_cs_local_index_from_id = true,
+-
+-   /* Only needed for the spirv_to_nir() pass done in ir3_cmdline.c
+-    * but that should be harmless for GL since 64b is not
+-    * supported there.
+-    */
+-   .lower_int64_options = (nir_lower_int64_options)~0,
+-   .lower_uniforms_to_ubo = true,
+-   .lower_device_index_to_zero = true,
+-   .use_scoped_barrier = true,
+-};
+-
+-const nir_shader_compiler_options *
+-ir3_get_compiler_options(struct ir3_compiler *compiler)
+-{
+-   if (compiler->gen >= 6)
+-      return &options_a6xx;
+-   return &options;
+-}
+-
+ static bool
+ ir3_nir_should_vectorize_mem(unsigned align_mul, unsigned align_offset,
+                              unsigned bit_size, unsigned num_components,
+diff --git a/src/freedreno/ir3/ir3_nir.h b/src/freedreno/ir3/ir3_nir.h
+--- a/src/freedreno/ir3/ir3_nir.h
++++ b/src/freedreno/ir3/ir3_nir.h
+@@ -62,8 +62,6 @@ bool ir3_nir_lower_64b_intrinsics(nir_shader *shader);
+ bool ir3_nir_lower_64b_undef(nir_shader *shader);
+ bool ir3_nir_lower_64b_global(nir_shader *shader);
+ 
+-const nir_shader_compiler_options *
+-ir3_get_compiler_options(struct ir3_compiler *compiler);
+ void ir3_optimize_loop(struct ir3_compiler *compiler, nir_shader *s);
+ void ir3_nir_lower_io_to_temporaries(nir_shader *s);
+ void ir3_finalize_nir(struct ir3_compiler *compiler, nir_shader *s);
+diff --git a/src/freedreno/ir3/ir3_parser.y b/src/freedreno/ir3/ir3_parser.y
+--- a/src/freedreno/ir3/ir3_parser.y
++++ b/src/freedreno/ir3/ir3_parser.y
+@@ -484,7 +484,15 @@ static void print_token(FILE *file, int type, YYSTYPE value)
+ %token <tok> T_OP_SEL_F32
+ %token <tok> T_OP_SAD_S16
+ %token <tok> T_OP_SAD_S32
+-%token <tok> T_OP_SHLG_B16
++%token <tok> T_OP_SHRM
++%token <tok> T_OP_SHLM
++%token <tok> T_OP_SHRG
++%token <tok> T_OP_SHLG
++%token <tok> T_OP_ANDG
++%token <tok> T_OP_DP2ACC
++%token <tok> T_OP_DP4ACC
++%token <tok> T_OP_WMM
++%token <tok> T_OP_WMM_ACCU
+ 
+ /* category 4: */
+ %token <tok> T_OP_RCP
+@@ -623,6 +631,11 @@ static void print_token(FILE *file, int type, YYSTYPE value)
+ %token <tok> T_UNTYPED
+ %token <tok> T_TYPED
+ 
++%token <tok> T_MIXED
++%token <tok> T_UNSIGNED
++%token <tok> T_LOW
++%token <tok> T_HIGH
++
+ %token <tok> T_1D
+ %token <tok> T_2D
+ %token <tok> T_3D
+@@ -949,6 +962,12 @@ cat2_instr:        cat2_opc_1src dst_reg ',' src_reg_or_const_or_rel_or_imm
+ |                  cat2_opc_2src_cnd '.' cond dst_reg ',' src_reg_or_const_or_rel_or_imm ',' src_reg_or_const_or_rel_or_imm
+ |                  cat2_opc_2src dst_reg ',' src_reg_or_const_or_rel_or_imm ',' src_reg_or_const_or_rel_or_imm
+ 
++cat3_dp_signedness:'.' T_MIXED   { instr->cat3.signedness = IR3_SRC_MIXED; }
++|                  '.' T_UNSIGNED{ instr->cat3.signedness = IR3_SRC_UNSIGNED; }
++
++cat3_dp_pack:      '.' T_LOW     { instr->cat3.packed = IR3_SRC_PACKED_LOW; }
++|                  '.' T_HIGH    { instr->cat3.packed = IR3_SRC_PACKED_HIGH; }
++
+ cat3_opc:          T_OP_MAD_U16   { new_instr(OPC_MAD_U16); }
+ |                  T_OP_MADSH_U16 { new_instr(OPC_MADSH_U16); }
+ |                  T_OP_MAD_S16   { new_instr(OPC_MAD_S16); }
+@@ -966,8 +985,22 @@ cat3_opc:          T_OP_MAD_U16   { new_instr(OPC_MAD_U16); }
+ |                  T_OP_SAD_S16   { new_instr(OPC_SAD_S16); }
+ |                  T_OP_SAD_S32   { new_instr(OPC_SAD_S32); }
+ 
++cat3_imm_reg_opc:  T_OP_SHRM      { new_instr(OPC_SHRM); }
++|                  T_OP_SHLM      { new_instr(OPC_SHLM); }
++|                  T_OP_SHRG      { new_instr(OPC_SHRG); }
++|                  T_OP_SHLG      { new_instr(OPC_SHLG); }
++|                  T_OP_ANDG      { new_instr(OPC_ANDG); }
++
++cat3_wmm:          T_OP_WMM       { new_instr(OPC_WMM); }
++|                  T_OP_WMM_ACCU  { new_instr(OPC_WMM_ACCU); }
++
++cat3_dp:           T_OP_DP2ACC    { new_instr(OPC_DP2ACC); }
++|                  T_OP_DP4ACC    { new_instr(OPC_DP4ACC); }
++
+ cat3_instr:        cat3_opc dst_reg ',' src_reg_or_const_or_rel ',' src_reg_or_const ',' src_reg_or_const_or_rel
+-|                  T_OP_SHLG_B16 { new_instr(OPC_SHLG_B16); } dst_reg ',' src_reg_or_rel_or_imm ',' src_reg_or_const ',' src_reg_or_rel_or_imm
++|                  cat3_imm_reg_opc dst_reg ',' src_reg_or_rel_or_imm ',' src_reg_or_const ',' src_reg_or_rel_or_imm
++|                  cat3_wmm         dst_reg ',' src_reg_gpr ',' src_reg ',' immediate
++|                  cat3_dp cat3_dp_signedness cat3_dp_pack dst_reg ',' src_reg_or_rel_or_imm ',' src_reg_or_const ',' src_reg_or_rel_or_imm
+ 
+ cat4_opc:          T_OP_RCP       { new_instr(OPC_RCP); }
+ |                  T_OP_RSQ       { new_instr(OPC_RSQ); }
+@@ -1267,6 +1300,9 @@ src_reg_flags:     src_reg_flag
+ src_reg:           src
+ |                  src_reg_flags src
+ 
++src_reg_gpr:       src_reg
++|                  relative_gpr_src
++
+ src_const:         const
+ |                  src_reg_flags const
+ 
+diff --git a/src/freedreno/vulkan/tu_device.c b/src/freedreno/vulkan/tu_device.c
+--- a/src/freedreno/vulkan/tu_device.c
++++ b/src/freedreno/vulkan/tu_device.c
+@@ -157,6 +157,7 @@ get_device_extensions(const struct tu_physical_device *device,
+       .KHR_driver_properties = true,
+       .KHR_separate_depth_stencil_layouts = true,
+       .KHR_buffer_device_address = true,
++      .KHR_shader_integer_dot_product = true,
+ #ifndef TU_USE_KGSL
+       .KHR_timeline_semaphore = true,
+ #endif
+@@ -790,6 +791,12 @@ tu_GetPhysicalDeviceFeatures2(VkPhysicalDevice physicalDevice,
+          features->computeFullSubgroups = true;
+          break;
+       }
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES_KHR: {
++         VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR *features =
++            (VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR *)ext;
++         features->shaderIntegerDotProduct = true;
++         break;
++      };
+ 
+       default:
+          break;
+@@ -1159,6 +1166,48 @@ tu_GetPhysicalDeviceProperties2(VkPhysicalDevice physicalDevice,
+          props->requiredSubgroupSizeStages = VK_SHADER_STAGE_ALL;
+          break;
+       }
++      case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES_KHR: {
++         VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR *props =
++            (VkPhysicalDeviceShaderIntegerDotProductPropertiesKHR *)ext;
++
++         props->integerDotProduct8BitUnsignedAccelerated = false;
++         props->integerDotProduct8BitSignedAccelerated = false;
++         props->integerDotProduct8BitMixedSignednessAccelerated = false;
++         props->integerDotProduct4x8BitPackedUnsignedAccelerated =
++            pdevice->info->a6xx.has_dp2acc;
++         /* TODO: we should be able to emulate 4x8BitPackedSigned fast enough */
++         props->integerDotProduct4x8BitPackedSignedAccelerated = false;
++         props->integerDotProduct4x8BitPackedMixedSignednessAccelerated =
++            pdevice->info->a6xx.has_dp2acc;
++         props->integerDotProduct16BitUnsignedAccelerated = false;
++         props->integerDotProduct16BitSignedAccelerated = false;
++         props->integerDotProduct16BitMixedSignednessAccelerated = false;
++         props->integerDotProduct32BitUnsignedAccelerated = false;
++         props->integerDotProduct32BitSignedAccelerated = false;
++         props->integerDotProduct32BitMixedSignednessAccelerated = false;
++         props->integerDotProduct64BitUnsignedAccelerated = false;
++         props->integerDotProduct64BitSignedAccelerated = false;
++         props->integerDotProduct64BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating8BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating8BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating4x8BitPackedUnsignedAccelerated =
++            pdevice->info->a6xx.has_dp2acc;
++         /* TODO: we should be able to emulate Saturating4x8BitPackedSigned fast enough */
++         props->integerDotProductAccumulatingSaturating4x8BitPackedSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating4x8BitPackedMixedSignednessAccelerated =
++            pdevice->info->a6xx.has_dp2acc;
++         props->integerDotProductAccumulatingSaturating16BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating16BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating16BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating32BitMixedSignednessAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitUnsignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitSignedAccelerated = false;
++         props->integerDotProductAccumulatingSaturating64BitMixedSignednessAccelerated = false;
++         break;
++      }
+ 
+       default:
+          break;
+diff --git a/src/intel/compiler/brw_compiler.c b/src/intel/compiler/brw_compiler.c
+--- a/src/intel/compiler/brw_compiler.c
++++ b/src/intel/compiler/brw_compiler.c
+@@ -178,7 +178,8 @@ brw_compiler_create(void *mem_ctx, const struct intel_device_info *devinfo)
+       nir_options->lower_bitfield_reverse = devinfo->ver < 7;
+       nir_options->has_iadd3 = devinfo->verx10 >= 125;
+ 
+-      nir_options->has_dot_4x8 = devinfo->ver >= 12;
++      nir_options->has_sdot_4x8 = devinfo->ver >= 12;
++      nir_options->has_udot_4x8 = devinfo->ver >= 12;
+       nir_options->has_sudot_4x8 = devinfo->ver >= 12;
+ 
+       nir_options->lower_int64_options = int64_options;

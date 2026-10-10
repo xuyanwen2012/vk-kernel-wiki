@@ -1,0 +1,32 @@
+repo: mesa/mesa
+pr: 41814
+url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41814
+merge_sha: c3cdcd09ed8e07bf14477dcd6101efe72c3d665b
+license: MIT
+license_file: artifacts/prs/mesa/LICENSE
+retrieved_at: '2026-10-05'
+patch_file: driver.patch
+origin: GitLab REST API, https://gitlab.freedesktop.org/api/v4, project mesa/mesa, merge_requests/41814/diffs, field 'diff' without its final newline
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: src/intel/compiler/brw/brw_compile_cs.cpp
+  status: modified
+  sha256: c9c8b8692d9fc4993728ea6a88a6e7deca361529fd5a990949801c5d5cd74a24
+- path: src/intel/compiler/brw/brw_lower_scoreboard.cpp
+  status: modified
+  sha256: 602a88a3204eedcde25cb6544d7d26d3b7d002957edce26b4970d3c4636daf17
+- path: src/intel/compiler/brw/brw_nir.c
+  status: modified
+  sha256: 6235f72194c8072e96ac4a7affcbbe90b5747120165656426887a7feb97a90b7
+- path: src/intel/compiler/brw/brw_nir.h
+  status: modified
+  sha256: fc96acfab30c03ae65cc70e95f0b3d93174fd899676c54b4357708633d130eaf
+- path: src/intel/compiler/brw/brw_nir_opt_systolic_vectorize.c
+  status: added
+  sha256: b31cefeed281cf43462a29e6e459288bbe90d64979f2ca88cc238d62bd163bba
+- path: src/intel/compiler/brw/brw_shader.cpp
+  status: modified
+  sha256: 897cdea6a1150b8da4c3908e10bf42f7102333166f9fdd9e14fb872e8c8a0acf
+- path: src/intel/compiler/brw/meson.build
+  status: modified
+  sha256: 22bd03f4c3d167a677d002b6a5afab1d1acaea2b8ea0519fac57201b4919afe5
