@@ -30,6 +30,11 @@ hardware_features:
   - 8bit-storage                # GL_EXT_shader_8bit_storage
   - integer-dot-product         # GL_EXT_integer_dot_product
   - specialization-constants    # local_size_*_id and spec-constant shape parameters
+  - full-subgroups              # computeFullSubgroups / REQUIRE_FULL_SUBGROUPS (every subgroup launched fully populated)
+  - subgroup-operations         # GL_KHR_shader_subgroup built-ins / subgroupSupportedOperations
+  - workgroup-size-limit        # maxComputeWorkGroupSize / maxComputeWorkGroupInvocations
+  - control-barrier             # barrier() / OpControlBarrier, including split barriers
+  - memory-model                # Vulkan memory model: data races, memory semantics, scopes
 
 # Optimization techniques present in the shader parameters and shader bodies.
 techniques:
