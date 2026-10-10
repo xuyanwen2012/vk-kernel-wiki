@@ -58,6 +58,8 @@ architectures:
             kind: device
           arc-pro-b70:
             kind: device
+      arc-a770:
+        kind: device
 
   nvidia:
     kind: vendor
