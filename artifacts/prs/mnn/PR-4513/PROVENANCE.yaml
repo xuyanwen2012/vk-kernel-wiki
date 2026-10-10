@@ -1,0 +1,35 @@
+repo: alibaba/MNN
+pr: 4513
+url: https://github.com/alibaba/MNN/pull/4513
+merge_sha: 5f255f622cd95968e2c5f0ef62f8ad28d9a141f3
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/4513/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int2_weight_prepare.comp
+  status: added
+  sha256: e015499065a43e22c8a46d42ec1a2972ef1c768ae4c20a1703292eb890035806
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int3_weight_prepare.comp
+  status: added
+  sha256: d028b316901d8b929f809c148f26d7b222c759bd075f29048264dd5b9a039800
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2.comp
+  status: added
+  sha256: ea0c413f7c08740c513488c71c436cde3e7d0dcbe7d100b7519af3f2ba0b1931
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2_nosubgroup.comp
+  status: added
+  sha256: ef46a8aee523cae1b64e387ed7e2c7c770ed240dd603057f3c46968cf3474c37
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3.comp
+  status: added
+  sha256: 58e54bd44b508d04de95ecbd5189e42bf195d35ec6bace59207fd1ca04a2583d
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3_nosubgroup.comp
+  status: added
+  sha256: c95f7c2a85b9e4549d293b2c71968a180a1215698266ec8dadd87a4f39d395bc
+- path: source/backend/vulkan/buffer/execution/glsl/int2_weight_to_pack.comp
+  status: added
+  sha256: c1d34e099620153622c34ac26d8c88442924e1780d5fe42c3bfc689e3e552c6d
+- path: source/backend/vulkan/buffer/execution/glsl/int3_weight_to_pack.comp
+  status: added
+  sha256: 30b6410c68e1964ceddef17eccd4a97d88e264b7c8cdbdd637e608201f3b056b

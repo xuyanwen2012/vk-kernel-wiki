@@ -1,0 +1,32 @@
+repo: alibaba/MNN
+pr: 3170
+url: https://github.com/alibaba/MNN/pull/3170
+merge_sha: b23b55b4950781763baa52423a0af3c65837d2e6
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/3170/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/image/execution/glsl/convolution1x1.comp
+  status: added
+  sha256: f2befb10af7a521911e15b4fafc881913d178d0b3cdb5c8f10bca500b162421b
+- path: source/backend/vulkan/image/execution/glsl/convolution1x1_c8w4.comp
+  status: added
+  sha256: a6c8d702ddbd374d7b5670594b4665fd2cf92fd5e67cf3b587077351b667c82d
+- path: source/backend/vulkan/image/execution/glsl/convolution1x1_w4.comp
+  status: added
+  sha256: 95e6ee3bf0a4af2f564a3ea54d8ef67708a94b7582734e37e17934822602367c
+- path: source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+  status: modified
+  sha256: 34b1a64e97e81532d9cd012b8bc03506381595d2ba354ea10fc78724c08a7b8c
+- path: source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+  status: removed
+  sha256: 98665519ce36fd6c0085e73f4582d916b673ded5aac8f3c88b9d7628f26e4125
+- path: source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp
+  status: modified
+  sha256: a5c25493f1e545ff7d4d4cc41fd5ac4165064c04f1e66f0f3119e5065987600a
+- path: source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+  status: modified
+  sha256: a1cd579e13f64be5d6dc5e206c2a8fdf4d891fc7a741da44bc73af95e5284c37

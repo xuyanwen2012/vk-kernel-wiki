@@ -1,0 +1,661 @@
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp
+@@ -0,0 +1,203 @@
++#extension GL_KHR_cooperative_matrix : require
++#extension GL_KHR_memory_scope_semantics : require
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout(constant_id = 3) const uint COOP_M = 16;
++layout(constant_id = 4) const uint COOP_N = 16;
++layout(constant_id = 5) const uint COOP_K = 16;
++
++// Output QK: [qLen, headNum, blockLen4/4] as FLOAT4
++layout(binding = 0) writeonly buffer outQK {
++    FLOAT data[];
++} uQK;
++
++// Query (rearranged): [headNum, headDim/4, qLen4] as FLOAT4
++// Logical: Q[h][d][q] where d is headDim, q is query position
++layout(binding = 1) readonly buffer inQuery {
++    FLOAT data[];
++} uQuery;
++
++// Key cache: [kvHeadNum, headDim/4, maxLen] as FLOAT4
++// Logical: K[kvh][d][kpos] where d is headDim, kpos is key position
++layout(binding = 2) readonly buffer inCacheKey {
++    FLOAT data[];
++} uCacheKey;
++
++// Mask buffer (additive mask or placeholder)
++layout(binding = 3) readonly buffer inMask {
++    FLOAT data[];
++} uMask;
++
++layout(binding = 4) readonly uniform constBuffer {
++    ivec4 s0; // qLen, kLen, headNum, kvHeadNum
++    ivec4 s1; // headDim, group, pastLen, totalLen
++    ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
++    vec4 f0;  // scale, 0, 0, 0
++} uConst;
++
++layout(push_constant) uniform PushConsts {
++    uint kStart;
++    uint blockLen;
++    uint padQLen;
++    uint padKBlock;
++} pc;
++
++// Shared memory for loading Q and K tiles from D4 format
++shared FLOAT smemA[COOP_M * COOP_K]; // Q tile [COOP_M, COOP_K]
++shared FLOAT smemB[COOP_K * COOP_N]; // K tile [COOP_K, COOP_N]
++
++const float NEG_INF = -3.402823466e38;
++
++void main() {
++    const uint tileN = gl_WorkGroupID.x; // kBlock dimension tile index
++    const uint tileM = gl_WorkGroupID.y; // qLen dimension tile index
++    const uint h = gl_WorkGroupID.z;     // head index
++
++    const int qLen = uConst.s0.x;
++    const int headNum = uConst.s0.z;
++    const int kvHeadNum = uConst.s0.w;
++    const int headDim = uConst.s1.x;
++    const int group = uConst.s1.y;
++    const int totalLen = uConst.s1.w;
++    const int maxLen = uConst.s2.w;
++    const int maskMode = uConst.s2.z;
++    const int maskQlen = uConst.s2.x;
++    const int maskKvlen = uConst.s2.y;
++    const int pastLen = uConst.s1.z;
++    const float scale = uConst.f0.x;
++
++    const uint kvh = h / uint(group);
++    const uint d4Size = uint(headDim) / 4u;
++    const uint qLen4 = pc.padQLen; // padded qLen (multiple of 4)
++    const uint kStart = pc.kStart;
++    const uint blockLen = pc.blockLen;
++
++    const uint mStart = tileM * COOP_M;
++    const uint nStart = tileN * COOP_N;
++
++    const uint tid = gl_LocalInvocationID.x;
++    const uint groupSize = gl_WorkGroupSize.x;
++
++    // Initialize accumulator to zero
++    coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator> matC;
++    matC = coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator>(FLOAT(0.0));
++
++    const uint tilesK = uint(headDim) / COOP_K;
++
++    for (uint tK = 0u; tK < tilesK; ++tK) {
++        uint kDimStart = tK * COOP_K;
++
++        // Load Q tile [COOP_M, COOP_K] from D4 format to shared memory (row-major)
++        // Q[h][d][q]: address = (h * d4Size + d/4) * qLen4 * 4 + q * 4 + d%4
++        {
++            uint totalElems = COOP_M * COOP_K;
++            for (uint i = tid; i < totalElems; i += groupSize) {
++                uint m = i / COOP_K;  // row in tile (q dimension)
++                uint k = i % COOP_K;  // col in tile (headDim dimension)
++
++                uint globalQ = mStart + m;
++                uint globalD = kDimStart + k;
++
++                FLOAT val = FLOAT(0.0);
++                if (globalQ < uint(qLen) && globalD < uint(headDim)) {
++                    uint d4 = globalD / 4u;
++                    uint dc = globalD % 4u;
++                    uint idx = (h * d4Size + d4) * qLen4 + globalQ;
++                    val = uQuery.data[idx * 4u + dc];
++                }
++                smemA[m * COOP_K + k] = val;
++            }
++        }
++
++        // Load K tile [COOP_K, COOP_N] from D4 format to shared memory (row-major)
++        // K[kvh][d][kpos]: address = (kvh * d4Size + d/4) * maxLen * 4 + kpos * 4 + d%4
++        {
++            uint totalElems = COOP_K * COOP_N;
++            for (uint i = tid; i < totalElems; i += groupSize) {
++                uint k = i / COOP_N;  // row in tile (headDim dimension)
++                uint n = i % COOP_N;  // col in tile (kBlock dimension)
++
++                uint globalD = kDimStart + k;
++                uint globalK = kStart + nStart + n;
++
++                FLOAT val = FLOAT(0.0);
++                if (globalD < uint(headDim) && globalK < uint(totalLen)) {
++                    uint d4 = globalD / 4u;
++                    uint dc = globalD % 4u;
++                    uint idx = (kvh * d4Size + d4) * uint(maxLen) + globalK;
++                    val = uCacheKey.data[idx * 4u + dc];
++                }
++                smemB[k * COOP_N + n] = val;
++            }
++        }
++
++        barrier();
++
++        // Load from shared memory into cooperative matrices
++        coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_K, gl_MatrixUseA> matA;
++        coopmat<FLOAT, gl_ScopeSubgroup, COOP_K, COOP_N, gl_MatrixUseB> matB;
++
++        coopMatLoad(matA, smemA, 0u, COOP_K, gl_CooperativeMatrixLayoutRowMajor);
++        coopMatLoad(matB, smemB, 0u, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
++
++        matC = coopMatMulAdd(matA, matB, matC);
++
++        barrier();
++    }
++
++    // Apply scale
++    matC = matC * FLOAT(scale);
++
++    // Store result to shared memory for post-processing (scale + mask)
++    coopMatStore(matC, smemA, 0u, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
++    // Note: smemA is reused here, size = COOP_M * COOP_N which must fit.
++    // We need COOP_M * COOP_N <= COOP_M * COOP_K (true when COOP_N <= COOP_K or we use smemB area)
++    // Actually let's use a combined area. For safety, store to smemB which has COOP_K * COOP_N elements.
++    // If COOP_M * COOP_N > COOP_K * COOP_N, we need more space. Let's just store directly to global.
++
++    barrier();
++
++    // Write output with mask applied
++    // Output format: uQK.data[(q * headNum + h) * blockLen4 + k]
++    // where blockLen4 = ((blockLen + 3) / 4) * 4
++    const uint blockLen4 = ((blockLen + 3u) / 4u) * 4u;
++    const int maskKStart = (maskMode == 1 && maskKvlen > 0 && totalLen > maskKvlen) ? (totalLen - maskKvlen) : 0;
++
++    uint totalElems = COOP_M * COOP_N;
++    for (uint i = tid; i < totalElems; i += groupSize) {
++        uint m = i / COOP_N;
++        uint n = i % COOP_N;
++
++        uint globalQ = mStart + m;
++        uint globalK = nStart + n;
++        uint globalKAbs = kStart + globalK; // absolute key position
++
++        if (globalQ >= uint(qLen) || globalK >= blockLen) {
++            continue;
++        }
++
++        float val = float(smemA[m * COOP_N + n]);
++
++        // Apply mask
++        if (maskMode == 1 && maskKvlen > 0) {
++            int mk = int(globalKAbs) - maskKStart;
++            if (int(globalKAbs) >= maskKStart && mk >= 0 && mk < maskKvlen && int(globalQ) < maskQlen) {
++                val += float(uMask.data[globalQ * uint(maskKvlen) + uint(mk)]);
++            }
++        } else if (maskMode == 2) {
++            int causalEnd = pastLen + int(globalQ);
++            if (int(globalKAbs) > causalEnd) {
++                val = NEG_INF;
++            }
++        }
++
++        // Pad invalid k lanes with -inf
++        if (globalKAbs >= uint(totalLen)) {
++            val = NEG_INF;
++        }
++
++        uint outIdx = (globalQ * uint(headNum) + h) * blockLen4 + globalK;
++        uQK.data[outIdx] = FLOAT(val);
++    }
++}
+\ No newline at end of file
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp
+@@ -0,0 +1,129 @@
++#extension GL_KHR_cooperative_matrix : require
++#extension GL_KHR_memory_scope_semantics : require
++
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++layout(constant_id = 3) const uint COOP_M = 16;
++layout(constant_id = 4) const uint COOP_N = 16;
++layout(constant_id = 5) const uint COOP_K = 16;
++
++// OAcc: [qLen * headNum, headDim] linear float (read-modify-write)
++layout(binding = 0) buffer s0 {
++    float data[];
++} uOAcc;
++
++// W (softmax output): [qLen * headNum, blockLen4] linear FLOAT
++// W[row][k] = uW.data[row * blockLen4 + k], row = q * headNum + h
++layout(binding = 1) readonly buffer s1 {
++    FLOAT data[];
++} uW;
++
++// Value cache: [kvHeadNum, maxLen, headDim] linear FLOAT
++// V[kvh][kpos][d] = uCacheValue.data[(kvh * maxLen + kpos) * headDim + d]
++layout(binding = 2) readonly buffer s2 {
++    FLOAT data[];
++} uCacheValue;
++
++layout(binding = 3) readonly uniform constBuffer {
++    ivec4 s0; // qLen, kLen, headNum, kvHeadNum
++    ivec4 s1; // headDim, group, pastLen, totalLen
++    ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
++    vec4 f0;  // scale, 0, 0, 0
++} uConst;
++
++// online-softmax per-row rescale factor; folded into the store so this kernel does oAcc = oAcc*alpha + w*V
++// in one pass (removes the separate scale_oacc dispatch).
++layout(binding = 4) readonly buffer s4 {
++    float data[];
++} uAlpha;
++
++layout(push_constant) uniform PushConsts {
++    uint kStart;
++    uint blockLen;
++    uint padQLen;
++    uint padKBlock;
++} pc;
++
++// Shared memory only for storing matC result back to OAcc
++shared FLOAT smemC[COOP_M * COOP_N];
++
++void main() {
++    const uint tileN = gl_WorkGroupID.x; // headDim dimension tile index
++    const uint tileM = gl_WorkGroupID.y; // qLen dimension tile index
++    const uint h = gl_WorkGroupID.z;     // head index
++
++    const int qLen = uConst.s0.x;
++    const int headNum = uConst.s0.z;
++    const int kvHeadNum = uConst.s0.w;
++    const int headDim = uConst.s1.x;
++    const int group = uConst.s1.y;
++    const int totalLen = uConst.s1.w;
++    const int maxLen = uConst.s2.w;
++
++    const uint kvh = h / uint(group);
++    const uint kStart = pc.kStart;
++    const uint blockLen4 = pc.padKBlock; // already padded to multiple of COOP_K
++
++    const uint mStart = tileM * COOP_M;
++    const uint nStart = tileN * COOP_N;
++
++    const uint tid = gl_LocalInvocationID.x;
++    const uint groupSize = gl_WorkGroupSize.x;
++
++    // Initialize accumulator to zero
++    coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator> matC;
++    matC = coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator>(0.0);
++
++    // W layout: row-major [qLen*headNum, blockLen4], stride between q-rows = headNum * blockLen4
++    // For tile (tileM, tK): A[m][k] = W[(mStart+m)*headNum + h][kBlockStart + k]
++    // offset = (mStart * headNum + h) * blockLen4
++    // stride = headNum * blockLen4
++    const uint wRowStride = uint(headNum) * blockLen4;
++    const uint wBaseOffset = (mStart * uint(headNum) + h) * blockLen4;
++
++    // V layout: row-major [kvHeadNum, maxLen, headDim], stride between k-rows = headDim
++    // For tile (tK, tileN): B[k][n] = V[kvh][kStart + kBlockStart + k][nStart + n]
++    // offset = (kvh * maxLen + kStart) * headDim + nStart
++    // stride = headDim
++    const uint vRowStride = uint(headDim);
++    const uint vBaseOffset = (kvh * uint(maxLen) + kStart) * uint(headDim) + nStart;
++
++    // Iterate over kBlock dimension in COOP_K steps
++    const uint tilesK = blockLen4 / COOP_K;
++
++    for (uint tK = 0u; tK < tilesK; ++tK) {
++        uint kBlockStart = tK * COOP_K;
++
++        // Load W tile directly from global buffer
++        coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_K, gl_MatrixUseA> matA;
++        uint wOffset = wBaseOffset + kBlockStart;
++        coopMatLoad(matA, uW.data, wOffset, wRowStride, gl_CooperativeMatrixLayoutRowMajor);
++
++        // Load V tile directly from global buffer
++        coopmat<FLOAT, gl_ScopeSubgroup, COOP_K, COOP_N, gl_MatrixUseB> matB;
++        uint vOffset = vBaseOffset + kBlockStart * vRowStride;
++        coopMatLoad(matB, uCacheValue.data, vOffset, vRowStride, gl_CooperativeMatrixLayoutRowMajor);
++
++        matC = coopMatMulAdd(matA, matB, matC);
++    }
++
++    // Store matC to shared memory, then add to OAcc (preserves fp32 precision)
++    coopMatStore(matC, smemC, 0u, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
++    barrier();
++
++    {
++        uint totalElems = COOP_M * COOP_N;
++        for (uint i = tid; i < totalElems; i += groupSize) {
++            uint m = i / COOP_N;
++            uint n = i % COOP_N;
++            uint globalQ = mStart + m;
++            uint globalD = nStart + n;
++
++            if (globalQ < uint(qLen) && globalD < uint(headDim)) {
++                float alpha = uAlpha.data[globalQ * uint(headNum) + h];
++                uint accIdx = (globalQ * uint(headNum) + h) * uint(headDim) + globalD;
++                uOAcc.data[accIdx] = uOAcc.data[accIdx] * alpha + float(smemC[m * COOP_N + n]);
++            }
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp
+@@ -0,0 +1,38 @@
++// Scale OAcc by per-row alpha factor before coop QKV accumulation.
++// OAcc layout: [qLen * headNum, headDim] linear float
++// Alpha layout: [qLen * headNum] linear float
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++layout(binding = 0) buffer s0 {
++    float data[];
++} uOAcc;
++
++layout(binding = 1) readonly buffer s1 {
++    float data[];
++} uAlpha;
++
++layout(binding = 2) readonly uniform constBuffer {
++    ivec4 s0; // qLen, kLen, headNum, kvHeadNum
++    ivec4 s1; // headDim, group, pastLen, totalLen
++    ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
++    vec4 f0;  // scale, 0, 0, 0
++} uConst;
++
++void main() {
++    const uint gid = gl_GlobalInvocationID.x;
++    const int qLen = uConst.s0.x;
++    const int headNum = uConst.s0.z;
++    const int headDim = uConst.s1.x;
++
++    const uint totalRows = uint(qLen) * uint(headNum);
++    const uint totalElems = totalRows * uint(headDim);
++
++    if (gid >= totalElems) {
++        return;
++    }
++
++    const uint row = gid / uint(headDim);
++    const float alpha = uAlpha.data[row];
++    uOAcc.data[gid] = uOAcc.data[gid] * alpha;
++}
+\ No newline at end of file
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp
+@@ -0,0 +1,94 @@
++#extension GL_KHR_shader_subgroup_arithmetic : require
++
++layout(set=0, binding=0) buffer s0 {
++    FLOAT4 data[];
++} uW;
++
++layout(set=0, binding=1) readonly buffer s1 {
++    FLOAT4 data[];
++} uQK;
++
++layout(set=0, binding=2) buffer s2 {
++    float data[];
++} uM;
++
++layout(set=0, binding=3) buffer s3 {
++    float data[];
++} uL;
++
++layout(set=0, binding=4) buffer s4 {
++    float data[];
++} uAlpha;
++
++layout(set=0, binding=5) readonly uniform constBuffer {
++    ivec4 s0; // qLen, kLen, headNum, kvHeadNum
++    ivec4 s1; // headDim, group, pastLen, totalLen
++    ivec4 s2; // maskQlen, maskKvlen, hasMask, cacheMaxLen
++    vec4 f0;  // scale, 0, 0, 0
++} uConst;
++
++layout(push_constant) uniform PushConsts {
++    uint blockLen;
++} pc;
++
++// One workgroup == one subgroup computes one (q, head) row. Lanes reduce over the k4 columns with
++// subgroup arithmetic ops (subgroupMax / subgroupAdd), removing the shared-memory tree reduction and
++// all its barriers. Host sets local_size_x == device subgroup size, so the whole workgroup is a single
++// subgroup and the subgroup reduction spans the full row.
++layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    const int h = int(gl_WorkGroupID.x);
++    const int q = int(gl_WorkGroupID.y);
++    const uint tid = gl_LocalInvocationID.x;
++    const uint groupSize = gl_WorkGroupSize.x;
++
++    const int qLen = uConst.s0.x;
++    const int headNum = uConst.s0.z;
++    // Dispatch grid is exactly (headNum, qLen, 1), so h and q are always in range and this guard is
++    // subgroup-uniform (never splits a subgroup before the reduction ops below).
++    if (h >= headNum || q >= qLen) {
++        return;
++    }
++
++    const int blockLen = int(pc.blockLen);
++    if (blockLen <= 0) {
++        return;
++    }
++    const int blockLen4 = ((blockLen + 3) / 4) * 4;
++    const int blockLen4_4 = blockLen4 / 4;
++
++    const int row = q * headNum + h;
++    const int base4 = row * blockLen4_4;
++
++    const float mOld = uM.data[row];
++    const float lOld = uL.data[row];
++
++    // block max via subgroup reduction (no shared memory, no barriers)
++    float mBlock = -3.402823466e38;
++    for (int k4 = int(tid); k4 < blockLen4_4; k4 += int(groupSize)) {
++        vec4 v = vec4(uQK.data[base4 + k4]);
++        mBlock = max(mBlock, max(max(v.x, v.y), max(v.z, v.w)));
++    }
++    mBlock = subgroupMax(mBlock);
++
++    const float mNew = max(mOld, mBlock);
++    const float alpha = (lOld > 0.0) ? exp(mOld - mNew) : 0.0;
++
++    // block sum of exp(score - mNew) and write unnormalized weights
++    float sumW = 0.0;
++    for (int k4 = int(tid); k4 < blockLen4_4; k4 += int(groupSize)) {
++        vec4 v = vec4(uQK.data[base4 + k4]);
++        vec4 w = exp(v - vec4(mNew));
++        sumW += w.x + w.y + w.z + w.w;
++        uW.data[base4 + k4] = FLOAT4(w);
++    }
++    sumW = subgroupAdd(sumW);
++    const float lNew = lOld * alpha + sumW;
++
++    if (tid == 0u) {
++        uM.data[row] = mNew;
++        uL.data[row] = lNew;
++        uAlpha.data[row] = alpha;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp b/source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp
+@@ -18,49 +18,85 @@ layout(binding = 2) readonly buffer BiasBuffer {
+     FLOAT Bias[];
+ };
+ 
+-// Output C is Linear (Row-Major) for this stage
++// Output C written DIRECTLY in NC4HW4 layout: [N/4, M, 4] as FLOAT4 (fused COOP_to_C4).
+ layout(binding = 3) writeonly buffer MatrixC {
+-    FLOAT C[];
++    FLOAT4 Cvec4[];
+ };
+ 
+ layout(binding = 4) uniform constBuffer {
+-    uint M; // Padded M
+-    uint N; // Padded N
+-    uint K; // Padded K
+-    uint pad;
++    uint M;          // Padded M
++    uint N;          // Padded N
++    uint K;          // Padded K
++    uint realM;      // Unpadded M (tokens)
++    uint realN;      // Unpadded N (out channels)
++    uint activation; // 0 none, 1 relu, 2 relu6
+ } uConst;
+ 
+ layout(constant_id = 3) const uint COOP_M = 64;
+ layout(constant_id = 4) const uint COOP_N = 64;
+ layout(constant_id = 5) const uint COOP_K = 16;
+ 
++shared FLOAT smemC[COOP_M * COOP_N];
++
+ void main() {
+     uint wgRow = gl_WorkGroupID.y;
+     uint wgCol = gl_WorkGroupID.x;
+-    
++
+     coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_K, gl_MatrixUseA> matA;
+     coopmat<FLOAT, gl_ScopeSubgroup, COOP_K, COOP_N, gl_MatrixUseB> matB;
+     coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator> matC;
+-    
+-    uint biasOffset = wgCol * COOP_N;
+ 
++    uint biasOffset = wgCol * COOP_N;
+     coopMatLoad(matC, Bias, biasOffset, 0, gl_CooperativeMatrixLayoutRowMajor);
+-    
++
+     uint tilesK = uConst.K / COOP_K;
+     uint tilesN = uConst.N / COOP_N;
+-    
++
+     for (uint t = 0; t < tilesK; ++t) {
+         uint tileIdxA = wgRow * tilesK + t;
+         uint offsetA = tileIdxA * (COOP_M * COOP_K);
+         coopMatLoad(matA, A, offsetA, COOP_K, gl_CooperativeMatrixLayoutRowMajor);
+-        
++
+         uint tileIdxB = t * tilesN + wgCol;
+         uint offsetB = tileIdxB * (COOP_K * COOP_N);
+         coopMatLoad(matB, B, offsetB, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
+-        
++
+         matC = coopMatMulAdd(matA, matB, matC);
+     }
+-    
+-    uint offsetC = (wgRow * COOP_M) * uConst.N + (wgCol * COOP_N);
+-    coopMatStore(matC, C, offsetC, uConst.N, gl_CooperativeMatrixLayoutRowMajor);
+-}
+\ No newline at end of file
++
++    // Fused epilogue: stage the 64x64 tile in shared, then write it straight into the NC4HW4 output
++    // (channels packed by 4), skipping the separate row-major temp + COOP_to_C4 transpose pass.
++    coopMatStore(matC, smemC, 0u, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
++    barrier();
++
++    const uint tid = gl_LocalInvocationID.x;
++    const uint groupSize = gl_WorkGroupSize.x;
++    const uint n4PerTile = COOP_N / 4u;               // FLOAT4 columns per tile
++    const uint total = COOP_M * n4PerTile;
++    const uint mBase = wgRow * COOP_M;
++    const uint n4Base = wgCol * n4PerTile;            // global_n / 4 base
++    const uint realM = uConst.realM;
++    const uint realN = uConst.realN;
++
++    // Map so the contiguous output dim (gm / tokens) varies fastest across consecutive threads:
++    // output is [N/4, M, 4] with Cvec4[gn4*realM + gm], so stepping gm is stride-1. Decomposing idx
++    // with m as the low index makes a warp write consecutive Cvec4 addresses (coalesced). The prior
++    // n4-fast mapping strided writes by realM per thread -> fully uncoalesced, which dominated DRAM
++    // traffic on large-N convs (big int4 LLMs) and cost ~13% prefill there.
++    for (uint idx = tid; idx < total; idx += groupSize) {
++        const uint m = idx % COOP_M;
++        const uint n4 = idx / COOP_M;
++        const uint gm = mBase + m;
++        const uint gn4 = n4Base + n4;
++        if (gm < realM && (gn4 * 4u) < realN) {
++            const uint s = m * COOP_N + n4 * 4u;
++            FLOAT4 v = FLOAT4(smemC[s + 0u], smemC[s + 1u], smemC[s + 2u], smemC[s + 3u]);
++            if (uConst.activation == 1u) {
++                v = max(v, FLOAT4(0.0));
++            } else if (uConst.activation == 2u) {
++                v = clamp(v, FLOAT4(0.0), FLOAT4(6.0));
++            }
++            Cvec4[gn4 * realM + gm] = v;
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp b/source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp
+@@ -0,0 +1,66 @@
++#extension GL_KHR_cooperative_matrix : require
++#extension GL_KHR_memory_scope_semantics : require
++
++layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
++
++// A is Packed: (M/COOP_M) x (K/COOP_K) tiles of COOP_M x COOP_K
++layout(binding = 0) readonly buffer MatrixA {
++    FLOAT A[];
++};
++
++// B is Packed: (K/COOP_K) x (N/COOP_N) tiles of COOP_K x COOP_N
++layout(binding = 1) readonly buffer MatrixB {
++    FLOAT B[];
++};
++
++// Bias is Linear: (N)
++layout(binding = 2) readonly buffer BiasBuffer {
++    FLOAT Bias[];
++};
++
++// Output C is Linear (Row-Major) for this stage
++layout(binding = 3) writeonly buffer MatrixC {
++    FLOAT C[];
++};
++
++layout(binding = 4) uniform constBuffer {
++    uint M; // Padded M
++    uint N; // Padded N
++    uint K; // Padded K
++    uint pad;
++} uConst;
++
++layout(constant_id = 3) const uint COOP_M = 64;
++layout(constant_id = 4) const uint COOP_N = 64;
++layout(constant_id = 5) const uint COOP_K = 16;
++
++void main() {
++    uint wgRow = gl_WorkGroupID.y;
++    uint wgCol = gl_WorkGroupID.x;
++    
++    coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_K, gl_MatrixUseA> matA;
++    coopmat<FLOAT, gl_ScopeSubgroup, COOP_K, COOP_N, gl_MatrixUseB> matB;
++    coopmat<FLOAT, gl_ScopeSubgroup, COOP_M, COOP_N, gl_MatrixUseAccumulator> matC;
++    
++    uint biasOffset = wgCol * COOP_N;
++
++    coopMatLoad(matC, Bias, biasOffset, 0, gl_CooperativeMatrixLayoutRowMajor);
++    
++    uint tilesK = uConst.K / COOP_K;
++    uint tilesN = uConst.N / COOP_N;
++    
++    for (uint t = 0; t < tilesK; ++t) {
++        uint tileIdxA = wgRow * tilesK + t;
++        uint offsetA = tileIdxA * (COOP_M * COOP_K);
++        coopMatLoad(matA, A, offsetA, COOP_K, gl_CooperativeMatrixLayoutRowMajor);
++        
++        uint tileIdxB = t * tilesN + wgCol;
++        uint offsetB = tileIdxB * (COOP_K * COOP_N);
++        coopMatLoad(matB, B, offsetB, COOP_N, gl_CooperativeMatrixLayoutRowMajor);
++        
++        matC = coopMatMulAdd(matA, matB, matC);
++    }
++    
++    uint offsetC = (wgRow * COOP_M) * uConst.N + (wgCol * COOP_N);
++    coopMatStore(matC, C, offsetC, uConst.N, gl_CooperativeMatrixLayoutRowMajor);
++}
+\ No newline at end of file

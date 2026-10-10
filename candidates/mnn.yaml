@@ -1,0 +1,2572 @@
+repo: alibaba/MNN
+license: Apache-2.0
+license_path: LICENSE.txt
+keywords_used:
+- vulkan
+- gpu in:title
+- shader in:title
+- attention in:title
+- quant in:title
+- C4 in:title
+- Sync in:title
+- Perf in:title
+- Fuse in:title
+- GEMM in:title
+shader_path_markers:
+- source/backend/vulkan/buffer/execution/glsl/
+- source/backend/vulkan/image/execution/glsl/
+host_path_markers:
+- source/backend/vulkan/
+architecture_code_markers:
+  VulkanRuntime::ADRENO: qualcomm
+  VulkanRuntime::MALI: arm
+searched_at: '2026-10-10'
+cutoff_date: '2026-10-10'
+total_candidates: 210
+included: 10
+deferred: 0
+excluded: 200
+prs:
+- number: 34
+  title: rename VulanDeconvolutionDepthwise to VulkanDeconvolutionDepthwise
+  author: nihui
+  merged_at: '2019-05-09'
+  url: https://github.com/alibaba/MNN/pull/34
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.cpp, source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.hpp'
+  evidence_paths:
+  - source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.cpp
+  - source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 674
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2020-03-12'
+  url: https://github.com/alibaba/MNN/pull/674
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 160 changed file(s)'
+  evidence_paths: []
+- number: 813
+  title: Fixed Travis CI linux vulkan build.
+  author: proydakov
+  merged_at: '2020-05-23'
+  url: https://github.com/alibaba/MNN/pull/813
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 828
+  title: Added linux omp vulkan in travis ci
+  author: proydakov
+  merged_at: '2020-05-31'
+  url: https://github.com/alibaba/MNN/pull/828
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 952
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2020-07-04'
+  url: https://github.com/alibaba/MNN/pull/952
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 203 changed file(s)'
+  evidence_paths: []
+- number: 961
+  title: Feature/sync
+  author: songyanbei
+  merged_at: '2020-07-23'
+  url: https://github.com/alibaba/MNN/pull/961
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 216 changed file(s)'
+  evidence_paths: []
+- number: 993
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2020-07-23'
+  url: https://github.com/alibaba/MNN/pull/993
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 28 changed file(s)'
+  evidence_paths: []
+- number: 1049
+  title: TFLITE PRelu support and fixing vulkan validation errors
+  author: rinthel
+  merged_at: '2020-09-15'
+  url: https://github.com/alibaba/MNN/pull/1049
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/backend/VulkanBackend.hpp, source/backend/vulkan/component/VulkanBuffer.cpp, source/backend/vulkan/component/VulkanCommandPool.cpp,
+    source/backend/vulkan/component/VulkanCommandPool.hpp, source/backend/vulkan/component/VulkanDevice.cpp, source/backend/vulkan/component/VulkanImage.cpp, source/backend/vulkan/component/VulkanImage.hpp,
+    source/backend/vulkan/component/VulkanPipeline.cpp, source/backend/vulkan/component/VulkanTensor.cpp, source/backend/vulkan/execution/VulkanBasicExecution.cpp, source/backend/vulkan/execution/VulkanBinary.cpp,
+    source/backend/vulkan/execution/VulkanConcat.cpp, source/backend/vulkan/execution/VulkanConvolution.cpp, source/backend/vulkan/execution/VulkanConvolution.hpp, source/backend/vulkan/execution/VulkanConvolutionImpl.cpp,
+    source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp, source/backend/vulkan/execution/VulkanDeconvolution.cpp, source/backend/vulkan/execution/VulkanImageConverter.cpp, source/backend/vulkan/execution/VulkanMatMul.cpp,
+    source/backend/vulkan/execution/VulkanMatrixMultier4x4.cpp, source/backend/vulkan/execution/VulkanMatrixMultier4x4.hpp, source/backend/vulkan/execution/VulkanNormalize.cpp, source/backend/vulkan/execution/VulkanPadding.cpp,
+    source/backend/vulkan/execution/VulkanPadding.hpp, source/backend/vulkan/execution/VulkanPool.cpp, source/backend/vulkan/execution/VulkanRelu.cpp, source/backend/vulkan/execution/VulkanResize.cpp, source/backend/vulkan/execution/VulkanSoftmax.cpp,
+    source/backend/vulkan/execution/VulkanUnary.cpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/backend/VulkanBackend.hpp
+  - source/backend/vulkan/component/VulkanBuffer.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.hpp
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  - source/backend/vulkan/component/VulkanImage.cpp
+  - source/backend/vulkan/component/VulkanImage.hpp
+  - source/backend/vulkan/component/VulkanPipeline.cpp
+  - source/backend/vulkan/component/VulkanTensor.cpp
+  - source/backend/vulkan/execution/VulkanBasicExecution.cpp
+  - source/backend/vulkan/execution/VulkanBinary.cpp
+  - source/backend/vulkan/execution/VulkanConcat.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.hpp
+  - source/backend/vulkan/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp
+  - source/backend/vulkan/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/execution/VulkanImageConverter.cpp
+  - source/backend/vulkan/execution/VulkanMatMul.cpp
+  - source/backend/vulkan/execution/VulkanMatrixMultier4x4.cpp
+  - source/backend/vulkan/execution/VulkanMatrixMultier4x4.hpp
+  - source/backend/vulkan/execution/VulkanNormalize.cpp
+  - source/backend/vulkan/execution/VulkanPadding.cpp
+  - source/backend/vulkan/execution/VulkanPadding.hpp
+  - source/backend/vulkan/execution/VulkanPool.cpp
+  - source/backend/vulkan/execution/VulkanRelu.cpp
+  - source/backend/vulkan/execution/VulkanResize.cpp
+  - source/backend/vulkan/execution/VulkanSoftmax.cpp
+  - source/backend/vulkan/execution/VulkanUnary.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1217
+  title: Feature/bugfix
+  author: jxt1234
+  merged_at: '2020-11-06'
+  url: https://github.com/alibaba/MNN/pull/1217
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/execution/VulkanConvolution.cpp'
+  evidence_paths:
+  - source/backend/vulkan/execution/VulkanConvolution.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1258
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2020-11-25'
+  url: https://github.com/alibaba/MNN/pull/1258
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 111 changed file(s)'
+  evidence_paths: []
+- number: 1324
+  title: Feature/vulkanbugfix
+  author: jxt1234
+  merged_at: '2020-12-31'
+  url: https://github.com/alibaba/MNN/pull/1324
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/compiler/AllShader.cpp, source/backend/vulkan/component/VulkanCommandPool.cpp, source/backend/vulkan/execution/VulkanConvolution.cpp,
+    source/backend/vulkan/execution/VulkanConvolution.hpp, source/backend/vulkan/execution/VulkanConvolutionImpl.cpp, source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp, source/backend/vulkan/execution/VulkanDeconvolution.cpp'
+  evidence_paths:
+  - source/backend/vulkan/compiler/AllShader.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.hpp
+  - source/backend/vulkan/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp
+  - source/backend/vulkan/execution/VulkanDeconvolution.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1329
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-01-06'
+  url: https://github.com/alibaba/MNN/pull/1329
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/compiler/AllShader.cpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/compiler/AllShader.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1333
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-01-08'
+  url: https://github.com/alibaba/MNN/pull/1333
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 39 changed file(s)'
+  evidence_paths: []
+- number: 1373
+  title: Sync Internal Github
+  author: jxt1234
+  merged_at: '2021-02-07'
+  url: https://github.com/alibaba/MNN/pull/1373
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 231 changed file(s)'
+  evidence_paths: []
+- number: 1406
+  title: '[MNN:Sync] Sync opencl from Internal Gitlab, support Buffer and more auto-turning mode'
+  author: jxt1234
+  merged_at: '2021-03-13'
+  url: https://github.com/alibaba/MNN/pull/1406
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 138 changed file(s)'
+  evidence_paths: []
+- number: 1437
+  title: '[MNN:Sync] Sync internal Gitlab'
+  author: jxt1234
+  merged_at: '2021-04-08'
+  url: https://github.com/alibaba/MNN/pull/1437
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/compiler/AllShader.cpp, source/backend/vulkan/compiler/VulkanShaderMap.cpp, source/backend/vulkan/execution/VulkanRelu.cpp,
+    source/backend/vulkan/execution/VulkanUnary.cpp, source/backend/vulkan/runtime/VulkanRuntime.cpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/compiler/AllShader.cpp
+  - source/backend/vulkan/compiler/VulkanShaderMap.cpp
+  - source/backend/vulkan/execution/VulkanRelu.cpp
+  - source/backend/vulkan/execution/VulkanUnary.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1454
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-04-16'
+  url: https://github.com/alibaba/MNN/pull/1454
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 74 changed file(s)'
+  evidence_paths: []
+- number: 1457
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-04-24'
+  url: https://github.com/alibaba/MNN/pull/1457
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 11 changed file(s)'
+  evidence_paths: []
+- number: 1469
+  title: sync from internal repo
+  author: jxt1234
+  merged_at: '2021-05-01'
+  url: https://github.com/alibaba/MNN/pull/1469
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/runtime/VulkanRuntime.cpp, source/backend/vulkan/runtime/vulkan_wrapper.cpp'
+  evidence_paths:
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  - source/backend/vulkan/runtime/vulkan_wrapper.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1535
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-06-24'
+  url: https://github.com/alibaba/MNN/pull/1535
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 15 changed file(s)'
+  evidence_paths: []
+- number: 1596
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2021-07-30'
+  url: https://github.com/alibaba/MNN/pull/1596
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/compiler/AllShader.cpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/compiler/AllShader.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1650
+  title: Vulkan GridSample
+  author: jokerz0624
+  merged_at: '2021-09-03'
+  url: https://github.com/alibaba/MNN/pull/1650
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/compiler/AllShader.cpp, source/backend/vulkan/compiler/VulkanShaderMap.cpp, source/backend/vulkan/execution/VulkanGridSample.cpp,
+    source/backend/vulkan/execution/VulkanGridSample.hpp'
+  evidence_paths:
+  - source/backend/vulkan/compiler/AllShader.cpp
+  - source/backend/vulkan/compiler/VulkanShaderMap.cpp
+  - source/backend/vulkan/execution/VulkanGridSample.cpp
+  - source/backend/vulkan/execution/VulkanGridSample.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1675
+  title: '[MNN:Sync] Sync internal Gitlab'
+  author: jxt1234
+  merged_at: '2021-09-18'
+  url: https://github.com/alibaba/MNN/pull/1675
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 330 changed file(s)'
+  evidence_paths: []
+- number: 1772
+  title: '[MNN:Sync] Sync internal gitlab'
+  author: jxt1234
+  merged_at: '2021-11-30'
+  url: https://github.com/alibaba/MNN/pull/1772
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/backend/VulkanBackend.hpp, source/backend/vulkan/component/VulkanBuffer.cpp, source/backend/vulkan/component/VulkanCommandPool.cpp,
+    source/backend/vulkan/component/VulkanCommandPool.hpp, source/backend/vulkan/component/VulkanDevice.cpp, source/backend/vulkan/component/VulkanImage.cpp, source/backend/vulkan/component/VulkanImage.hpp,
+    source/backend/vulkan/component/VulkanInstance.cpp, source/backend/vulkan/component/VulkanInstance.hpp, source/backend/vulkan/component/VulkanMemoryPool.cpp, source/backend/vulkan/component/VulkanMemoryPool.hpp,
+    source/backend/vulkan/execution/VulkanBasicExecution.cpp, source/backend/vulkan/execution/VulkanBinary.cpp, source/backend/vulkan/execution/VulkanConvolution.cpp, source/backend/vulkan/execution/VulkanConvolution.hpp,
+    source/backend/vulkan/execution/VulkanConvolutionImpl.cpp, source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp, source/backend/vulkan/execution/VulkanDeconvolution.cpp, source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.cpp,
+    source/backend/vulkan/execution/VulkanGridSample.cpp, source/backend/vulkan/execution/VulkanImageConverter.cpp, source/backend/vulkan/execution/VulkanMatMul.cpp, source/backend/vulkan/execution/VulkanMatrixMultier4x4.cpp,
+    source/backend/vulkan/execution/VulkanPool.cpp, source/backend/vulkan/execution/VulkanROIPooling.cpp, source/backend/vulkan/execution/VulkanRaster.cpp, source/backend/vulkan/execution/VulkanRelu.cpp,
+    source/backend/vulkan/execution/VulkanResize.cpp, source/backend/vulkan/execution/VulkanScale.cpp, source/backend/vulkan/execution/VulkanUnary.cpp, source/backend/vulkan/runtime/VulkanRuntime.cpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/backend/VulkanBackend.hpp
+  - source/backend/vulkan/component/VulkanBuffer.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.hpp
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  - source/backend/vulkan/component/VulkanImage.cpp
+  - source/backend/vulkan/component/VulkanImage.hpp
+  - source/backend/vulkan/component/VulkanInstance.cpp
+  - source/backend/vulkan/component/VulkanInstance.hpp
+  - source/backend/vulkan/component/VulkanMemoryPool.cpp
+  - source/backend/vulkan/component/VulkanMemoryPool.hpp
+  - source/backend/vulkan/execution/VulkanBasicExecution.cpp
+  - source/backend/vulkan/execution/VulkanBinary.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.cpp
+  - source/backend/vulkan/execution/VulkanConvolution.hpp
+  - source/backend/vulkan/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/execution/VulkanConvolutionWinograd.cpp
+  - source/backend/vulkan/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/execution/VulkanDeconvolutionDepthwise.cpp
+  - source/backend/vulkan/execution/VulkanGridSample.cpp
+  - source/backend/vulkan/execution/VulkanImageConverter.cpp
+  - source/backend/vulkan/execution/VulkanMatMul.cpp
+  - source/backend/vulkan/execution/VulkanMatrixMultier4x4.cpp
+  - source/backend/vulkan/execution/VulkanPool.cpp
+  - source/backend/vulkan/execution/VulkanROIPooling.cpp
+  - source/backend/vulkan/execution/VulkanRaster.cpp
+  - source/backend/vulkan/execution/VulkanRelu.cpp
+  - source/backend/vulkan/execution/VulkanResize.cpp
+  - source/backend/vulkan/execution/VulkanScale.cpp
+  - source/backend/vulkan/execution/VulkanUnary.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1815
+  title: '[MNN:Sync] Sync internal gitlab'
+  author: jxt1234
+  merged_at: '2022-01-04'
+  url: https://github.com/alibaba/MNN/pull/1815
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/backend/VulkanBackend.cpp, source/backend/vulkan/backend/VulkanBackend.hpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/backend/VulkanBackend.cpp
+  - source/backend/vulkan/backend/VulkanBackend.hpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1860
+  title: '[Sync] Sync internal Gitlab'
+  author: jxt1234
+  merged_at: '2022-02-18'
+  url: https://github.com/alibaba/MNN/pull/1860
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanMemoryPool.cpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanMemoryPool.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1914
+  title: '[Sync] Sync internal gitlab'
+  author: jxt1234
+  merged_at: '2022-05-06'
+  url: https://github.com/alibaba/MNN/pull/1914
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 225 changed file(s)'
+  evidence_paths: []
+- number: 1952
+  title: '[MNN:Sync] Sync internal gitlab'
+  author: jxt1234
+  merged_at: '2022-06-10'
+  url: https://github.com/alibaba/MNN/pull/1952
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 192 changed file(s)'
+  evidence_paths: []
+- number: 1970
+  title: '[MNN:Sync] Sync internal gitlab'
+  author: jxt1234
+  merged_at: '2022-06-24'
+  url: https://github.com/alibaba/MNN/pull/1970
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 173 changed file(s)'
+  evidence_paths: []
+- number: 1986
+  title: '[MNN:Sync] Sync 2.0.1'
+  author: jxt1234
+  merged_at: '2022-07-11'
+  url: https://github.com/alibaba/MNN/pull/1986
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 66 changed file(s)'
+  evidence_paths: []
+- number: 1997
+  title: '[MNN:Sync] Sync internal Gitlab to 2.0.2'
+  author: jxt1234
+  merged_at: '2022-07-19'
+  url: https://github.com/alibaba/MNN/pull/1997
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 59 changed file(s)'
+  evidence_paths: []
+- number: 2000
+  title: '[Sync] Sync internal 2.0.3'
+  author: jxt1234
+  merged_at: '2022-07-22'
+  url: https://github.com/alibaba/MNN/pull/2000
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 52 changed file(s)'
+  evidence_paths: []
+- number: 2017
+  title: Sync Internal 2.0.4
+  author: jxt1234
+  merged_at: '2022-08-12'
+  url: https://github.com/alibaba/MNN/pull/2017
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 498 changed file(s)'
+  evidence_paths: []
+- number: 2027
+  title: Sync Internal 2.0.5
+  author: wangzhaode
+  merged_at: '2022-08-24'
+  url: https://github.com/alibaba/MNN/pull/2027
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 100 changed file(s)'
+  evidence_paths: []
+- number: 2037
+  title: '[MNN:Sync] Sync Internal 2.1.0'
+  author: jxt1234
+  merged_at: '2022-08-31'
+  url: https://github.com/alibaba/MNN/pull/2037
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 75 changed file(s)'
+  evidence_paths: []
+- number: 2054
+  title: '[MNN:Sync] Sync Internal 2.1.1 contain below changes.'
+  author: wangzhaode
+  merged_at: '2022-09-09'
+  url: https://github.com/alibaba/MNN/pull/2054
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 48 changed file(s)'
+  evidence_paths: []
+- number: 2086
+  title: '[Sync] Sync Internal 2.1.2'
+  author: jxt1234
+  merged_at: '2022-09-30'
+  url: https://github.com/alibaba/MNN/pull/2086
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/compiler/AllShader.cpp, source/backend/vulkan/execution/VulkanBinary.cpp, source/backend/vulkan/execution/VulkanBinary.hpp'
+  evidence_paths:
+  - source/backend/vulkan/compiler/AllShader.cpp
+  - source/backend/vulkan/execution/VulkanBinary.cpp
+  - source/backend/vulkan/execution/VulkanBinary.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2103
+  title: '[Sync] Sync Internal Gitlab 2.2.0'
+  author: jxt1234
+  merged_at: '2022-10-31'
+  url: https://github.com/alibaba/MNN/pull/2103
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 101 changed file(s)'
+  evidence_paths: []
+- number: 2115
+  title: '[Sync] Sync Internal Gitlab 2.2.1 contains below commits:'
+  author: wangzhaode
+  merged_at: '2022-11-08'
+  url: https://github.com/alibaba/MNN/pull/2115
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 58 changed file(s)'
+  evidence_paths: []
+- number: 2131
+  title: '[Sync] Sync Internal 2.2.2'
+  author: jxt1234
+  merged_at: '2022-11-19'
+  url: https://github.com/alibaba/MNN/pull/2131
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 34 changed file(s)'
+  evidence_paths: []
+- number: 2155
+  title: '[MNN:Sync] A few bugfixes'
+  author: jxt1234
+  merged_at: '2022-12-04'
+  url: https://github.com/alibaba/MNN/pull/2155
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 17 changed file(s)'
+  evidence_paths: []
+- number: 2177
+  title: '[MNN:Internal] Sync to 2.2.3'
+  author: jxt1234
+  merged_at: '2022-12-24'
+  url: https://github.com/alibaba/MNN/pull/2177
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 30 changed file(s)'
+  evidence_paths: []
+- number: 2184
+  title: '[MNN:Sync] Sync Internal 2.3.0'
+  author: jxt1234
+  merged_at: '2022-12-30'
+  url: https://github.com/alibaba/MNN/pull/2184
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/argmax.comp, source/backend/vulkan/buffer/execution/glsl/avgpool.comp, source/backend/vulkan/buffer/execution/glsl/binary.comp,
+    source/backend/vulkan/buffer/execution/glsl/blit.comp, source/backend/vulkan/buffer/execution/glsl/blitregion.comp, source/backend/vulkan/buffer/execution/glsl/convolution.comp, source/backend/vulkan/buffer/execution/glsl/convolutionDepthwise.comp,
+    source/backend/vulkan/buffer/execution/glsl/convolutionDepthwiseMali.comp, source/backend/vulkan/buffer/execution/glsl/deconvolution.comp, source/backend/vulkan/buffer/execution/glsl/deconvolutionDepthwise.comp,
+    source/backend/vulkan/buffer/execution/glsl/dwweightcopy.comp, source/backend/vulkan/buffer/execution/glsl/gemm16x16.comp, source/backend/vulkan/buffer/execution/glsl/gemm16x16_bias.comp, source/backend/vulkan/buffer/execution/glsl/gridSampleBilinear.comp,
+    source/backend/vulkan/buffer/execution/glsl/gridSampleNearest.comp, source/backend/vulkan/buffer/execution/glsl/matmulunit.comp, source/backend/vulkan/buffer/execution/glsl/matmulunit_HAS_BIAS.comp,
+    source/backend/vulkan/buffer/execution/glsl/maxpool.comp, source/backend/vulkan/buffer/execution/glsl/nc4hw4Tonchw.comp, source/backend/vulkan/buffer/execution/glsl/nchwTonc4hw4.comp, source/backend/vulkan/buffer/execution/glsl/norm.comp,
+    source/backend/vulkan/buffer/execution/glsl/onehot.comp, source/backend/vulkan/buffer/execution/glsl/preluWithChannel.comp, source/backend/vulkan/buffer/execution/glsl/range.comp, source/backend/vulkan/buffer/execution/glsl/reduce.comp,
+    source/backend/vulkan/buffer/execution/glsl/resizeBilinear.comp, source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp, source/backend/vulkan/buffer/execution/glsl/roipooling.comp, source/backend/vulkan/buffer/execution/glsl/scale.comp,
+    source/backend/vulkan/buffer/execution/glsl/select.comp, source/backend/vulkan/buffer/execution/glsl/softmaxHeight_NHWC.comp, source/backend/vulkan/buffer/execution/glsl/unary.comp, source/backend/vulkan/image/execution/glsl/avgpool.comp,
+    source/backend/vulkan/image/execution/glsl/binaryImage.comp, source/backend/vulkan/image/execution/glsl/blit.comp, source/backend/vulkan/image/execution/glsl/blit_image.comp, source/backend/vulkan/image/execution/glsl/buffer2Image1D.comp,
+    source/backend/vulkan/image/execution/glsl/buffer2Image2D.comp, source/backend/vulkan/image/execution/glsl/buffer2Image3D.comp, source/backend/vulkan/image/execution/glsl/col2Im.comp, source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp,
+    source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp, source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp, source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp,
+    source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp, source/backend/vulkan/image/execution/glsl/dwweightcopy.comp, source/backend/vulkan/image/execution/glsl/fill_image.comp, source/backend/vulkan/image/execution/glsl/gemm16x16.comp,
+    source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp, source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp, source/backend/vulkan/image/execution/glsl/im2col.comp, source/backend/vulkan/image/execution/glsl/im2col1x1.comp,
+    source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp, source/backend/vulkan/image/execution/glsl/imageTonchw.comp, source/backend/vulkan/image/execution/glsl/matmul_input.comp, source/backend/vulkan/image/execution/glsl/matmul_output.comp,
+    source/backend/vulkan/image/execution/glsl/maxpool.comp, source/backend/vulkan/image/execution/glsl/nc4hw4Tonchw.comp, source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp, source/backend/vulkan/image/execution/glsl/nchwToimage.comp,
+    source/backend/vulkan/image/execution/glsl/nchwTonc4hw4.comp, source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp, source/backend/vulkan/image/execution/glsl/preluWithChannel.comp, source/backend/vulkan/image/execution/glsl/reduce.comp,
+    source/backend/vulkan/image/execution/glsl/relu.comp, source/backend/vulkan/image/execution/glsl/relu6.comp, source/backend/vulkan/image/execution/glsl/resizeBilinear.comp, source/backend/vulkan/image/execution/glsl/resizeNearest.comp,
+    source/backend/vulkan/image/execution/glsl/roipooling.comp, source/backend/vulkan/image/execution/glsl/scale.comp, source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp, source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp,
+    source/backend/vulkan/image/execution/glsl/unaryImage.comp, source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp, source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/argmax.comp
+  - source/backend/vulkan/buffer/execution/glsl/avgpool.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary.comp
+  - source/backend/vulkan/buffer/execution/glsl/blit.comp
+  - source/backend/vulkan/buffer/execution/glsl/blitregion.comp
+  - source/backend/vulkan/buffer/execution/glsl/convolution.comp
+  - source/backend/vulkan/buffer/execution/glsl/convolutionDepthwise.comp
+  - source/backend/vulkan/buffer/execution/glsl/convolutionDepthwiseMali.comp
+  - source/backend/vulkan/buffer/execution/glsl/deconvolution.comp
+  - source/backend/vulkan/buffer/execution/glsl/deconvolutionDepthwise.comp
+  - source/backend/vulkan/buffer/execution/glsl/dwweightcopy.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemm16x16.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemm16x16_bias.comp
+  - source/backend/vulkan/buffer/execution/glsl/gridSampleBilinear.comp
+  - source/backend/vulkan/buffer/execution/glsl/gridSampleNearest.comp
+  - source/backend/vulkan/buffer/execution/glsl/matmulunit.comp
+  - source/backend/vulkan/buffer/execution/glsl/matmulunit_HAS_BIAS.comp
+  - source/backend/vulkan/buffer/execution/glsl/maxpool.comp
+  - source/backend/vulkan/buffer/execution/glsl/nc4hw4Tonchw.comp
+  - source/backend/vulkan/buffer/execution/glsl/nchwTonc4hw4.comp
+  - source/backend/vulkan/buffer/execution/glsl/norm.comp
+  - source/backend/vulkan/buffer/execution/glsl/onehot.comp
+  - source/backend/vulkan/buffer/execution/glsl/preluWithChannel.comp
+  - source/backend/vulkan/buffer/execution/glsl/range.comp
+  - source/backend/vulkan/buffer/execution/glsl/reduce.comp
+  - source/backend/vulkan/buffer/execution/glsl/resizeBilinear.comp
+  - source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp
+  - source/backend/vulkan/buffer/execution/glsl/roipooling.comp
+  - source/backend/vulkan/buffer/execution/glsl/scale.comp
+  - source/backend/vulkan/buffer/execution/glsl/select.comp
+  - source/backend/vulkan/buffer/execution/glsl/softmaxHeight_NHWC.comp
+  - source/backend/vulkan/buffer/execution/glsl/unary.comp
+  - source/backend/vulkan/image/execution/glsl/avgpool.comp
+  - source/backend/vulkan/image/execution/glsl/binaryImage.comp
+  - source/backend/vulkan/image/execution/glsl/blit.comp
+  - source/backend/vulkan/image/execution/glsl/blit_image.comp
+  - source/backend/vulkan/image/execution/glsl/buffer2Image1D.comp
+  - source/backend/vulkan/image/execution/glsl/buffer2Image2D.comp
+  - source/backend/vulkan/image/execution/glsl/buffer2Image3D.comp
+  - source/backend/vulkan/image/execution/glsl/col2Im.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+  - source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
+  - source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
+  - source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
+  - source/backend/vulkan/image/execution/glsl/dwweightcopy.comp
+  - source/backend/vulkan/image/execution/glsl/fill_image.comp
+  - source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+  - source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
+  - source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
+  - source/backend/vulkan/image/execution/glsl/im2col.comp
+  - source/backend/vulkan/image/execution/glsl/im2col1x1.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+  - source/backend/vulkan/image/execution/glsl/matmul_input.comp
+  - source/backend/vulkan/image/execution/glsl/matmul_output.comp
+  - source/backend/vulkan/image/execution/glsl/maxpool.comp
+  - source/backend/vulkan/image/execution/glsl/nc4hw4Tonchw.comp
+  - source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+  - source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+  - source/backend/vulkan/image/execution/glsl/nchwTonc4hw4.comp
+  - source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
+  - source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
+  - source/backend/vulkan/image/execution/glsl/reduce.comp
+  - source/backend/vulkan/image/execution/glsl/relu.comp
+  - source/backend/vulkan/image/execution/glsl/relu6.comp
+  - source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
+  - source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+  - source/backend/vulkan/image/execution/glsl/roipooling.comp
+  - source/backend/vulkan/image/execution/glsl/scale.comp
+  - source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp
+  - source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
+  - source/backend/vulkan/image/execution/glsl/unaryImage.comp
+  - source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
+  - source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
+- number: 2191
+  title: '[Sync] Sync Internal changes.'
+  author: wangzhaode
+  merged_at: '2023-01-11'
+  url: https://github.com/alibaba/MNN/pull/2191
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 23 changed file(s)'
+  evidence_paths: []
+- number: 2223
+  title: '[MNN:Sync] Sync Internal 2.3.1'
+  author: jxt1234
+  merged_at: '2023-02-15'
+  url: https://github.com/alibaba/MNN/pull/2223
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 92 changed file(s)'
+  evidence_paths: []
+- number: 2225
+  title: '[GithubAction:Feature] Add wiki sync.'
+  author: wangzhaode
+  merged_at: '2023-02-16'
+  url: https://github.com/alibaba/MNN/pull/2225
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 2244
+  title: '[MNN:Sync] Sync Internal Gitlab (2.4)'
+  author: jxt1234
+  merged_at: '2023-02-28'
+  url: https://github.com/alibaba/MNN/pull/2244
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (unary operators): source/backend/vulkan/buffer/execution/glsl/unary.comp,
+    source/backend/vulkan/image/execution/glsl/unaryImage.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/unary.comp
+  - source/backend/vulkan/image/execution/glsl/unaryImage.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2290
+  title: '[MNN:Sync] Sync Internal 2.4.1'
+  author: jxt1234
+  merged_at: '2023-03-20'
+  url: https://github.com/alibaba/MNN/pull/2290
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/compiler/AllShader.cpp, source/backend/vulkan/buffer/compiler/VulkanShaderMap.cpp, source/backend/vulkan/buffer/execution/VulkanLoop.cpp,
+    source/backend/vulkan/buffer/execution/VulkanLoop.hpp, source/backend/vulkan/buffer/execution/VulkanMatMul.cpp, source/backend/vulkan/buffer/execution/VulkanMatMul.hpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/compiler/AllShader.cpp
+  - source/backend/vulkan/buffer/compiler/VulkanShaderMap.cpp
+  - source/backend/vulkan/buffer/execution/VulkanLoop.cpp
+  - source/backend/vulkan/buffer/execution/VulkanLoop.hpp
+  - source/backend/vulkan/buffer/execution/VulkanMatMul.cpp
+  - source/backend/vulkan/buffer/execution/VulkanMatMul.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2300
+  title: Feature/sync
+  author: jxt1234
+  merged_at: '2023-03-25'
+  url: https://github.com/alibaba/MNN/pull/2300
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 2326
+  title: '[MNN:Sync] Sync 2.4.2'
+  author: jxt1234
+  merged_at: '2023-04-11'
+  url: https://github.com/alibaba/MNN/pull/2326
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanRaster.cpp, source/backend/vulkan/component/VulkanPipeline.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanRaster.cpp
+  - source/backend/vulkan/component/VulkanPipeline.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2339
+  title: '[MNN:Sync] Sync Internal Gitlab 2.4.3'
+  author: jxt1234
+  merged_at: '2023-04-18'
+  url: https://github.com/alibaba/MNN/pull/2339
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanRaster.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanRaster.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2355
+  title: '[MNN:Sync] Sync Internal 2.5.0'
+  author: wangzhaode
+  merged_at: '2023-04-27'
+  url: https://github.com/alibaba/MNN/pull/2355
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 129 changed file(s)'
+  evidence_paths: []
+- number: 2379
+  title: '[MNN:Sync] Sync Internal Gitlab: 2.5.1'
+  author: jxt1234
+  merged_at: '2023-05-19'
+  url: https://github.com/alibaba/MNN/pull/2379
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 98 changed file(s)'
+  evidence_paths: []
+- number: 2434
+  title: '[MNN:Sync] Sync Internal 2.5.3'
+  author: jxt1234
+  merged_at: '2023-06-16'
+  url: https://github.com/alibaba/MNN/pull/2434
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 219 changed file(s)'
+  evidence_paths: []
+- number: 2450
+  title: '[MNN:Sync] Sync Internal code, support low_memory for conv.'
+  author: wangzhaode
+  merged_at: '2023-06-27'
+  url: https://github.com/alibaba/MNN/pull/2450
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 57 changed file(s)'
+  evidence_paths: []
+- number: 2498
+  title: '[MNN:Sync] Sync Internal Gitlab'
+  author: jxt1234
+  merged_at: '2023-07-18'
+  url: https://github.com/alibaba/MNN/pull/2498
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanMatMul.cpp, source/backend/vulkan/runtime/VulkanRuntime.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanMatMul.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2503
+  title: Feature/bugfix
+  author: jxt1234
+  merged_at: '2023-07-23'
+  url: https://github.com/alibaba/MNN/pull/2503
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (standalone softmax fix): source/backend/vulkan/buffer/execution/glsl/softmaxHeight_NHWC.comp,
+    source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/softmaxHeight_NHWC.comp
+  - source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2513
+  title: '[MNN:Sync] Sync Internal 2.6.2'
+  author: jxt1234
+  merged_at: '2023-07-31'
+  url: https://github.com/alibaba/MNN/pull/2513
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/backend/VulkanBackend.cpp, source/backend/vulkan/image/backend/VulkanBackend.hpp'
+  evidence_paths:
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  - source/backend/vulkan/image/backend/VulkanBackend.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2550
+  title: '[MNN:Sync] Sync Internal 2.6.3'
+  author: jxt1234
+  merged_at: '2023-08-22'
+  url: https://github.com/alibaba/MNN/pull/2550
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2580
+  title: '[MNN:Sync] Sync Internal 2.7.0'
+  author: jxt1234
+  merged_at: '2023-09-04'
+  url: https://github.com/alibaba/MNN/pull/2580
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/buffer/execution/VulkanRaster.cpp, source/backend/vulkan/buffer/execution/VulkanRaster.hpp,
+    source/backend/vulkan/component/VulkanBuffer.hpp, source/backend/vulkan/component/VulkanImage.hpp, source/backend/vulkan/component/VulkanMemoryPool.cpp, source/backend/vulkan/component/VulkanMemoryPool.hpp,
+    source/backend/vulkan/runtime/VulkanRuntime.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/buffer/execution/VulkanRaster.cpp
+  - source/backend/vulkan/buffer/execution/VulkanRaster.hpp
+  - source/backend/vulkan/component/VulkanBuffer.hpp
+  - source/backend/vulkan/component/VulkanImage.hpp
+  - source/backend/vulkan/component/VulkanMemoryPool.cpp
+  - source/backend/vulkan/component/VulkanMemoryPool.hpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2595
+  title: '[MNN:Sync] Sync Internal 2.7.1'
+  author: wangzhaode
+  merged_at: '2023-09-21'
+  url: https://github.com/alibaba/MNN/pull/2595
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/buffer/backend/VulkanBackend.hpp, source/backend/vulkan/buffer/execution/VulkanConvolution.cpp,
+    source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp, source/backend/vulkan/image/backend/VulkanBackend.cpp, source/backend/vulkan/image/backend/VulkanBackend.hpp, source/backend/vulkan/image/execution/VulkanConvolution.cpp,
+    source/backend/vulkan/image/execution/VulkanDeconvolution.cpp, source/backend/vulkan/image/execution/VulkanDeconvolutionDepthwise.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/buffer/backend/VulkanBackend.hpp
+  - source/backend/vulkan/buffer/execution/VulkanConvolution.cpp
+  - source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  - source/backend/vulkan/image/backend/VulkanBackend.hpp
+  - source/backend/vulkan/image/execution/VulkanConvolution.cpp
+  - source/backend/vulkan/image/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/image/execution/VulkanDeconvolutionDepthwise.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2618
+  title: '[MNN:Sync] Sync Internal 2.7.2'
+  author: jxt1234
+  merged_at: '2023-10-20'
+  url: https://github.com/alibaba/MNN/pull/2618
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 163 changed file(s)'
+  evidence_paths: []
+- number: 2676
+  title: '[MNN:Sync] Sync Internal 2.8.0'
+  author: wangzhaode
+  merged_at: '2023-12-04'
+  url: https://github.com/alibaba/MNN/pull/2676
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (binary, reduce and resize operators): source/backend/vulkan/buffer/execution/glsl/binary.comp,
+    source/backend/vulkan/buffer/execution/glsl/binary_blit.comp, source/backend/vulkan/buffer/execution/glsl/reduce.comp, source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp, source/backend/vulkan/image/execution/glsl/resizeNearest.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/binary.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary_blit.comp
+  - source/backend/vulkan/buffer/execution/glsl/reduce.comp
+  - source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp
+  - source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2693
+  title: '[MNN::Bugfix] Some bugfix sync.'
+  author: wangzhaode
+  merged_at: '2023-12-12'
+  url: https://github.com/alibaba/MNN/pull/2693
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 38 changed file(s)'
+  evidence_paths: []
+- number: 2710
+  title: '[MNN:Sync] Sync Internal 2.8.1'
+  author: wangzhaode
+  merged_at: '2023-12-27'
+  url: https://github.com/alibaba/MNN/pull/2710
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/buffer/backend/VulkanBackend.hpp, source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp,
+    source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp, source/backend/vulkan/buffer/execution/VulkanFuse.cpp, source/backend/vulkan/buffer/execution/VulkanLayernorm.cpp, source/backend/vulkan/buffer/execution/VulkanMatMul.cpp,
+    source/backend/vulkan/buffer/execution/VulkanMatMul.hpp, source/backend/vulkan/component/VulkanCommandPool.cpp, source/backend/vulkan/component/VulkanCommandPool.hpp, source/backend/vulkan/component/VulkanDevice.cpp,
+    source/backend/vulkan/component/VulkanDevice.hpp, source/backend/vulkan/component/VulkanPipeline.cpp, source/backend/vulkan/component/VulkanPipeline.hpp, source/backend/vulkan/component/VulkanQueryPool.cpp,
+    source/backend/vulkan/component/VulkanQueryPool.hpp, source/backend/vulkan/image/backend/VulkanBackend.cpp, source/backend/vulkan/runtime/VulkanRuntime.cpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/buffer/backend/VulkanBackend.hpp
+  - source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/buffer/execution/VulkanFuse.cpp
+  - source/backend/vulkan/buffer/execution/VulkanLayernorm.cpp
+  - source/backend/vulkan/buffer/execution/VulkanMatMul.cpp
+  - source/backend/vulkan/buffer/execution/VulkanMatMul.hpp
+  - source/backend/vulkan/component/VulkanCommandPool.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.hpp
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  - source/backend/vulkan/component/VulkanDevice.hpp
+  - source/backend/vulkan/component/VulkanPipeline.cpp
+  - source/backend/vulkan/component/VulkanPipeline.hpp
+  - source/backend/vulkan/component/VulkanQueryPool.cpp
+  - source/backend/vulkan/component/VulkanQueryPool.hpp
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2774
+  title: '[MNN:Sync] Sync Internal 2.8.2'
+  author: wangzhaode
+  merged_at: '2024-02-29'
+  url: https://github.com/alibaba/MNN/pull/2774
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (argmax): source/backend/vulkan/buffer/execution/glsl/argmax.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/argmax.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2785
+  title: '[MNN:Sync] Sync Internal 2.8.3'
+  author: wangzhaode
+  merged_at: '2024-03-13'
+  url: https://github.com/alibaba/MNN/pull/2785
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1056 changed file(s)'
+  evidence_paths: []
+- number: 2839
+  title: '[MNN:Sync] Sync Internal 2.8.4'
+  author: jxt1234
+  merged_at: '2024-04-19'
+  url: https://github.com/alibaba/MNN/pull/2839
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/argmax.comp, source/backend/vulkan/buffer/execution/glsl/binary.comp, source/backend/vulkan/buffer/execution/glsl/binary_blit.comp,
+    source/backend/vulkan/buffer/execution/glsl/binary_blit_int.comp, source/backend/vulkan/buffer/execution/glsl/binary_int.comp, source/backend/vulkan/buffer/execution/glsl/blitregion.comp, source/backend/vulkan/buffer/execution/glsl/cast_float_int.comp,
+    source/backend/vulkan/buffer/execution/glsl/cast_int_bool.comp, source/backend/vulkan/buffer/execution/glsl/convolutionint4.comp, source/backend/vulkan/buffer/execution/glsl/convolutionint8.comp, source/backend/vulkan/buffer/execution/glsl/onehot.comp,
+    source/backend/vulkan/buffer/execution/glsl/range.comp, source/backend/vulkan/buffer/execution/glsl/reduce_int.comp, source/backend/vulkan/buffer/execution/glsl/select.comp, source/backend/vulkan/buffer/execution/glsl/unary_int.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/argmax.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary_blit.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary_blit_int.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary_int.comp
+  - source/backend/vulkan/buffer/execution/glsl/blitregion.comp
+  - source/backend/vulkan/buffer/execution/glsl/cast_float_int.comp
+  - source/backend/vulkan/buffer/execution/glsl/cast_int_bool.comp
+  - source/backend/vulkan/buffer/execution/glsl/convolutionint4.comp
+  - source/backend/vulkan/buffer/execution/glsl/convolutionint8.comp
+  - source/backend/vulkan/buffer/execution/glsl/onehot.comp
+  - source/backend/vulkan/buffer/execution/glsl/range.comp
+  - source/backend/vulkan/buffer/execution/glsl/reduce_int.comp
+  - source/backend/vulkan/buffer/execution/glsl/select.comp
+  - source/backend/vulkan/buffer/execution/glsl/unary_int.comp
+- number: 2863
+  title: MNN:Sync Sync Internal 2.9.0
+  author: jxt1234
+  merged_at: '2024-05-11'
+  url: https://github.com/alibaba/MNN/pull/2863
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (ROI pooling): source/backend/vulkan/buffer/execution/glsl/roipooling.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/roipooling.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 2896
+  title: '[MNN:Sync] Sync Internal 2.9.1'
+  author: jxt1234
+  merged_at: '2024-06-03'
+  url: https://github.com/alibaba/MNN/pull/2896
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 106 changed file(s)'
+  evidence_paths: []
+- number: 2917
+  title: 'MNN:Sync: Fix bug for llama2/llama3 attention fuse, refract llm usage'
+  author: jxt1234
+  merged_at: '2024-06-15'
+  url: https://github.com/alibaba/MNN/pull/2917
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 110 changed file(s)'
+  evidence_paths: []
+- number: 2947
+  title: 'MNN:Sync: Sync Internal 2.9.2'
+  author: jxt1234
+  merged_at: '2024-07-04'
+  url: https://github.com/alibaba/MNN/pull/2947
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 111 changed file(s)'
+  evidence_paths: []
+- number: 2963
+  title: 'MNN:Sync: Sync Internal 2.9.3'
+  author: jxt1234
+  merged_at: '2024-07-23'
+  url: https://github.com/alibaba/MNN/pull/2963
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 260 changed file(s)'
+  evidence_paths: []
+- number: 2994
+  title: Fixed Vulkan devices detection
+  author: EduMenges
+  merged_at: '2024-08-20'
+  url: https://github.com/alibaba/MNN/pull/2994
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanDevice.cpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3004
+  title: 'MNN:Sync: Sync Internal 2.9.4'
+  author: jxt1234
+  merged_at: '2024-08-24'
+  url: https://github.com/alibaba/MNN/pull/3004
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/image/execution/glsl/argmax.comp, source/backend/vulkan/image/execution/glsl/avgpool.comp, source/backend/vulkan/image/execution/glsl/binaryImage.comp,
+    source/backend/vulkan/image/execution/glsl/blit_image.comp, source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp, source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp,
+    source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp, source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp, source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp, source/backend/vulkan/image/execution/glsl/fill_image.comp,
+    source/backend/vulkan/image/execution/glsl/gemm16x16.comp, source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp, source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp, source/backend/vulkan/image/execution/glsl/im2col.comp,
+    source/backend/vulkan/image/execution/glsl/im2col1x1.comp, source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp, source/backend/vulkan/image/execution/glsl/imageTonchw.comp, source/backend/vulkan/image/execution/glsl/matmul_input.comp,
+    source/backend/vulkan/image/execution/glsl/matmul_output.comp, source/backend/vulkan/image/execution/glsl/maxpool.comp, source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp, source/backend/vulkan/image/execution/glsl/nchwToimage.comp,
+    source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp, source/backend/vulkan/image/execution/glsl/preluWithChannel.comp, source/backend/vulkan/image/execution/glsl/relu.comp, source/backend/vulkan/image/execution/glsl/relu6.comp,
+    source/backend/vulkan/image/execution/glsl/resizeBilinear.comp, source/backend/vulkan/image/execution/glsl/resizeNearest.comp, source/backend/vulkan/image/execution/glsl/roipooling.comp, source/backend/vulkan/image/execution/glsl/scale.comp,
+    source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp, source/backend/vulkan/image/execution/glsl/unaryImage.comp, source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp,
+    source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/argmax.comp
+  - source/backend/vulkan/image/execution/glsl/avgpool.comp
+  - source/backend/vulkan/image/execution/glsl/binaryImage.comp
+  - source/backend/vulkan/image/execution/glsl/blit_image.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+  - source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
+  - source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
+  - source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
+  - source/backend/vulkan/image/execution/glsl/fill_image.comp
+  - source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+  - source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
+  - source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
+  - source/backend/vulkan/image/execution/glsl/im2col.comp
+  - source/backend/vulkan/image/execution/glsl/im2col1x1.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+  - source/backend/vulkan/image/execution/glsl/matmul_input.comp
+  - source/backend/vulkan/image/execution/glsl/matmul_output.comp
+  - source/backend/vulkan/image/execution/glsl/maxpool.comp
+  - source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+  - source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+  - source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
+  - source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
+  - source/backend/vulkan/image/execution/glsl/relu.comp
+  - source/backend/vulkan/image/execution/glsl/relu6.comp
+  - source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
+  - source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+  - source/backend/vulkan/image/execution/glsl/roipooling.comp
+  - source/backend/vulkan/image/execution/glsl/scale.comp
+  - source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
+  - source/backend/vulkan/image/execution/glsl/unaryImage.comp
+  - source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
+  - source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
+- number: 3028
+  title: 'MNN:Sync: Sync Internal 2.9.5'
+  author: jxt1234
+  merged_at: '2024-09-12'
+  url: https://github.com/alibaba/MNN/pull/3028
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanPipeline.cpp, source/backend/vulkan/runtime/VulkanRuntime.cpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanPipeline.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.cpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3048
+  title: 'MNN:Bugfix: Fix bug for dynammic quant nan for same value input'
+  author: jxt1234
+  merged_at: '2024-10-11'
+  url: https://github.com/alibaba/MNN/pull/3048
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 3050
+  title: 'MNN:Sync: Sync Internal 2.9.6'
+  author: jxt1234
+  merged_at: '2024-10-14'
+  url: https://github.com/alibaba/MNN/pull/3050
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (binary blit): source/backend/vulkan/image/execution/glsl/binary_blit.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/binary_blit.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3087
+  title: 'MNN:Sync: Sync Internal 3.0.0'
+  author: jxt1234
+  merged_at: '2024-11-18'
+  url: https://github.com/alibaba/MNN/pull/3087
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (reduce and image-mode softmax): source/backend/vulkan/image/execution/glsl/reduce.comp,
+    source/backend/vulkan/image/execution/glsl/softmaxImage.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/reduce.comp
+  - source/backend/vulkan/image/execution/glsl/softmaxImage.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3092
+  title: 'Bugfix: Vulkan windows compilation error.'
+  author: jxt1234
+  merged_at: '2024-11-19'
+  url: https://github.com/alibaba/MNN/pull/3092
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/execution/VulkanSoftmax.cpp, source/backend/vulkan/image/execution/VulkanSoftmax.hpp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/VulkanSoftmax.cpp
+  - source/backend/vulkan/image/execution/VulkanSoftmax.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3107
+  title: 'MNN:Sync: Sync Internal 3.0.1'
+  author: jxt1234
+  merged_at: '2024-12-02'
+  url: https://github.com/alibaba/MNN/pull/3107
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (depthwise convolution and unary operators): source/backend/vulkan/buffer/execution/glsl/unary.comp,
+    source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp, source/backend/vulkan/image/execution/glsl/unaryImage.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/unary.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp
+  - source/backend/vulkan/image/execution/glsl/unaryImage.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3110
+  title: Revert vulkan softmax modify
+  author: jxt1234
+  merged_at: '2024-12-02'
+  url: https://github.com/alibaba/MNN/pull/3110
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/execution/VulkanSoftmax.cpp, source/backend/vulkan/image/execution/VulkanSoftmax.hpp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/VulkanSoftmax.cpp
+  - source/backend/vulkan/image/execution/VulkanSoftmax.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3130
+  title: 'MNN:Sync: Sync Interal 3.0.2'
+  author: jxt1234
+  merged_at: '2024-12-20'
+  url: https://github.com/alibaba/MNN/pull/3130
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanPRelu.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanPRelu.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3145
+  title: 'MNN:Sync: sync internal 3.0.3'
+  author: jxt1234
+  merged_at: '2024-12-31'
+  url: https://github.com/alibaba/MNN/pull/3145
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (depthwise convolution): source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3170
+  title: 'MNN:Sync: Sync Internal 3.0.4'
+  author: jxt1234
+  merged_at: '2025-01-22'
+  url: https://github.com/alibaba/MNN/pull/3170
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/image/execution/glsl/convolution1x1.comp, source/backend/vulkan/image/execution/glsl/convolution1x1_c8w4.comp, source/backend/vulkan/image/execution/glsl/convolution1x1_w4.comp,
+    source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp, source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp, source/backend/vulkan/image/execution/glsl/gemm16x16.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/convolution1x1.comp
+  - source/backend/vulkan/image/execution/glsl/convolution1x1_c8w4.comp
+  - source/backend/vulkan/image/execution/glsl/convolution1x1_w4.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+  - source/backend/vulkan/image/execution/glsl/convolutionDepthwise_s1d1_w2.comp
+  - source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+- number: 3225
+  title: 'MNN:Sync: Sync Internal 3.0.5'
+  author: jxt1234
+  merged_at: '2025-02-12'
+  url: https://github.com/alibaba/MNN/pull/3225
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/buffer/backend/VulkanBackend.hpp, source/backend/vulkan/buffer/execution/VulkanBasicExecution.cpp,
+    source/backend/vulkan/buffer/execution/VulkanBasicExecution.hpp, source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp, source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp, source/backend/vulkan/image/backend/VulkanBackend.cpp,
+    source/backend/vulkan/image/backend/VulkanBackend.hpp, source/backend/vulkan/image/compiler/AllShader.cpp, source/backend/vulkan/image/compiler/VulkanShaderMap.cpp, source/backend/vulkan/image/execution/VulkanBasicExecution.cpp,
+    source/backend/vulkan/image/execution/VulkanBasicExecution.hpp, source/backend/vulkan/image/execution/VulkanConvolution1x1.cpp, source/backend/vulkan/image/execution/VulkanConvolution1x1.hpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/buffer/backend/VulkanBackend.hpp
+  - source/backend/vulkan/buffer/execution/VulkanBasicExecution.cpp
+  - source/backend/vulkan/buffer/execution/VulkanBasicExecution.hpp
+  - source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/buffer/execution/VulkanDeconvolution.cpp
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  - source/backend/vulkan/image/backend/VulkanBackend.hpp
+  - source/backend/vulkan/image/compiler/AllShader.cpp
+  - source/backend/vulkan/image/compiler/VulkanShaderMap.cpp
+  - source/backend/vulkan/image/execution/VulkanBasicExecution.cpp
+  - source/backend/vulkan/image/execution/VulkanBasicExecution.hpp
+  - source/backend/vulkan/image/execution/VulkanConvolution1x1.cpp
+  - source/backend/vulkan/image/execution/VulkanConvolution1x1.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3226
+  title: 'Vulkan:Bugfix: Fix bug for windows compile error'
+  author: jxt1234
+  merged_at: '2025-02-12'
+  url: https://github.com/alibaba/MNN/pull/3226
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/backend/VulkanBackend.cpp'
+  evidence_paths:
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3240
+  title: 'MNN:Sync: Sync a few bugfix, add qwen2.5-vl support'
+  author: jxt1234
+  merged_at: '2025-02-17'
+  url: https://github.com/alibaba/MNN/pull/3240
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 3258
+  title: '[MNN:Sync] Sync Internal 3.1.0.'
+  author: wangzhaode
+  merged_at: '2025-02-24'
+  url: https://github.com/alibaba/MNN/pull/3258
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/backend/VulkanBackend.cpp'
+  evidence_paths:
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3310
+  title: QNX Neutrino Compatibility and Minor Fixes
+  author: xi-guo-0
+  merged_at: '2025-03-12'
+  url: https://github.com/alibaba/MNN/pull/3310
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 3315
+  title: 'MNN:Sync: Sync Internal 3.1.1'
+  author: jxt1234
+  merged_at: '2025-03-12'
+  url: https://github.com/alibaba/MNN/pull/3315
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 105 changed file(s)'
+  evidence_paths: []
+- number: 3352
+  title: 'MNN:Sync: Sync Internal 3.1.2'
+  author: jxt1234
+  merged_at: '2025-03-27'
+  url: https://github.com/alibaba/MNN/pull/3352
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp, source/backend/vulkan/buffer/render/VulkanGaussianRender.hpp, source/backend/vulkan/buffer/render/VulkanRasterAndInterpolate.cpp,
+    source/backend/vulkan/buffer/render/VulkanRasterDiff.cpp, source/backend/vulkan/buffer/render/VulkanTexture.cpp, source/backend/vulkan/buffer/render/compiler/AllShaderRender.cpp, source/backend/vulkan/buffer/render/compiler/VulkanShaderMapRender.cpp,
+    source/backend/vulkan/buffer/render/compiler/makeshader.py'
+  evidence_paths:
+  - source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp
+  - source/backend/vulkan/buffer/render/VulkanGaussianRender.hpp
+  - source/backend/vulkan/buffer/render/VulkanRasterAndInterpolate.cpp
+  - source/backend/vulkan/buffer/render/VulkanRasterDiff.cpp
+  - source/backend/vulkan/buffer/render/VulkanTexture.cpp
+  - source/backend/vulkan/buffer/render/compiler/AllShaderRender.cpp
+  - source/backend/vulkan/buffer/render/compiler/VulkanShaderMapRender.cpp
+  - source/backend/vulkan/buffer/render/compiler/makeshader.py
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3355
+  title: 'LLM:Sync: Sync llmexport files'
+  author: jxt1234
+  merged_at: '2025-03-27'
+  url: https://github.com/alibaba/MNN/pull/3355
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 3402
+  title: 'MNN:Sync: Sync Internal 3.1.3'
+  author: jxt1234
+  merged_at: '2025-04-28'
+  url: https://github.com/alibaba/MNN/pull/3402
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp, source/backend/vulkan/buffer/render/compiler/AllShaderRender.cpp, source/backend/vulkan/buffer/render/compiler/VulkanShaderMapRender.cpp,
+    source/backend/vulkan/component/VulkanDevice.cpp, source/backend/vulkan/component/VulkanDevice.hpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp
+  - source/backend/vulkan/buffer/render/compiler/AllShaderRender.cpp
+  - source/backend/vulkan/buffer/render/compiler/VulkanShaderMapRender.cpp
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  - source/backend/vulkan/component/VulkanDevice.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3406
+  title: 'LLM:Feature, OpenCL:Bugfix: Sync internal bugfix( support llm prompt'
+  author: jxt1234
+  merged_at: '2025-04-30'
+  url: https://github.com/alibaba/MNN/pull/3406
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 27 changed file(s)'
+  evidence_paths: []
+- number: 3413
+  title: 'LLM:Bugfix: Fix bug for arm82 / gpu error when use penalty'
+  author: jxt1234
+  merged_at: '2025-05-01'
+  url: https://github.com/alibaba/MNN/pull/3413
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 3505
+  title: '[MNN:Sync] Sync Internal 3.1.4.'
+  author: wangzhaode
+  merged_at: '2025-05-08'
+  url: https://github.com/alibaba/MNN/pull/3505
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 94 changed file(s)'
+  evidence_paths: []
+- number: 3557
+  title: '[MNN:Sync] Sync internal.'
+  author: wangzhaode
+  merged_at: '2025-05-23'
+  url: https://github.com/alibaba/MNN/pull/3557
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 154 changed file(s)'
+  evidence_paths: []
+- number: 3603
+  title: 'MNN:Sync: Sync 3.2.0'
+  author: jxt1234
+  merged_at: '2025-06-06'
+  url: https://github.com/alibaba/MNN/pull/3603
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 110 changed file(s)'
+  evidence_paths: []
+- number: 3610
+  title: 'Vulkan:Bugfix: Fix bug for radixsort copy sortnumber error'
+  author: jxt1234
+  merged_at: '2025-06-09'
+  url: https://github.com/alibaba/MNN/pull/3610
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/buffer/backend/VulkanBackend.hpp, source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp,
+    source/backend/vulkan/buffer/execution/VulkanFuse.cpp, source/backend/vulkan/buffer/execution/VulkanRaster.cpp, source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp, source/backend/vulkan/component/VulkanCommandPool.cpp,
+    source/backend/vulkan/component/VulkanCommandPool.hpp, source/backend/vulkan/component/VulkanDevice.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/buffer/backend/VulkanBackend.hpp
+  - source/backend/vulkan/buffer/execution/VulkanConvolutionImpl.cpp
+  - source/backend/vulkan/buffer/execution/VulkanFuse.cpp
+  - source/backend/vulkan/buffer/execution/VulkanRaster.cpp
+  - source/backend/vulkan/buffer/render/VulkanGaussianRender.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.cpp
+  - source/backend/vulkan/component/VulkanCommandPool.hpp
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3635
+  title: 'MNN:Sync: Sync Internal 3.2.1'
+  author: jxt1234
+  merged_at: '2025-06-17'
+  url: https://github.com/alibaba/MNN/pull/3635
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1089 changed file(s)'
+  evidence_paths: []
+- number: 3658
+  title: Sync forward type schema
+  author: jules-ai
+  merged_at: '2025-06-26'
+  url: https://github.com/alibaba/MNN/pull/3658
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 3747
+  title: 'MNN:Sync: Sync Internal 3.2.2'
+  author: jxt1234
+  merged_at: '2025-07-23'
+  url: https://github.com/alibaba/MNN/pull/3747
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 231 changed file(s)'
+  evidence_paths: []
+- number: 3790
+  title: '[MNN:Sync] Sync Internal reranker, gpt-oss.'
+  author: wangzhaode
+  merged_at: '2025-08-08'
+  url: https://github.com/alibaba/MNN/pull/3790
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 116 changed file(s)'
+  evidence_paths: []
+- number: 3832
+  title: 'MNN:Sync: Sync Internal 3.2.3'
+  author: jxt1234
+  merged_at: '2025-08-22'
+  url: https://github.com/alibaba/MNN/pull/3832
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 91 changed file(s)'
+  evidence_paths: []
+- number: 3906
+  title: 'MNN:Sync: Sync Internal 3.2.4'
+  author: jxt1234
+  merged_at: '2025-09-22'
+  url: https://github.com/alibaba/MNN/pull/3906
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 165 changed file(s)'
+  evidence_paths: []
+- number: 3950
+  title: 'MNN:Sync: Sync Internal 3.2.5'
+  author: wangzhaode
+  merged_at: '2025-10-16'
+  url: https://github.com/alibaba/MNN/pull/3950
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 41 changed file(s)'
+  evidence_paths: []
+- number: 3986
+  title: 'MNN:Sync: Sync Internal 3.3.0'
+  author: jxt1234
+  merged_at: '2025-10-31'
+  url: https://github.com/alibaba/MNN/pull/3986
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 243 changed file(s)'
+  evidence_paths: []
+- number: 4000
+  title: 'Bugfix: MNN2QNNModel, not add audio.so, smooth quant with vl'
+  author: jxt1234
+  merged_at: '2025-11-06'
+  url: https://github.com/alibaba/MNN/pull/4000
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 4 changed file(s)'
+  evidence_paths: []
+- number: 4017
+  title: Fix/opencl depthwise deconv and vulkan barrier
+  author: JunKnows
+  merged_at: '2025-12-26'
+  url: https://github.com/alibaba/MNN/pull/4017
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanImage.cpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanImage.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4066
+  title: '[Sync] Update MNN to 3.3.1 and Sync Internal Improvements'
+  author: wangzhaode
+  merged_at: '2025-12-19'
+  url: https://github.com/alibaba/MNN/pull/4066
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 136 changed file(s)'
+  evidence_paths: []
+- number: 4096
+  title: Attention Q 量化越界问题修正与 Expr 加载 const 权重分离模型问题修正
+  author: jxt1234
+  merged_at: '2026-01-22'
+  url: https://github.com/alibaba/MNN/pull/4096
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4115
+  title: 'Converter:Feature: Add convpad fuse'
+  author: jxt1234
+  merged_at: '2026-01-20'
+  url: https://github.com/alibaba/MNN/pull/4115
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4294
+  title: 'Geometry:Bugfix: Fix bug for gpu case GeometryGather with const indic…'
+  author: jxt1234
+  merged_at: '2026-03-20'
+  url: https://github.com/alibaba/MNN/pull/4294
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4348
+  title: '[Vulkan:Bugfix] Removed static lookup to dynamic symbol'
+  author: EduMenges
+  merged_at: '2026-04-17'
+  url: https://github.com/alibaba/MNN/pull/4348
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanDevice.cpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4373
+  title: '[Vulkan:Bugfix] Fix bug for building mnncli with -DMNN_VULKAN=ON'
+  author: Dts0
+  merged_at: '2026-04-17'
+  url: https://github.com/alibaba/MNN/pull/4373
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4397
+  title: '[LLM:Perf] Interleaved Thinker/Talker generation for Omni — TTFA ↓2.7x'
+  author: EricMoin
+  merged_at: '2026-05-07'
+  url: https://github.com/alibaba/MNN/pull/4397
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 6 changed file(s)'
+  evidence_paths: []
+- number: 4414
+  title: '[QNN:Perf] Parallelize offline graph export with multi-process'
+  author: yydhYYDH
+  merged_at: '2026-05-09'
+  url: https://github.com/alibaba/MNN/pull/4414
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4422
+  title: Add test_ci.sh + declarative stage config (test_stages.json) and assorted CI / op fixes
+  author: katolikov
+  merged_at: '2026-05-25'
+  url: https://github.com/alibaba/MNN/pull/4422
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/image/execution/VulkanDeconvolution.cpp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/VulkanDeconvolution.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4424
+  title: '[LLM:Bugfix] Reset linear-attention states in `llm_demo`'
+  author: hebangwen
+  merged_at: '2026-05-18'
+  url: https://github.com/alibaba/MNN/pull/4424
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanLinearAttention.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanLinearAttention.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4426
+  title: '[CPU:Perf] Adapt CommonOptFunction for RVV architecture'
+  author: jxgxxx
+  merged_at: '2026-06-18'
+  url: https://github.com/alibaba/MNN/pull/4426
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 8 changed file(s)'
+  evidence_paths: []
+- number: 4434
+  title: '[CPU:Perf] add fused MNNFusedGatedDelta kernel for LinearAttention prefill'
+  author: luckysmg
+  merged_at: '2026-05-12'
+  url: https://github.com/alibaba/MNN/pull/4434
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 5 changed file(s)'
+  evidence_paths: []
+- number: 4478
+  title: '[LLM:Feature] Add Qwen3-ASR and Qwen3-VL-Embedding export and runtime support.'
+  author: huangzhengxiang
+  merged_at: '2026-08-11'
+  url: https://github.com/alibaba/MNN/pull/4478
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 26 changed file(s)'
+  evidence_paths: []
+- number: 4486
+  title: '[OpenCL:Optimize] Use image1d_buffer_t for int4 gemm/gemv performance'
+  author: wangzhaode
+  merged_at: '2026-05-28'
+  url: https://github.com/alibaba/MNN/pull/4486
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 23 changed file(s)'
+  evidence_paths: []
+- number: 4487
+  title: '[CPU:Feature] Support low-bit ARM quant kernels'
+  author: wangzhaode
+  merged_at: '2026-05-28'
+  url: https://github.com/alibaba/MNN/pull/4487
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 32 changed file(s)'
+  evidence_paths: []
+- number: 4501
+  title: '[MNN:Bugfix] Delete WEIGHT_DEQUANT_GEMM macro.'
+  author: wangzhaode
+  merged_at: '2026-06-02'
+  url: https://github.com/alibaba/MNN/pull/4501
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4505
+  title: '[OpenCL:Bugfix] Fix OOB access prior to memory reallocation in Attention op'
+  author: wangzhaode
+  merged_at: '2026-06-03'
+  url: https://github.com/alibaba/MNN/pull/4505
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4506
+  title: '[MNN:Refact] Delete ''MNN_CPU_DEQUANT_GEMM'' code'
+  author: wangzhaode
+  merged_at: '2026-06-03'
+  url: https://github.com/alibaba/MNN/pull/4506
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 33 changed file(s)'
+  evidence_paths: []
+- number: 4513
+  title: '[GPU:Feature] Add 2/3-bit weight quant support for OpenCL/Metal/Vulkan'
+  author: wangzhaode
+  merged_at: '2026-06-05'
+  url: https://github.com/alibaba/MNN/pull/4513
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/conv1x1_int2_weight_prepare.comp, source/backend/vulkan/buffer/execution/glsl/conv1x1_int3_weight_prepare.comp,
+    source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2.comp, source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2_nosubgroup.comp, source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3.comp,
+    source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3_nosubgroup.comp, source/backend/vulkan/buffer/execution/glsl/int2_weight_to_pack.comp, source/backend/vulkan/buffer/execution/glsl/int3_weight_to_pack.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/conv1x1_int2_weight_prepare.comp
+  - source/backend/vulkan/buffer/execution/glsl/conv1x1_int3_weight_prepare.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2_nosubgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3.comp
+  - source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3_nosubgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/int2_weight_to_pack.comp
+  - source/backend/vulkan/buffer/execution/glsl/int3_weight_to_pack.comp
+- number: 4516
+  title: '[Test:Speed]Add GEMM performance benchmarks for FP32, INT8, and Block…'
+  author: wangzhaode
+  merged_at: '2026-06-05'
+  url: https://github.com/alibaba/MNN/pull/4516
+  decision: include
+  rule: manual-kernel-host-source
+  reason: 'include (manual review of title and changed paths): adds the GEMM speed benchmark (fp32, int8, int4 conv1x1) and the Vulkan time-profiler hooks it reads: source/backend/vulkan/buffer/backend/VulkanBackend.cpp,
+    source/backend/vulkan/component/VulkanTimeProfiler.hpp, source/backend/vulkan/runtime/VulkanRuntime.hpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/component/VulkanTimeProfiler.hpp
+  - source/backend/vulkan/runtime/VulkanRuntime.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4535
+  title: '[OpenCL:Feature]Add native TopKV2 GPU support for OpenCL IMAGE and Vu…'
+  author: wangzhaode
+  merged_at: '2026-06-15'
+  url: https://github.com/alibaba/MNN/pull/4535
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (top-k, blit and layout-conversion operators): source/backend/vulkan/buffer/execution/glsl/topkv2.comp,
+    source/backend/vulkan/image/execution/glsl/blit.comp, source/backend/vulkan/image/execution/glsl/blit_image.comp, source/backend/vulkan/image/execution/glsl/fill_image.comp, source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp,
+    source/backend/vulkan/image/execution/glsl/imageTonchw.comp, source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp, source/backend/vulkan/image/execution/glsl/nchwToimage.comp, source/backend/vulkan/image/execution/glsl/topkv2.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/topkv2.comp
+  - source/backend/vulkan/image/execution/glsl/blit.comp
+  - source/backend/vulkan/image/execution/glsl/blit_image.comp
+  - source/backend/vulkan/image/execution/glsl/fill_image.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+  - source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+  - source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+  - source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+  - source/backend/vulkan/image/execution/glsl/topkv2.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4539
+  title: '[LLM:Perf] Treat linear_attention layers as full attention'
+  author: wangzhaode
+  merged_at: '2026-06-15'
+  url: https://github.com/alibaba/MNN/pull/4539
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4541
+  title: '[CI:Chore] Update release workflow: enable LLM+OMNI, Android 16K page size, SME2 by default'
+  author: wangzhaode
+  merged_at: '2026-06-16'
+  url: https://github.com/alibaba/MNN/pull/4541
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4547
+  title: '[CPU:Perf] Optimize QuantizedAdd with RVV'
+  author: jxgxxx
+  merged_at: '2026-09-11'
+  url: https://github.com/alibaba/MNN/pull/4547
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4550
+  title: '[Infra:Refact] Modernize shader build scripts to handle complex paths'
+  author: RinZ27
+  merged_at: '2026-06-18'
+  url: https://github.com/alibaba/MNN/pull/4550
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/compiler/makeshader.py, source/backend/vulkan/buffer/render/compiler/makeshader.py, source/backend/vulkan/image/compiler/makeshader.py'
+  evidence_paths:
+  - source/backend/vulkan/buffer/compiler/makeshader.py
+  - source/backend/vulkan/buffer/render/compiler/makeshader.py
+  - source/backend/vulkan/image/compiler/makeshader.py
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4556
+  title: '[Metal:Bugfix] Respect attention kv_cache flag'
+  author: wangzhaode
+  merged_at: '2026-06-22'
+  url: https://github.com/alibaba/MNN/pull/4556
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4563
+  title: '[Vulkan:Feature] Add Range op image implementation'
+  author: wangzhaode
+  merged_at: '2026-06-23'
+  url: https://github.com/alibaba/MNN/pull/4563
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (Range operator): source/backend/vulkan/image/execution/glsl/range.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/range.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4598
+  title: '[LLM:Perf] Optimize C4 export and packed RoPE paths'
+  author: wangzhaode
+  merged_at: '2026-07-07'
+  url: https://github.com/alibaba/MNN/pull/4598
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 31 changed file(s)'
+  evidence_paths: []
+- number: 4599
+  title: '[Infra:Feature] Make Copybara sync script configurable'
+  author: wangzhaode
+  merged_at: '2026-07-07'
+  url: https://github.com/alibaba/MNN/pull/4599
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4607
+  title: '[LLM:Bugfix] Guard C4 fuse and fix Metal raster'
+  author: wangzhaode
+  merged_at: '2026-07-09'
+  url: https://github.com/alibaba/MNN/pull/4607
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 8 changed file(s)'
+  evidence_paths: []
+- number: 4609
+  title: '[OpenCL:Bugfix] Fix c4 long-prefill attention: V-buffer OOB in gemm t…'
+  author: Qxinyu
+  merged_at: '2026-07-09'
+  url: https://github.com/alibaba/MNN/pull/4609
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 4 changed file(s)'
+  evidence_paths: []
+- number: 4619
+  title: '[Infra:Bugfix] Isolate NeuroPilot directory from GitHub sync'
+  author: wangzhaode
+  merged_at: '2026-07-14'
+  url: https://github.com/alibaba/MNN/pull/4619
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4629
+  title: '[LLM:Perf] Enable Transformer C4 graphs across backends'
+  author: wangzhaode
+  merged_at: '2026-07-15'
+  url: https://github.com/alibaba/MNN/pull/4629
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp, source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp,
+    source/backend/vulkan/buffer/execution/glsl/attention_fused.comp, source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp, source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp,
+    source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp, source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp, source/backend/vulkan/buffer/execution/glsl/binary.comp,
+    source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp,
+    source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp,
+    source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp,
+    source/backend/vulkan/buffer/execution/glsl/norm.comp, source/backend/vulkan/buffer/execution/glsl/norm_binary.comp, source/backend/vulkan/buffer/execution/glsl/norm_opt.comp, source/backend/vulkan/buffer/execution/glsl/rope.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
+  - source/backend/vulkan/buffer/execution/glsl/binary.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp
+  - source/backend/vulkan/buffer/execution/glsl/norm.comp
+  - source/backend/vulkan/buffer/execution/glsl/norm_binary.comp
+  - source/backend/vulkan/buffer/execution/glsl/norm_opt.comp
+  - source/backend/vulkan/buffer/execution/glsl/rope.comp
+- number: 4630
+  title: '[Core:Bugfix] Fix crashes when mmap allocation fails across all backends'
+  author: v0jiuqi
+  merged_at: '2026-07-16'
+  url: https://github.com/alibaba/MNN/pull/4630
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/backend/VulkanBackend.cpp, source/backend/vulkan/component/VulkanBuffer.cpp, source/backend/vulkan/component/VulkanImage.cpp,
+    source/backend/vulkan/component/VulkanImage.hpp, source/backend/vulkan/component/VulkanMemoryPool.cpp, source/backend/vulkan/component/VulkanMemoryPool.hpp, source/backend/vulkan/image/backend/VulkanBackend.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/backend/VulkanBackend.cpp
+  - source/backend/vulkan/component/VulkanBuffer.cpp
+  - source/backend/vulkan/component/VulkanImage.cpp
+  - source/backend/vulkan/component/VulkanImage.hpp
+  - source/backend/vulkan/component/VulkanMemoryPool.cpp
+  - source/backend/vulkan/component/VulkanMemoryPool.hpp
+  - source/backend/vulkan/image/backend/VulkanBackend.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4644
+  title: '[OpenCL:Bugfix] Fix opencl kernel compile bug for attention c4'
+  author: Qxinyu
+  merged_at: '2026-07-20'
+  url: https://github.com/alibaba/MNN/pull/4644
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4646
+  title: '[LLM:Bugfix] Clear AWQ attention KV cache'
+  author: LudovicoYIN
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4646
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4648
+  title: '[Metal:Speed] Fused Q4/Q8 dequant+GEMM kernel + M_TILE=64 variant for…'
+  author: v0jiuqi
+  merged_at: '2026-07-21'
+  url: https://github.com/alibaba/MNN/pull/4648
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 42 changed file(s)'
+  evidence_paths: []
+- number: 4651
+  title: '[Metal:Speed] Fused Q4/Q8 dequant+GEMM kernel + M_TILE=64 variant for…'
+  author: v0jiuqi
+  merged_at: '2026-07-21'
+  url: https://github.com/alibaba/MNN/pull/4651
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 5 changed file(s)'
+  evidence_paths: []
+- number: 4654
+  title: '[Metal:Bugfix] prefill_qkv_tensor missing ATTENTION_C4 output branch'
+  author: v0jiuqi
+  merged_at: '2026-07-22'
+  url: https://github.com/alibaba/MNN/pull/4654
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4659
+  title: '[OpenCL:Bugfix] Fix maskless attention setArg overflow causing wrong SD UNet output on Adreno (#4653)'
+  author: Qxinyu
+  merged_at: '2026-07-22'
+  url: https://github.com/alibaba/MNN/pull/4659
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 4672
+  title: '[Feature:Bugfix] Fix pooling pads bug for metal, vulkan, trt, hexagon…'
+  author: Qxinyu
+  merged_at: '2026-07-27'
+  url: https://github.com/alibaba/MNN/pull/4672
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/buffer/execution/VulkanPool.cpp, source/backend/vulkan/image/execution/VulkanPool.cpp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/VulkanPool.cpp
+  - source/backend/vulkan/image/execution/VulkanPool.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4678
+  title: '[Metal:Perf] LLM prefill/decode optimization batch for Apple GPUs (M4…'
+  author: v0jiuqi
+  merged_at: '2026-07-27'
+  url: https://github.com/alibaba/MNN/pull/4678
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 27 changed file(s)'
+  evidence_paths: []
+- number: 4682
+  title: '[CPU:Perf] Optimize LinearAttention x86 kernels'
+  author: LudovicoYIN
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4682
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 4700
+  title: '[Hexagon:Perf] Optimize FP16 activations with PWL'
+  author: wangzhaode
+  merged_at: '2026-07-31'
+  url: https://github.com/alibaba/MNN/pull/4700
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 17 changed file(s)'
+  evidence_paths: []
+- number: 4702
+  title: '[CPU:Perf] Optimize SpacemiT K3 RVV IME2 LLM inference'
+  author: wangzhaode
+  merged_at: '2026-07-31'
+  url: https://github.com/alibaba/MNN/pull/4702
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 38 changed file(s)'
+  evidence_paths: []
+- number: 4703
+  title: '[Metal:Perf] LLM Apple-GPU optimization + attention/env overhaul.'
+  author: v0jiuqi
+  merged_at: '2026-07-31'
+  url: https://github.com/alibaba/MNN/pull/4703
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 29 changed file(s)'
+  evidence_paths: []
+- number: 4710
+  title: '[Metal:Perf] Optimize LinearAttention prefill and decode'
+  author: v0jiuqi
+  merged_at: '2026-08-03'
+  url: https://github.com/alibaba/MNN/pull/4710
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 8 changed file(s)'
+  evidence_paths: []
+- number: 4715
+  title: '[Hexagon:Perf] Sync hexagon optimization for attention, unary, raster…'
+  author: jxt1234
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4715
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 60 changed file(s)'
+  evidence_paths: []
+- number: 4717
+  title: '[Metal:Perf] Optimize LinearAttention chunk prefill on Tensor API dev…'
+  author: wangzhaode
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4717
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4720
+  title: '[CPU:Perf] Add SME2 attention SME-NEON mixed optimization'
+  author: huangzhengxiang
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4720
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 4722
+  title: '[Sync] Import internal changes (d565e4cb8f..d565e4cb8f)'
+  author: wangzhaode
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4722
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4723
+  title: '[Infra:Test] Verify reverse automated sync'
+  author: wangzhaode
+  merged_at: '2026-08-06'
+  url: https://github.com/alibaba/MNN/pull/4723
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4724
+  title: '[Infra:Test] Verify automatic sync merge'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4724
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4725
+  title: '[Infra:Test] Verify automatic sync merge'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4725
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4726
+  title: '[Sync] Import internal changes (8dfbfa53f5..8dfbfa53f5)'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4726
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4727
+  title: '[Infra:Feature] Trigger internal sync after PR merge'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4727
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4729
+  title: '[Infra:Test] Verify single-commit rebase sync'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4729
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4730
+  title: '[Infra:Test] Add second squash sync marker'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4730
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4732
+  title: '[Metal:Bugfix] Fix DFlash SIGSEGV on Metal + fused-attention draft for correctness+speed (incl. shader/dflash.py comment cleanup)'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4732
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4734
+  title: '[CPU:Bugfix] Fix Arm82 build without transformer fuse'
+  author: wangzhaode
+  merged_at: '2026-08-07'
+  url: https://github.com/alibaba/MNN/pull/4734
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 8 changed file(s)'
+  evidence_paths: []
+- number: 4743
+  title: '[Infra:Test] Add sync cleanup e2e step 2'
+  author: wangzhaode
+  merged_at: '2026-08-10'
+  url: https://github.com/alibaba/MNN/pull/4743
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4744
+  title: '[Infra:Test] Add sync cleanup e2e step 3'
+  author: wangzhaode
+  merged_at: '2026-08-10'
+  url: https://github.com/alibaba/MNN/pull/4744
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4748
+  title: '[Infra:Bugfix] Skip reverse sync for outbound PRs'
+  author: wangzhaode
+  merged_at: '2026-08-10'
+  url: https://github.com/alibaba/MNN/pull/4748
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4755
+  title: '[LLM:Perf] Fuse transformer projections and gated norms at export time. Link: https://code.alibaba-inc.com/AliNN/AliNNPrivate/codereview/29080226'
+  author: wangzhaode
+  merged_at: '2026-08-11'
+  url: https://github.com/alibaba/MNN/pull/4755
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp,
+    source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp, source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+  - source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+- number: 4756
+  title: '[OpenCL:Bugfix] Replace vector-to-pointer cast in int4 weight quant kernels for Mali compat'
+  author: wangzhaode
+  merged_at: '2026-08-11'
+  url: https://github.com/alibaba/MNN/pull/4756
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4764
+  title: '[Infra:Test] Add second rebase sync marker'
+  author: wangzhaode
+  merged_at: '2026-08-12'
+  url: https://github.com/alibaba/MNN/pull/4764
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 1 changed file(s)'
+  evidence_paths: []
+- number: 4768
+  title: '[Hexagon:Perf] Add int4 vrmpy decode GEMV (M=1),  Opitimize FlashAttention and Gemm'
+  author: wangzhaode
+  merged_at: '2026-08-13'
+  url: https://github.com/alibaba/MNN/pull/4768
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 25 changed file(s)'
+  evidence_paths: []
+- number: 4771
+  title: '[LLM:Perf] DFlash engine: on-device fc/concat, incremental draft KV, on-device argmax'
+  author: wangzhaode
+  merged_at: '2026-08-14'
+  url: https://github.com/alibaba/MNN/pull/4771
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 14 changed file(s)'
+  evidence_paths: []
+- number: 4772
+  title: '[Metal:Perf] Fused-Q4 M8 tile and K-split for speculative-block decode'
+  author: wangzhaode
+  merged_at: '2026-08-14'
+  url: https://github.com/alibaba/MNN/pull/4772
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 5 changed file(s)'
+  evidence_paths: []
+- number: 4785
+  title: '[Vulkan:Opt] use coop matrix optimize vulkan attention qk * v'
+  author: wangzhaode
+  merged_at: '2026-08-18'
+  url: https://github.com/alibaba/MNN/pull/4785
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp, source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp,
+    source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp, source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp, source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp,
+    source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp
+  - source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp
+  - source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp
+  - source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp
+- number: 4786
+  title: '[Metal:Perf] Optimize Q4 decode loads, lane splits, and RMSNorm'
+  author: wangzhaode
+  merged_at: '2026-08-19'
+  url: https://github.com/alibaba/MNN/pull/4786
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 15 changed file(s)'
+  evidence_paths: []
+- number: 4791
+  title: '[Hexagon:Perf] Optimize asymmetric performance, Add Mod BinaryOp'
+  author: wangzhaode
+  merged_at: '2026-08-20'
+  url: https://github.com/alibaba/MNN/pull/4791
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 13 changed file(s)'
+  evidence_paths: []
+- number: 4808
+  title: '[OpenCL:Bugfix] Fix image-mode reduction kernel selection for unsupported shapes. Fix attention clone ignoring output_c4 flag, causing wrong vision results with weight pre-rearrange'
+  author: wangzhaode
+  merged_at: '2026-08-25'
+  url: https://github.com/alibaba/MNN/pull/4808
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4825
+  title: '[CPU:Perf] Optimize SpacemiT IME2 dynamic prefill'
+  author: wangzhaode
+  merged_at: '2026-09-01'
+  url: https://github.com/alibaba/MNN/pull/4825
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 4 changed file(s)'
+  evidence_paths: []
+- number: 4829
+  title: '[CPU:Perf] Normalize fp16 C4 LayerNorm in the packed domain instead of transposing'
+  author: wangzhaode
+  merged_at: '2026-09-03'
+  url: https://github.com/alibaba/MNN/pull/4829
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 4832
+  title: '[Vulkan:Perf] Optimize INT4 cooperative matrix path'
+  author: wangzhaode
+  merged_at: '2026-09-04'
+  url: https://github.com/alibaba/MNN/pull/4832
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: source/backend/vulkan/buffer/execution/glsl/dynamic_int4_to_int8_unpack.comp, source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_coop_gemm_fused.comp'
+  evidence_paths:
+  - source/backend/vulkan/buffer/execution/glsl/dynamic_int4_to_int8_unpack.comp
+  - source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_coop_gemm_fused.comp
+- number: 4839
+  title: '[CPU:Perf] Enable RVV matrix kernels and optimize depthwise deconvolution'
+  author: typer-J
+  merged_at: '2026-09-14'
+  url: https://github.com/alibaba/MNN/pull/4839
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 9 changed file(s)'
+  evidence_paths: []
+- number: 4840
+  title: '[CPU:Perf] Optimize RVV packing while preserving C4 layout'
+  author: typer-J
+  merged_at: '2026-09-11'
+  url: https://github.com/alibaba/MNN/pull/4840
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 6 changed file(s)'
+  evidence_paths: []
+- number: 4841
+  title: '[CPU:Feature] Add RVV attention mask kernel'
+  author: typer-J
+  merged_at: '2026-09-11'
+  url: https://github.com/alibaba/MNN/pull/4841
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 5 changed file(s)'
+  evidence_paths: []
+- number: 4842
+  title: '[CPU:Feature] Add RVV linear attention kernels'
+  author: typer-J
+  merged_at: '2026-09-11'
+  url: https://github.com/alibaba/MNN/pull/4842
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 5 changed file(s)'
+  evidence_paths: []
+- number: 4846
+  title: '[CPU:Perf] Register and optimize RVV C4 Scale and PReLU'
+  author: typer-J
+  merged_at: '2026-09-14'
+  url: https://github.com/alibaba/MNN/pull/4846
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 4847
+  title: '[CPU:Perf] Vectorize unpacked E=1 GEMV on RISC-V'
+  author: typer-J
+  merged_at: '2026-09-14'
+  url: https://github.com/alibaba/MNN/pull/4847
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 4851
+  title: '[LLM:Perf] KV-cache Qwen3-TTS talker/code-predictor decode and fix garbled audio output'
+  author: wangzhaode
+  merged_at: '2026-09-10'
+  url: https://github.com/alibaba/MNN/pull/4851
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 4854
+  title: '[Metal:Perf] Optimize LLM prefill and decode performance'
+  author: wangzhaode
+  merged_at: '2026-09-11'
+  url: https://github.com/alibaba/MNN/pull/4854
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 77 changed file(s)'
+  evidence_paths: []
+- number: 4867
+  title: '[CPU:Perf] Optimize int8 Min/Max/ScaleAndAddBias with RVV'
+  author: typer-J
+  merged_at: '2026-09-14'
+  url: https://github.com/alibaba/MNN/pull/4867
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4868
+  title: '[CPU:Perf] Optimize sparse im2col blit with RVV'
+  author: typer-J
+  merged_at: '2026-09-14'
+  url: https://github.com/alibaba/MNN/pull/4868
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4874
+  title: '[CPU:Perf] Optimize C4 bilinear sampler with RVV'
+  author: typer-J
+  merged_at: '2026-09-16'
+  url: https://github.com/alibaba/MNN/pull/4874
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 4 changed file(s)'
+  evidence_paths: []
+- number: 4879
+  title: '[CPU:Perf] Vectorize depthwise convolution input padding copy with RVV'
+  author: Xlawy
+  merged_at: '2026-09-16'
+  url: https://github.com/alibaba/MNN/pull/4879
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4882
+  title: '[CPU:Perf] Give each bilinear lane a whole C4 pixel'
+  author: typer-J
+  merged_at: '2026-09-21'
+  url: https://github.com/alibaba/MNN/pull/4882
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4884
+  title: '[OpenCL:Opt] Fuse the C4 gated / binary RMSNorm ops into single kernels. Run a FusedLinear group as one decode GEMV dispatch'
+  author: wangzhaode
+  merged_at: '2026-09-17'
+  url: https://github.com/alibaba/MNN/pull/4884
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 19 changed file(s)'
+  evidence_paths: []
+- number: 4888
+  title: '[LLM:Bugfix] Route Omni attention masks by mode'
+  author: ZedingZhang
+  merged_at: '2026-09-20'
+  url: https://github.com/alibaba/MNN/pull/4888
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4889
+  title: '[Metal:Bugfix] Abort LLM generation on discarded GPU command buffers instead of emitting garbage'
+  author: wangzhaode
+  merged_at: '2026-09-18'
+  url: https://github.com/alibaba/MNN/pull/4889
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 7 changed file(s)'
+  evidence_paths: []
+- number: 4897
+  title: '[CPU:Perf] Share output for deconvolution without overlap'
+  author: Hosi121
+  merged_at: '2026-09-21'
+  url: https://github.com/alibaba/MNN/pull/4897
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 3 changed file(s)'
+  evidence_paths: []
+- number: 4906
+  title: '[Test] Add Metal attention and linear-attention op unit tests'
+  author: wangzhaode
+  merged_at: '2026-09-22'
+  url: https://github.com/alibaba/MNN/pull/4906
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4909
+  title: '[CPU:Feature] Add SME2/NEON mixed-kernel int8 execution, fp16 quant metadata, and cache-line-isolated ThreadPool flags'
+  author: wangzhaode
+  merged_at: '2026-09-23'
+  url: https://github.com/alibaba/MNN/pull/4909
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 45 changed file(s)'
+  evidence_paths: []
+- number: 4910
+  title: '[OpenCL:Perf] Parallelize decode RoPE head-dim with local-memory norm reduce, Remove per-frame finish in QCOM record replay'
+  author: wangzhaode
+  merged_at: '2026-09-23'
+  url: https://github.com/alibaba/MNN/pull/4910
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 4 changed file(s)'
+  evidence_paths: []
+- number: 4912
+  title: '[CPU:Perf] Fuse output processing for 2x2 deconvolution'
+  author: Hosi121
+  merged_at: '2026-09-29'
+  url: https://github.com/alibaba/MNN/pull/4912
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 8 changed file(s)'
+  evidence_paths: []
+- number: 4923
+  title: '[CPU:Bugfix] Fix DynamicQuant for nonzero one-sided inputs'
+  author: hulkbig
+  merged_at: '2026-10-08'
+  url: https://github.com/alibaba/MNN/pull/4923
+  decision: exclude
+  rule: no-shader-or-backend-source
+  reason: 'exclude: no GLSL shader or backend host source in 2 changed file(s)'
+  evidence_paths: []
+- number: 4940
+  title: '[Vulkan:Bugfix] Use buffer path for multi-image softmax'
+  author: Qxinyu
+  merged_at: '2026-10-09'
+  url: https://github.com/alibaba/MNN/pull/4940
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): shader change outside the matmul / linear / attention / quantization scope of this ledger (standalone softmax fix): source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp'
+  evidence_paths:
+  - source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4946
+  title: '[Vulkan:Bugfix] Share descriptor pools per layout to fix large-graph crashes'
+  author: Qxinyu
+  merged_at: '2026-10-09'
+  url: https://github.com/alibaba/MNN/pull/4946
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title and changed paths): host-side change with no GLSL shader source, and the title names no matmul / linear / attention / quantization kernel change (internal sync,
+    device setup, memory, build, operator plumbing): source/backend/vulkan/component/VulkanDevice.cpp, source/backend/vulkan/component/VulkanDevice.hpp, source/backend/vulkan/component/VulkanPipeline.cpp,
+    source/backend/vulkan/component/VulkanPipeline.hpp'
+  evidence_paths:
+  - source/backend/vulkan/component/VulkanDevice.cpp
+  - source/backend/vulkan/component/VulkanDevice.hpp
+  - source/backend/vulkan/component/VulkanPipeline.cpp
+  - source/backend/vulkan/component/VulkanPipeline.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'

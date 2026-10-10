@@ -1,0 +1,1123 @@
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp b/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
+@@ -33,7 +33,7 @@ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+@@ -82,6 +82,7 @@ void main() {
+     }
+ 
+     const float scale = uConst.f0.x;
++    const bool outputC4 = uConst.f0.w > 0.5;
+     const int qBase = (q * headNum + h) * headDim;
+     const int kMaskStart = (maskMode == 1 && maskKvlen > 0 && totalLen > maskKvlen) ? (totalLen - maskKvlen) : 0;
+ 
+@@ -143,8 +144,6 @@ void main() {
+     const float laneScale = (l > 0.0) ? exp(m - mGlobal) : 0.0;
+     const float lGlobal = subgroupAdd(l * laneScale);
+     const float invL = (lGlobal > 0.0) ? (1.0 / lGlobal) : 0.0;
+-    const int outBase = (q * headNum + h) * headDim;
+-
+     for (int i = 0; i < d4Size; ++i) {
+         vec4 scaled = outVec[i] * laneScale;
+         vec4 reduced;
+@@ -155,10 +154,12 @@ void main() {
+         if (lane == 0u) {
+             vec4 v = reduced * invL;
+             const int d = i * 4;
+-            uOutput.data[outBase + d + 0] = FLOAT(v.x);
+-            uOutput.data[outBase + d + 1] = FLOAT(v.y);
+-            uOutput.data[outBase + d + 2] = FLOAT(v.z);
+-            uOutput.data[outBase + d + 3] = FLOAT(v.w);
++            const int outBase = outputC4 ? ((h * d4Size + i) * qLen + q) * 4
++                                         : (q * headNum + h) * headDim + d;
++            uOutput.data[outBase + 0] = FLOAT(v.x);
++            uOutput.data[outBase + 1] = FLOAT(v.y);
++            uOutput.data[outBase + 2] = FLOAT(v.z);
++            uOutput.data[outBase + 3] = FLOAT(v.w);
+         }
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp b/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
+@@ -33,7 +33,7 @@ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+@@ -80,6 +80,7 @@ void main() {
+     }
+ 
+     const float scale = uConst.f0.x;
++    const bool outputC4 = uConst.f0.w > 0.5;
+     const int qBase = (q * headNum + h) * 128;
+     const int kMaskStart = (maskMode == 1 && maskKvlen > 0 && totalLen > maskKvlen) ? (totalLen - maskKvlen) : 0;
+ 
+@@ -141,8 +142,6 @@ void main() {
+     const float laneScale = (l > 0.0) ? exp(m - mGlobal) : 0.0;
+     const float lGlobal = subgroupAdd(l * laneScale);
+     const float invL = (lGlobal > 0.0) ? (1.0 / lGlobal) : 0.0;
+-    const int outBase = (q * headNum + h) * 128;
+-
+     for (int i = 0; i < D4_SIZE; ++i) {
+         vec4 scaled = outVec[i] * laneScale;
+         vec4 reduced;
+@@ -153,10 +152,12 @@ void main() {
+         if (lane == 0u) {
+             vec4 v = reduced * invL;
+             const int d = i * 4;
+-            uOutput.data[outBase + d + 0] = FLOAT(v.x);
+-            uOutput.data[outBase + d + 1] = FLOAT(v.y);
+-            uOutput.data[outBase + d + 2] = FLOAT(v.z);
+-            uOutput.data[outBase + d + 3] = FLOAT(v.w);
++            const int outBase = outputC4 ? ((h * D4_SIZE + i) * qLen + q) * 4
++                                         : (q * headNum + h) * 128 + d;
++            uOutput.data[outBase + 0] = FLOAT(v.x);
++            uOutput.data[outBase + 1] = FLOAT(v.y);
++            uOutput.data[outBase + 2] = FLOAT(v.z);
++            uOutput.data[outBase + 3] = FLOAT(v.w);
+         }
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_fused.comp b/source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
+@@ -30,7 +30,7 @@ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+@@ -61,6 +61,8 @@ void main() {
+     const int maskKvlen = uConst.s2.y;
+ 
+     const float scale = uConst.f0.x;
++    const bool valueC4 = uConst.f0.z > 0.5;
++    const bool outputC4 = uConst.f0.w > 0.5;
+ 
+     const int kvh = h / group;
+     if (kvh >= kvHeadNum) {
+@@ -121,10 +123,10 @@ void main() {
+             s += w;
+         }
+ 
+-        const int vOffBase = ((k * kvHeadNum + kvh) * headDim);
+         for (int i = 0; i < d4Size; ++i) {
+             const int d = i * 4;
+-            const int vOff = vOffBase + d;
++            const int vOff = valueC4 ? ((kvh * d4Size + i) * kLen + k) * 4
++                                     : ((k * kvHeadNum + kvh) * headDim) + d;
+             vec4 vv = vec4(float(uCacheValue.data[vOff + 0]), float(uCacheValue.data[vOff + 1]), float(uCacheValue.data[vOff + 2]),
+                            float(uCacheValue.data[vOff + 3]));
+             outVec[i] += w * vv;
+@@ -133,13 +135,14 @@ void main() {
+ 
+     float invS = 1.0 / s;
+     // output: [1, qLen, headNum * headDim]
+-    const int outBase = (q * headNum + h) * headDim;
+     for (int i = 0; i < d4Size; ++i) {
+         vec4 v = outVec[i] * invS;
+         const int d = i * 4;
+-        uOutput.data[outBase + d + 0] = FLOAT(v.x);
+-        uOutput.data[outBase + d + 1] = FLOAT(v.y);
+-        uOutput.data[outBase + d + 2] = FLOAT(v.z);
+-        uOutput.data[outBase + d + 3] = FLOAT(v.w);
++        const int outBase = outputC4 ? ((h * d4Size + i) * qLen + q) * 4
++                                     : (q * headNum + h) * headDim + d;
++        uOutput.data[outBase + 0] = FLOAT(v.x);
++        uOutput.data[outBase + 1] = FLOAT(v.y);
++        uOutput.data[outBase + 2] = FLOAT(v.z);
++        uOutput.data[outBase + 3] = FLOAT(v.w);
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp b/source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
+@@ -30,7 +30,7 @@ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, maskMode, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+@@ -62,6 +62,7 @@ void main() {
+     const int maxLen = uConst.s2.w;
+ 
+     const float scale = uConst.f0.x;
++    const bool outputC4 = uConst.f0.w > 0.5;
+ 
+     const int kvh = h / group;
+     if (kvh >= kvHeadNum) {
+@@ -135,13 +136,14 @@ void main() {
+ 
+     float invS = 1.0 / s;
+     // output: [1, qLen, headNum * headDim]
+-    const int outBase = (q * headNum + h) * headDim;
+     for (int i = 0; i < d4Size; ++i) {
+         vec4 v = outVec[i] * invS;
+         const int d = i * 4;
+-        uOutput.data[outBase + d + 0] = FLOAT(v.x);
+-        uOutput.data[outBase + d + 1] = FLOAT(v.y);
+-        uOutput.data[outBase + d + 2] = FLOAT(v.z);
+-        uOutput.data[outBase + d + 3] = FLOAT(v.w);
++        const int outBase = outputC4 ? ((h * d4Size + i) * qLen + q) * 4
++                                     : (q * headNum + h) * headDim + d;
++        uOutput.data[outBase + 0] = FLOAT(v.x);
++        uOutput.data[outBase + 1] = FLOAT(v.y);
++        uOutput.data[outBase + 2] = FLOAT(v.z);
++        uOutput.data[outBase + 3] = FLOAT(v.w);
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp b/source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
+@@ -18,7 +18,7 @@ layout(set=0, binding=4) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, hasMask, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x = 8, local_size_y = 1, local_size_z = 1) in;
+@@ -44,8 +44,11 @@ void main() {
+         return;
+     }
+ 
+-    // input: [1, kLen, kvHeadNum, headDim]
+-    const int inBase = (token * kvHeadNum + kvh) * headDim + d;
++    // Key is contiguous [1, kLen, kvHeadNum, headDim]; value may use channel-blocked C4 storage.
++    const bool valueC4 = uConst.f0.z > 0.5;
++    const int keyBase4 = (token * kvHeadNum + kvh) * (headDim / 4) + d4;
++    const int valueBase4 = valueC4 ? (kvh * (headDim / 4) + d4) * kLen + token
++                                   : (token * kvHeadNum + kvh) * (headDim / 4) + d4;
+     const int cacheToken = pastLen + token;
+     if (cacheToken >= maxLen) {
+         return;
+@@ -54,10 +57,10 @@ void main() {
+     // cacheK (packed): [kvHeadNum, headDim/4, maxLen, 4]
+     const int d4Size = headDim / 4;
+     const int outBase = (kvh * d4Size + d4) * maxLen + cacheToken;
+-    uCacheKey.data[outBase] = uKey.data[inBase / 4];
++    uCacheKey.data[outBase] = uKey.data[keyBase4];
+ 
+     // cacheV (kvh-major, packed-D): [kvHeadNum, maxLen, headDim/4, 4]
+     // Index: ((kvh * maxLen + token) * d4Size + d4)
+     const int outBaseV4 = (kvh * maxLen + cacheToken) * d4Size + d4;
+-    uCacheValue.data[outBaseV4] = uValue.data[inBase / 4];
++    uCacheValue.data[outBaseV4] = uValue.data[valueBase4];
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
+@@ -14,7 +14,7 @@ layout(set=0, binding=3) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, hasMask, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+@@ -49,7 +49,8 @@ void main() {
+     const int base0 = row0 * headDim + d;
+     vec4 v0 = vec4(uOAcc.data[base0 + 0], uOAcc.data[base0 + 1], uOAcc.data[base0 + 2], uOAcc.data[base0 + 3]) * inv0;
+ 
+-    const int outBase0 = row0 * headDim + d;
++    const bool outputC4 = uConst.f0.w > 0.5;
++    const int outBase0 = outputC4 ? ((h * d4Size + d4) * qLen + q0) * 4 : row0 * headDim + d;
+     uOutput.data[outBase0 + 0] = FLOAT(v0.x);
+     uOutput.data[outBase0 + 1] = FLOAT(v0.y);
+     uOutput.data[outBase0 + 2] = FLOAT(v0.z);
+@@ -61,11 +62,10 @@ void main() {
+         const int base1 = row1 * headDim + d;
+         vec4 v1 = vec4(uOAcc.data[base1 + 0], uOAcc.data[base1 + 1], uOAcc.data[base1 + 2], uOAcc.data[base1 + 3]) * inv1;
+ 
+-        const int outBase1 = row1 * headDim + d;
++        const int outBase1 = outputC4 ? ((h * d4Size + d4) * qLen + q0 + 1) * 4 : row1 * headDim + d;
+         uOutput.data[outBase1 + 0] = FLOAT(v1.x);
+         uOutput.data[outBase1 + 1] = FLOAT(v1.y);
+         uOutput.data[outBase1 + 2] = FLOAT(v1.z);
+         uOutput.data[outBase1 + 3] = FLOAT(v1.w);
+     }
+ }
+-
+diff --git a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
+@@ -10,7 +10,7 @@ layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec4 s0; // qLen, kLen, headNum, kvHeadNum
+     ivec4 s1; // headDim, group, pastLen, totalLen
+     ivec4 s2; // maskQlen, maskKvlen, hasMask, cacheMaxLen
+-    vec4 f0;  // scale, 0, 0, 0
++    vec4 f0;  // scale, 0, valueC4, outputC4
+ } uConst;
+ 
+ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+@@ -39,8 +39,8 @@ void main() {
+         return;
+     }
+ 
+-    // input: [1, qLen, headNum, headDim] as FLOAT4 over D => [q, h, d4]
+-    vec4 qv = (q < qLen) ? vec4(uQuery.data[(q * headNum + h) * d4Size + d4]) : vec4(0.0);
++    const int inputOffset = (q * headNum + h) * d4Size + d4;
++    vec4 qv = (q < qLen) ? vec4(uQuery.data[inputOffset]) : vec4(0.0);
+ 
+     // output: [headNum, headDim/4, qLen4] as FLOAT4 over D => [h, d4, q]
+     const int outBase = (h * d4Size + d4) * qLen4 + q;
+diff --git a/source/backend/vulkan/buffer/execution/glsl/binary.comp b/source/backend/vulkan/buffer/execution/glsl/binary.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/binary.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/binary.comp
+@@ -49,6 +49,9 @@ void main()
+ #ifdef MUL
+         value = x0 * x1;
+ #endif
++#ifdef MUL_SILU
++        value = x0 * (x1 / (FLOAT4(1.0) + exp(-x1)));
++#endif
+ #ifdef DIV
+         value = x0 / x1;
+ #endif
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp
+@@ -16,7 +16,7 @@ layout(set=0, binding=3) writeonly buffer s3{
+ 
+ layout(set=0, binding=4) readonly uniform constBuffer {
+     ivec4 size0; // batch, conv_dim, seq_len, kernel_size
+-    ivec4 size1; // conv_state_size, total, 0, 0
++    ivec4 size1; // conv_state_size, total, qkv_c4, 0
+ } uConstant;
+ 
+ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+@@ -32,6 +32,7 @@ void main()
+     int L = uConstant.size0.z;
+     int K = uConstant.size0.w;
+     int css = uConstant.size1.x; // conv_state_size = K - 1
++    bool qkvC4 = uConstant.size1.z != 0;
+ 
+     int l = gid % L;
+     int bd = gid / L;
+@@ -47,7 +48,10 @@ void main()
+         if (pos < css) {
+             input_val = float(uConvState.data[b * D * css + d * css + pos]);
+         } else {
+-            input_val = float(uQKV.data[b * D * L + d * L + (pos - css)]);
++            int lIn = pos - css;
++            int inputOffset = qkvC4 ? ((d >> 2) * (B * L) + b * L + lIn) * 4 + (d & 3)
++                                     : b * D * L + d * L + lIn;
++            input_val = float(uQKV.data[inputOffset]);
+         }
+         sum += input_val * float(uConvWeight.data[d * K + k]);
+     }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp
+@@ -8,35 +8,39 @@ layout(set=0, binding=1) buffer s1{
+ 
+ layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec4 size0; // batch, conv_dim, seq_len, conv_state_size
+-    ivec4 size1; // total, 0, 0, 0
++    ivec4 size1; // channel_count, qkv_c4, 0, 0
+ } uConstant;
+ 
+ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+ 
+ void main()
+ {
+     int gid = int(gl_GlobalInvocationID.x);
+-    int total = uConstant.size1.x;
+-    if (gid >= total) return;
++    int channelCount = uConstant.size1.x;
++    if (gid >= channelCount) return;
+ 
+     int B = uConstant.size0.x;
+     int D = uConstant.size0.y;
+     int L = uConstant.size0.z;
+     int css = uConstant.size0.w;
+ 
+-    int i = gid % css;
+-    int bd = gid / css;
++    int bd = gid;
+     int b = bd / D;
+     int d = bd % D;
++    bool qkvC4 = uConstant.size1.y != 0;
+ 
+-    // new_state[i] = padded[L + i], padded = cat(old_state[css], qkv[L])
+-    int pos = L + i;
+-    FLOAT val;
+-    if (pos < css) {
+-        val = uConvState.data[b * D * css + d * css + pos];
+-    } else {
+-        val = uQKV.data[b * D * L + d * L + (pos - css)];
++    // Ascending writes are safe because each source state index is greater than its destination.
++    for (int i = 0; i < css; ++i) {
++        int pos = L + i;
++        FLOAT val;
++        if (pos < css) {
++            val = uConvState.data[b * D * css + d * css + pos];
++        } else {
++            int lIn = pos - css;
++            int inputOffset = qkvC4 ? ((d >> 2) * (B * L) + b * L + lIn) * 4 + (d & 3)
++                                     : b * D * L + d * L + lIn;
++            val = uQKV.data[inputOffset];
++        }
++        uConvState.data[b * D * css + d * css + i] = val;
+     }
+-    // Write to conv_state. Since L >= 1, (L+i) > i always, no read-write conflict.
+-    uConvState.data[b * D * css + d * css + i] = val;
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+@@ -31,11 +31,15 @@ layout(set=0, binding=6) writeonly buffer s6 {
+ 
+ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 size0; // batch, seq_len, num_v_heads, head_k_dim
+-    ivec4 size1; // head_v_dim, total_rows, 0, 0
++    ivec4 size1; // head_v_dim, total_rows, layout_flags, 0
+ } uConstant;
+ 
+ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+ 
++int c4Offset(int token, int channel, int tokenCount) {
++    return ((channel >> 2) * tokenCount + token) * 4 + (channel & 3);
++}
++
+ void main() {
+     const uint row = gl_WorkGroupID.x * gl_WorkGroupSize.y + gl_LocalInvocationID.y;
+     const uint lane = gl_SubgroupInvocationID;
+@@ -48,6 +52,8 @@ void main() {
+     const int numVHeads = uConstant.size0.z;
+     const int dk = uConstant.size0.w;
+     const int dv = uConstant.size1.x;
++    const int seqLen = uConstant.size0.y;
++    const int layoutFlags = uConstant.size1.z;
+ 
+     const int j = int(row % uint(dv));
+     const int bh = int(row / uint(dv));
+@@ -59,8 +65,11 @@ void main() {
+     const int vIndex = bth * dv + j;
+     const int stateBase = ((b * numVHeads + h) * dv + j) * dk;
+ 
+-    const float decay = exp(float(uGate.data[bth]));
+-    const float beta = float(uBeta.data[bth]);
++    const int token = b * seqLen;
++    const int gateIndex = (layoutFlags & 1) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++    const int betaIndex = (layoutFlags & 2) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++    const float decay = exp(float(uGate.data[gateIndex]));
++    const float beta = float(uBeta.data[betaIndex]);
+     const float vVal = float(uV.data[vIndex]);
+ 
+     float vPredPartial = 0.0;
+@@ -82,6 +91,10 @@ void main() {
+     }
+     const float outVal = subgroupAdd(outPartial);
+     if (lane == 0u) {
+-        uOutput.data[bth * dv + j] = FLOAT(outVal);
++        const int outputToken = token * numVHeads + h;
++        const int outputIndex = (layoutFlags & 4) != 0
++                                    ? c4Offset(outputToken, j, batch * seqLen * numVHeads)
++                                    : bth * dv + j;
++        uOutput.data[outputIndex] = FLOAT(outVal);
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+@@ -28,13 +28,17 @@ layout(set=0, binding=6) writeonly buffer s6 {
+ 
+ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 size0; // batch, seq_len, num_v_heads, head_k_dim
+-    ivec4 size1; // head_v_dim, total_rows, 0, 0
++    ivec4 size1; // head_v_dim, total_rows, layout_flags, 0
+ } uConstant;
+ 
+ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+ 
+ shared float sReduce[512];
+ 
++int c4Offset(int token, int channel, int tokenCount) {
++    return ((channel >> 2) * tokenCount + token) * 4 + (channel & 3);
++}
++
+ void main() {
+     const uint laneCount = gl_WorkGroupSize.x;
+     const uint lane = gl_LocalInvocationID.x;
+@@ -46,6 +50,9 @@ void main() {
+     const int numVHeads = uConstant.size0.z;
+     const int dk = uConstant.size0.w;
+     const int dv = uConstant.size1.x;
++    const int batch = uConstant.size0.x;
++    const int seqLen = uConstant.size0.y;
++    const int layoutFlags = uConstant.size1.z;
+ 
+     const int j = alive ? int(row % uint(dv)) : 0;
+     const int bh = alive ? int(row / uint(dv)) : 0;
+@@ -61,8 +68,11 @@ void main() {
+     float beta = 0.0;
+     float vVal = 0.0;
+     if (alive) {
+-        decay = exp(float(uGate.data[bth]));
+-        beta = float(uBeta.data[bth]);
++        const int token = b * seqLen;
++        const int gateIndex = (layoutFlags & 1) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++        const int betaIndex = (layoutFlags & 2) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++        decay = exp(float(uGate.data[gateIndex]));
++        beta = float(uBeta.data[betaIndex]);
+         vVal = float(uV.data[vIndex]);
+     }
+ 
+@@ -108,6 +118,11 @@ void main() {
+         barrier();
+     }
+     if (alive && lane == 0u) {
+-        uOutput.data[bth * dv + j] = FLOAT(sReduce[scratchBase]);
++        const int token = b * seqLen;
++        const int outputToken = token * numVHeads + h;
++        const int outputIndex = (layoutFlags & 4) != 0
++                                    ? c4Offset(outputToken, j, batch * seqLen * numVHeads)
++                                    : bth * dv + j;
++        uOutput.data[outputIndex] = FLOAT(sReduce[scratchBase]);
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+@@ -31,11 +31,15 @@ layout(set=0, binding=6) writeonly buffer s6 {
+ 
+ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 size0; // batch, seq_len, num_v_heads, head_k_dim
+-    ivec4 size1; // head_v_dim, total_rows, 0, 0
++    ivec4 size1; // head_v_dim, total_rows, layout_flags, 0
+ } uConstant;
+ 
+ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+ 
++int c4Offset(int token, int channel, int tokenCount) {
++    return ((channel >> 2) * tokenCount + token) * 4 + (channel & 3);
++}
++
+ void main() {
+     const uint row = gl_WorkGroupID.x * gl_WorkGroupSize.y + gl_LocalInvocationID.y;
+     const uint lane = gl_SubgroupInvocationID;
+@@ -49,6 +53,7 @@ void main() {
+     const int numVHeads = uConstant.size0.z;
+     const int dk = uConstant.size0.w;
+     const int dv = uConstant.size1.x;
++    const int layoutFlags = uConstant.size1.z;
+ 
+     const int j = int(row % uint(dv));
+     const int bh = int(row / uint(dv));
+@@ -61,9 +66,12 @@ void main() {
+         const int qBase = bth * dk;
+         const int kBase = qBase;
+         const int vIndex = bth * dv + j;
++        const int token = b * seqLen + t;
++        const int gateIndex = (layoutFlags & 1) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++        const int betaIndex = (layoutFlags & 2) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
+ 
+-        const float decay = exp(float(uGate.data[bth]));
+-        const float beta = float(uBeta.data[bth]);
++        const float decay = exp(float(uGate.data[gateIndex]));
++        const float beta = float(uBeta.data[betaIndex]);
+         const float vVal = float(uV.data[vIndex]);
+ 
+         float vPredPartial = 0.0;
+@@ -85,7 +93,11 @@ void main() {
+         }
+         const float outVal = subgroupAdd(outPartial);
+         if (lane == 0u) {
+-            uOutput.data[bth * dv + j] = FLOAT(outVal);
++            const int outputToken = token * numVHeads + h;
++            const int outputIndex = (layoutFlags & 4) != 0
++                                        ? c4Offset(outputToken, j, batch * seqLen * numVHeads)
++                                        : bth * dv + j;
++            uOutput.data[outputIndex] = FLOAT(outVal);
+         }
+     }
+ }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+@@ -28,7 +28,7 @@ layout(set=0, binding=6) writeonly buffer s6 {
+ 
+ layout(set=0, binding=7) readonly uniform constBuffer {
+     ivec4 size0; // batch, seq_len, num_v_heads, head_k_dim
+-    ivec4 size1; // head_v_dim, total_rows, 0, 0
++    ivec4 size1; // head_v_dim, total_rows, layout_flags, 0
+ } uConstant;
+ 
+ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+@@ -37,6 +37,10 @@ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+ // Max size covers laneCount * rowsPerGroup (up to 128 * 4 = 512 on current hardware).
+ shared float sReduce[512];
+ 
++int c4Offset(int token, int channel, int tokenCount) {
++    return ((channel >> 2) * tokenCount + token) * 4 + (channel & 3);
++}
++
+ void main() {
+     const uint laneCount = gl_WorkGroupSize.x;
+     const uint lane = gl_LocalInvocationID.x;
+@@ -49,6 +53,8 @@ void main() {
+     const int numVHeads = uConstant.size0.z;
+     const int dk = uConstant.size0.w;
+     const int dv = uConstant.size1.x;
++    const int batch = uConstant.size0.x;
++    const int layoutFlags = uConstant.size1.z;
+ 
+     // Compute indices; guarded uses of the result rely on `alive`.
+     const int j = alive ? int(row % uint(dv)) : 0;
+@@ -67,14 +73,18 @@ void main() {
+         int kBase = 0;
+         int bth = 0;
+         int vIndex = 0;
++        int token = 0;
+         if (alive) {
+             bth = (b * seqLen + t) * numVHeads + h;
+             qBase = bth * dk;
+             kBase = qBase;
+             vIndex = bth * dv + j;
++            token = b * seqLen + t;
+ 
+-            decay = exp(float(uGate.data[bth]));
+-            beta = float(uBeta.data[bth]);
++            const int gateIndex = (layoutFlags & 1) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++            const int betaIndex = (layoutFlags & 2) != 0 ? c4Offset(token, h, batch * seqLen) : bth;
++            decay = exp(float(uGate.data[gateIndex]));
++            beta = float(uBeta.data[betaIndex]);
+             vVal = float(uV.data[vIndex]);
+         }
+ 
+@@ -120,7 +130,11 @@ void main() {
+             barrier();
+         }
+         if (alive && lane == 0u) {
+-            uOutput.data[bth * dv + j] = FLOAT(sReduce[scratchBase]);
++            const int outputToken = token * numVHeads + h;
++            const int outputIndex = (layoutFlags & 4) != 0
++                                        ? c4Offset(outputToken, j, batch * seqLen * numVHeads)
++                                        : bth * dv + j;
++            uOutput.data[outputIndex] = FLOAT(sReduce[scratchBase]);
+         }
+         barrier();
+     }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp
+@@ -0,0 +1,61 @@
++layout(set=0, binding=0) readonly buffer s0 {
++    FLOAT data[];
++} uQKV;
++
++layout(set=0, binding=1) readonly buffer s1 {
++    FLOAT data[];
++} uConvState;
++
++layout(set=0, binding=2) readonly buffer s2 {
++    FLOAT data[];
++} uConvWeight;
++
++layout(set=0, binding=3) writeonly buffer s3 {
++    FLOAT data[];
++} uConvOut;
++
++layout(set=0, binding=4) readonly uniform constBuffer {
++    ivec4 size0; // batch, conv_dim, seq_len, kernel_size
++    ivec4 size1; // conv_state_size, hidden, qkv_c4, output_c4
++} uConstant;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++int qkvOffset(int b, int d, int l, int B, int D, int L, bool qkvC4) {
++    if (qkvC4) {
++        return ((d >> 2) * (B * L) + b * L + l) * 4 + (d & 3);
++    }
++    return (b * D + d) * L + l;
++}
++
++float shortInput(int b, int h, int l, int B, int D, int L, int H, bool qkvC4) {
++    float bValue = float(uQKV.data[qkvOffset(b, h, l, B, D, L, qkvC4)]);
++    float xValue = float(uQKV.data[qkvOffset(b, 2 * H + h, l, B, D, L, qkvC4)]);
++    return bValue * xValue;
++}
++
++void main() {
++    int gid = int(gl_GlobalInvocationID.x);
++    int B = uConstant.size0.x;
++    int D = uConstant.size0.y;
++    int L = uConstant.size0.z;
++    int K = uConstant.size0.w;
++    int css = uConstant.size1.x;
++    int H = uConstant.size1.y;
++    bool qkvC4 = uConstant.size1.z != 0;
++    int total = B * H * L;
++    if (gid >= total) return;
++
++    int l = gid % L;
++    int bh = gid / L;
++    int b = bh / H;
++    int h = bh % H;
++    float sum = 0.0;
++    for (int k = 0; k < K; ++k) {
++        int pos = l + k;
++        float value = pos < css ? float(uConvState.data[(b * H + h) * css + pos])
++                                : shortInput(b, h, pos - css, B, D, L, H, qkvC4);
++        sum += value * float(uConvWeight.data[h * K + k]);
++    }
++    uConvOut.data[(b * H + h) * L + l] = FLOAT(sum);
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp
+@@ -0,0 +1,51 @@
++layout(set=0, binding=0) readonly buffer s0 {
++    FLOAT data[];
++} uQKV;
++
++layout(set=0, binding=1) readonly buffer s1 {
++    FLOAT data[];
++} uConvOut;
++
++layout(set=0, binding=2) writeonly buffer s2 {
++    FLOAT data[];
++} uOutput;
++
++layout(set=0, binding=3) readonly uniform constBuffer {
++    ivec4 size0; // batch, conv_dim, seq_len, kernel_size
++    ivec4 size1; // conv_state_size, hidden, qkv_c4, output_c4
++} uConstant;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++int c4Offset(int token, int channel, int tokenCount) {
++    return ((channel >> 2) * tokenCount + token) * 4 + (channel & 3);
++}
++
++int qkvOffset(int b, int d, int l, int B, int D, int L, bool qkvC4) {
++    if (qkvC4) {
++        return c4Offset(b * L + l, d, B * L);
++    }
++    return (b * D + d) * L + l;
++}
++
++void main() {
++    int gid = int(gl_GlobalInvocationID.x);
++    int B = uConstant.size0.x;
++    int D = uConstant.size0.y;
++    int L = uConstant.size0.z;
++    int H = uConstant.size1.y;
++    bool qkvC4 = uConstant.size1.z != 0;
++    bool outputC4 = uConstant.size1.w != 0;
++    int total = B * H * L;
++    if (gid >= total) return;
++
++    int l = gid % L;
++    int bh = gid / L;
++    int b = bh / H;
++    int h = bh % H;
++    float cValue = float(uQKV.data[qkvOffset(b, H + h, l, B, D, L, qkvC4)]);
++    float convValue = float(uConvOut.data[(b * H + h) * L + l]);
++    int token = b * L + l;
++    int outputOffset = outputC4 ? c4Offset(token, h, B * L) : token * H + h;
++    uOutput.data[outputOffset] = FLOAT(cValue * convValue);
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp
+@@ -0,0 +1,47 @@
++layout(set=0, binding=0) readonly buffer s0 {
++    FLOAT data[];
++} uQKV;
++
++layout(set=0, binding=1) buffer s1 {
++    FLOAT data[];
++} uConvState;
++
++layout(set=0, binding=2) readonly uniform constBuffer {
++    ivec4 size0; // batch, conv_dim, seq_len, kernel_size
++    ivec4 size1; // conv_state_size, hidden, qkv_c4, output_c4
++} uConstant;
++
++layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++int qkvOffset(int b, int d, int l, int B, int D, int L, bool qkvC4) {
++    if (qkvC4) {
++        return ((d >> 2) * (B * L) + b * L + l) * 4 + (d & 3);
++    }
++    return (b * D + d) * L + l;
++}
++
++float shortInput(int b, int h, int l, int B, int D, int L, int H, bool qkvC4) {
++    float bValue = float(uQKV.data[qkvOffset(b, h, l, B, D, L, qkvC4)]);
++    float xValue = float(uQKV.data[qkvOffset(b, 2 * H + h, l, B, D, L, qkvC4)]);
++    return bValue * xValue;
++}
++
++void main() {
++    int bh = int(gl_GlobalInvocationID.x);
++    int B = uConstant.size0.x;
++    int D = uConstant.size0.y;
++    int L = uConstant.size0.z;
++    int css = uConstant.size1.x;
++    int H = uConstant.size1.y;
++    bool qkvC4 = uConstant.size1.z != 0;
++    if (bh >= B * H) return;
++
++    int b = bh / H;
++    int h = bh % H;
++    for (int i = 0; i < css; ++i) {
++        int pos = L + i;
++        FLOAT value = pos < css ? uConvState.data[bh * css + pos]
++                                : FLOAT(shortInput(b, h, pos - css, B, D, L, H, qkvC4));
++        uConvState.data[bh * css + i] = value;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/norm.comp b/source/backend/vulkan/buffer/execution/glsl/norm.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/norm.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/norm.comp
+@@ -31,48 +31,59 @@ void main()
+     int y = int(gl_GlobalInvocationID.x);
+     if (y < uConstant.size.w)
+     {
++        bool inputC4 = uConstant.size.z != 0;
+         float scale = 1.0 / float(uConstant.size.x);
+         if (USE_RMS != 0u) {
+             float squaremean = 0.0;
+             for (int j=0; j<uConstant.size.x; ++j)
+             {
+-                float v = float(uInput.data[j + y * uConstant.size.x]);
++                int index = inputC4 ? ((j >> 2) * uConstant.size.w + y) * 4 + (j & 3)
++                                    : j + y * uConstant.size.x;
++                float v = float(uInput.data[index]);
+                 squaremean = squaremean + (v * v * scale);
+             }
+             float invStd = 1.0 / sqrt(squaremean + uConstant.eps);
+             for (int j=0; j<uConstant.size.x; ++j)
+             {
+-                float v = float(uInput.data[j + y * uConstant.size.x]);
++                int index = inputC4 ? ((j >> 2) * uConstant.size.w + y) * 4 + (j & 3)
++                                    : j + y * uConstant.size.x;
++                float v = float(uInput.data[index]);
+ #ifdef LAYERNORM_SCALE
+                 float dst = (v * invStd) * float(uGamma.data[j]) + float(uBeta.data[j]);
+ #else
+                 float dst = v * invStd;
+ #endif
+-                uOutput.data[j + y * uConstant.size.x] = FLOAT(dst);
++                uOutput.data[index] = FLOAT(dst);
+             }
+         } else {
+         float mean = 0.0;
+         for (int j=0; j<uConstant.size.x; ++j)
+         {
+-            mean = mean + (float(uInput.data[j + y * uConstant.size.x]) * scale);
++            int index = inputC4 ? ((j >> 2) * uConstant.size.w + y) * 4 + (j & 3)
++                                : j + y * uConstant.size.x;
++            mean = mean + (float(uInput.data[index]) * scale);
+         }
+         float squaremean = 0.0;
+         for (int j=0; j<uConstant.size.x; ++j)
+         {
+-            float v = float(uInput.data[j + y * uConstant.size.x]);
++            int index = inputC4 ? ((j >> 2) * uConstant.size.w + y) * 4 + (j & 3)
++                                : j + y * uConstant.size.x;
++            float v = float(uInput.data[index]);
+             v = v - mean;
+             squaremean = squaremean + (v * v * scale);
+         }
+         float invStd = 1.0 / sqrt(squaremean + uConstant.eps);
+         for (int j=0; j<uConstant.size.x; ++j)
+         {
+-            float v = float(uInput.data[j + y * uConstant.size.x]);
++            int index = inputC4 ? ((j >> 2) * uConstant.size.w + y) * 4 + (j & 3)
++                                : j + y * uConstant.size.x;
++            float v = float(uInput.data[index]);
+ #ifdef LAYERNORM_SCALE
+             float dst = ((v - mean) * invStd) * float(uGamma.data[j]) + float(uBeta.data[j]);
+ #else
+             float dst = (v - mean) * invStd;
+ #endif
+-            uOutput.data[j + y * uConstant.size.x] = FLOAT(dst);
++            uOutput.data[index] = FLOAT(dst);
+         }
+         }
+     }
+diff --git a/source/backend/vulkan/buffer/execution/glsl/norm_binary.comp b/source/backend/vulkan/buffer/execution/glsl/norm_binary.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/norm_binary.comp
+@@ -0,0 +1,92 @@
++layout(set=0, binding=0) writeonly buffer SumBuffer {
++    FLOAT4 data[];
++} uSum;
++
++layout(set=0, binding=1) writeonly buffer NormBuffer {
++    FLOAT4 data[];
++} uNorm;
++
++layout(set=0, binding=2) readonly buffer Input0Buffer {
++    FLOAT4 data[];
++} uInput0;
++
++layout(set=0, binding=3) readonly buffer Input1Buffer {
++    FLOAT4 data[];
++} uInput1;
++
++layout(set=0, binding=4) readonly uniform constBuffer {
++    ivec4 size; // inside, outside, inputC4, outside
++    float eps;
++} uConstant;
++
++layout(constant_id = 3) const uint USE_RMS = 0;
++
++#ifdef LAYERNORM_SCALE
++layout(set=0, binding=5) readonly buffer GammaBuffer {
++    FLOAT4 data[];
++} uGamma;
++
++layout(set=0, binding=6) readonly buffer BetaBuffer {
++    FLOAT4 data[];
++} uBeta;
++#endif
++
++layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++shared float gSum[64];
++shared float gSqSum[64];
++
++void main() {
++    int inside = uConstant.size.x;
++    int outside = uConstant.size.w;
++    int token = int(gl_WorkGroupID.x);
++    if (token >= outside) {
++        return;
++    }
++
++    int inside4 = inside >> 2;
++    uint tid = gl_LocalInvocationID.x;
++    uint groupSize = gl_WorkGroupSize.x;
++    float sum = 0.0;
++    float sqSum = 0.0;
++    for (int c4 = int(tid); c4 < inside4; c4 += int(groupSize)) {
++        int index = c4 * outside + token;
++        vec4 value = vec4(uInput0.data[index]) + vec4(uInput1.data[index]);
++        uSum.data[index] = FLOAT4(value);
++        if (USE_RMS == 0u) {
++            sum += value.x + value.y + value.z + value.w;
++        }
++        sqSum += dot(value, value);
++    }
++
++    if (USE_RMS == 0u) {
++        gSum[tid] = sum;
++    }
++    gSqSum[tid] = sqSum;
++    barrier();
++
++    for (uint stride = groupSize >> 1; stride > 0; stride >>= 1) {
++        if (tid < stride) {
++            if (USE_RMS == 0u) {
++                gSum[tid] += gSum[tid + stride];
++            }
++            gSqSum[tid] += gSqSum[tid + stride];
++        }
++        barrier();
++    }
++
++    float invInside = 1.0 / float(inside);
++    float mean = USE_RMS == 0u ? gSum[0] * invInside : 0.0;
++    float squareMean = gSqSum[0] * invInside;
++    float variance = USE_RMS == 0u ? max(squareMean - mean * mean, 0.0) : squareMean;
++    float invStd = inversesqrt(variance + uConstant.eps);
++    for (int c4 = int(tid); c4 < inside4; c4 += int(groupSize)) {
++        int index = c4 * outside + token;
++        vec4 value = vec4(uInput0.data[index]) + vec4(uInput1.data[index]);
++        vec4 normalized = USE_RMS == 0u ? (value - vec4(mean)) * invStd : value * invStd;
++#ifdef LAYERNORM_SCALE
++        normalized = normalized * vec4(uGamma.data[c4]) + vec4(uBeta.data[c4]);
++#endif
++        uNorm.data[index] = FLOAT4(normalized);
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/norm_opt.comp b/source/backend/vulkan/buffer/execution/glsl/norm_opt.comp
+--- a/source/backend/vulkan/buffer/execution/glsl/norm_opt.comp
++++ b/source/backend/vulkan/buffer/execution/glsl/norm_opt.comp
+@@ -37,14 +37,15 @@ void main() {
+         return;
+     }
+     int inside4 = inside >> 2;
+-    int base4 = y * inside4;
++    bool inputC4 = uConstant.size.z != 0;
+     uint tid = gl_LocalInvocationID.x;
+     uint groupSize = gl_WorkGroupSize.x;
+ 
+     float sum = 0.0;
+     float sqSum = 0.0;
+     for (int j4 = int(tid); j4 < inside4; j4 += int(groupSize)) {
+-        vec4 v4 = vec4(uInput.data[base4 + j4]);
++        int index4 = inputC4 ? j4 * outside + y : y * inside4 + j4;
++        vec4 v4 = vec4(uInput.data[index4]);
+         if (USE_RMS == 0u) {
+             sum += v4.x + v4.y + v4.z + v4.w;
+         }
+@@ -74,13 +75,14 @@ void main() {
+     float invStd = inversesqrt(var + uConstant.eps);
+ 
+     for (int j4 = int(tid); j4 < inside4; j4 += int(groupSize)) {
+-        vec4 v4 = vec4(uInput.data[base4 + j4]);
++        int index4 = inputC4 ? j4 * outside + y : y * inside4 + j4;
++        vec4 v4 = vec4(uInput.data[index4]);
+         vec4 nv = (USE_RMS != 0u) ? (v4 * invStd) : ((v4 - vec4(mean)) * invStd);
+ #ifdef LAYERNORM_SCALE
+         vec4 dst = nv * vec4(uGamma.data[j4]) + vec4(uBeta.data[j4]);
+ #else
+         vec4 dst = nv;
+ #endif
+-        uOutput.data[base4 + j4] = FLOAT4(dst);
++        uOutput.data[index4] = FLOAT4(dst);
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/rope.comp b/source/backend/vulkan/buffer/execution/glsl/rope.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/rope.comp
+@@ -0,0 +1,121 @@
++layout(set=0, binding=0) readonly buffer s0 {
++    FLOAT data[];
++} uQ;
++
++layout(set=0, binding=1) readonly buffer s1 {
++    FLOAT data[];
++} uK;
++
++layout(set=0, binding=2) readonly buffer s2 {
++    FLOAT data[];
++} uCos;
++
++layout(set=0, binding=3) readonly buffer s3 {
++    FLOAT data[];
++} uSin;
++
++layout(set=0, binding=4) writeonly buffer s4 {
++    FLOAT data[];
++} uQOut;
++
++layout(set=0, binding=5) writeonly buffer s5 {
++    FLOAT data[];
++} uKOut;
++
++layout(set=0, binding=6) readonly buffer s6 {
++    FLOAT data[];
++} uQGamma;
++
++layout(set=0, binding=7) readonly buffer s7 {
++    FLOAT data[];
++} uKGamma;
++
++layout(set=0, binding=8) readonly uniform constBuffer {
++    ivec4 size0; // seqLen, headDim, numHead, kvNumHead
++    ivec4 size1; // ropeHalfDim, qNorm, kNorm, 0
++    vec4 eps;    // qEps, kEps, 0, 0
++} uConstant;
++
++layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++shared float squareSum[64];
++
++int c4Offset(int token, int channel, int seqLen) {
++    return ((channel >> 2) * seqLen + token) * 4 + (channel & 3);
++}
++
++void main() {
++    const int combinedHead = int(gl_WorkGroupID.x);
++    const int token = int(gl_WorkGroupID.y);
++    const int seqLen = uConstant.size0.x;
++    const int headDim = uConstant.size0.y;
++    const int numHead = uConstant.size0.z;
++    const int kvNumHead = uConstant.size0.w;
++    if (token >= seqLen || combinedHead >= numHead + kvNumHead) {
++        return;
++    }
++
++    const bool isQ = combinedHead < numHead;
++    const int head = isQ ? combinedHead : combinedHead - numHead;
++    const int headCount = isQ ? numHead : kvNumHead;
++    const int channelBase = head * headDim;
++    const int outputBase = (token * headCount + head) * headDim;
++    const bool useNorm = isQ ? (uConstant.size1.y != 0) : (uConstant.size1.z != 0);
++    const uint tid = gl_LocalInvocationID.x;
++    float localSum = 0.0;
++    if (useNorm) {
++        for (int d = int(tid); d < headDim; d += 64) {
++            int offset = c4Offset(token, channelBase + d, seqLen);
++            float value = isQ ? float(uQ.data[offset]) : float(uK.data[offset]);
++            localSum += value * value;
++        }
++    }
++    squareSum[tid] = localSum;
++    barrier();
++    for (uint stride = 32u; stride > 0u; stride >>= 1u) {
++        if (tid < stride) {
++            squareSum[tid] += squareSum[tid + stride];
++        }
++        barrier();
++    }
++    const float eps = isQ ? uConstant.eps.x : uConstant.eps.y;
++    const float scale = useNorm ? inversesqrt(squareSum[0] / float(headDim) + eps) : 1.0;
++    const int ropeHalfDim = uConstant.size1.x;
++    const int ropeDim = ropeHalfDim * 2;
++    const int trigBase = token * ropeDim;
++
++    for (int d = int(tid); d < ropeHalfDim; d += 64) {
++        const int evenOffset = c4Offset(token, channelBase + d, seqLen);
++        const int oddOffset = c4Offset(token, channelBase + d + ropeHalfDim, seqLen);
++        float even = isQ ? float(uQ.data[evenOffset]) : float(uK.data[evenOffset]);
++        float odd = isQ ? float(uQ.data[oddOffset]) : float(uK.data[oddOffset]);
++        if (useNorm) {
++            even *= scale * (isQ ? float(uQGamma.data[d]) : float(uKGamma.data[d]));
++            odd *= scale *
++                   (isQ ? float(uQGamma.data[d + ropeHalfDim]) : float(uKGamma.data[d + ropeHalfDim]));
++        }
++        const float cEven = float(uCos.data[trigBase + d]);
++        const float cOdd = float(uCos.data[trigBase + d + ropeHalfDim]);
++        const float sEven = float(uSin.data[trigBase + d]);
++        const float sOdd = float(uSin.data[trigBase + d + ropeHalfDim]);
++        if (isQ) {
++            uQOut.data[outputBase + d] = FLOAT(even * cEven - odd * sEven);
++            uQOut.data[outputBase + d + ropeHalfDim] = FLOAT(odd * cOdd + even * sOdd);
++        } else {
++            uKOut.data[outputBase + d] = FLOAT(even * cEven - odd * sEven);
++            uKOut.data[outputBase + d + ropeHalfDim] = FLOAT(odd * cOdd + even * sOdd);
++        }
++    }
++    for (int d = ropeDim + int(tid); d < headDim; d += 64) {
++        const int offset = c4Offset(token, channelBase + d, seqLen);
++        float value = isQ ? float(uQ.data[offset]) : float(uK.data[offset]);
++        if (useNorm) {
++            value *= scale * (isQ ? float(uQGamma.data[d]) : float(uKGamma.data[d]));
++        }
++        if (isQ) {
++            uQOut.data[outputBase + d] = FLOAT(value);
++        } else {
++            uKOut.data[outputBase + d] = FLOAT(value);
++        }
++    }
++}

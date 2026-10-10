@@ -1,0 +1,113 @@
+repo: alibaba/MNN
+pr: 3004
+url: https://github.com/alibaba/MNN/pull/3004
+merge_sha: 5e93be132e42aed8a41fd2f323fdb78a0b4eb1df
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/3004/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/image/execution/glsl/argmax.comp
+  status: added
+  sha256: 9c1534a1b2e9d58d82f28127205303c060e552c4ddb2a90cba3b09885c3751f0
+- path: source/backend/vulkan/image/execution/glsl/avgpool.comp
+  status: modified
+  sha256: 0544304335fb5e2c15e89f68a6d6780eaf2542adfdb692779d68b8f2990e80a6
+- path: source/backend/vulkan/image/execution/glsl/binaryImage.comp
+  status: modified
+  sha256: cebff206d40f6f32d73ef368b4b5a03717011c4b40ef76529cc008292f178733
+- path: source/backend/vulkan/image/execution/glsl/blit_image.comp
+  status: modified
+  sha256: 92da69075f95a9416fc1119e9d2d07891dd6024bc33fcd47206ca129ee7f9504
+- path: source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+  status: modified
+  sha256: 22a7b0563c2ed3b5aa5c11823668ef9ba24f4c7ae636896e256f442acb38c7f2
+- path: source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+  status: modified
+  sha256: 22a7b0563c2ed3b5aa5c11823668ef9ba24f4c7ae636896e256f442acb38c7f2
+- path: source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
+  status: modified
+  sha256: c1799c80b73273c1ea5b098c6a7b5ec5996f69b7142e68fff293160ee206ebc0
+- path: source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
+  status: modified
+  sha256: 6c34081e48a406c038c24356c33abe02d816f48db8f448bcaae51d0f07e861aa
+- path: source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
+  status: modified
+  sha256: 973e1aa7a9248066c4c2bdf3fc32844f43b052e3aa736677814473d6c9cb6309
+- path: source/backend/vulkan/image/execution/glsl/fill_image.comp
+  status: modified
+  sha256: de29fdd0995295c104b55f7417209d2631d9de3d59d48271719425093489cb82
+- path: source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+  status: modified
+  sha256: a1e689096ac027af24ace7148dd0a62f5a97fbd2d1a1953f2f9a909be32c59f3
+- path: source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
+  status: modified
+  sha256: 34110eae9933f7511975c6c0e2886b2aaa0fcfcccdd892a674b7f59ec86a4c93
+- path: source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
+  status: modified
+  sha256: 34110eae9933f7511975c6c0e2886b2aaa0fcfcccdd892a674b7f59ec86a4c93
+- path: source/backend/vulkan/image/execution/glsl/im2col.comp
+  status: modified
+  sha256: efeae3cf7e791eb09e4f0a16062c21a703b33aa616772631b3fbc06cb40f0807
+- path: source/backend/vulkan/image/execution/glsl/im2col1x1.comp
+  status: modified
+  sha256: 8cc7eec5d3513c3c6ad70bdc3f64f32667606e2bebd3d950ca8c2415445ad41a
+- path: source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+  status: modified
+  sha256: 88b9652a07fa72dc9b0438dc4c12a88db44a41d47fe63b13ff9a2b9795d58389
+- path: source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+  status: modified
+  sha256: 31c90bf51a931097d1676e7e4d9ba5cf6d50537435a077104d30081a242a8ce1
+- path: source/backend/vulkan/image/execution/glsl/matmul_input.comp
+  status: modified
+  sha256: 5678364cd696ff6e8a26a5ee6896ef2473c555975d3c1b93e11ad2afa8112b6d
+- path: source/backend/vulkan/image/execution/glsl/matmul_output.comp
+  status: modified
+  sha256: 2e2cbeccd7ccdfcd63a766596718618d055e63f3642cf9c4164a8fc89608209a
+- path: source/backend/vulkan/image/execution/glsl/maxpool.comp
+  status: modified
+  sha256: afb541de0f221d2362d3a1b1d695c16609659e5f5ca0f258a1c48e2db17fde92
+- path: source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+  status: modified
+  sha256: 456f60d682954d045b0ce50a9e40b0f6debdda7eca4ba9fc9a32fe1bc065e867
+- path: source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+  status: modified
+  sha256: 700ebf791534e4fc25bf48e7950c3976a5c28ab78469f14aef7f9e466979b204
+- path: source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
+  status: modified
+  sha256: cc15087c94bd9427f58042784d55b397984a88baaefdaf2dcddfc8c079379d17
+- path: source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
+  status: modified
+  sha256: 617f217dd455e81cd231fb109092d38d9d3e85ebb77077cd5e89f81a0f5bfaff
+- path: source/backend/vulkan/image/execution/glsl/relu.comp
+  status: modified
+  sha256: 23c3b50f387ae5703140f98444931dcf19af703724a0561351b5500fccc7b017
+- path: source/backend/vulkan/image/execution/glsl/relu6.comp
+  status: modified
+  sha256: 23c3b50f387ae5703140f98444931dcf19af703724a0561351b5500fccc7b017
+- path: source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
+  status: modified
+  sha256: 713789d8c2074ad9f13f3ae81e56a983c4d04c7147c656d00a5b1ce7e008dadc
+- path: source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+  status: modified
+  sha256: 713789d8c2074ad9f13f3ae81e56a983c4d04c7147c656d00a5b1ce7e008dadc
+- path: source/backend/vulkan/image/execution/glsl/roipooling.comp
+  status: modified
+  sha256: d123d3957317b0796582c9bf0d9ea3c527e38bcc31ec493d679874e088fdb2d8
+- path: source/backend/vulkan/image/execution/glsl/scale.comp
+  status: modified
+  sha256: a573c727fd3cc0ad5eb8c05f849cd4013bea6593831e7d149c97429a33049f4f
+- path: source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
+  status: modified
+  sha256: 689ed5508905fb92cbdd5acc326570a4d804e0b80233bd587b51fb889b4c5908
+- path: source/backend/vulkan/image/execution/glsl/unaryImage.comp
+  status: modified
+  sha256: 175b532d3c064b308f260290647597410b1f25ef683b93f4a34d27d98de600e1
+- path: source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
+  status: modified
+  sha256: 4595ae32a186deecf27fc6dd1d5af99987b63e548345cead0762469f11e83f6c
+- path: source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
+  status: modified
+  sha256: 19c9c933f8b857a4ded60c060d918bc660e0108ceca33ae0aa610e1051d824a8
