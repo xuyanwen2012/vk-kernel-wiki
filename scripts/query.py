@@ -16,6 +16,9 @@ Architecture filters follow the tree in data/architectures.yaml: asking for a
 node returns pages tagged with that node or any descendant, never pages tagged
 only with an ancestor. Spellings listed in data/aliases.yaml are resolved
 first. The number of ancestor-only pages left out is reported on stderr.
+A free-text query that names an architecture node is not a filter: when its
+leading results are tagged only with other architectures, a warning on stderr
+says so.
 
 Returns a ranked list of matching pages with titles, paths, and key frontmatter fields.
 
@@ -23,7 +26,8 @@ Ranking of free-text queries (every matching page is still returned; only the
 order is decided here), in order of precedence:
 
 1. Coverage: pages matching more of the query terms come first, so pages that
-   match ALL the terms precede every partial match.
+   match ALL the terms precede every partial match. Function words (STOP_WORDS)
+   are not counted when the query has other words.
 2. Field strength, summed over the terms: a term in the title or id outweighs
    one in a vocabulary field (tags and the like), which outweighs one reached
    only through an alias expansion (the page carries the canonical term but
@@ -147,6 +151,15 @@ LEVEL_BODY = 2      # found in body text only
 # Longest alias, in whitespace-separated tokens, looked up as a phrase.
 MAX_ALIAS_TOKENS = 5
 
+# Function words of a natural-language query ("GEMM on Intel Arc"). They occur
+# as substrings of almost every page, so they say nothing about relevance: a
+# page matching only these is still returned, after every other match, and
+# they do not count towards coverage or field strength. Ignored only when the
+# query has other words.
+STOP_WORDS = frozenset(
+    "a an and are as at by for from in is of on or the to vs what which with".split()
+)
+
 # Authority classes (ranking rule 4), lower sorts first.
 AUTHORITY_WIKI, AUTHORITY_CURATED, AUTHORITY_GENERATED = 0, 1, 2
 
@@ -189,6 +202,13 @@ def build_terms(tokens):
             if canonical:
                 for term in span:
                     attach(term, canonical)
+    if any(t["literal"] not in STOP_WORDS for t in terms):
+        for term in terms:
+            # A function word that is part of an alias ("top-k", "split k") or
+            # names a node keeps its meaning.
+            term["stop"] = (
+                term["literal"] in STOP_WORDS and not term["expansions"] and not term["node"]
+            )
     return terms
 
 
@@ -241,9 +261,10 @@ def authority_class(ptype):
 
 
 def score_page(fm, body, terms):
-    """Return (coverage, strength, fine) for a page against the query terms.
+    """Return (coverage, strength, fine) for a page against the query terms,
+    or None when the page matches no term at all.
 
-    coverage: how many terms the page matches anywhere.
+    coverage: how many terms (function words aside) the page matches anywhere.
     strength: sum of the per-term field-strength levels (LEVEL_*).
     fine:     the fine-grained keyword score (title or id 10, vocabulary
               fields 5, up to 3 body hits; best spelling per term).
@@ -258,8 +279,12 @@ def score_page(fm, body, terms):
     archs = page_architectures(fm) if any(t["node"] for t in terms) else set()
 
     coverage = strength = fine = 0
+    matched = False
     for term in terms:
         literal = term["literal"]
+        if term.get("stop"):
+            matched = matched or literal in head_text or literal in field_text or literal in body_lower
+            continue
         in_body = literal in body_lower
         expanded = any(c in head_text or c in field_text for c in term["expansions"])
         # Tagged with the named node or one of its descendants: the page is
@@ -277,6 +302,7 @@ def score_page(fm, body, terms):
             level = LEVEL_BODY
         else:
             continue
+        matched = True
         coverage += 1
         strength += level
 
@@ -289,7 +315,7 @@ def score_page(fm, body, terms):
                 variant_score += 5
             best = max(best, variant_score)
         fine += best
-    return coverage, strength, fine
+    return (coverage, strength, fine) if matched else None
 
 
 def rank_pages(pages, terms, architecture=None):
@@ -297,9 +323,10 @@ def rank_pages(pages, terms, architecture=None):
     subjects = subject_nodes(terms, architecture)
     ranked = []
     for p in pages:
-        coverage, strength, fine = score_page(p["fm"], p["body"], terms)
-        if not coverage:
+        scored = score_page(p["fm"], p["body"], terms)
+        if scored is None:
             continue
+        coverage, strength, fine = scored
         p["_score"] = fine
         p["_rank"] = (
             -coverage,
@@ -393,6 +420,49 @@ def report_architecture_filter(requested, eligible_pages):
     print(message + ".", file=sys.stderr)
 
 
+# How many of the first results the cross-architecture check looks at.
+CROSS_ARCHITECTURE_TOP = 5
+
+
+def report_cross_architecture(terms, shown_pages):
+    """Warn on stderr when a free-text query names an architecture node and
+    leading results are tagged only with other architectures.
+
+    A page is on the subject when it carries a named node, one of its
+    descendants or one of its ancestors; a page with no architecture tag makes
+    no device claim and is not counted. --architecture needs no such check:
+    it already removes the other pages.
+    """
+    named = [term["node"] for term in terms if term["node"]]
+    if not named:
+        return
+    related = set()
+    for node in named:
+        related.add(node)
+        related.update(arch_policy.descendants(node))
+        related.update(arch_policy.ancestors(node))
+    top = shown_pages[:CROSS_ARCHITECTURE_TOP]
+    other = []
+    off_subject = 0
+    for page in top:
+        archs = page_architectures(page["fm"])
+        if archs and not archs & related:
+            off_subject += 1
+            other.extend(a for a in sorted(archs) if a not in other)
+    if not off_subject:
+        return
+    names = ", ".join(dict.fromkeys(named))
+    other_vendors = {vendor_of(a) for a in other if arch_policy.is_known(a)}
+    kind = "another vendor's architecture" if not other_vendors & {vendor_of(n) for n in named} \
+        else "another architecture"
+    print(
+        f"WARNING: the query names '{names}', but {off_subject} of the top {len(top)} result(s) "
+        f"are tagged only with {kind} ({', '.join(other)}); what those pages state does not "
+        f"carry over to '{names}'. Use --architecture to keep only pages tagged with it.",
+        file=sys.stderr,
+    )
+
+
 def format_result(page, compact=False):
     """Format a single page as a readable line."""
     fm = page["fm"]
@@ -476,6 +546,7 @@ def main():
         pages.sort(key=lambda x: x["path"])
 
     pages = pages[:args.limit]
+    report_cross_architecture(terms, pages)
 
     if args.paths_only:
         for p in pages:

@@ -1981,6 +1981,20 @@ class RankingTest(RankingRoots):
         # Without keywords the order is by path, as before.
         self.assertEqual(self.ranked(root), sorted(self.ranked(root)))
 
+    def test_function_words_do_not_decide_the_order(self):
+        root = self.make_root({
+            # Matches the function word and one content word.
+            "sources/docs/a.md": fixture_page("gemm on a device", id="doc-a"),
+            # Matches both content words, not the function word.
+            "sources/docs/b.md": fixture_page("gemm", id="doc-b", body="quagga"),
+            # Matches the function word only: still returned, last.
+            "sources/docs/c.md": fixture_page("notes on zebras", id="doc-c"),
+        })
+        self.assertEqual(self.ranked(root, "gemm on quagga"),
+                         ["sources/docs/b.md", "sources/docs/a.md", "sources/docs/c.md"])
+        # A query of function words alone is matched literally.
+        self.assertEqual(set(self.ranked(root, "on")), {"sources/docs/a.md", "sources/docs/c.md"})
+
     def test_compact_output_format_is_unchanged(self):
         root = self.make_root({"sources/docs/a.md": fixture_page("zebra", id="doc-a")})
         proc = run_script("query.py", "zebra", "--compact", root=root)
@@ -2044,6 +2058,71 @@ class AliasRankingTest(RankingRoots):
         # The generic pages are still returned, after the specific ones.
         proc = run_script("query.py", "DPAS", "--paths-only", "--limit", "10000")
         self.assertIn("wiki/hardware/cooperative-matrix-rdna3.md", proc.stdout.split())
+
+
+class CrossArchitectureWarningTest(RankingRoots):
+    """A vendor or device named in free text is not a filter; say so when the
+    leading results are for other architectures."""
+
+    AMD_ONLY = {
+        "wiki/kernels/a.md": fixture_page(
+            "GEMM kernel on the Radeon 780M", id="kernel-a", type="kernel", tags=["gemm"],
+            architectures=["radeon-780m"], body="Not measured on Intel Arc."),
+        "sources/measurements/b.md": fixture_page(
+            "GEMM run", id="meas-b", tags=["gemm"], architectures=["radeon-780m"]),
+        "sources/docs/c-no-architecture.md": fixture_page("GEMM background", id="doc-c", tags=["gemm"]),
+    }
+
+    def warning_lines(self):
+        return [line for line in self.last_stderr.splitlines() if line.startswith("WARNING")]
+
+    def test_other_vendor_results_are_flagged(self):
+        root = self.make_root(self.AMD_ONLY)
+        for query in (["GEMM on Intel Arc"], ["GEMM", "Intel"], ["gemm Battlemage"], ["gemm Arc B580"]):
+            with self.subTest(query=query):
+                paths = self.ranked(root, *query)
+                self.assertIn("wiki/kernels/a.md", paths)  # still returned
+                lines = self.warning_lines()
+                self.assertEqual(len(lines), 1, self.last_stderr)
+                self.assertIn("2 of the top 3 result(s) are tagged only with another vendor's architecture "
+                              "(radeon-780m)", lines[0])
+        self.ranked(root, "GEMM on Intel Arc")
+        self.assertIn("the query names 'intel'", self.warning_lines()[0])
+
+    def test_sibling_device_is_another_architecture(self):
+        root = self.make_root(self.AMD_ONLY)
+        self.ranked(root, "gemm", "RX 7600")
+        self.assertIn("the query names 'rx-7600', but 2 of the top 3 result(s) are tagged only with "
+                      "another architecture (radeon-780m)", self.warning_lines()[0])
+
+    def test_no_warning_when_results_are_on_the_subject(self):
+        pages = dict(self.AMD_ONLY)
+        pages["sources/docs/d-vendor.md"] = fixture_page("GEMM", id="doc-d", tags=["gemm"], architectures=["amd"])
+        pages["sources/docs/e-generation.md"] = fixture_page(
+            "GEMM", id="doc-e", tags=["gemm"], architectures=["rdna3", "intel"])
+        root = self.make_root(pages)
+        for query in (["gemm AMD"], ["gemm 780M"], ["gemm rdna3"], ["gemm"], ["gemm coopmat"]):
+            with self.subTest(query=query):
+                self.ranked(root, *query)
+                self.assertEqual(self.warning_lines(), [])
+
+    def test_only_the_leading_results_are_checked(self):
+        pages = {
+            f"sources/docs/intel-{n}.md": fixture_page(
+                "GEMM for Arc", id=f"doc-intel-{n}", architectures=["intel"])
+            for n in range(5)
+        }
+        pages.update(self.AMD_ONLY)
+        root = self.make_root(pages)
+        paths = self.ranked(root, "GEMM on Intel Arc")
+        self.assertEqual(set(paths[:5]), {f"sources/docs/intel-{n}.md" for n in range(5)})
+        self.assertIn("wiki/kernels/a.md", paths[5:])
+        self.assertEqual(self.warning_lines(), [])
+
+    def test_architecture_filter_needs_no_warning(self):
+        root = self.make_root(self.AMD_ONLY)
+        self.assertEqual(self.ranked(root, "GEMM Intel", "--architecture", "intel"), [])
+        self.assertEqual(self.warning_lines(), [])
 
 
 if __name__ == "__main__":
