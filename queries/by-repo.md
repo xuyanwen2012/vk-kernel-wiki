@@ -590,7 +590,7 @@
 
 <a id="mesamesa"></a>
 ## mesa/mesa
-156 PRs
+169 PRs
 
 | PR | Title | Date | Techniques | Tags |
 |-----|-------|------|------------|------|
@@ -603,6 +603,7 @@
 | [#43634](../sources/prs/mesa/PR-43634.md) | nir,radv: add nir_intrinsic_deref_buffer_address and fix transposed cmat loads with descriptor heap | 2026-08-10 |  | cooperative-matrix, c, python |
 | [#43460](../sources/prs/mesa/PR-43460.md) | nvk: report shared memory usage in statistics | 2026-08-04 |  | shared-memory-limit, rust, c |
 | [#43426](../sources/prs/mesa/PR-43426.md) | radv: drop support for cooperativeMatrixRobustBufferAccess and other radv_compiler_info feature fixes | 2026-08-03 |  | cooperative-matrix, c |
+| [#43240](../sources/prs/mesa/PR-43240.md) | radv/nir/opt_tid_function: optimize (local_index & #c) even with large workgroups | 2026-07-27 |  | c |
 | [#43148](../sources/prs/mesa/PR-43148.md) | nir/coopmat: use args for flexible dimension lowering info. | 2026-07-23 |  | cooperative-matrix, c |
 | [#43088](../sources/prs/mesa/PR-43088.md) | intel/dev: Clamp PTL+ CS workgroup threads to 32 | 2026-07-20 |  | c |
 | [#43056](../sources/prs/mesa/PR-43056.md) | nir/coopmat: use nir_shader_get_entrypoint() | 2026-07-18 |  | cooperative-matrix, c |
@@ -617,6 +618,7 @@
 | [#41981](../sources/prs/mesa/PR-41981.md) | panvk: enable Vulkan 1.1 and subgroups on Bifrost | 2026-06-03 |  | c |
 | [#41922](../sources/prs/mesa/PR-41922.md) | radv: fix usage of radv_nir_cmat_length | 2026-06-01 |  | cooperative-matrix, c |
 | [#41913](../sources/prs/mesa/PR-41913.md) | jay: Handle dpas_intel intrinsic | 2026-05-31 |  | cooperative-matrix, c, python |
+| [#41809](../sources/prs/mesa/PR-41809.md) | nir,radv: add pass to optimize shared variables to subgroup operations | 2026-05-26 |  | subgroup-operations, c |
 | [#41814](../sources/prs/mesa/PR-41814.md) | intel/brw: Add pass to vectorize dot products into systolic-array matrix multiplications. | 2026-05-26 |  | cooperative-matrix, c, cpp |
 | [#41691](../sources/prs/mesa/PR-41691.md) | compiler: Support more than 255 cols/rows in cmat descriptions | 2026-05-19 |  | cooperative-matrix, python, c |
 | [#41653](../sources/prs/mesa/PR-41653.md) | radv,nir: use global_load_tr_b{64,128} for cooperative matrix loads | 2026-05-18 |  | cooperative-matrix, c, cpp |
@@ -630,6 +632,7 @@
 | [#40350](../sources/prs/mesa/PR-40350.md) | anv: Add vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV | 2026-03-11 |  | cooperative-matrix, c |
 | [#40003](../sources/prs/mesa/PR-40003.md) | radv: VK_VALVE_shader_mixed_float_dot_product | 2026-02-20 |  | cpp, python, c |
 | [#40014](../sources/prs/mesa/PR-40014.md) | anv: Set PIPELINE_SELECT systolic mode based on shader usage | 2026-02-20 |  | cooperative-matrix, cpp, c |
+| [#39981](../sources/prs/mesa/PR-39981.md) | radv/nir: Correctly handle workgroup sizes not aligned to 32 | 2026-02-19 |  | c |
 | [#39904](../sources/prs/mesa/PR-39904.md) | anv: Enable cooperativeMatrixPerElementOperations | 2026-02-15 |  | cooperative-matrix, c |
 | [#39769](../sources/prs/mesa/PR-39769.md) | brw: Fix cooperative matrix constant sources other than src0 | 2026-02-09 |  | cooperative-matrix, cpp |
 | [#39728](../sources/prs/mesa/PR-39728.md) | anv: Two small changes to cooperative matrix feature handling | 2026-02-06 |  | cooperative-matrix, c |
@@ -646,8 +649,11 @@
 | [#37941](../sources/prs/mesa/PR-37941.md) | nak: ensure deref has a ptr_stride in cmat load/store lowering | 2025-10-17 |  | cooperative-matrix, rust, c |
 | [#37879](../sources/prs/mesa/PR-37879.md) | nir/coopmat: fix non square load/store lowering for flexible dimensions | 2025-10-15 |  | cooperative-matrix, c |
 | [#37867](../sources/prs/mesa/PR-37867.md) | aco/optimizer: add separate fp16 temp labels, rework label_canonicalized | 2025-10-14 |  | fp16-arithmetic, cpp |
+| [#37667](../sources/prs/mesa/PR-37667.md) | amd: don't allow unsigned wraps for shared memory offsets on GFX6 | 2025-10-02 |  | shared-memory-limit, c |
 | [#37619](../sources/prs/mesa/PR-37619.md) | radv: add a helper whether shader fp16 is enabled | 2025-09-29 |  | fp16-arithmetic, c |
+| [#37453](../sources/prs/mesa/PR-37453.md) | amd: allow for unsigned wraps when folding shared memory offsets | 2025-09-18 |  | shared-memory-limit, c, cpp |
 | [#37442](../sources/prs/mesa/PR-37442.md) | radv: make sure fp16 is enabled consistently on gfx8 | 2025-09-17 |  | fp16-arithmetic, c |
+| [#37294](../sources/prs/mesa/PR-37294.md) | radv: determine subgroup/wave size early | 2025-09-11 |  | c |
 | [#37258](../sources/prs/mesa/PR-37258.md) | nir: rework subgroup size information | 2025-09-09 |  | subgroup-size, c, cpp |
 | [#37213](../sources/prs/mesa/PR-37213.md) | radv/nir/lower_cmat: add shuffle_xor_imm helper | 2025-09-06 |  | cooperative-matrix, c |
 | [#37135](../sources/prs/mesa/PR-37135.md) | nvk: rework shared memory QMD handling and make compute faster | 2025-09-02 |  | shared-memory-limit, rust, c |
@@ -658,6 +664,7 @@
 | [#36328](../sources/prs/mesa/PR-36328.md) | aco: WMMA statistics and s_delay_alu tweaks | 2025-07-23 |  | cooperative-matrix, cpp |
 | [#36185](../sources/prs/mesa/PR-36185.md) | brw: Fix cmat conversion between bfloat16 and non-float32 | 2025-07-17 |  | cooperative-matrix, bfloat16-arithmetic, fp16-arithmetic |
 | [#36163](../sources/prs/mesa/PR-36163.md) | nvk,nak: Blackwell cooperative matrix fixes | 2025-07-16 |  | cooperative-matrix, rust, c |
+| [#36133](../sources/prs/mesa/PR-36133.md) | amd/common: refactor shared memory code emission | 2025-07-15 |  | shared-memory-limit, c, cpp |
 | [#36115](../sources/prs/mesa/PR-36115.md) | radv/nir/lower_cmat: optimize gfx11 matrix use conversions | 2025-07-14 |  | cooperative-matrix, cpp, c |
 | [#36117](../sources/prs/mesa/PR-36117.md) | radv,nir: gfx11 8bit cmat load optimizations | 2025-07-14 |  | cooperative-matrix, c, python |
 | [#36016](../sources/prs/mesa/PR-36016.md) | radv/nir/lower_cmat: use explicit shift when calculating gfx12 wave64 layout | 2025-07-09 |  | cooperative-matrix, wave64, c |
@@ -671,6 +678,7 @@
 | [#34793](../sources/prs/mesa/PR-34793.md) | spirv,nir,radv: implement VK_NV_cooperative_matrix2/CooperativeMatrixConversionsNV | 2025-05-02 |  | cooperative-matrix, cooperative-matrix2, c |
 | [#34768](../sources/prs/mesa/PR-34768.md) | radv: VK_KHR_shader_bfloat16 | 2025-04-30 |  | bfloat16-arithmetic, fp16-arithmetic, c |
 | [#34695](../sources/prs/mesa/PR-34695.md) | panvk: Advertise support for VK_KHR_shader_integer_dot_product | 2025-04-24 |  | integer-dot-product, c |
+| [#34634](../sources/prs/mesa/PR-34634.md) | aco/gfx11: create waitcnt for workgroup vmem barriers | 2025-04-21 |  | cpp |
 | [#34511](../sources/prs/mesa/PR-34511.md) | spirv, radv, intel: Add NIR intrinsic for cmat conversion | 2025-04-14 |  | cooperative-matrix, c, python |
 | [#34441](../sources/prs/mesa/PR-34441.md) | ir3: Move load/store vectorization to finalize, vectorize shared memory | 2025-04-09 |  | shared-memory-limit, c, cpp |
 | [#34396](../sources/prs/mesa/PR-34396.md) | radv,nir,aco: optimize cooperative matrix input modifiers and inline constants | 2025-04-06 |  | cooperative-matrix, cpp, c |
@@ -700,12 +708,14 @@
 | [#28254](../sources/prs/mesa/PR-28254.md) | tu: KHR_8bit_storage support | 2024-03-18 |  | 8bit-storage, python, c |
 | [#27903](../sources/prs/mesa/PR-27903.md) | intel/cmat: stride is in number of elements of the pointer type | 2024-03-01 |  | cooperative-matrix, c |
 | [#27635](../sources/prs/mesa/PR-27635.md) | nvk, nak: Implement shaderFloat16 | 2024-02-15 |  | fp16-arithmetic, rust, c |
+| [#27104](../sources/prs/mesa/PR-27104.md) | radv: Remove dead shared variables in radv_optimize_nir. | 2024-01-17 |  | c |
 | [#26993](../sources/prs/mesa/PR-26993.md) | intel/compiler: Disable DPAS instructions on MTL | 2024-01-11 |  | cooperative-matrix, c |
 | [#26768](../sources/prs/mesa/PR-26768.md) | radv: Use correct writemask for cooperative matrix ordering. | 2023-12-19 |  | cooperative-matrix, c |
 | [#26533](../sources/prs/mesa/PR-26533.md) | nak,nvk: KHR_shader_integer_dot_product | 2023-12-06 |  | integer-dot-product, c, python |
 | [#26503](../sources/prs/mesa/PR-26503.md) | nvk: Advertise VK_EXT_subgroup_size_control | 2023-12-04 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 | [#26445](../sources/prs/mesa/PR-26445.md) | aco: implement 16-bit derivatives and improve fp16 support on gfx8 | 2023-12-01 |  | fp16-arithmetic, cpp |
 | [#26437](../sources/prs/mesa/PR-26437.md) | anv: fix minSubgroupSize for xe2 | 2023-11-30 |  | subgroup-size, c |
+| [#26388](../sources/prs/mesa/PR-26388.md) | nir,radv: shrink shared memory arrays | 2023-11-28 |  | shared-memory-limit, c |
 | [#26264](../sources/prs/mesa/PR-26264.md) | nvk,nak: More subgroup ops | 2023-11-17 |  | subgroup-operations, rust, c |
 | [#25994](../sources/prs/mesa/PR-25994.md) | intel/dev: Enable VK_KHR_cooperative_matrix on all Gfx9+ GPUs | 2023-11-01 |  | cooperative-matrix, c, python |
 | [#25780](../sources/prs/mesa/PR-25780.md) | nvk: Advertise VK_KHR_workgroup_memory_explicit_layout | 2023-10-18 |  | shared-memory-limit, c |
@@ -726,9 +736,11 @@
 | [#12617](../sources/prs/mesa/PR-12617.md) | nir,spirv,radv,aco: implement VK_KHR_shader_integer_dot_product | 2021-08-30 |  | integer-dot-product, c, cpp |
 | [#12624](../sources/prs/mesa/PR-12624.md) | anv: Enable KHR_shader_integer_dot_product | 2021-08-30 |  | integer-dot-product, c |
 | [#12142](../sources/prs/mesa/PR-12142.md) | SPV_KHR_integer_dot_product support | 2021-07-30 |  | integer-dot-product, c, python |
+| [#11262](../sources/prs/mesa/PR-11262.md) | radv: increase maxComputeSharedMemorySize | 2021-06-09 |  | shared-memory-limit, c |
 | [#10039](../sources/prs/mesa/PR-10039.md) | turnip: fix alignment of non-32b types in workgroup memory | 2021-04-05 |  | shared-memory-limit, c |
 | [#9459](../sources/prs/mesa/PR-9459.md) | aco: set compr for fp16 exports | 2021-03-08 |  | fp16-arithmetic, cpp, c |
 | [#9409](../sources/prs/mesa/PR-9409.md) | turnip: reduce maxComputeWorkGroupSize to respect hw limits | 2021-03-04 |  | c |
+| [#8752](../sources/prs/mesa/PR-8752.md) | radv: Expose VK_KHR_workgroup_memory_explicit_layout. | 2021-01-27 |  | shared-memory-limit, c, python |
 | [#8699](../sources/prs/mesa/PR-8699.md) | spirv, anv: Implement VK_KHR_workgroup_memory_explicit_layout | 2021-01-25 |  | shared-memory-limit, c, python |
 | [#7453](../sources/prs/mesa/PR-7453.md) | anv: restrict number of subgroups per group | 2020-11-04 |  | c |
 | [#6752](../sources/prs/mesa/PR-6752.md) | tu, ir3, nir: Support vulkan subgroup ops | 2020-09-16 |  | subgroup-operations, c, python |
@@ -745,6 +757,7 @@
 | [#3226](../sources/prs/mesa/PR-3226.md) | intel/fs: Optimizations for "small workgroups" | 2019-12-28 |  | cpp |
 | [#2967](../sources/prs/mesa/PR-2967.md) | turnip: SSBOs and compute shaders | 2019-12-04 |  | c |
 | [#2872](../sources/prs/mesa/PR-2872.md) | radv: fix reporting subgroup size with VK_KHR_pipeline_executable_properties | 2019-11-25 |  | subgroup-size, c |
+| [#2658](../sources/prs/mesa/PR-2658.md) | radv,ac/nir: lower deref operations for shared memory | 2019-11-07 |  | shared-memory-limit, cpp, c |
 | [#2588](../sources/prs/mesa/PR-2588.md) | radv: implement VK_EXT_subgroup_size_control | 2019-11-01 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 | [#1646](../sources/prs/mesa/PR-1646.md) | anv: Implement VK_EXT_subgroup_size_control version 2 | 2019-08-12 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |
 | [#1411](../sources/prs/mesa/PR-1411.md) | anv: Implement VK_EXT_subgroup_size_control | 2019-07-21 | required-subgroup-size | subgroup-size, subgroup-size-control, required-subgroup-size |

@@ -33,6 +33,7 @@
 | [Vulkan Phi Fix for AMD Proprietary Drivers](../sources/prs/llama-cpp/PR-5260.md) | `sources/prs/llama-cpp/PR-5260.md` |
 | [vulkan: only use M-sized matmul on Apple GPUs](../sources/prs/llama-cpp/PR-5412.md) | `sources/prs/llama-cpp/PR-5412.md` |
 | [Fix Vulkan Quantized Matrix Vector Multiplication on AMD GPUs when ncols < 64](../sources/prs/llama-cpp/PR-8855.md) | `sources/prs/llama-cpp/PR-8855.md` |
+| [radv: increase maxComputeSharedMemorySize](../sources/prs/mesa/PR-11262.md) | `sources/prs/mesa/PR-11262.md` |
 | [nir,spirv,radv,aco: implement VK_KHR_shader_integer_dot_product](../sources/prs/mesa/PR-12617.md) | `sources/prs/mesa/PR-12617.md` |
 | [tu: Implement VK_KHR_shader_integer_dot_product](../sources/prs/mesa/PR-13986.md) | `sources/prs/mesa/PR-13986.md` |
 | [nir, aco: Add algebraic optimization for VKD3D-Proton fp32->fp16 conversion.](../sources/prs/mesa/PR-15838.md) | `sources/prs/mesa/PR-15838.md` |
@@ -42,28 +43,38 @@
 | [radv: Enable required subgroup size on mesh/task.](../sources/prs/mesa/PR-23925.md) | `sources/prs/mesa/PR-23925.md` |
 | [nir/lower_fp16_casts,radv,intel/compiler: add and use option to split fp64 casts](../sources/prs/mesa/PR-25566.md) | `sources/prs/mesa/PR-25566.md` |
 | [radv: implement VK_EXT_subgroup_size_control](../sources/prs/mesa/PR-2588.md) | `sources/prs/mesa/PR-2588.md` |
+| [nir,radv: shrink shared memory arrays](../sources/prs/mesa/PR-26388.md) | `sources/prs/mesa/PR-26388.md` |
+| [radv,ac/nir: lower deref operations for shared memory](../sources/prs/mesa/PR-2658.md) | `sources/prs/mesa/PR-2658.md` |
 | [radv: Use correct writemask for cooperative matrix ordering.](../sources/prs/mesa/PR-26768.md) | `sources/prs/mesa/PR-26768.md` |
+| [radv: Remove dead shared variables in radv_optimize_nir.](../sources/prs/mesa/PR-27104.md) | `sources/prs/mesa/PR-27104.md` |
 | [radv: fix reporting subgroup size with VK_KHR_pipeline_executable_properties](../sources/prs/mesa/PR-2872.md) | `sources/prs/mesa/PR-2872.md` |
 | [radv: add a helper to report if cooperative matrix is enabled](../sources/prs/mesa/PR-33120.md) | `sources/prs/mesa/PR-33120.md` |
 | [radv,nir,aco: optimize cooperative matrix input modifiers and inline constants](../sources/prs/mesa/PR-34396.md) | `sources/prs/mesa/PR-34396.md` |
 | [spirv, radv, intel: Add NIR intrinsic for cmat conversion](../sources/prs/mesa/PR-34511.md) | `sources/prs/mesa/PR-34511.md` |
 | [spirv,nir,radv: implement VK_NV_cooperative_matrix2/CooperativeMatrixConversionsNV](../sources/prs/mesa/PR-34793.md) | `sources/prs/mesa/PR-34793.md` |
 | [radv/nir/lower_cmat: set optimal load/store alignment](../sources/prs/mesa/PR-35633.md) | `sources/prs/mesa/PR-35633.md` |
+| [amd/common: refactor shared memory code emission](../sources/prs/mesa/PR-36133.md) | `sources/prs/mesa/PR-36133.md` |
 | [nir/radv: add support for cooperative matrix per-element operations](../sources/prs/mesa/PR-36992.md) | `sources/prs/mesa/PR-36992.md` |
 | [radv: cooperative matrix cleanup](../sources/prs/mesa/PR-37002.md) | `sources/prs/mesa/PR-37002.md` |
 | [radv/nir/lower_cmat: add shuffle_xor_imm helper](../sources/prs/mesa/PR-37213.md) | `sources/prs/mesa/PR-37213.md` |
+| [radv: determine subgroup/wave size early](../sources/prs/mesa/PR-37294.md) | `sources/prs/mesa/PR-37294.md` |
 | [radv: make sure fp16 is enabled consistently on gfx8](../sources/prs/mesa/PR-37442.md) | `sources/prs/mesa/PR-37442.md` |
+| [amd: allow for unsigned wraps when folding shared memory offsets](../sources/prs/mesa/PR-37453.md) | `sources/prs/mesa/PR-37453.md` |
 | [radv: add a helper whether shader fp16 is enabled](../sources/prs/mesa/PR-37619.md) | `sources/prs/mesa/PR-37619.md` |
+| [amd: don't allow unsigned wraps for shared memory offsets on GFX6](../sources/prs/mesa/PR-37667.md) | `sources/prs/mesa/PR-37667.md` |
 | [aco/optimizer: add separate fp16 temp labels, rework label_canonicalized](../sources/prs/mesa/PR-37867.md) | `sources/prs/mesa/PR-37867.md` |
 | [nir/radv: add support for coopmat2 reduce](../sources/prs/mesa/PR-38389.md) | `sources/prs/mesa/PR-38389.md` |
 | [lvp/radv/nir: add coopmat2 support for Tensor Addressing and Block Loads](../sources/prs/mesa/PR-38589.md) | `sources/prs/mesa/PR-38589.md` |
 | [radv/coopmat: fix deref stride](../sources/prs/mesa/PR-39256.md) | `sources/prs/mesa/PR-39256.md` |
+| [radv/nir: Correctly handle workgroup sizes not aligned to 32](../sources/prs/mesa/PR-39981.md) | `sources/prs/mesa/PR-39981.md` |
 | [radv,nir: use global_load_tr_b{64,128} for cooperative matrix loads](../sources/prs/mesa/PR-41653.md) | `sources/prs/mesa/PR-41653.md` |
+| [nir,radv: add pass to optimize shared variables to subgroup operations](../sources/prs/mesa/PR-41809.md) | `sources/prs/mesa/PR-41809.md` |
 | [radv: fix usage of radv_nir_cmat_length](../sources/prs/mesa/PR-41922.md) | `sources/prs/mesa/PR-41922.md` |
 | [radv: accepted fixes for VK_EXT_subgroup_size_control](../sources/prs/mesa/PR-4215.md) | `sources/prs/mesa/PR-4215.md` |
 | [radv: remove wrong assert that checks compute subgroup size](../sources/prs/mesa/PR-4227.md) | `sources/prs/mesa/PR-4227.md` |
 | [radv: enable VK_KHR_8bit_storage on GFX6-GFX7](../sources/prs/mesa/PR-4299.md) | `sources/prs/mesa/PR-4299.md` |
 | [nir/coopmat: use args for flexible dimension lowering info.](../sources/prs/mesa/PR-43148.md) | `sources/prs/mesa/PR-43148.md` |
+| [radv/nir/opt_tid_function: optimize (local_index & #c) even with large workgroups](../sources/prs/mesa/PR-43240.md) | `sources/prs/mesa/PR-43240.md` |
 | [radv: drop support for cooperativeMatrixRobustBufferAccess and other radv_compiler_info feature fixes](../sources/prs/mesa/PR-43426.md) | `sources/prs/mesa/PR-43426.md` |
 | [nir,radv: add nir_intrinsic_deref_buffer_address and fix transposed cmat loads with descriptor heap](../sources/prs/mesa/PR-43634.md) | `sources/prs/mesa/PR-43634.md` |
 | [radv/nir/spirv: add support for VK_EXT_cooperative_matrix_maintenance1](../sources/prs/mesa/PR-43730.md) | `sources/prs/mesa/PR-43730.md` |
@@ -73,6 +84,7 @@
 | [radv/aco: enable VK_EXT_subgroup_size_control](../sources/prs/mesa/PR-5056.md) | `sources/prs/mesa/PR-5056.md` |
 | [radv/aco: enable FP16 features/extensions on GFX9+](../sources/prs/mesa/PR-5347.md) | `sources/prs/mesa/PR-5347.md` |
 | [tu, ir3, nir: Support vulkan subgroup ops](../sources/prs/mesa/PR-6752.md) | `sources/prs/mesa/PR-6752.md` |
+| [radv: Expose VK_KHR_workgroup_memory_explicit_layout.](../sources/prs/mesa/PR-8752.md) | `sources/prs/mesa/PR-8752.md` |
 | [aco: set compr for fp16 exports](../sources/prs/mesa/PR-9459.md) | `sources/prs/mesa/PR-9459.md` |
 
 ### `rdna3` (generation)
@@ -97,6 +109,7 @@ Path: `amd` > `rdna3`
 | [nak,nvk: KHR_shader_integer_dot_product](../sources/prs/mesa/PR-26533.md) | `sources/prs/mesa/PR-26533.md` |
 | [radv: add support for VK_KHR_cooperative_matrix on GFX12](../sources/prs/mesa/PR-33378.md) | `sources/prs/mesa/PR-33378.md` |
 | [radv/nir/lower_cmat: tightly pack 8bit gfx11 acc matrix](../sources/prs/mesa/PR-34382.md) | `sources/prs/mesa/PR-34382.md` |
+| [aco/gfx11: create waitcnt for workgroup vmem barriers](../sources/prs/mesa/PR-34634.md) | `sources/prs/mesa/PR-34634.md` |
 | [radv: VK_KHR_shader_bfloat16](../sources/prs/mesa/PR-34768.md) | `sources/prs/mesa/PR-34768.md` |
 | [radv/nir/lower_cmat: fix gfx11 B->ACC conversion](../sources/prs/mesa/PR-35713.md) | `sources/prs/mesa/PR-35713.md` |
 | [radv/nir/lower_cmat: optimize gfx11 matrix use conversions](../sources/prs/mesa/PR-36115.md) | `sources/prs/mesa/PR-36115.md` |
