@@ -2,7 +2,7 @@
 
 A structured knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference across GPU vendors, built for retrieval by LLM agents. This file is the rulebook for agents that edit the repository. For querying, see `SKILL.md`.
 
-Corpus status: 597 pages. 18 (5 source-measurement, 13 wiki) are for the device node `radeon-780m` on RADV Mesa 25.2.7; 4 are official-document pages, 2 are blog pages and 1 is a language page; 572 are generated source-pr pages from `ggml-org/llama.cpp` (405), `Tencent/ncnn` (103) and `mesa/mesa` (64). Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
+Corpus status: 788 pages. 18 (5 source-measurement, 13 wiki) are for the device node `radeon-780m` on RADV Mesa 25.2.7, the only measured device; 58 are document pages (34 `official-doc`, 9 `upstream-code`, 14 `vendor-doc`, 1 `paper`), 11 are blog pages and 1 is a language page; 700 are generated source-pr pages from `ggml-org/llama.cpp` (405), `mesa/mesa` (156), `Tencent/ncnn` (103), `alibaba/MNN` (10), `jeffbolznv/vk_cooperative_matrix_perf` (10), `KhronosGroup/glslang` (8) and `KhronosGroup/SPIRV-Tools` (8). Run `python3 scripts/repo_status.py` for current counts; `index.md` lists the pages.
 
 ## Non-Negotiable Authoring Rules
 

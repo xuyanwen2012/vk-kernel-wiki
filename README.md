@@ -2,7 +2,7 @@
 
 A structured knowledge base about optimizing Vulkan GLSL compute-shader kernels for ML inference (cooperative-matrix quantized linear, scaled dot-product attention) across GPU vendors, packaged as a Claude Code skill. The repository root is the skill directory.
 
-> **Status: current contents.** 597 pages: 5 source-measurement pages, 4 official-document pages (Khronos cooperative-matrix proposals and GLSL extension, Mesa RADV environment variables), 2 blog pages, 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`, and 14 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 1 language). Measurements and the hardware, technique, pattern and kernel pages cover the AMD Radeon 780M only (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages. No other device has a measurement or wiki page. A pull-request page carries an architecture node only where the generator found evidence for one (the title, a device check the pull request adds to the code, or a changed path under a vendor's driver), recorded in `architecture_evidence`; most llama.cpp and ncnn pages carry none, and the Mesa pages are tagged `amd` or `rdna3`.
+> **Status: current contents.** 788 pages: 5 source-measurement pages, 58 document pages (34 official documents: Khronos Vulkan, GLSL and Vulkan Guide specification text and extension proposals, the Intel DPAS instruction specification, Mesa documentation and release notes, NVIDIA driver release notes; 9 pages quoting other projects' source files, tests and code samples; 14 vendor and project articles, guides, slide decks and framework release notes; 1 paper), 11 blog pages (benchmark posts, write-ups and upstream issue threads), 700 upstream pull-request pages generated from seven repositories (`ggml-org/llama.cpp` Vulkan backend: 405 and `Tencent/ncnn` Vulkan layers: 103, both merged up to 2026-10-05; `mesa/mesa` Vulkan drivers and compilers, RADV / ACO, ANV, NVK / NAK, Turnip / ir3 and Panvk, with the common cooperative-matrix lowering: 156; `alibaba/MNN` Vulkan backend: 10; `jeffbolznv/vk_cooperative_matrix_perf`, NVIDIA's cooperative-matrix benchmark: 10; `KhronosGroup/glslang`: 8; `KhronosGroup/SPIRV-Tools`: 8; these five searched up to 2026-10-10), 594 of them with the upstream patches saved under `artifacts/`, and 14 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel, 1 language). First-party measurements cover one device only: the AMD Radeon 780M (device node `radeon-780m`), driver RADV Mesa 25.2.7, with measurement dates 2026-09-01 (device-properties export), 2026-09-27 and 2026-09-28 as recorded on the pages; the hardware, technique, pattern and kernel pages are written from those measurements. No other device has a measurement or a hardware, technique, pattern or kernel page. The other sources now span more vendors: document, blog and pull-request pages quote Khronos, AMD, Intel, NVIDIA, Qualcomm and Arm material and carry nodes of all five vendors, but they are verbatim excerpts of what their authors wrote, not measurements made for this wiki. A pull-request page carries an architecture node only where the generator found evidence for one (the title, a device check the pull request adds to the code, or a changed path under a vendor's driver), recorded in `architecture_evidence`; most llama.cpp and ncnn pages carry none, and 148 of the 156 Mesa pages carry the vendor of the driver they change (`amd`, `intel`, `nvidia`, `qualcomm`, `arm`) or a generation named in the title.
 
 ## Install as a Claude Code Skill
 
@@ -16,7 +16,7 @@ python3 scripts/repo_status.py
 python3 scripts/query.py --architecture rdna3 --compact
 ```
 
-`repo_status.py` reports 597 indexed pages (583 source, 14 wiki), and the query lists the pages tagged `rdna3` or one of its devices.
+`repo_status.py` reports 788 indexed pages (774 source, 14 wiki), and the query lists the pages tagged `rdna3` or one of its devices.
 
 Optional override to point the scripts at another wiki root (a directory containing `data/tags.yaml`):
 
@@ -30,10 +30,11 @@ export VK_KERNEL_WIKI_ROOT=/path/to/another/root
 - A controlled vocabulary ([`data/tags.yaml`](data/tags.yaml)) and alias map ([`data/aliases.yaml`](data/aliases.yaml)).
 - A data-driven architecture tree of vendors, generations and devices ([`data/architectures.yaml`](data/architectures.yaml)).
 - A version-claim registry ([`data/version-claims.yaml`](data/version-claims.yaml)) with one claim: the 780M pages were measured on RADV Mesa 25.2.7, and 23 later cooperative-matrix merge requests are not in that release ([`data/release-membership.yaml`](data/release-membership.yaml)).
-- Reference bundles of complete upstream kernel files pinned to a commit ([`artifacts/kernels/`](artifacts/README.md)): llama.cpp matmul and flash attention shaders, ncnn cooperative-matrix shaders, and Mesa's RADV cooperative-matrix lowering.
+- Ten reference bundles of complete upstream kernel files pinned to a commit ([`artifacts/kernels/`](artifacts/README.md)): llama.cpp matmul and flash attention shaders, ncnn cooperative-matrix shaders, Mesa's RADV cooperative-matrix lowering, MNN's cooperative-matrix Conv1x1, low-bit GEMV / GEMM and attention shaders with its optimization notes, NVIDIA's cooperative-matrix benchmark, and Qualcomm's Adreno cooperative-matrix sample.
 - Query, validation and index-generation scripts.
 - 18 knowledge pages for the AMD Radeon 780M on RADV Mesa 25.2.7: 5 first-party measurement source pages and 13 wiki pages (2 hardware, 5 technique, 3 pattern, 3 kernel). See [`index.md`](index.md).
-- 572 upstream pull-request pages generated from three repositories, merged up to 2026-10-05 (`ggml-org/llama.cpp` Vulkan backend: 405; `Tencent/ncnn` Vulkan layers: 103; `mesa/mesa` RADV, ACO and cooperative-matrix lowering: 64), 488 of them with the upstream patches saved under `artifacts/`. See [`queries/by-repo.md`](queries/by-repo.md).
+- 700 upstream pull-request pages generated from seven repositories (`ggml-org/llama.cpp` Vulkan backend: 405 and `Tencent/ncnn` Vulkan layers: 103, both merged up to 2026-10-05; `mesa/mesa` Vulkan drivers and compilers, RADV / ACO, ANV, NVK / NAK, Turnip / ir3 and Panvk, with the common cooperative-matrix lowering: 156; `alibaba/MNN` Vulkan backend: 10; `jeffbolznv/vk_cooperative_matrix_perf`, NVIDIA's cooperative-matrix benchmark: 10; `KhronosGroup/glslang`: 8; `KhronosGroup/SPIRV-Tools`: 8; these five searched up to 2026-10-10), 594 of them with the upstream patches saved under `artifacts/`. See [`queries/by-repo.md`](queries/by-repo.md).
+- 58 document pages (34 official documents: Khronos Vulkan, GLSL and Vulkan Guide specification text and extension proposals, the Intel DPAS instruction specification, Mesa documentation and release notes, NVIDIA driver release notes; 9 pages quoting other projects' source files, tests and code samples; 14 vendor and project articles, guides, slide decks and framework release notes; 1 paper), 11 blog pages (benchmark posts, write-ups and upstream issue threads), all holding verbatim excerpts with locators. See [`index.md`](index.md).
 - A pull-request intake pipeline: candidate ledgers in [`candidates/`](candidates/README.md), a decision policy, a page generator, and verbatim upstream shader patches with provenance in [`artifacts/`](artifacts/README.md).
 
 ## Query Tools
@@ -160,17 +161,17 @@ vk-kernel-wiki/
 │   └── authoring.md
 │
 ├── sources/                    # Layer 1: raw evidence
-│   ├── measurements/           # 3 pages (Radeon 780M)
-│   ├── prs/                    # llama-cpp/, mesa/, ncnn/: 572 generated pages
-│   ├── docs/
-│   └── blogs/
+│   ├── measurements/           # 5 pages (Radeon 780M)
+│   ├── prs/                    # glslang/, llama-cpp/, mesa/, mnn/, ncnn/, spirv-tools/, vk-coopmat-perf/: 700 generated pages
+│   ├── docs/                   # 58 pages
+│   └── blogs/                  # 11 pages
 │
 ├── wiki/                       # Layer 2: synthesized knowledge
 │   ├── hardware/               # 2 pages
-│   ├── techniques/             # 4 pages
-│   ├── patterns/               # 1 page
+│   ├── techniques/             # 5 pages
+│   ├── patterns/               # 3 pages
 │   ├── kernels/                # 3 pages
-│   ├── languages/
+│   ├── languages/              # 1 page
 │   └── migration/
 │
 ├── queries/                    # Layer 3: generated indices

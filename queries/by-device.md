@@ -30,6 +30,14 @@ Path: `amd` > `rdna3` > `rx-7600`
 |-------------|--------|-------------|------|
 | _None_ | | | |
 
+## `rx-9070-xt`
+
+Path: `amd` > `rdna4` > `rx-9070-xt`
+
+| Measurement | Driver | Measured at | Path |
+|-------------|--------|-------------|------|
+| _None_ | | | |
+
 ## `arc-b580`
 
 Path: `intel` > `xe2` > `arc-b580`
@@ -41,6 +49,22 @@ Path: `intel` > `xe2` > `arc-b580`
 ## `arc-pro-b70`
 
 Path: `intel` > `xe2` > `arc-pro-b70`
+
+| Measurement | Driver | Measured at | Path |
+|-------------|--------|-------------|------|
+| _None_ | | | |
+
+## `arc-a770`
+
+Path: `intel` > `arc-a770`
+
+| Measurement | Driver | Measured at | Path |
+|-------------|--------|-------------|------|
+| _None_ | | | |
+
+## `rtx-4070`
+
+Path: `nvidia` > `rtx-4070`
 
 | Measurement | Driver | Measured at | Path |
 |-------------|--------|-------------|------|

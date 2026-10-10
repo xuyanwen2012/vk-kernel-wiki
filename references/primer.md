@@ -2,7 +2,7 @@
 
 A map of the knowledge base, organised by the controlled vocabulary in `data/tags.yaml` and the architecture tree in `data/architectures.yaml`. Use it when a question is broad: find the area, then query by the term shown.
 
-**Current corpus: 597 pages, including 4 official-document pages, 2 blog pages and 1 language page that are not tied to the 780M. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`; the other 572 are generated pull-request pages from `ggml-org/llama.cpp`, `Tencent/ncnn` and `mesa/mesa`.** The tables below list measurement and wiki pages by id. Pull-request pages are not listed by id; where a term or node has only pull-request pages the table says so and names the generated index. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
+**Current corpus: 788 pages. 18 of them (5 source-measurement pages, 13 wiki pages) are tagged with the single device node `radeon-780m`, the only measured device; 58 document pages, 11 blog pages and 1 language page are not tied to the 780M; the other 700 are generated pull-request pages from `ggml-org/llama.cpp` (405), `mesa/mesa` (156), `Tencent/ncnn` (103), `alibaba/MNN` (10), `jeffbolznv/vk_cooperative_matrix_perf` (10), `KhronosGroup/glslang` (8) and `KhronosGroup/SPIRV-Tools` (8).** The tables below list measurement and wiki pages by id. Document, blog and pull-request pages are not listed by id; where a term or node has only such pages the table says which kinds and names the generated index, and a row that lists ids may have such pages as well. Every measurement page carries the driver RADV Mesa 25.2.7; the measurement dates recorded on the pages are 2026-09-01 (`meas-780m-vulkaninfo`), 2026-09-27 (`meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`) and 2026-09-28 (`meas-780m-e2e-prefill`). For `meas-780m-8da4w-port` and `meas-780m-sdpa-port` the driver version is attributed from the package install history captured on the device on 2026-10-04 (`sources/measurements/780m-driver-history/mesa-install-history-2026-10-04.txt`); the runs themselves record the driver name without a version. A term or node marked "no pages yet" has no page. A page listed next to a term carries that term in its frontmatter; the listing is not a claim about behaviour or performance, and nothing here is established for any other device, driver or date. The one-line descriptions repeat the term definitions in `data/tags.yaml`.
 
 Query any term with `python3 scripts/query.py --tag <term>`, and any node with `python3 scripts/query.py --architecture <node>`. Aliases for each are in `data/aliases.yaml`.
 
@@ -14,32 +14,36 @@ Any node name is a valid value of the `architectures` field. Asking for a node r
 
 | Node | Kind | Parent | Pages |
 |---|---|---|---|
-| `amd` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
-| `rdna3` | generation | `amd` | pull-request pages only; list: `queries/by-architecture.md` |
+| `amd` | vendor | | pull-request, document and blog pages only; list: `queries/by-architecture.md` |
+| `rdna3` | generation | `amd` | `lang-glsl-cooperative-matrix`; otherwise pull-request, document and blog pages only; list: `queries/by-architecture.md` |
 | `radeon-780m` | device | `rdna3` | 18 pages (5 source-measurement, 13 wiki); list: `queries/by-architecture.md` |
-| `rx-7900-xtx` | device | `rdna3` | no pages yet |
+| `rx-7900-xtx` | device | `rdna3` | document pages only; list: `queries/by-architecture.md` |
 | `rx-7600` | device | `rdna3` | no pages yet |
-| `intel` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
-| `xe2` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
-| `arc-b580` | device | `xe2` | no pages yet |
-| `arc-pro-b70` | device | `xe2` | no pages yet |
+| `rdna4` | generation | `amd` | pull-request and document pages only; list: `queries/by-architecture.md` |
+| `rx-9070-xt` | device | `rdna4` | document pages only; list: `queries/by-architecture.md` |
+| `intel` | vendor | | pull-request and document pages only; list: `queries/by-architecture.md` |
+| `xe2` | generation | `intel` | pull-request and blog pages only; list: `queries/by-architecture.md` |
+| `arc-b580` | device | `xe2` | blog pages only; list: `queries/by-architecture.md` |
+| `arc-pro-b70` | device | `xe2` | blog pages only; list: `queries/by-architecture.md` |
+| `arc-a770` | device | `intel` | blog pages only; list: `queries/by-architecture.md` |
 | `meteor-lake` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
 | `xe3` | generation | `intel` | pull-request pages only; list: `queries/by-architecture.md` |
-| `nvidia` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
+| `nvidia` | vendor | | pull-request, document and blog pages only; list: `queries/by-architecture.md` |
+| `rtx-4070` | device | `nvidia` | document pages only; list: `queries/by-architecture.md` |
 | `rtx-4070-ti-super` | device | `nvidia` | no pages yet |
 | `jetson-orin` | device | `nvidia` | no pages yet |
 | `turing` | generation | `nvidia` | pull-request and document pages only; list: `queries/by-architecture.md` |
 | `ampere` | generation | `nvidia` | pull-request pages only; list: `queries/by-architecture.md` |
 | `blackwell` | generation | `nvidia` | pull-request pages only; list: `queries/by-architecture.md` |
-| `qualcomm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
+| `qualcomm` | vendor | | pull-request and document pages only; list: `queries/by-architecture.md` |
 | `adreno-840` | device | `qualcomm` | no pages yet |
 | `adreno-7xx` | generation | `qualcomm` | pull-request pages only; list: `queries/by-architecture.md` |
-| `arm` | vendor | | pull-request pages only; list: `queries/by-architecture.md` |
+| `arm` | vendor | | pull-request and document pages only; list: `queries/by-architecture.md` |
 | `mali-g1` | device | `arm` | no pages yet |
 | `bifrost` | generation | `arm` | pull-request pages only; list: `queries/by-architecture.md` |
 | `samsung` | vendor | | reserved, no devices |
 
-All measurement and wiki pages are tagged with the device node `radeon-780m` only, so a query for `rdna3` or `amd` returns them as descendants. Some pull-request pages are tagged with a vendor or generation node taken from the pull-request title or from a device check the pull request adds to the code. Measurements per device are indexed in `queries/by-device.md`.
+All measurement pages and all hardware, technique, pattern and kernel pages are tagged with the device node `radeon-780m` only, so a query for `rdna3` or `amd` returns them as descendants. Document and blog pages carry the nodes their source names. Some pull-request pages are tagged with a vendor or generation node taken from the pull-request title, from a device check the pull request adds to the code, or from a changed path under a vendor's driver. Measurements per device are indexed in `queries/by-device.md`.
 
 ---
 
@@ -52,8 +56,8 @@ Pages live in `wiki/hardware/` (id prefix `hw-`). Index: `queries/by-hardware-fe
 | Term | Meaning (from `data/tags.yaml`) | Pages |
 |---|---|---|
 | `cooperative-matrix` | VK_KHR_cooperative_matrix / GL_KHR_cooperative_matrix | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-e2e-prefill`, `meas-780m-sdpa-port`, `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m`, `pattern-coopmat-name-check-false-failure`, `pattern-sdpa-release-gap`, `pattern-unaligned-m-fallback`, `technique-drain-in-a-staging`, `technique-fp32-accumulation`, `technique-full-a-map`, `technique-workgroup-tile-sizing` |
-| `int8-cooperative-matrix` | an int8 cooperative-matrix shape is enumerated | pull-request pages only; list: `queries/by-hardware-feature.md` |
-| `cooperative-matrix2` | VK_NV_cooperative_matrix2 / GL_NV_cooperative_matrix2 | pull-request pages only; list: `queries/by-hardware-feature.md` |
+| `int8-cooperative-matrix` | an int8 cooperative-matrix shape is enumerated | `lang-glsl-cooperative-matrix`; otherwise pull-request and document pages only; list: `queries/by-hardware-feature.md` |
+| `cooperative-matrix2` | VK_NV_cooperative_matrix2 / GL_NV_cooperative_matrix2 | `lang-glsl-cooperative-matrix`; otherwise pull-request, document and blog pages only; list: `queries/by-hardware-feature.md` |
 | `coopmat-shape` | the M x N x K shapes a device exposes | `hw-cooperative-matrix-rdna3` |
 | `coopmat-fp32-accumulator` | fp32 accumulator matrix for fp16 operands | `hw-cooperative-matrix-rdna3`, `kernel-linear-4w-780m`, `kernel-sdpa-prefill-780m`, `technique-fp32-accumulation` |
 
@@ -64,7 +68,8 @@ Pages live in `wiki/hardware/` (id prefix `hw-`). Index: `queries/by-hardware-fe
 | `subgroup-size` | default subgroup size of the device | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `subgroup-size-control` | VK_EXT_subgroup_size_control (required size per pipeline) | `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m` |
 | `wave64` | adapters whose native subgroup is 64 lanes | `meas-780m-8da4w-port`, `meas-780m-vulkaninfo`, `hw-cooperative-matrix-rdna3`, `hw-radeon-780m`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
-| `subgroup-operations` | GL_KHR_shader_subgroup operations a driver exposes (VkPhysicalDeviceSubgroupProperties) | pull-request pages only; list: `queries/by-hardware-feature.md` |
+| `subgroup-operations` | GL_KHR_shader_subgroup built-ins a driver exposes (subgroupSupportedOperations, VkPhysicalDeviceSubgroupProperties) | pull-request and document pages only; list: `queries/by-hardware-feature.md` |
+| `full-subgroups` | computeFullSubgroups / REQUIRE_FULL_SUBGROUPS (every subgroup launched fully populated) | document pages only; list: `queries/by-hardware-feature.md` |
 
 ### Memory and storage
 
@@ -74,17 +79,20 @@ Pages live in `wiki/hardware/` (id prefix `hw-`). Index: `queries/by-hardware-fe
 | `storage-buffer` | tensor stored as a buffer (SSBO) | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `storage-texture3d` | tensor stored as a 3D texture | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-e2e-prefill`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `technique-drain-in-a-staging` |
 | `storage-texture2d` | packed weights stored as a 2D texture | `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m` |
+| `workgroup-size-limit` | maxComputeWorkGroupSize / maxComputeWorkGroupInvocations | document pages only; list: `queries/by-hardware-feature.md` |
+| `control-barrier` | barrier() / OpControlBarrier, including split barriers | document pages only; list: `queries/by-hardware-feature.md` |
+| `memory-model` | Vulkan memory model: data races, memory semantics, scopes | document pages only; list: `queries/by-hardware-feature.md` |
 
 ### Shader arithmetic and constants
 
 | Term | Meaning | Pages |
 |---|---|---|
 | `fp16-arithmetic` | GL_EXT_shader_explicit_arithmetic_types_float16 | `meas-780m-vulkaninfo`, `hw-radeon-780m` |
-| `bfloat16-arithmetic` | GL_EXT_bfloat16 (bf16 scalars, vectors and matrix components) | pull-request pages only; list: `queries/by-hardware-feature.md` |
+| `bfloat16-arithmetic` | GL_EXT_bfloat16 (bf16 scalars, vectors and matrix components) | pull-request, document and blog pages only; list: `queries/by-hardware-feature.md` |
 | `int8-arithmetic` | GL_EXT_shader_explicit_arithmetic_types_int8 | `meas-780m-vulkaninfo`, `hw-radeon-780m`, `kernel-linear-8da4w-780m` |
 | `8bit-storage` | GL_EXT_shader_8bit_storage | `meas-780m-vulkaninfo`, `hw-radeon-780m` |
 | `integer-dot-product` | GL_EXT_integer_dot_product | `meas-780m-vulkaninfo`, `hw-radeon-780m` |
-| `specialization-constants` | local_size_*_id and spec-constant shape parameters | pull-request pages only; list: `queries/by-hardware-feature.md` |
+| `specialization-constants` | local_size_*_id and spec-constant shape parameters | `lang-glsl-cooperative-matrix`; otherwise pull-request and document pages only; list: `queries/by-hardware-feature.md` |
 
 ---
 
@@ -100,8 +108,8 @@ Pages live in `wiki/techniques/` (id prefix `technique-`). Index: `queries/by-te
 | `k-chunk-sizing` | K consumed per main-loop iteration | `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
 | `subgroup-grid` | subgroup grid inside the workgroup | `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m`, `technique-workgroup-tile-sizing` |
 | `required-subgroup-size` | pipeline pinned to one subgroup size | `meas-780m-8da4w-port`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
-| `mma-shape-selection` | shape of one cooperative-matrix multiply-add | no pages yet |
-| `per-shape-tile-selection` | different tiles for different operator shapes | no pages yet |
+| `mma-shape-selection` | shape of one cooperative-matrix multiply-add | document pages only; list: `queries/by-technique.md` |
+| `per-shape-tile-selection` | different tiles for different operator shapes | document pages only; list: `queries/by-technique.md` |
 
 ### Accumulation precision
 
@@ -116,7 +124,7 @@ Pages live in `wiki/techniques/` (id prefix `technique-`). Index: `queries/by-te
 | Term | Meaning | Pages |
 |---|---|---|
 | `double-buffering` | ping-pong shared-memory slices, prefetch ahead of the multiply | `meas-780m-8da4w-port`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `technique-full-a-map` |
-| `shared-memory-fence` | explicit ordering of shared stores against matrix loads | no pages yet |
+| `shared-memory-fence` | explicit ordering of shared stores against matrix loads | document pages only; list: `queries/by-technique.md` |
 | `fragment-contiguous-layout` | unpadded, fragment-contiguous shared-memory layout | no pages yet |
 | `f16vec4-shared-memory` | shared memory stored as f16vec4 | no pages yet |
 | `shared-memory-pool` | operands and output drain share one pool | no pages yet |
@@ -156,9 +164,9 @@ Pages live in `wiki/techniques/` (id prefix `technique-`). Index: `queries/by-te
 | Term | Meaning | Pages |
 |---|---|---|
 | `split-k-reduction` | K split across workgroups, partial sums reduced in a second pass | pull-request pages only; list: `queries/by-technique.md` |
-| `kernel-fusion` | several operators merged into one dispatch | pull-request pages only; list: `queries/by-technique.md` |
-| `device-specific-tuning` | parameters or kernel choice tuned per vendor, generation or device | pull-request pages only; list: `queries/by-technique.md` |
-| `driver-workaround` | a path disabled or changed because of a driver or compiler defect | pull-request pages only; list: `queries/by-technique.md` |
+| `kernel-fusion` | several operators merged into one dispatch | pull-request, document and blog pages only; list: `queries/by-technique.md` |
+| `device-specific-tuning` | parameters or kernel choice tuned per vendor, generation or device | pull-request, document and blog pages only; list: `queries/by-technique.md` |
+| `driver-workaround` | a path disabled or changed because of a driver or compiler defect | pull-request and blog pages only; list: `queries/by-technique.md` |
 | `winograd-convolution` | 3x3 convolution through the Winograd transform | pull-request pages only; list: `queries/by-technique.md` |
 | `channel-packing` | channels packed into vec4/vec8 elements (pack4, pack8) | pull-request pages only; list: `queries/by-technique.md` |
 
@@ -173,7 +181,7 @@ Pages live in `wiki/kernels/` (id prefix `kernel-`). Index: `queries/by-kernel-t
 | Term | Meaning | Pages |
 |---|---|---|
 | `gemm` | | `meas-780m-e2e-prefill`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m`, `technique-drain-in-a-staging`, `technique-fp32-accumulation`, `technique-workgroup-tile-sizing` |
-| `gemv` | | pull-request pages only; list: `queries/by-kernel-type.md` |
+| `gemv` | | pull-request, document and blog pages only; list: `queries/by-kernel-type.md` |
 
 ### Quantized linear
 
@@ -206,14 +214,14 @@ Pages live in `wiki/kernels/` (id prefix `kernel-`). Index: `queries/by-kernel-t
 
 | Term | Meaning | Pages |
 |---|---|---|
-| `moe` | mixture-of-experts routing and per-expert matrix products | pull-request pages only; list: `queries/by-kernel-type.md` |
-| `convolution` | conv1d/2d/3d, transposed convolution, im2col / col2im | pull-request pages only; list: `queries/by-kernel-type.md` |
-| `dequantize` | quantized weight blocks expanded to float | pull-request pages only; list: `queries/by-kernel-type.md` |
+| `moe` | mixture-of-experts routing and per-expert matrix products | pull-request, document and blog pages only; list: `queries/by-kernel-type.md` |
+| `convolution` | conv1d/2d/3d, transposed convolution, im2col / col2im | pull-request and document pages only; list: `queries/by-kernel-type.md` |
+| `dequantize` | quantized weight blocks expanded to float | pull-request and document pages only; list: `queries/by-kernel-type.md` |
 | `rope` | rotary position embedding | pull-request pages only; list: `queries/by-kernel-type.md` |
 | `normalization` | RMS, L2, group and layer normalization | pull-request pages only; list: `queries/by-kernel-type.md` |
 | `softmax` | standalone softmax | pull-request pages only; list: `queries/by-kernel-type.md` |
 | `topk-sort` | argsort, argmax and top-k selection | pull-request pages only; list: `queries/by-kernel-type.md` |
-| `gated-delta-net` | gated delta-rule linear attention | pull-request pages only; list: `queries/by-kernel-type.md` |
+| `gated-delta-net` | gated delta-rule linear attention | pull-request and document pages only; list: `queries/by-kernel-type.md` |
 | `tensor-copy` | copy, type conversion, row gather/scatter, concat, pad, repeat | pull-request pages only; list: `queries/by-kernel-type.md` |
 | `elementwise` | unary and binary elementwise operators and activations | pull-request pages only; list: `queries/by-kernel-type.md` |
 
@@ -225,8 +233,8 @@ Pages live in `wiki/languages/` (id prefix `lang-`). Index: `queries/by-language
 
 | Term | Pages |
 |---|---|
-| `glsl` | `lang-glsl-cooperative-matrix`, `doc-glsl-khr-cooperative-matrix`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m` |
-| `spirv` | no pages yet |
+| `glsl` | `lang-glsl-cooperative-matrix`, `kernel-linear-4w-780m`, `kernel-linear-8da4w-780m`, `kernel-sdpa-prefill-780m`; also pull-request and document pages; list: `queries/by-language.md` |
+| `spirv` | document and blog pages only; list: `queries/by-language.md` |
 | `cpp` | pull-request pages only; list: `queries/by-language.md` |
 | `c` | pull-request pages only; list: `queries/by-language.md` |
 | `python` | pull-request pages only; list: `queries/by-language.md` |
@@ -249,9 +257,9 @@ Migration pages describe porting a kernel from one architecture node to another 
 | Source type | Directory | `source_category` values | Pages |
 |---|---|---|---|
 | First-party measurement | `sources/measurements/` | `measurement` | `meas-780m-vulkaninfo`, `meas-780m-4w-bootstrap`, `meas-780m-8da4w-port`, `meas-780m-sdpa-port`, `meas-780m-e2e-prefill` |
-| Upstream pull request | `sources/prs/` | `upstream-code` | 572 generated pages in `sources/prs/llama-cpp/`, `sources/prs/ncnn/` and `sources/prs/mesa/`; list: `queries/by-repo.md` |
-| Documentation and papers | `sources/docs/` | `official-doc` (specification-grade), `upstream-code` (another project's source files), `vendor-doc` (vendor and project articles, guides, slide decks), `paper` | `doc-vk-khr-cooperative-matrix-proposal`, `doc-vk-nv-cooperative-matrix2-proposal`, `doc-glsl-khr-cooperative-matrix`, `doc-mesa-radv-envvars` |
-| Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | `blog-themaister-fsr4-wmma`, `blog-zolotukhin-matrix-cores-decode` |
+| Upstream pull request | `sources/prs/` | `upstream-code` | 700 generated pages in `sources/prs/llama-cpp/` (405), `mesa/` (156), `ncnn/` (103), `mnn/` (10), `vk-coopmat-perf/` (10), `glslang/` (8) and `spirv-tools/` (8); list: `queries/by-repo.md` |
+| Documentation and papers | `sources/docs/` | `official-doc` (specification-grade), `upstream-code` (another project's source files), `vendor-doc` (vendor and project articles, guides, slide decks), `paper` | 58 pages: 34 `official-doc` (`doc-glsl-khr-cooperative-matrix`, `doc-glsl-khr-shader-subgroup`, `doc-glsl-spec-barrier-functions`, `doc-glsl-spec-shared-variables`, `doc-glsl-spec-spirv-barrier-mapping`, `doc-intel-igc-visa-dpas`, `doc-mesa-features-vulkan-compute`, `doc-mesa-radv-envvars`, `doc-mesa-relnotes-19-1-0`, `doc-mesa-relnotes-21-1-0`, `doc-mesa-relnotes-23-3-0`, `doc-mesa-relnotes-25-0-0`, `doc-mesa-relnotes-25-1-0`, `doc-mesa-relnotes-25-2-0`, `doc-mesa-relnotes-26-2-0`, `doc-mesa-relnotes-new-features`, `doc-nvidia-vulkan-beta-driver-release-notes`, `doc-vk-ext-cooperative-matrix-maintenance1-proposal`, `doc-vk-ext-shader-split-barrier-proposal`, `doc-vk-ext-subgroup-size-control`, `doc-vk-khr-cooperative-matrix-proposal`, `doc-vk-nv-cooperative-matrix-decode-vector-proposal`, `doc-vk-nv-cooperative-matrix2-extension`, `doc-vk-nv-cooperative-matrix2-proposal`, `doc-vk-qcom-cooperative-matrix-conversion-proposal`, `doc-vk-spec-cooperative-matrix-properties`, `doc-vk-spec-features-subgroup-coopmat`, `doc-vk-spec-limits-compute-subgroup-coopmat`, `doc-vk-spec-memory-model`, `doc-vk-spec-pipeline-shader-stage-subgroup-flags`, `doc-vk-spec-shaders-compute-subgroups`, `doc-vk-spec-spirvenv-cooperative-matrix-subgroups`, `doc-vk-spec-subgroup-builtins`, `doc-vulkan-guide-subgroups`); 9 `upstream-code` (`doc-arm-libgpucounters-shader-core-counters`, `doc-cubek-matmul`, `doc-onnxruntime-webgpu-matmul-nbits`, `doc-qualcomm-adreno-cooperative-matrix-sample`, `doc-vk-gl-cts-cooperative-matrix-tests`, `doc-vk-gl-cts-subgroup-size-control-tests`, `doc-vvl-cooperative-matrix-checks`, `doc-vvl-subgroup-size-and-shared-memory-checks`, `doc-wonnx-gemm-template`); 14 `vendor-doc` (`doc-amd-rdna-performance-guide`, `doc-amd-rdna3-beyond-the-current-gen`, `doc-gpuopen-matrix-cores-rdna4`, `doc-gpuopen-wmma-on-rdna3`, `doc-intel-oneapi-gpu-guide-joint-matrix`, `doc-intel-oneapi-gpu-guide-xmx`, `doc-iree-vulkan-deployment-guide`, `doc-iree-vulkanised-2025-spirv-talk`, `doc-mnn-release-3-4-0`, `doc-mnn-release-3-4-1`, `doc-mnn-release-3-6-0`, `doc-mnn-vulkan-optimization-handbook`, `doc-nvidia-vulkanised-2025-cooperative-matrix2`, `doc-tvm-vulkan-runtime`); 1 `paper` (`doc-webllm-paper`) |
+| Blogs and notes | `sources/blogs/` | `benchmark-blog`, `community-note` | 11 pages: `blog-glslang-issue-3929-bfloat16-coopmat-elementwise`, `blog-glslang-issue-3948-small-index-types`, `blog-llama-cpp-discussion-13530-intel-xe2-coopmat`, `blog-llama-cpp-issue-22034-intel-device-lost`, `blog-mlc-amd-gpus-llm-inference`, `blog-nvidia-vulkan-cooperative-matrices-2019`, `blog-shaderc-issue-1594-coopmat2-optimizer-capability`, `blog-spirv-tools-issue-6077-coopmat-bitwise-ops`, `blog-spirv-tools-issue-6410-coopmat-load-through-array`, `blog-themaister-fsr4-wmma`, `blog-zolotukhin-matrix-cores-decode` |
 
 First-party measurements are the most trusted source type. Index per device: `queries/by-device.md`. PR pages per repository: `queries/by-repo.md`.
 
@@ -269,4 +277,4 @@ A `verified` wiki page needs an `evidence_basis` that holds either a `measuremen
 
 ## Version-Sensitive Claims
 
-Registry: `data/version-claims.yaml`. No claims yet. Tracked tools: `mesa-radv`, `mesa-anv`, `glslc`, `vulkan-sdk`, `adreno-driver`, `mali-driver`, `nvidia-driver`, `executorch`.
+Registry: `data/version-claims.yaml`. One claim: `vs-radv-coopmat-lowering-after-25-2-7`. Tracked tools: `mesa-radv`, `mesa-anv`, `glslc`, `vulkan-sdk`, `adreno-driver`, `mali-driver`, `nvidia-driver`, `executorch`.
