@@ -1446,6 +1446,9 @@ class PrPolicyTest(unittest.TestCase):
             ("ssm_conv.comp", []), ("conv2d_mm.comp", ["convolution"]), ("rope_norm.comp", ["rope"]),
             ("rms_norm.comp", ["normalization"]), ("topk_moe.comp", ["moe", "topk-sort"]),
             ("dequant_q4_k.comp", ["dequantize"]), ("add.comp", ["elementwise"]), ("copy.comp", ["tensor-copy"]),
+            # "attention" as a word of its own names the operator; inside a longer word it does not.
+            ("attention_prefill_coop_qk.comp", ["sdpa"]), ("attention_fused.comp", ["sdpa"]),
+            ("flash_attn_cm1.comp", ["sdpa"]), ("multiheadattention.comp", []), ("inattention.comp", []),
         ):
             with self.subTest(name=name):
                 files = [{"filename": f"src/fixture-shaders/{name}"}]

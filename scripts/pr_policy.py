@@ -292,7 +292,13 @@ _HARDWARE_PATTERNS = {
 _KERNEL_TYPE_PATTERNS = {
     "gemm": _TOKEN.format(r"mul_?mmq?|mmq|gemm") + r"|mat[\s_-]?mul|matrix[\s_-]matrix",
     "gemv": _TOKEN.format(r"mmvq?|gemv") + r"|mul_mat_vec|matrix[\s_-]vector",
-    "sdpa": r"flash[\s_-]?att(?:entio)?n|scaled[\s_-]dot[\s_-]product[\s_-]attention|" + _TOKEN.format("sdpa"),
+    # "attention" as a word of its own in a title or a shader file name
+    # (attention_prefill_coop_qk.comp) names the operator outright. A run of
+    # letters that merely contains it (multiheadattention.comp) does not match.
+    "sdpa": (
+        r"flash[\s_-]?att(?:entio)?n|scaled[\s_-]dot[\s_-]product[\s_-]attention|"
+        r"(?<![A-Za-z])attention(?![A-Za-z])|" + _TOKEN.format("sdpa")
+    ),
     "moe": _TOKEN.format(r"moe|mmid") + r"|mul_(?:mm|mat)_id|count_experts",
     "convolution": r"(?<![A-Za-z])(?<!ssm_)conv(?:[\s_-]?[123]d|_transpose|olution)?(?![A-Za-z])|im2col|col2im",
     "dequantize": r"dequant",
