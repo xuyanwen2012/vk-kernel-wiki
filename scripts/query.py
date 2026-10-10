@@ -18,6 +18,23 @@ only with an ancestor. Spellings listed in data/aliases.yaml are resolved
 first. The number of ancestor-only pages left out is reported on stderr.
 
 Returns a ranked list of matching pages with titles, paths, and key frontmatter fields.
+
+Ranking of free-text queries (every matching page is still returned; only the
+order is decided here), in order of precedence:
+
+1. Coverage: pages matching more of the query terms come first, so pages that
+   match ALL the terms precede every partial match.
+2. Field strength, summed over the terms: a term in the title or id outweighs
+   one in a vocabulary field (tags and the like), which outweighs a body-only
+   match.
+3. Subject focus: when the query names an architecture node (as a term or with
+   --architecture), a page tagged only with that vendor's nodes precedes a
+   page that lists it among other vendors, which precedes a page that merely
+   mentions it.
+4. Authority: synthesized wiki/ pages, then curated source pages (measurements,
+   documents, blogs), then generated pull-request pages.
+5. The fine-grained keyword score (title > vocabulary fields > body hits),
+   then the path.
 """
 
 import argparse
@@ -115,35 +132,163 @@ def detect_page_type(fm, path):
     return "unknown"
 
 
-def score_keyword_match(fm, body, keywords):
-    """Score a page by keyword matches in title, tags, and body (title > tags > body).
+# Field-strength levels of one query term on one page (ranking rule 2). A
+# title match is worth a vocabulary-field match plus a body match, so a page
+# titled by one term and mentioning the other is not outranked by a page that
+# merely carries both as tags (generated pull-request pages get a tag for every
+# shader file they touch).
+LEVEL_TITLE = 6     # the typed term is in the title or the id
+LEVEL_FIELD = 4     # the typed term is in a vocabulary field
+LEVEL_BODY = 2      # found in body text only
 
-    Each user keyword is expanded through the alias map, so a spelling listed
-    in data/aliases.yaml also scores pages that use the canonical term.
+# Authority classes (ranking rule 4), lower sorts first.
+AUTHORITY_WIKI, AUTHORITY_CURATED, AUTHORITY_GENERATED = 0, 1, 2
+
+
+def tokenize_query(query_args):
+    """Flatten the free-text arguments into whitespace-separated tokens, so
+    `query.py "quantized linear"` behaves like `query.py quantized linear`."""
+    return [tok for q in query_args for tok in re.split(r"\s+", q.strip()) if tok]
+
+
+def build_terms(tokens):
+    """Turn query tokens into scoring terms.
+
+    Each term keeps the literal token and the canonical term the alias map
+    points it to, if any; both spellings count as the term. `node` is the
+    architecture node the term names, if any.
     """
-    score = 0
-    title_text = str(fm.get("title", "")).lower()
-    tag_text = " ".join(
+    aliases = load_alias_expansions()
+    terms = []
+    for tok in tokens:
+        term = {"literal": tok.lower(), "expansions": [], "node": None}
+        canonical = aliases.get(term["literal"])
+        if canonical:
+            canonical_l = canonical.lower()
+            if arch_policy.is_known(canonical_l):
+                term["node"] = canonical_l
+            if canonical_l != term["literal"]:
+                term["expansions"].append(canonical_l)
+        terms.append(term)
+    return terms
+
+
+def subject_nodes(terms, architecture=None):
+    """Architecture nodes the query is about: named by a term or by --architecture."""
+    nodes = []
+    if architecture:
+        node = arch_policy.resolve_architecture(architecture)
+        if arch_policy.is_known(node):
+            nodes.append(node)
+    for term in terms:
+        if term["node"] and term["node"] not in nodes:
+            nodes.append(term["node"])
+    return nodes
+
+
+def vendor_of(node):
+    """Root (vendor) node of a known architecture node."""
+    above = arch_policy.ancestors(node)
+    return above[-1] if above else arch_policy.normalize(node)
+
+
+def page_architectures(fm):
+    return {arch_policy.normalize(a) for a in as_list(fm.get("architectures"))}
+
+
+def subject_focus(fm, subjects):
+    """2: every vendor the page is tagged with is a subject of the query;
+    1: tagged with a subject node (or a descendant) among other vendors;
+    0: not tagged with any subject node (it can only mention one)."""
+    if not subjects:
+        return 0
+    archs = page_architectures(fm)
+    wanted = set()
+    for node in subjects:
+        wanted.add(node)
+        wanted.update(arch_policy.descendants(node))
+    if not archs & wanted:
+        return 0
+    page_vendors = {vendor_of(a) for a in archs if arch_policy.is_known(a)}
+    return 2 if page_vendors <= {vendor_of(n) for n in subjects} else 1
+
+
+def authority_class(ptype):
+    if ptype.startswith("wiki-"):
+        return AUTHORITY_WIKI
+    if ptype == "source-pr":
+        return AUTHORITY_GENERATED
+    return AUTHORITY_CURATED
+
+
+def score_page(fm, body, terms):
+    """Return (coverage, strength, fine) for a page against the query terms.
+
+    coverage: how many terms the page matches anywhere.
+    strength: sum of the per-term field-strength levels (LEVEL_*).
+    fine:     the fine-grained keyword score (title or id 10, vocabulary
+              fields 5, up to 3 body hits; best spelling per term).
+    """
+    head_text = f"{fm.get('title', '')}\n{fm.get('id', '')}".lower()
+    field_text = " ".join(
         str(v)
         for k in VOCAB_FIELDS + ("architectures", "aliases", "symptoms")
         for v in as_list(fm.get(k))
     ).lower()
     body_lower = body.lower()
-    for kw in keywords:
-        best_variant_score = 0
-        for variant in expand_keyword(kw):
-            v_l = variant.lower()
-            variant_score = 0
-            if v_l in title_text:
+    archs = page_architectures(fm) if any(t["node"] for t in terms) else set()
+
+    coverage = strength = fine = 0
+    for term in terms:
+        spellings = [term["literal"]] + term["expansions"]
+        # Tagged with the named node or one of its descendants: the page is
+        # about that architecture, whatever spelling the query used.
+        about_node = bool(term["node"]) and (
+            term["node"] in archs or any(d in archs for d in arch_policy.descendants(term["node"]))
+        )
+        if any(v in head_text for v in spellings):
+            level = LEVEL_TITLE
+        elif about_node or any(v in field_text for v in spellings):
+            level = LEVEL_FIELD
+        elif any(v in body_lower for v in spellings):
+            level = LEVEL_BODY
+        else:
+            continue
+        coverage += 1
+        strength += level
+
+        best = 0
+        for variant in spellings:
+            variant_score = min(body_lower.count(variant), 3)
+            if variant in head_text:
                 variant_score += 10
-            if v_l in tag_text:
+            if variant in field_text:
                 variant_score += 5
-            body_hits = body_lower.count(v_l)
-            variant_score += min(body_hits, 3)
-            if variant_score > best_variant_score:
-                best_variant_score = variant_score
-        score += best_variant_score
-    return score
+            best = max(best, variant_score)
+        fine += best
+    return coverage, strength, fine
+
+
+def rank_pages(pages, terms, architecture=None):
+    """Keep the pages that match at least one term and order them (module docstring)."""
+    subjects = subject_nodes(terms, architecture)
+    ranked = []
+    for p in pages:
+        coverage, strength, fine = score_page(p["fm"], p["body"], terms)
+        if not coverage:
+            continue
+        p["_score"] = fine
+        p["_rank"] = (
+            -coverage,
+            -strength,
+            -subject_focus(p["fm"], subjects),
+            authority_class(p.get("_ptype") or detect_page_type(p["fm"], p["path"])),
+            -fine,
+            p["path"],
+        )
+        ranked.append(p)
+    ranked.sort(key=lambda x: x["_rank"])
+    return ranked
 
 
 def filter_pages(pages, args):
@@ -300,18 +445,10 @@ def main():
     else:
         pages = filter_pages(all_pages, args)
 
-    # Score by keywords if any. Flatten multi-word quoted args into tokens so
-    # `query.py "quantized linear"` behaves like `query.py quantized linear`.
-    keywords = []
-    for q in args.query:
-        for tok in re.split(r"\s+", q.strip()):
-            if tok:
-                keywords.append(tok)
-    if keywords:
-        for p in pages:
-            p["_score"] = score_keyword_match(p["fm"], p["body"], keywords)
-        pages = [p for p in pages if p["_score"] > 0]
-        pages.sort(key=lambda x: (-x["_score"], x["path"]))
+    # Rank by keywords if any; without keywords the order is by path.
+    terms = build_terms(tokenize_query(args.query))
+    if terms:
+        pages = rank_pages(pages, terms, args.architecture)
     else:
         pages.sort(key=lambda x: x["path"])
 

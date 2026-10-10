@@ -1846,5 +1846,142 @@ class PrPipelineTest(TempRoots):
                 self.assertEqual(ledger["total_candidates"], len(ledger["prs"]))
 
 
+# ---------------------------------------------------------------------------
+# 6. Free-text ranking in query.py
+# ---------------------------------------------------------------------------
+
+def fixture_page(title, body="FIXTURE body.", **fields):
+    """Text of a minimal synthetic page: query.py reads frontmatter and body only."""
+    lines = ["---", f"title: 'FIXTURE {title}'"]
+    for key, value in fields.items():
+        if isinstance(value, (list, tuple)):
+            lines.append(f"{key}:")
+            lines.extend(f"- {item}" for item in value)
+        else:
+            lines.append(f"{key}: {value}")
+    lines += ["---", "", body, ""]
+    return "\n".join(lines)
+
+
+class RankingTest(TempRoots):
+    """Ordering rules of free-text queries. Each test builds a throwaway root
+    whose pages differ only in the property under test."""
+
+    def make_root(self, pages):
+        root = self.copy_root(TESTS_DIR / "no-such-pages")
+        for rel, text in pages.items():
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        return root
+
+    def ranked(self, root, *args):
+        proc = run_script("query.py", *args, "--paths-only", "--limit", "100", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.last_stderr = proc.stderr
+        return proc.stdout.split()
+
+    def test_pages_matching_all_terms_come_before_partial_matches(self):
+        root = self.make_root({
+            # One term everywhere (title, id, tag, body), the other nowhere.
+            "sources/docs/a-heavy-partial.md": fixture_page(
+                "zebra zebra", id="doc-zebra", tags=["zebra"], body="zebra zebra zebra zebra"),
+            # Both terms, in the body only.
+            "sources/docs/b-both-in-body.md": fixture_page(
+                "plain", id="doc-b", body="one zebra and one quagga"),
+            "sources/docs/c-other-partial.md": fixture_page("quagga", id="doc-c"),
+            "sources/docs/d-unrelated.md": fixture_page("unrelated", id="doc-d"),
+        })
+        paths = self.ranked(root, "zebra quagga")
+        self.assertEqual(paths[0], "sources/docs/b-both-in-body.md")
+        # Partial matches are ranked after, not hidden.
+        self.assertEqual(set(paths[1:]), {"sources/docs/a-heavy-partial.md", "sources/docs/c-other-partial.md"})
+        # The same holds when the terms are separate arguments.
+        self.assertEqual(self.ranked(root, "zebra", "quagga"), paths)
+
+    def test_title_and_id_outrank_tags_which_outrank_body(self):
+        root = self.make_root({
+            "sources/docs/a-body.md": fixture_page("plain", id="doc-a", body="gemm gemm gemm gemm gemm"),
+            "sources/docs/b-tag.md": fixture_page("plain", id="doc-b", tags=["gemm"]),
+            "sources/docs/c-title.md": fixture_page("gemm", id="doc-c"),
+            "sources/docs/d-id.md": fixture_page("plain", id="doc-gemm-d"),
+        })
+        paths = self.ranked(root, "gemm")
+        self.assertEqual(set(paths[:2]), {"sources/docs/c-title.md", "sources/docs/d-id.md"})
+        self.assertEqual(paths[2:], ["sources/docs/b-tag.md", "sources/docs/a-body.md"])
+
+    def test_title_plus_body_is_not_outranked_by_two_tags(self):
+        # A generated page tagged with everything must not beat the page
+        # titled by one term that discusses the other.
+        root = self.make_root({
+            "sources/prs/fixture/a-tag-stuffed.md": fixture_page(
+                "plain", id="pr-fixture-1", tags=["softmax", "gemm"]),
+            "sources/prs/fixture/b-titled.md": fixture_page(
+                "softmax", id="pr-fixture-2", body="uses gemm gemm"),
+        })
+        self.assertEqual(self.ranked(root, "softmax gemm")[0], "sources/prs/fixture/b-titled.md")
+
+    def test_subject_architecture_outranks_a_mention(self):
+        pages = {
+            "sources/docs/a-mention.md": fixture_page(
+                "gemm", id="doc-a", architectures=["amd"], body="Also compared with Intel."),
+            "sources/docs/b-inventory.md": fixture_page(
+                "gemm", id="doc-b", architectures=["amd", "intel", "nvidia"]),
+            "sources/docs/c-subject.md": fixture_page("gemm", id="doc-c", architectures=["intel"]),
+            "sources/docs/d-descendant.md": fixture_page("gemm", id="doc-d", architectures=["arc-b580"]),
+        }
+        root = self.make_root(pages)
+        paths = self.ranked(root, "gemm intel")
+        self.assertEqual(paths, [
+            "sources/docs/c-subject.md", "sources/docs/d-descendant.md",
+            "sources/docs/b-inventory.md", "sources/docs/a-mention.md",
+        ])
+        # With the node given as a filter, the single-vendor pages still come
+        # before the page that lists the vendor among others.
+        paths = self.ranked(root, "gemm", "--architecture", "intel")
+        self.assertEqual(paths, [
+            "sources/docs/c-subject.md", "sources/docs/d-descendant.md", "sources/docs/b-inventory.md",
+        ])
+
+    def test_authority_breaks_ties_between_equally_relevant_pages(self):
+        def same(**extra):
+            return fixture_page("softmax", body="softmax", **extra)
+        root = self.make_root({
+            "sources/prs/fixture/a.md": same(id="pr-fixture-1"),
+            "sources/blogs/b.md": same(id="blog-b"),
+            "sources/docs/c.md": same(id="doc-c"),
+            "sources/measurements/d.md": same(id="meas-d"),
+            "wiki/techniques/e.md": same(id="technique-e", type="technique"),
+            # More relevant (two terms) pull-request page: authority must not lift
+            # the wiki page above it.
+            "sources/prs/fixture/f.md": fixture_page("softmax quagga", id="pr-fixture-2"),
+        })
+        paths = self.ranked(root, "softmax quagga")
+        self.assertEqual(paths[0], "sources/prs/fixture/f.md")
+        self.assertEqual(paths[1], "wiki/techniques/e.md")
+        self.assertEqual(set(paths[2:5]), {"sources/blogs/b.md", "sources/docs/c.md", "sources/measurements/d.md"})
+        self.assertEqual(paths[5], "sources/prs/fixture/a.md")
+
+    def test_ranking_never_hides_a_match_and_filters_still_apply(self):
+        root = self.make_root({
+            "sources/docs/a.md": fixture_page("zebra", id="doc-a", tags=["gemm"]),
+            "sources/docs/b.md": fixture_page("plain", id="doc-b", body="zebra"),
+            "sources/prs/fixture/c.md": fixture_page("plain", id="pr-fixture-1", tags=["zebra", "gemm"]),
+            "wiki/kernels/d.md": fixture_page("quagga", id="kernel-d", type="kernel"),
+        })
+        self.assertEqual(set(self.ranked(root, "zebra quagga")), {
+            "sources/docs/a.md", "sources/docs/b.md", "sources/prs/fixture/c.md", "wiki/kernels/d.md"})
+        self.assertEqual(set(self.ranked(root, "zebra", "--tag", "gemm")),
+                         {"sources/docs/a.md", "sources/prs/fixture/c.md"})
+        self.assertEqual(self.ranked(root, "zebra", "--type", "doc"), ["sources/docs/a.md", "sources/docs/b.md"])
+        # Without keywords the order is by path, as before.
+        self.assertEqual(self.ranked(root), sorted(self.ranked(root)))
+
+    def test_compact_output_format_is_unchanged(self):
+        root = self.make_root({"sources/docs/a.md": fixture_page("zebra", id="doc-a")})
+        proc = run_script("query.py", "zebra", "--compact", root=root)
+        self.assertEqual(proc.stdout, "# 1 result(s)\n\n  [source-doc] doc-a: FIXTURE zebra  (sources/docs/a.md)\n")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
