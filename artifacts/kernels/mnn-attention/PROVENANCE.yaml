@@ -1,0 +1,65 @@
+repo: alibaba/MNN
+url: https://github.com/alibaba/MNN
+commit: 9c1788748c4d8aba00f9b644f50f5c15576d7d80
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qk.comp
+  file: attention_prefill_coop_qk.comp
+  sha256: e6705533cd516063122853dca8f33b5e9c68cae5dfb87d22ee50c3c2c8fcebbc
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_qkv.comp
+  file: attention_prefill_coop_qkv.comp
+  sha256: 418513743b34c359bf5c0150b6244d4fdec5455e42b0f52e390f53df2dad5bc8
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_coop_scale_oacc.comp
+  file: attention_prefill_coop_scale_oacc.comp
+  sha256: af58a7d656fc7a8f09e62c11140c625684320da21ab9daa1c5dcb5ed7b56fffa
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
+  file: attention_prefill_rearrange_q.comp
+  sha256: bdcbec3f05a76db6544b31cfc2aef303fb589e389f0327bb4b51cebe42d99d3c
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_init_state.comp
+  file: attention_prefill_kblock_init_state.comp
+  sha256: 64853e56792805db7daa01874b2f2ca937150966091b41349cd03bd3c54ea24a
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_qk.comp
+  file: attention_prefill_kblock_qk.comp
+  sha256: 93f226747e8b96904131baae689aca3aa9131fdf56bb27a3be60f5bec5c26a2c
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_qk_full.comp
+  file: attention_prefill_kblock_qk_full.comp
+  sha256: 4e02651d027cb24719f3257fe0c9f42fae7d3f10083cdc09d07375444280e50f
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online.comp
+  file: attention_prefill_kblock_softmax_online.comp
+  sha256: a2369324dbf62d2e03e95f75939adb8e895728df66206e5ddb6551219d6aa286
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_softmax_online_subgroup.comp
+  file: attention_prefill_kblock_softmax_online_subgroup.comp
+  sha256: 18efd704fa3b810f1ad3ec763fcbbf9c44906643b462328262418a8515a95cb8
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_qkv_acc.comp
+  file: attention_prefill_kblock_qkv_acc.comp
+  sha256: d51b5ad0b1a1b03fe1daab5ae160773258c9d017849b6172dbd8c1579b94be4b
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_qkv_acc_full.comp
+  file: attention_prefill_kblock_qkv_acc_full.comp
+  sha256: 39937f5af562254501864662963709f0f005ab245386e82d7fedce183b992b32
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
+  file: attention_prefill_kblock_finalize.comp
+  sha256: 2e9e61e12e22b225b7b0ad61a5cba14234765303c43a0f89557a9f22f0c58163
+- path: source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
+  file: attention_decode_q1_subgroup.comp
+  sha256: 2a34e4f9bbc5232a04945c018613102829da1374e63bd2790a2a5d81253775a7
+- path: source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
+  file: attention_decode_q1_subgroup_hd128.comp
+  sha256: 73a442a35785ddb540f32bde3ba1496aa0c8f7c6b76caddfc61cf3ff1c2cf96b
+- path: source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
+  file: attention_fused.comp
+  sha256: 6ae2c79d09eea705e8e87325185308d3d2d81392c742be962b358638768b3ee8
+- path: source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
+  file: attention_fused_packed.comp
+  sha256: 4dff7020afce95a41c49f69fabf64c08f0f46987714408fcfbf4db1d66ddeae1
+- path: source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
+  file: attention_kvcache_update.comp
+  sha256: d2849b3b8a480e7df3d676b9dfb11df0b9aad3a07f4a0145921ef71d600d17fd
+- path: source/backend/vulkan/buffer/execution/VulkanAttention.cpp
+  file: VulkanAttention.cpp
+  sha256: 510fe2bf01f2b0814c78d919e1da258d9c56d84b4184967fe8ab3b86304283cf
+- path: source/backend/vulkan/buffer/execution/VulkanAttention.hpp
+  file: VulkanAttention.hpp
+  sha256: a98724ecceae2391ded310b88c0ba24cb4116782d97b164f1ebf8abff5c5b753

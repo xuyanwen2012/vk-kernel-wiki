@@ -1,0 +1,14 @@
+repo: alibaba/MNN
+url: https://github.com/alibaba/MNN
+commit: 9c1788748c4d8aba00f9b644f50f5c15576d7d80
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: skills/vulkan-optimize/optimization-handbook.md
+  file: optimization-handbook.md
+  sha256: 1326bddbc720323c07a634e00456b1a8f0b241f1e18b3d07f9b33ec5b7b823b0
+- path: skills/vulkan-optimize/kernel-opt.md
+  file: kernel-opt.md
+  sha256: e3f68500da632d6d78a1fd2f30e6adb5b43d0a23e775f2e5ef1be369991541f7
