@@ -1515,6 +1515,14 @@ class PrPolicyTest(unittest.TestCase):
         self.assertEqual(self.policy.classify_scope(files[1:], config, "FIXTURE topic change").rule, "no-driver-path")
         # In driver mode the saved files are the ones under the driver paths.
         self.assertEqual([f["filename"] for f in self.policy.shader_files(files, config)], ["src/fixture-driver/a.c"])
+        # A path the ledger excludes from artifacts still decides, but is not saved.
+        fenced = self.policy.PathConfig.from_ledger({
+            "scope_mode": "driver", "driver_path_markers": ["src/fixture-driver/"],
+            "topic_patterns": ["fixture topic"],
+            "artifact_exclude_path_markers": {"fixture-driver/a.c": "FIXTURE other licence"},
+        })
+        self.assertEqual(self.policy.classify_scope(files, fenced, "FIXTURE topic change").decision, "include")
+        self.assertEqual(self.policy.shader_files(files, fenced), [])
         with self.assertRaises(ValueError):
             self.policy.PathConfig.from_ledger({"scope_mode": "fixture"})
 
@@ -1671,6 +1679,28 @@ class PrPipelineTest(TempRoots):
         run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline", "--reclassify", root=root)
         ledger = yaml.safe_load((root / "candidates" / "fixture-repo.yaml").read_text(encoding="utf-8"))
         self.assertEqual(ledger["prs"][1]["decision"], "include")
+
+    def test_reclassify_excluded_leaves_other_rows_alone(self):
+        root = self.make_root()
+        path = root / "candidates" / "fixture-repo.yaml"
+        run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline", "--reclassify", root=root)
+        ledger = yaml.safe_load(path.read_text(encoding="utf-8"))
+        # Widen the header so the excluded row 3 would now be deferred, and mark
+        # the rows that must not move: an included one and a manual exclusion.
+        ledger["host_path_markers"] = [*ledger["host_path_markers"], "docs/"]
+        ledger["prs"][0]["reason"] = "FIXTURE reason the page was written from"
+        ledger["prs"][3].update(decision="exclude", decision_source="manual")
+        path.write_text(yaml.safe_dump(ledger, sort_keys=False), encoding="utf-8")
+        cache = root / ".cache" / "pr-evidence" / "fixture-repo"
+        (cache / "3.json").write_text(json.dumps(fixture_evidence(3, "FIXTURE docs", ["docs/readme.cpp"])),
+                                      encoding="utf-8")
+        proc = run_script("refresh_candidate_ledger.py", "--cutoff", "2000-01-31", "--offline",
+                          "--reclassify-excluded", root=root)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        rows = yaml.safe_load(path.read_text(encoding="utf-8"))["prs"]
+        self.assertEqual([row["decision"] for row in rows], ["include", "defer", "defer", "exclude"])
+        self.assertEqual(rows[0]["reason"], "FIXTURE reason the page was written from")
+        self.assertEqual(rows[3]["decision_source"], "manual")
 
     def test_driver_ledger_writes_driver_patch(self):
         root = self.make_root()

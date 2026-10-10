@@ -8,7 +8,10 @@ include / defer / exclude decision from scripts/pr_policy.py.
 
 Existing rows are never changed, so a decision edited by hand survives a
 refresh. Pass --reclassify to recompute every row that does not carry
-`decision_source: manual`.
+`decision_source: manual`. Pass --reclassify-excluded after widening a
+ledger's path markers or topic patterns: it recomputes only the rows whose
+decision is `exclude` (and that are not manual), so the rows that already
+have a page keep the reason and evidence paths their page was written from.
 
 A ledger starts as a header written by hand:
 
@@ -35,7 +38,8 @@ utility: scripts/validate.py and the test suite stay offline.
 
 Usage:
     refresh_candidate_ledger.py --cutoff YYYY-MM-DD [--repos slug,slug]
-                                [--reclassify] [--dry-run] [--jobs N]
+                                [--reclassify | --reclassify-excluded]
+                                [--dry-run] [--jobs N]
 """
 
 from __future__ import annotations
@@ -78,7 +82,7 @@ def build_row(ledger: dict, slug: str, number: int, cache_dir=None, offline=Fals
 
 
 def refresh(path: Path, cutoff: date, reclassify: bool, dry_run: bool, jobs: int,
-            cache_dir=None, offline=False) -> Counter:
+            cache_dir=None, offline=False, reclassify_excluded: bool = False) -> Counter:
     slug = path.stem
     ledger = pr_evidence.load_ledger(path)
     rows = {int(r["number"]): r for r in ledger["prs"] if isinstance(r, dict) and "number" in r}
@@ -93,6 +97,11 @@ def refresh(path: Path, cutoff: date, reclassify: bool, dry_run: bool, jobs: int
     todo = sorted(n for n in seen if n not in rows)
     if reclassify:
         todo = sorted(set(todo) | {n for n, r in rows.items() if r.get("decision_source") != "manual"})
+    elif reclassify_excluded:
+        todo = sorted(set(todo) | {
+            n for n, r in rows.items()
+            if r.get("decision_source") != "manual" and str(r.get("decision")) == "exclude"
+        })
     with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
         for row in pool.map(lambda n: build_row(ledger, slug, n, cache_dir, offline), todo):
             rows[row["number"]] = row
@@ -120,6 +129,8 @@ def main() -> int:
     parser.add_argument("--cutoff", required=True, help="only pull requests merged on or before this date")
     parser.add_argument("--repos", help="comma-separated ledger slugs (default: every ledger)")
     parser.add_argument("--reclassify", action="store_true", help="recompute rows not marked manual")
+    parser.add_argument("--reclassify-excluded", action="store_true",
+                        help="recompute only the rows that are excluded and not marked manual")
     parser.add_argument("--dry-run", action="store_true", help="do not write the ledger")
     parser.add_argument("--offline", action="store_true", help="no search; classify from cached evidence only")
     parser.add_argument("--cache-dir", help="evidence cache directory (default: <root>/.cache/pr-evidence)")
@@ -137,7 +148,8 @@ def main() -> int:
     status = 0
     for path in paths:
         try:
-            refresh(path, cutoff, args.reclassify, args.dry_run, args.jobs, args.cache_dir, args.offline)
+            refresh(path, cutoff, args.reclassify, args.dry_run, args.jobs, args.cache_dir, args.offline,
+                    args.reclassify_excluded)
         except (OSError, pr_evidence.EvidenceError) as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             status = 1

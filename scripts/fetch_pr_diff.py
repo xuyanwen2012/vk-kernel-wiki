@@ -98,6 +98,14 @@ def write_bundle(ledger: dict, slug: str, evidence: dict, spdx: str) -> bool:
             for f in files
         ],
     }
+    omitted = [
+        {"path": f["filename"], "reason": str(reason)}
+        for f in pr_policy.normalize_files(evidence["files"])
+        for marker, reason in (ledger.get("artifact_exclude_path_markers") or {}).items()
+        if marker in f["filename"] and (config.mode != "driver" or any(m in f["filename"] for m in config.driver))
+    ]
+    if omitted:
+        provenance["omitted_files"] = omitted
     (directory / pr_artifacts.PROVENANCE_NAME).write_text(pr_evidence.dump_yaml(provenance), encoding="utf-8")
     return True
 
