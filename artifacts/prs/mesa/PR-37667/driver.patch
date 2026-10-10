@@ -1,0 +1,133 @@
+diff --git a/src/amd/common/nir/ac_nir.c b/src/amd/common/nir/ac_nir.c
+--- a/src/amd/common/nir/ac_nir.c
++++ b/src/amd/common/nir/ac_nir.c
+@@ -898,12 +898,16 @@ ac_nir_lower_phis_to_scalar_cb(const nir_instr *instr, const void *_)
+ bool
+ ac_nir_allow_offset_wrap_cb(nir_intrinsic_instr *instr, const void *data)
+ {
++   enum amd_gfx_level gfx_level = *(enum amd_gfx_level *)data;
+    switch (instr->intrinsic) {
+    case nir_intrinsic_load_shared:
+    case nir_intrinsic_store_shared:
+    case nir_intrinsic_shared_atomic:
+    case nir_intrinsic_shared_atomic_swap:
+-      return true;
++   case nir_intrinsic_load_shared2_amd:
++   case nir_intrinsic_store_shared2_amd:
++      /* GFX6 uses a 16-bit adder and can't handle unsigned wrap. */
++      return gfx_level >= GFX7;
+    default: return false;
+    }
+ }
+diff --git a/src/amd/vulkan/radv_pipeline.c b/src/amd/vulkan/radv_pipeline.c
+--- a/src/amd/vulkan/radv_pipeline.c
++++ b/src/amd/vulkan/radv_pipeline.c
+@@ -612,7 +612,7 @@ radv_postprocess_nir(struct radv_device *device, const struct radv_graphics_stat
+ 
+    radv_optimize_nir_algebraic(
+       stage->nir, io_to_mem || lowered_ngg || stage->stage == MESA_SHADER_COMPUTE || stage->stage == MESA_SHADER_TASK,
+-      gfx_level >= GFX8);
++      gfx_level >= GFX8, gfx_level);
+ 
+    if (stage->nir->info.cs.has_cooperative_matrix)
+       NIR_PASS(_, stage->nir, radv_nir_opt_cooperative_matrix, gfx_level);
+diff --git a/src/amd/vulkan/radv_pipeline_graphics.c b/src/amd/vulkan/radv_pipeline_graphics.c
+--- a/src/amd/vulkan/radv_pipeline_graphics.c
++++ b/src/amd/vulkan/radv_pipeline_graphics.c
+@@ -1698,7 +1698,7 @@ radv_graphics_shaders_fill_linked_io_info(struct radv_shader_stage *producer_sta
+  * than running the same optimizations on I/O derefs.
+  */
+ static void
+-radv_graphics_shaders_link_varyings(struct radv_shader_stage *stages)
++radv_graphics_shaders_link_varyings(struct radv_shader_stage *stages, enum amd_gfx_level gfx_level)
+ {
+    /* Prepare shaders before running nir_opt_varyings. */
+    for (int i = 0; i < ARRAY_SIZE(graphics_shader_order); ++i) {
+@@ -1747,13 +1747,13 @@ radv_graphics_shaders_link_varyings(struct radv_shader_stage *stages)
+ 
+       /* Run algebraic optimizations on shaders that changed. */
+       if (p & nir_progress_producer) {
+-         radv_optimize_nir_algebraic(producer, false, false);
++         radv_optimize_nir_algebraic(producer, false, false, gfx_level);
+          NIR_PASS(_, producer, nir_opt_undef);
+ 
+          highest_changed_producer = i;
+       }
+       if (p & nir_progress_consumer) {
+-         radv_optimize_nir_algebraic(consumer, false, false);
++         radv_optimize_nir_algebraic(consumer, false, false, gfx_level);
+          NIR_PASS(_, consumer, nir_opt_undef);
+       }
+    }
+@@ -1775,11 +1775,11 @@ radv_graphics_shaders_link_varyings(struct radv_shader_stage *stages)
+ 
+       /* Run algebraic optimizations on shaders that changed. */
+       if (p & nir_progress_producer) {
+-         radv_optimize_nir_algebraic(producer, true, false);
++         radv_optimize_nir_algebraic(producer, true, false, gfx_level);
+          NIR_PASS(_, producer, nir_opt_undef);
+       }
+       if (p & nir_progress_consumer) {
+-         radv_optimize_nir_algebraic(consumer, true, false);
++         radv_optimize_nir_algebraic(consumer, true, false, gfx_level);
+          NIR_PASS(_, consumer, nir_opt_undef);
+       }
+    }
+@@ -2902,7 +2902,7 @@ radv_graphics_shaders_compile(struct radv_device *device, struct vk_pipeline_cac
+    }
+ 
+    /* Optimize varyings on lowered shader I/O (more efficient than optimizing I/O derefs). */
+-   radv_graphics_shaders_link_varyings(stages);
++   radv_graphics_shaders_link_varyings(stages, pdev->info.gfx_level);
+ 
+    /* Optimize constant clip/cull distance after linking to operate on scalar io in the last
+     * pre raster stage.
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -232,7 +232,7 @@ radv_optimize_nir(struct nir_shader *shader, bool optimize_conservatively)
+ }
+ 
+ void
+-radv_optimize_nir_algebraic(nir_shader *nir, bool opt_offsets, bool opt_mqsad)
++radv_optimize_nir_algebraic(nir_shader *nir, bool opt_offsets, bool opt_mqsad, enum amd_gfx_level gfx_level)
+ {
+    bool more_algebraic = true;
+    while (more_algebraic) {
+@@ -258,12 +258,13 @@ radv_optimize_nir_algebraic(nir_shader *nir, bool opt_offsets, bool opt_mqsad)
+    }
+ 
+    if (opt_offsets) {
+-      static const nir_opt_offsets_options offset_options = {
++      const nir_opt_offsets_options offset_options = {
+          .uniform_max = 0,
+          .buffer_max = ~0,
+          .shared_max = UINT16_MAX,
+          .shared_atomic_max = UINT16_MAX,
+          .allow_offset_wrap_cb = ac_nir_allow_offset_wrap_cb,
++         .cb_data = &gfx_level,
+       };
+       NIR_PASS(_, nir, nir_opt_offsets, &offset_options);
+    }
+@@ -885,7 +886,7 @@ radv_lower_ngg(struct radv_device *device, struct radv_shader_stage *ngg_stage,
+       assert(info->is_ngg);
+ 
+       if (info->has_ngg_culling)
+-         radv_optimize_nir_algebraic(nir, false, false);
++         radv_optimize_nir_algebraic(nir, false, false, pdev->info.gfx_level);
+ 
+       options.num_vertices_per_primitive = num_vertices_per_prim;
+       options.early_prim_export = info->has_ngg_early_prim_export;
+diff --git a/src/amd/vulkan/radv_shader.h b/src/amd/vulkan/radv_shader.h
+--- a/src/amd/vulkan/radv_shader.h
++++ b/src/amd/vulkan/radv_shader.h
+@@ -487,7 +487,8 @@ struct radv_shader_dma_submission {
+ struct radv_shader_stage;
+ 
+ void radv_optimize_nir(struct nir_shader *shader, bool optimize_conservatively);
+-void radv_optimize_nir_algebraic(nir_shader *shader, bool opt_offsets, bool opt_mqsad);
++void radv_optimize_nir_algebraic(nir_shader *shader, bool opt_offsets, bool opt_mqsad,
++                                 enum amd_gfx_level gfx_level);
+ 
+ void radv_nir_lower_rt_io(nir_shader *shader, bool monolithic, uint32_t payload_offset);
+ 

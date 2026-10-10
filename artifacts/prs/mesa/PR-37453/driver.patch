@@ -1,0 +1,153 @@
+diff --git a/src/amd/common/nir/ac_nir.c b/src/amd/common/nir/ac_nir.c
+--- a/src/amd/common/nir/ac_nir.c
++++ b/src/amd/common/nir/ac_nir.c
+@@ -8,6 +8,7 @@
+ #include "ac_nir.h"
+ #include "ac_nir_helpers.h"
+ #include "nir_builder.h"
++#include "nir_intrinsics.h"
+ 
+ /* Set NIR options shared by ACO, LLVM, RADV, and radeonsi. */
+ void ac_nir_set_options(struct radeon_info *info, bool use_llvm,
+@@ -893,3 +894,16 @@ ac_nir_lower_phis_to_scalar_cb(const nir_instr *instr, const void *_)
+ 
+    return 32 / phi->def.bit_size;
+ }
++
++bool
++ac_nir_allow_offset_wrap_cb(nir_intrinsic_instr *instr, const void *data)
++{
++   switch (instr->intrinsic) {
++   case nir_intrinsic_load_shared:
++   case nir_intrinsic_store_shared:
++   case nir_intrinsic_shared_atomic:
++   case nir_intrinsic_shared_atomic_swap:
++      return true;
++   default: return false;
++   }
++}
+diff --git a/src/amd/common/nir/ac_nir.h b/src/amd/common/nir/ac_nir.h
+--- a/src/amd/common/nir/ac_nir.h
++++ b/src/amd/common/nir/ac_nir.h
+@@ -441,6 +441,9 @@ ac_nir_store_may_be_subdword(const nir_intrinsic_instr *instr);
+ uint8_t
+ ac_nir_lower_phis_to_scalar_cb(const nir_instr *instr, const void *_);
+ 
++bool
++ac_nir_allow_offset_wrap_cb(nir_intrinsic_instr *instr, const void *data);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+--- a/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
++++ b/src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp
+@@ -15,6 +15,7 @@
+ #include "ac_nir.h"
+ #include "amdgfxregs.h"
+ #include <numeric>
++#include <stdint.h>
+ 
+ namespace aco {
+ namespace {
+@@ -2932,12 +2933,7 @@ visit_load_shared(isel_context* ctx, nir_intrinsic_instr* instr)
+    }
+ 
+    unsigned const_offset = nir_intrinsic_base(instr);
+-   unsigned const_offset_range = 65536;
+-   if (const_offset >= const_offset_range) {
+-      unsigned excess = const_offset - (const_offset % const_offset_range);
+-      address = bld.vadd32(bld.def(v1), address, Operand::c32(excess));
+-      const_offset -= excess;
+-   }
++   assert(const_offset <= UINT16_MAX);
+ 
+    Definition def = dst.regClass().type() == RegType::sgpr
+                        ? bld.def(RegClass::get(RegType::vgpr, bytes))
+@@ -2992,12 +2988,7 @@ visit_store_shared(isel_context* ctx, nir_intrinsic_instr* instr)
+    }
+ 
+    unsigned const_offset = nir_intrinsic_base(instr);
+-   unsigned const_offset_range = 65536;
+-   if (const_offset >= const_offset_range) {
+-      unsigned excess = const_offset - (const_offset % const_offset_range);
+-      address = bld.vadd32(bld.def(v1), address, Operand::c32(excess));
+-      const_offset -= excess;
+-   }
++   assert(const_offset <= UINT16_MAX);
+ 
+    Instruction* ds = bld.ds(op, address, data, m, const_offset);
+    ds->ds().sync = memory_sync_info(storage_shared);
+diff --git a/src/amd/compiler/aco_optimizer.cpp b/src/amd/compiler/aco_optimizer.cpp
+--- a/src/amd/compiler/aco_optimizer.cpp
++++ b/src/amd/compiler/aco_optimizer.cpp
+@@ -1521,54 +1521,6 @@ label_instruction(opt_ctx& ctx, aco_ptr<Instruction>& instr)
+          }
+       }
+ 
+-      /* DS: combine additions */
+-      else if (instr->isDS()) {
+-
+-         DS_instruction& ds = instr->ds();
+-         Temp base;
+-         uint32_t offset;
+-         bool has_usable_ds_offset = ctx.program->gfx_level >= GFX7;
+-         if (has_usable_ds_offset && i == 0 &&
+-             parse_base_offset(ctx, instr.get(), i, &base, &offset, false) &&
+-             base.regClass() == instr->operands[i].regClass() &&
+-             instr->opcode != aco_opcode::ds_swizzle_b32 &&
+-             instr->opcode != aco_opcode::ds_bvh_stack_push4_pop1_rtn_b32 &&
+-             instr->opcode != aco_opcode::ds_bvh_stack_push8_pop1_rtn_b32 &&
+-             instr->opcode != aco_opcode::ds_bvh_stack_push8_pop2_rtn_b64) {
+-            if (instr->opcode == aco_opcode::ds_write2_b32 ||
+-                instr->opcode == aco_opcode::ds_read2_b32 ||
+-                instr->opcode == aco_opcode::ds_write2_b64 ||
+-                instr->opcode == aco_opcode::ds_read2_b64 ||
+-                instr->opcode == aco_opcode::ds_write2st64_b32 ||
+-                instr->opcode == aco_opcode::ds_read2st64_b32 ||
+-                instr->opcode == aco_opcode::ds_write2st64_b64 ||
+-                instr->opcode == aco_opcode::ds_read2st64_b64) {
+-               bool is64bit = instr->opcode == aco_opcode::ds_write2_b64 ||
+-                              instr->opcode == aco_opcode::ds_read2_b64 ||
+-                              instr->opcode == aco_opcode::ds_write2st64_b64 ||
+-                              instr->opcode == aco_opcode::ds_read2st64_b64;
+-               bool st64 = instr->opcode == aco_opcode::ds_write2st64_b32 ||
+-                           instr->opcode == aco_opcode::ds_read2st64_b32 ||
+-                           instr->opcode == aco_opcode::ds_write2st64_b64 ||
+-                           instr->opcode == aco_opcode::ds_read2st64_b64;
+-               unsigned shifts = (is64bit ? 3 : 2) + (st64 ? 6 : 0);
+-               unsigned mask = BITFIELD_MASK(shifts);
+-
+-               if ((offset & mask) == 0 && ds.offset0 + (offset >> shifts) <= 255 &&
+-                   ds.offset1 + (offset >> shifts) <= 255) {
+-                  instr->operands[i].setTemp(base);
+-                  ds.offset0 += offset >> shifts;
+-                  ds.offset1 += offset >> shifts;
+-               }
+-            } else {
+-               if (ds.offset0 + offset <= 65535) {
+-                  instr->operands[i].setTemp(base);
+-                  ds.offset0 += offset;
+-               }
+-            }
+-         }
+-      }
+-
+       else if (instr->isBranch()) {
+          if (ctx.info[instr->operands[0].tempId()].is_scc_invert()) {
+             /* Flip the branch instruction to get rid of the scc_invert instruction */
+diff --git a/src/amd/vulkan/radv_shader.c b/src/amd/vulkan/radv_shader.c
+--- a/src/amd/vulkan/radv_shader.c
++++ b/src/amd/vulkan/radv_shader.c
+@@ -260,8 +260,9 @@ radv_optimize_nir_algebraic(nir_shader *nir, bool opt_offsets, bool opt_mqsad)
+       static const nir_opt_offsets_options offset_options = {
+          .uniform_max = 0,
+          .buffer_max = ~0,
+-         .shared_max = ~0,
+-         .shared_atomic_max = ~0,
++         .shared_max = UINT16_MAX,
++         .shared_atomic_max = UINT16_MAX,
++         .allow_offset_wrap_cb = ac_nir_allow_offset_wrap_cb,
+       };
+       NIR_PASS(_, nir, nir_opt_offsets, &offset_options);
+    }

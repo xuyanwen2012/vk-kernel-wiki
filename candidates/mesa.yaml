@@ -68,8 +68,8 @@ architecture_code_markers:
 searched_at: '2026-10-10'
 cutoff_date: '2026-10-10'
 total_candidates: 694
-included: 156
-deferred: 13
+included: 169
+deferred: 0
 excluded: 525
 prs:
 - number: 4
@@ -431,11 +431,10 @@ prs:
   author: hakzsam
   merged_at: '2019-11-29'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/2658
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/compiler/aco_instruction_selection_setup.cpp,
-    src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/compiler/aco_instruction_selection_setup.cpp, src/amd/llvm/ac_nir_to_llvm.c, src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/compiler/aco_instruction_selection_setup.cpp
   - src/amd/llvm/ac_nir_to_llvm.c
@@ -1429,11 +1428,10 @@ prs:
   author: bnieuwenhuizen
   merged_at: '2021-01-29'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/8752
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_extensions.py,
-    src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/radv_device.c, src/amd/vulkan/radv_extensions.py, src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/vulkan/radv_device.c
   - src/amd/vulkan/radv_extensions.py
@@ -1821,10 +1819,10 @@ prs:
   author: pendingchaos
   merged_at: '2021-06-10'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/11262
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/radv_device.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/radv_device.c'
   evidence_paths:
   - src/amd/vulkan/radv_device.c
   decision_source: manual
@@ -4010,10 +4008,10 @@ prs:
   author: DadSchoorse
   merged_at: '2025-08-22'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/26388
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/vulkan/radv_shader.c
   decision_source: manual
@@ -4189,10 +4187,10 @@ prs:
   author: doitsujin
   merged_at: '2024-02-08'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/27104
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/vulkan/radv_shader.c
   decision_source: manual
@@ -5760,10 +5758,10 @@ prs:
   author: pendingchaos
   merged_at: '2025-04-25'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/34634
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/compiler/aco_insert_waitcnt.cpp'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/compiler/aco_insert_waitcnt.cpp'
   evidence_paths:
   - src/amd/compiler/aco_insert_waitcnt.cpp
   decision_source: manual
@@ -6079,11 +6077,11 @@ prs:
   author: daniel-schuermann
   merged_at: '2025-08-19'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/36133
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/common/nir/ac_nir.c, src/amd/common/nir/ac_nir_lower_mem_access_bit_sizes.c,
-    src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp, src/amd/vulkan/radv_pipeline.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/common/nir/ac_nir.c, src/amd/common/nir/ac_nir_lower_mem_access_bit_sizes.c, src/amd/compiler/instruction_selection/aco_select_nir_alu.cpp, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp,
+    src/amd/vulkan/radv_pipeline.c'
   evidence_paths:
   - src/amd/common/nir/ac_nir.c
   - src/amd/common/nir/ac_nir_lower_mem_access_bit_sizes.c
@@ -6341,11 +6339,12 @@ prs:
   author: DadSchoorse
   merged_at: '2025-09-14'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37294
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/common/nir/ac_nir_create_gs_copy_shader.c,
-    src/amd/llvm/ac_llvm_build.c, src/amd/llvm/ac_llvm_build.h, src/amd/vulkan/nir/radv_nir_rt_shader.c, src/amd/vulkan/radv_nir_to_llvm.c, src/amd/vulkan/radv_pipeline.c (+6 more)'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/common/nir/ac_nir_create_gs_copy_shader.c, src/amd/llvm/ac_llvm_build.c, src/amd/llvm/ac_llvm_build.h, src/amd/vulkan/nir/radv_nir_rt_shader.c, src/amd/vulkan/radv_nir_to_llvm.c,
+    src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_pipeline_graphics.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h, src/amd/vulkan/radv_shader_info.c, src/amd/vulkan/radv_shader_info.h,
+    src/amd/vulkan/radv_shader_object.c'
   evidence_paths:
   - src/amd/common/nir/ac_nir_create_gs_copy_shader.c
   - src/amd/llvm/ac_llvm_build.c
@@ -6376,11 +6375,10 @@ prs:
   author: daniel-schuermann
   merged_at: '2025-09-24'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37453
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/common/nir/ac_nir.c, src/amd/common/nir/ac_nir.h,
-    src/amd/compiler/aco_optimizer.cpp, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp, src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/common/nir/ac_nir.c, src/amd/common/nir/ac_nir.h, src/amd/compiler/aco_optimizer.cpp, src/amd/compiler/instruction_selection/aco_select_nir_intrinsics.cpp, src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/common/nir/ac_nir.c
   - src/amd/common/nir/ac_nir.h
@@ -6440,11 +6438,10 @@ prs:
   author: daniel-schuermann
   merged_at: '2025-10-03'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/37667
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/common/nir/ac_nir.c, src/amd/vulkan/radv_pipeline.c,
-    src/amd/vulkan/radv_pipeline_graphics.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/common/nir/ac_nir.c, src/amd/vulkan/radv_pipeline.c, src/amd/vulkan/radv_pipeline_graphics.c, src/amd/vulkan/radv_shader.c, src/amd/vulkan/radv_shader.h'
   evidence_paths:
   - src/amd/common/nir/ac_nir.c
   - src/amd/vulkan/radv_pipeline.c
@@ -7112,10 +7109,10 @@ prs:
   author: pixelcluster
   merged_at: '2026-02-23'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/39981
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/nir/radv_nir_lower_ray_queries.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/nir/radv_nir_lower_ray_queries.c'
   evidence_paths:
   - src/amd/vulkan/nir/radv_nir_lower_ray_queries.c
   decision_source: manual
@@ -7683,10 +7680,10 @@ prs:
   author: DadSchoorse
   merged_at: '2026-07-03'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/41809
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/radv_shader.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/radv_shader.c'
   evidence_paths:
   - src/amd/vulkan/radv_shader.c
   decision_source: manual
@@ -8244,10 +8241,10 @@ prs:
   author: DadSchoorse
   merged_at: '2026-07-29'
   url: https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43240
-  decision: defer
-  rule: manual-deferred-outside-batch
-  reason: 'defer (manual review of title and changed paths): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, matched only by the topic patterns added on 2026-10-10 for the
-    other vendors'' drivers; relevant to the wiki but outside the non-AMD batch that added those patterns, left for a decision on widening the AMD coverage: src/amd/vulkan/nir/radv_nir_opt_tid_function.c'
+  decision: include
+  rule: manual-owner-decision
+  reason: 'include (owner decision 2026-10-10: relevant AMD compute behaviour): RADV/ACO change on compute shared memory, workgroup or subgroup-size handling, deferred by the manual review of 2026-10-10;
+    driver source changed: src/amd/vulkan/nir/radv_nir_opt_tid_function.c'
   evidence_paths:
   - src/amd/vulkan/nir/radv_nir_opt_tid_function.c
   decision_source: manual
