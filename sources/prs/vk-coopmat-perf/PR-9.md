@@ -9,9 +9,11 @@ url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/9
 source_category: upstream-code
 architectures: []
 tags:
+- subgroup-size
 - cpp
 techniques: []
-hardware_features: []
+hardware_features:
+- subgroup-size
 kernel_types: []
 languages:
 - cpp
