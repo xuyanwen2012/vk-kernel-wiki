@@ -18,6 +18,9 @@
 ## - Node names are unique across the whole tree (a name identifies one node).
 ## - `children` may be omitted or empty. A vendor with no children is a
 ##   reserved node: valid as a tag, but it has no devices yet.
+## - A generation may be declared before any of its devices (`kind: generation`
+##   written out, no children) when a source names the generation but no
+##   device of it. It is valid as a tag and never as a measurement `device`.
 ## - `kind` may be omitted; it then defaults to `vendor` for a root node,
 ##   `generation` for a non-root node with children, and `device` otherwise.
 ## - Mapping order is meaningful: generated indices list nodes in this order.

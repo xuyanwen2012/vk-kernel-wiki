@@ -1377,9 +1377,12 @@ class ArchitectureQueryTest(unittest.TestCase):
         reserved = [n for n in info["childless"] if info["kinds"][n] == "vendor"]
         self.assertEqual(len(reserved), 1)
         self.assertNotIn(reserved[0], info["devices"])
+        # A generation may be declared before any of its devices is added
+        # (`kind: generation`, no children). It is a valid tag, never a device.
         for node in info["childless"]:
             if node not in reserved:
-                self.assertEqual(info["kinds"][node], "device")
+                self.assertIn(info["kinds"][node], ("device", "generation"))
+                self.assertEqual(node in info["devices"], info["kinds"][node] == "device")
 
 
 # ---------------------------------------------------------------------------
