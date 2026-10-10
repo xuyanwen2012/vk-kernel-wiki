@@ -1,0 +1,2386 @@
+diff --git a/source/backend/vulkan/buffer/execution/glsl/argmax.comp b/source/backend/vulkan/buffer/execution/glsl/argmax.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/argmax.comp
+@@ -0,0 +1,47 @@
++#version 440 core
++layout(std430) buffer;
++layout(set=0, binding=0) buffer destbuffer{
++    float data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer{
++    float data[];
++}uInput;
++
++layout(set = 0, binding = 2) uniform constBuffer {
++    ivec4 size;//inside, axis, outside, inside * outside
++}uConst;
++
++layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    int index = int(gl_GlobalInvocationID.x);
++    // y: index in outside, x: index in inside
++    int x = index % uConst.size.x;
++    int y = index / uConst.size.x;
++    if(index < uConst.size.w)
++    {
++        int W = uConst.size.x;
++        int H = uConst.size.y;
++        int C = uConst.size.z;
++        int offset = y * H * W + x;
++        float maxValue = uInput.data[offset];
++        int maxIndex = 0;
++        for(int i = 1; i < H; ++i)
++        {
++#ifndef ARGMIN
++            if (uInput.data[offset + i * W] > maxValue) {
++                maxValue = uInput.data[offset + i * W];
++                maxIndex = i;
++            }
++#else
++            if (uInput.data[offset + i * W] < maxValue) {
++                maxValue = uInput.data[offset + i * W];
++                maxIndex = i;
++            }
++#endif
++        }
++        uOutput.data[index] = maxIndex;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/avgpool.comp b/source/backend/vulkan/buffer/execution/glsl/avgpool.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/avgpool.comp
+@@ -0,0 +1,65 @@
++#version 440 core
++layout(std430) buffer;
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput;
++
++
++layout(set=0, binding=2) uniform constBuffer {
++    ivec4 inputSize;
++    ivec4 outputSize;
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++} uConstant;
++
++layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    ivec3 outputSize = uConstant.outputSize.xyz;
++    ivec2 spos = pos.xy*uConstant.stride-uConstant.pad;
++
++    if (all(lessThan(pos, outputSize)))
++    {
++        ivec2 inputSizeXY = uConstant.inputSize.xy;
++        FLOAT4 color = FLOAT4(0.0);
++        ivec2 sfxy = max(ivec2(0), -spos);
++        ivec2 efxy = min(uConstant.kernelSize, inputSizeXY-spos);
++        ivec2 size = efxy-sfxy;
++        FLOAT4 frac = FLOAT4(1.0/float(size.x)/float(size.y));
++
++        for (int fy=sfxy.y; fy<efxy.y; ++fy)
++        {
++            for (int fx=sfxy.x; fx<efxy.x; ++fx)
++            {
++                ivec2 spos_ = spos + ivec2(fx, fy);
++                FLOAT4 inputColor = uInput.data[0
++                + pos.z * uConstant.inputSize.y * uConstant.inputSize.x
++                + spos_.y * uConstant.inputSize.x
++                + spos_.x
++                ];
++                color = inputColor + color;
++            }
++        }
++        uOutput.data[0
++            + pos.z * uConstant.outputSize.x * uConstant.outputSize.y
++            + pos.y * uConstant.outputSize.x
++            + pos.x
++            ] = color * frac;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/binary.comp b/source/backend/vulkan/buffer/execution/glsl/binary.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/binary.comp
+@@ -0,0 +1,93 @@
++#version 440 core
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput0;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    FLOAT4 data[];
++} uInput1;
++
++layout(set=0, binding=3) uniform constBuffer{
++    ivec4 stride00;//WHC, LIMIT
++    int activationType;
++} uConstant;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    ivec3 inSize = uConstant.stride00.xyz;
++    if(posTmp.x < uConstant.stride00.w)
++    {
++        vec4 x0 = uInput0.data[uConstant.stride00.x * posTmp.x];
++        if (uConstant.stride00.x == 0) {
++            x0 = vec4(x0.r);
++        }
++        vec4 x1 = uInput1.data[uConstant.stride00.y * posTmp.x];
++        if (uConstant.stride00.y == 0) {
++            x1 = vec4(x1.r);
++        }
++        vec4 value = x0;
++#ifdef ADD
++        value = x0 + x1;
++#endif
++#ifdef SUB
++        value = x0 - x1;
++#endif
++#ifdef MUL
++        value = x0 * x1;
++#endif
++#ifdef DIV
++        value = x0 / x1;
++#endif
++#ifdef POW
++        value = pow(x0, x1);
++#endif
++#ifdef VMAX
++        value = max(x0, x1);
++#endif
++#ifdef VMIN
++        value = min(x0, x1);
++#endif
++#ifdef SQUDIFF
++        value = (x0 - x1) * (x0 - x1);
++#endif
++#ifdef LESS
++        value = FLOAT4(lessThan(x0, x1));
++#endif
++#ifdef LESSEQUAL
++        value = FLOAT4(lessThanEqual(x0, x1));
++#endif
++#ifdef GREATER
++        value = FLOAT4(greaterThan(x0, x1));
++#endif
++#ifdef GREATEREQUAL
++        value = FLOAT4(greaterThanEqual(x0, x1));
++#endif
++#ifdef EQUAL
++        value = FLOAT4(equal(x0, x1));
++#endif
++#ifdef NOTEQUAL
++        value = FLOAT4(notEqual(x0, x1));
++#endif
++        if(uConstant.activationType == 1) {
++            value = max(value, vec4(0));
++        }
++        uOutput.data[posTmp.x] = value;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/blit.comp b/source/backend/vulkan/buffer/execution/glsl/blit.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/blit.comp
+@@ -0,0 +1,48 @@
++#version 440 core
++#ifdef C4
++#define FLOAT vec4
++#else
++#define FLOAT float
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer sourceBuffer{
++    FLOAT data[];
++} uOutput;
++
++
++layout(set=0, binding=1) readonly buffer destBuffer{
++    FLOAT data[];
++} uInput;
++
++layout(set=0, binding=2) uniform constBuffer{
++    ivec4 stride;
++    ivec4 size;
++    ivec4 extent;
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    if (posTmp.x < uConstant.size.w)
++    {
++        ivec3 pos;
++        pos.x = posTmp.x / (uConstant.size.y * uConstant.size.z);
++        int subIndex = posTmp.x % (uConstant.size.y * uConstant.size.z);
++        pos.z = subIndex % uConstant.size.z;
++        pos.y = subIndex / uConstant.size.z;
++        int srcOffset = uConstant.stride.w
++            + uConstant.stride.z * pos.z
++            + uConstant.stride.y * pos.y
++            + uConstant.stride.x * pos.x
++            ;
++        
++        int dstOffset = uConstant.extent.w
++            + pos.x * uConstant.extent.x
++            + pos.y * uConstant.extent.y
++            + pos.z * uConstant.extent.z
++            ;
++        uOutput.data[dstOffset] = uInput.data[srcOffset];
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/blitregion.comp b/source/backend/vulkan/buffer/execution/glsl/blitregion.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/blitregion.comp
+@@ -0,0 +1,73 @@
++#version 440 core
++#ifdef C4
++#define FLOAT vec4
++#else
++#define FLOAT float
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer sourceBuffer{
++    FLOAT data[];
++} uOutput;
++
++
++layout(set=0, binding=1) readonly buffer s0{
++    FLOAT data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer s1{
++    FLOAT data[];
++} uSrcOffset;
++
++layout(set=0, binding=3) readonly buffer s2{
++    FLOAT data[];
++} uDstOffset;
++
++layout(set=0, binding=4) uniform constBuffer{
++    ivec4 stride;
++    ivec4 size;
++    ivec4 extent;
++    ivec4 step;
++    ivec4 iter;
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    if (posTmp.x < uConstant.step.w)
++    {
++        ivec3 pos;
++        int regionInsideIndex = posTmp.x % uConstant.size.w;
++        int regionOutsideIndex = posTmp.x / uConstant.size.w;
++        pos.x = regionInsideIndex / (uConstant.size.y * uConstant.size.z);
++        int subIndex = regionInsideIndex % (uConstant.size.y * uConstant.size.z);
++        pos.z = subIndex % uConstant.size.z;
++        pos.y = subIndex / uConstant.size.z;
++        int srcBasicOffset, dstBasicOffset;
++        if (uConstant.iter.y > 0) {
++            srcBasicOffset = uConstant.step.y * int(uSrcOffset.data[regionOutsideIndex]);
++        } else {
++            srcBasicOffset = uConstant.step.y * regionOutsideIndex;;
++        }
++        if (uConstant.iter.x > 0) {
++            dstBasicOffset = uConstant.step.x * int(uDstOffset.data[regionOutsideIndex]);
++        } else {
++            dstBasicOffset = uConstant.step.x * regionOutsideIndex;;
++        }
++        int srcOffset = srcBasicOffset
++            + uConstant.stride.w
++            + uConstant.stride.z * pos.z
++            + uConstant.stride.y * pos.y
++            + uConstant.stride.x * pos.x
++            ;
++        
++        int dstOffset = dstBasicOffset
++            + uConstant.extent.w
++            + pos.x * uConstant.extent.x
++            + pos.y * uConstant.extent.y
++            + pos.z * uConstant.extent.z
++            ;
++        uOutput.data[dstOffset] = uInput.data[srcOffset];
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/convolution.comp b/source/backend/vulkan/buffer/execution/glsl/convolution.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/convolution.comp
+@@ -0,0 +1,102 @@
++#version 440 core
++
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer inputBuffer {
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer KernelBuffer{
++    FLOAT4 data[];
++} uKernel;
++
++layout(set=0, binding=3) readonly buffer BiasBuffer{
++    FLOAT4 data[];
++} uBias;
++
++layout(set=0, binding=4) uniform constBuffer {
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++    ivec2 dilate;
++    ivec4 inputSize;
++    ivec4 outputSize;
++    ivec4 offset;//batchOffset, hOffset, outputHeight, other
++} uConstant;
++
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    int gpuIndex = int(gl_GlobalInvocationID.x);
++    int gpuIndexX = gpuIndex % uConstant.outputSize.x;
++    int temp = gpuIndex / uConstant.outputSize.x;
++    int gpuIndexY = temp % uConstant.outputSize.y;
++    int gpuIndexZ = temp / uConstant.outputSize.y;
++    ivec3 pos = ivec3(gpuIndexX, gpuIndexY, gpuIndexZ);
++    ivec3 outputSize = uConstant.outputSize.xyz;
++    int oz = pos.z / uConstant.outputSize.w;
++    int ob = pos.z % uConstant.outputSize.w;
++
++    if (gpuIndex < uConstant.outputSize.x * uConstant.outputSize.y * uConstant.outputSize.z * uConstant.outputSize.w)
++    {
++        ivec3 inputSize = uConstant.inputSize.xyz;
++        ivec2 s0 = pos.xy*uConstant.stride-uConstant.pad;
++        ivec2 sta = max(ivec2(0, 0), (UP_DIV(-s0, uConstant.dilate)));
++        ivec2 end = min(uConstant.kernelSize, UP_DIV(uConstant.inputSize.xy - s0, uConstant.dilate));
++        int fx, fy, fz;
++        vec4 color = uBias.data[oz];
++        for (fy=sta.y; fy<end.y; ++fy)
++        {
++            int sy = fy*uConstant.dilate.y + s0.y;
++            for (fx=sta.x; fx<end.x; ++fx)
++            {
++                int sx = fx*uConstant.dilate.x + s0.x;
++                int kPosOffset = (fx+fy*uConstant.kernelSize.x + oz * uConstant.kernelSize.x * uConstant.kernelSize.y) * uConstant.inputSize.z;
++                for (fz=0; fz<uConstant.inputSize.z; ++fz)
++                {
++                    int iPos = sx
++                        + sy * uConstant.inputSize.x
++                        + fz * uConstant.inputSize.x * uConstant.inputSize.y * uConstant.inputSize.w
++                        + ob * uConstant.inputSize.x * uConstant.inputSize.y
++                        ;
++                    vec4 inputValue = uInput.data[iPos];
++                    vec4 k0 = uKernel.data[(kPosOffset+fz) * 4 + 0];
++                    vec4 k1 = uKernel.data[(kPosOffset+fz) * 4 + 1];
++                    vec4 k2 = uKernel.data[(kPosOffset+fz) * 4 + 2];
++                    vec4 k3 = uKernel.data[(kPosOffset+fz) * 4 + 3];
++                    color  += k0*inputValue.x;
++                    color  += k1*inputValue.y;
++                    color  += k2*inputValue.z;
++                    color  += k3*inputValue.w;
++                }
++            }
++        }
++
++#ifdef RELU
++        color = max(color, vec4(0));
++#endif
++#ifdef RELU6
++        color = clamp(color, vec4(0), vec4(6));
++#endif
++        int oPos = pos.x
++            + pos.y * uConstant.outputSize.x
++            + pos.z * uConstant.outputSize.x * uConstant.outputSize.y
++            ;
++        uOutput.data[oPos] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwise.comp b/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwise.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwise.comp
+@@ -0,0 +1,89 @@
++#version 440 core
++
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer inputBuffer {
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer KernelBuffer{
++    FLOAT4 data[];
++} uKernel;
++
++layout(set=0, binding=3) readonly buffer BiasBuffer{
++    FLOAT4 data[];
++} uBias;
++
++layout(set=0, binding=4) uniform constBuffer {
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++    ivec2 dilate;
++    ivec4 inputSize;
++    ivec4 outputSize;
++    ivec4 offset;//batchOffset, hOffset, outputHeight, other
++} uConstant;
++
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++layout (local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    ivec3 outputSize = uConstant.outputSize.xyz;
++    int oz = pos.z / uConstant.outputSize.w;
++    int ob = pos.z % uConstant.outputSize.w;
++
++    if (all(lessThan(pos.xy, outputSize.xy)))
++    {
++        ivec3 inputSize = uConstant.inputSize.xyz;
++        ivec2 s0 = pos.xy*uConstant.stride-uConstant.pad;
++        ivec2 sta = max(ivec2(0, 0), (UP_DIV(-s0, uConstant.dilate)));
++        ivec2 end = min(uConstant.kernelSize, UP_DIV(uConstant.inputSize.xy - s0, uConstant.dilate));
++        int fx, fy, fz;
++        vec4 color = uBias.data[oz];
++        for (fy=sta.y; fy<end.y; ++fy)
++        {
++            int sy = fy*uConstant.dilate.y + s0.y;
++            for (fx=sta.x; fx<end.x; ++fx)
++            {
++                int sx = fx*uConstant.dilate.x + s0.x;
++                int iPos = sx
++                    + sy * uConstant.inputSize.x
++                    + oz * uConstant.inputSize.x * uConstant.inputSize.y * uConstant.outputSize.w
++                    + ob * uConstant.inputSize.x * uConstant.inputSize.y
++                    ;
++                vec4 inputValue = uInput.data[iPos];
++
++                vec4 k = uKernel.data[fx+fy*uConstant.kernelSize.x + oz * uConstant.kernelSize.x * uConstant.kernelSize.y];
++
++                color  += k*inputValue;
++            }
++        }
++
++#ifdef RELU
++        color = max(color, vec4(0));
++#endif
++#ifdef RELU6
++        color = clamp(color, vec4(0), vec4(6));
++#endif
++        int oPos = pos.x
++            + pos.y * uConstant.outputSize.x
++            + pos.z * uConstant.outputSize.x * uConstant.outputSize.y
++            ;
++        uOutput.data[oPos] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwiseMali.comp b/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwiseMali.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/convolutionDepthwiseMali.comp
+@@ -0,0 +1,89 @@
++#version 440 core
++
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer inputBuffer {
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer KernelBuffer{
++    FLOAT4 data[];
++} uKernel;
++
++layout(set=0, binding=3) readonly buffer BiasBuffer{
++    FLOAT4 data[];
++} uBias;
++
++layout(set=0, binding=4) uniform constBuffer {
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++    ivec2 dilate;
++    ivec4 inputSize;
++    ivec4 outputSize;
++    ivec4 offset;//batchOffset, hOffset, outputHeight, other
++} uConstant;
++
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    ivec3 outputSize = uConstant.outputSize.xyz;
++    int oz = pos.z / uConstant.outputSize.w;
++    int ob = pos.z % uConstant.outputSize.w;
++
++    if (all(lessThan(pos.xy, outputSize.xy)))
++    {
++        ivec3 inputSize = uConstant.inputSize.xyz;
++        ivec2 s0 = pos.xy*uConstant.stride-uConstant.pad;
++        ivec2 sta = max(ivec2(0, 0), (UP_DIV(-s0, uConstant.dilate)));
++        ivec2 end = min(uConstant.kernelSize, UP_DIV(uConstant.inputSize.xy - s0, uConstant.dilate));
++        int fx, fy, fz;
++        vec4 color = uBias.data[oz];
++        for (fy=sta.y; fy<end.y; ++fy)
++        {
++            int sy = fy*uConstant.dilate.y + s0.y;
++            for (fx=sta.x; fx<end.x; ++fx)
++            {
++                int sx = fx*uConstant.dilate.x + s0.x;
++                int iPos = sx
++                    + sy * uConstant.inputSize.x
++                    + oz * uConstant.inputSize.x * uConstant.inputSize.y * uConstant.outputSize.w
++                    + ob * uConstant.inputSize.x * uConstant.inputSize.y
++                    ;
++                vec4 inputValue = uInput.data[iPos];
++
++                vec4 k = uKernel.data[fx+fy*uConstant.kernelSize.x + oz * uConstant.kernelSize.x * uConstant.kernelSize.y];
++
++                color  += k*inputValue;
++            }
++        }
++
++#ifdef RELU
++        color = max(color, vec4(0));
++#endif
++#ifdef RELU6
++        color = clamp(color, vec4(0), vec4(6));
++#endif
++        int oPos = pos.x
++            + pos.y * uConstant.outputSize.x
++            + pos.z * uConstant.outputSize.x * uConstant.outputSize.y
++            ;
++        uOutput.data[oPos] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/deconvolution.comp b/source/backend/vulkan/buffer/execution/glsl/deconvolution.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/deconvolution.comp
+@@ -0,0 +1,106 @@
++#version 440 core
++layout(std430) buffer;
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    FLOAT4 data[];
++} uKernel;
++
++layout(set=0, binding=3) readonly buffer sourceBuffer2{
++    FLOAT4 data[];
++} uBias;
++
++layout(set=0, binding=4) readonly uniform constBuffer {
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++    ivec2 dilate;
++    ivec4 inputSize;
++    ivec4 outputSize;
++    int batch;
++    int group;
++} uConstant;
++
++layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++void main()
++{
++    int workIndex = int(gl_GlobalInvocationID.x);
++    if (workIndex < uConstant.outputSize.x * uConstant.outputSize.y * uConstant.outputSize.z * uConstant.outputSize.w)
++    {
++        ivec3 pos;
++        pos.x = workIndex % uConstant.outputSize.x;
++        int temp = workIndex / uConstant.outputSize.x;
++        pos.y = temp % uConstant.outputSize.y;
++        pos.z = temp / uConstant.outputSize.y;
++        ivec3 inputSize = uConstant.inputSize.xyz;
++        ivec3 outputSize = uConstant.outputSize.xyz;
++
++        ivec2 oxy = pos.xy + uConstant.pad;
++        int oz = pos.z / uConstant.outputSize.w;
++        int sb = pos.z % uConstant.outputSize.w;
++
++        vec4 color = uBias.data[oz];
++        for (int fy=0; fy<uConstant.kernelSize.y; ++fy)
++        {
++            int sy = oxy.y - fy*uConstant.dilate.y;
++            int y = sy / uConstant.stride.y;
++            if (sy % uConstant.stride.y == 0 && y == clamp(y, 0, inputSize.y-1))
++            {
++                for (int fx=0; fx<uConstant.kernelSize.x; ++fx)
++                {
++                    int sx = oxy.x - fx*uConstant.dilate.x;
++                    int x = sx / uConstant.stride.x;
++                    if (sx % uConstant.stride.x == 0 && x == clamp(x, 0, inputSize.x-1))
++                    {
++                        int sBegin = x
++                             + y * uConstant.inputSize.x
++                             + sb * uConstant.inputSize.x * uConstant.inputSize.y;
++                        int kBegin = fx
++                            + fy * uConstant.kernelSize.x
++                            + oz * uConstant.kernelSize.x * uConstant.kernelSize.y;
++                        for (int fz=0; fz<uConstant.inputSize.z; ++fz)
++                        {
++                            vec4 S = uInput.data[sBegin
++                             + fz * uConstant.inputSize.x * uConstant.inputSize.y * uConstant.inputSize.w
++                            ];
++                            int kOffst = 4 * (kBegin * uConstant.inputSize.z + fz);
++                            vec4 K0 = uKernel.data[kOffst + 0];
++                            vec4 K1 = uKernel.data[kOffst + 1];
++                            vec4 K2 = uKernel.data[kOffst + 2];
++                            vec4 K3 = uKernel.data[kOffst + 3];
++                            color += K0 * S.x;
++                            color += K1 * S.y;
++                            color += K2 * S.z;
++                            color += K3 * S.w;
++                        }
++                    }
++                }
++            }
++        }
++#ifdef RELU
++        color = max(color, vec4(0));
++#endif
++#ifdef RELU6
++        color = clamp(color, vec4(0), vec4(6));
++#endif
++        uOutput.data[pos.x + pos.y * uConstant.outputSize.x + pos.z * uConstant.outputSize.x * uConstant.outputSize.y] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/deconvolutionDepthwise.comp b/source/backend/vulkan/buffer/execution/glsl/deconvolutionDepthwise.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/deconvolutionDepthwise.comp
+@@ -0,0 +1,88 @@
++#version 440 core
++layout(std430) buffer;
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    FLOAT4 data[];
++} uKernel;
++
++layout(set=0, binding=3) readonly buffer sourceBuffer2{
++    FLOAT4 data[];
++} uBias;
++
++layout(set=0, binding=4) readonly uniform constBuffer {
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++    ivec2 dilate;
++    ivec4 inputSize;
++    ivec4 outputSize;
++    int batch;
++    int group;
++} uConstant;
++
++layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++void main()
++{
++    int workIndex = int(gl_GlobalInvocationID.x);
++    if (workIndex < uConstant.outputSize.x * uConstant.outputSize.y * uConstant.outputSize.z * uConstant.outputSize.w)
++    {
++        ivec3 pos;
++        pos.x = workIndex % uConstant.outputSize.x;
++        int temp = workIndex / uConstant.outputSize.x;
++        pos.y = temp % uConstant.outputSize.y;
++        pos.z = temp / uConstant.outputSize.y;
++        ivec3 inputSize = uConstant.inputSize.xyz;
++        ivec3 outputSize = uConstant.outputSize.xyz;
++
++        ivec2 oxy = pos.xy + uConstant.pad;
++        int fz = pos.z / uConstant.outputSize.w;
++        int sb = pos.z % uConstant.outputSize.w;
++
++        vec4 color = uBias.data[fz];
++        for (int fy=0; fy<uConstant.kernelSize.y; ++fy)
++        {
++            int sy = oxy.y - fy*uConstant.dilate.y;
++            int y = sy / uConstant.stride.y;
++            if (sy % uConstant.stride.y == 0 && y == clamp(y, 0, inputSize.y-1))
++            {
++                for (int fx=0; fx<uConstant.kernelSize.x; ++fx)
++                {
++                    int sx = oxy.x - fx*uConstant.dilate.x;
++                    int x = sx / uConstant.stride.x;
++                    if (sx % uConstant.stride.x == 0 && x == clamp(x, 0, inputSize.x-1))
++                    {
++                        vec4 inputColor = uInput.data[x + y * uConstant.inputSize.x + pos.z * uConstant.inputSize.x * uConstant.inputSize.y];
++                        vec4 kernelColor = uKernel.data[fx+fy*uConstant.kernelSize.x + fz * uConstant.kernelSize.x * uConstant.kernelSize.y];
++                        color += inputColor*kernelColor;
++                    }
++                }
++            }
++        }
++#ifdef RELU
++        color = max(color, vec4(0));
++#endif
++#ifdef RELU6
++        color = clamp(color, vec4(0), vec4(6));
++#endif
++        uOutput.data[pos.x + pos.y * uConstant.outputSize.x + pos.z * uConstant.outputSize.x * uConstant.outputSize.y] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/dwweightcopy.comp b/source/backend/vulkan/buffer/execution/glsl/dwweightcopy.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/dwweightcopy.comp
+@@ -0,0 +1,31 @@
++#version 440 core
++
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    float data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    float data[];
++} uInput;
++
++layout(set=0, binding=2) readonly uniform constBuffer {
++    ivec4 size; // kw, kh, height, kw*kh*c/4
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    if (posTmp.x < uConstant.size.w)
++    {
++        ivec2 pos;
++        int kernelSize = uConstant.size.x * uConstant.size.y;
++        pos.x = posTmp.x % kernelSize;
++        pos.y = posTmp.x / kernelSize;
++        int outputPos = pos.x * 4 + (pos.y / 4) * kernelSize * 4 + (pos.y % 4);
++        uOutput.data[outputPos] = uInput.data[posTmp.x];
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/gemm16x16.comp b/source/backend/vulkan/buffer/execution/glsl/gemm16x16.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/gemm16x16.comp
+@@ -0,0 +1,78 @@
++#version 440 core
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutBuffer;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInBuffer0;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    FLOAT4 data[];
++} uInBuffer1;
++
++layout(set=0, binding=3) readonly restrict uniform constBuffer {
++    ivec4 outputSize;//eUnit, hUnit, h, l
++}uConst;
++
++layout (local_size_x = 2, local_size_y = 4, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    if (pos.x < uConst.outputSize.x && pos.y < uConst.outputSize.y)
++    {
++        FLOAT4 o0 = FLOAT4(0);
++        FLOAT4 o1 = FLOAT4(0);
++        FLOAT4 o2 = FLOAT4(0);
++        FLOAT4 o3 = FLOAT4(0);
++        FLOAT4 o4 = FLOAT4(0);
++        FLOAT4 o5 = FLOAT4(0);
++        FLOAT4 o6 = FLOAT4(0);
++        FLOAT4 o7 = FLOAT4(0);
++        int multiLength = uConst.outputSize.w;
++        int kernelY = pos.y + pos.z * uConst.outputSize.y;
++        int srcY = pos.x + pos.z * uConst.outputSize.x;
++
++        for (int k=0; k<multiLength; ++k)
++        {
++            FLOAT4 S = uInBuffer0.data[2 * (k + pos.x * multiLength) + 0];
++            FLOAT4 S2 = uInBuffer0.data[2 * (k + pos.x * multiLength) + 1];
++            FLOAT4 K = uInBuffer1.data[k + pos.y * multiLength];
++            o0 += S * K.x;
++            o1 += S * K.y;
++            o2 += S * K.z;
++            o3 += S * K.w;
++            o4 += S2 * K.x;
++            o5 += S2 * K.y;
++            o6 += S2 * K.z;
++            o7 += S2 * K.w;
++        }
++        int h =  uConst.outputSize.z;
++        int dstOffset = 2 * (pos.x * h + pos.y * 4);
++        uOutBuffer.data[dstOffset + 0] = o0;
++        uOutBuffer.data[dstOffset + 1] = o4;
++        if (pos.y * 4 + 1 < h) {
++            uOutBuffer.data[dstOffset + 2] = o1;
++            uOutBuffer.data[dstOffset + 3] = o5;
++        }
++        if (pos.y * 4 + 2 < h) {
++            uOutBuffer.data[dstOffset + 4] = o2;
++            uOutBuffer.data[dstOffset + 5] = o6;
++        }
++        if (pos.y * 4 + 3 < h) {
++            uOutBuffer.data[dstOffset + 6] = o3;
++            uOutBuffer.data[dstOffset + 7] = o7;
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/gemm16x16_bias.comp b/source/backend/vulkan/buffer/execution/glsl/gemm16x16_bias.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/gemm16x16_bias.comp
+@@ -0,0 +1,83 @@
++#version 440 core
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutBuffer;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInBuffer0;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    FLOAT4 data[];
++} uInBuffer1;
++
++layout(set=0, binding=3) readonly restrict uniform constBuffer {
++    ivec4 outputSize;//eUnit, hUnit, h, l
++}uConst;
++
++layout(set=0, binding=4) readonly buffer sourceBuffer3{
++    FLOAT4 data[];
++} uBias;
++
++layout (local_size_x = 2, local_size_y = 4, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    if (pos.x < uConst.outputSize.x && pos.y < uConst.outputSize.y)
++    {
++        FLOAT4 o0 = FLOAT4(0);
++        FLOAT4 o1 = FLOAT4(0);
++        FLOAT4 o2 = FLOAT4(0);
++        FLOAT4 o3 = FLOAT4(0);
++        FLOAT4 o4 = FLOAT4(0);
++        FLOAT4 o5 = FLOAT4(0);
++        FLOAT4 o6 = FLOAT4(0);
++        FLOAT4 o7 = FLOAT4(0);
++        int multiLength = uConst.outputSize.w;
++        int kernelY = pos.y + pos.z * uConst.outputSize.y;
++        int srcY = pos.x + pos.z * uConst.outputSize.x;
++
++        for (int k=0; k<multiLength; ++k)
++        {
++            FLOAT4 S = uInBuffer0.data[2 * (k + pos.x * multiLength) + 0];
++            FLOAT4 S2 = uInBuffer0.data[2 * (k + pos.x * multiLength) + 1];
++            FLOAT4 K = uInBuffer1.data[k + pos.y * multiLength];
++            o0 += S * K.x;
++            o1 += S * K.y;
++            o2 += S * K.z;
++            o3 += S * K.w;
++            o4 += S2 * K.x;
++            o5 += S2 * K.y;
++            o6 += S2 * K.z;
++            o7 += S2 * K.w;
++        }
++        int h =  uConst.outputSize.z;
++        int dstOffset = 2 * (pos.x * h + pos.y * 4);
++        FLOAT4 bias = uBias.data[pos.y];
++        uOutBuffer.data[dstOffset + 0] = o0 + FLOAT4(bias.x);
++        uOutBuffer.data[dstOffset + 1] = o4 + FLOAT4(bias.x);
++        if (pos.y * 4 + 1 < h) {
++            uOutBuffer.data[dstOffset + 2] = o1 + FLOAT4(bias.y);
++            uOutBuffer.data[dstOffset + 3] = o5 + FLOAT4(bias.y);
++        }
++        if (pos.y * 4 + 2 < h) {
++            uOutBuffer.data[dstOffset + 4] = o2 + FLOAT4(bias.z);
++            uOutBuffer.data[dstOffset + 5] = o6 + FLOAT4(bias.z);
++        }
++        if (pos.y * 4 + 3 < h) {
++            uOutBuffer.data[dstOffset + 6] = o3 + FLOAT4(bias.w);
++            uOutBuffer.data[dstOffset + 7] = o7 + FLOAT4(bias.w);
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/gridSampleBilinear.comp b/source/backend/vulkan/buffer/execution/glsl/gridSampleBilinear.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/gridSampleBilinear.comp
+@@ -0,0 +1,109 @@
++#version 450 core
++layout(std430) buffer;
++
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    vec4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    float data[];
++} uGrid;
++
++layout(set=0, binding=3) uniform gridSampleBuffer{
++	ivec4 inShape;  // inW, inH
++	ivec4 outShape; // outW, outH
++	bool alignCorners;
++}uGridSampleParam;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++vec4 LoadSample(int positionX, int positionY, int c, int n) {
++	vec4 value;
++	int width = uGridSampleParam.inShape.x;
++	int height = uGridSampleParam.inShape.y;
++#ifdef PAD_MODE_ZEROS
++	if (positionX < 0 || positionX >= width || positionY < 0 || positionY >= height) {
++		value = vec4(0.0);
++	} else {
++		value = uInput.data[0
++			+ positionX
++			+ positionY * width
++			+ n * width * height
++			+ c * width * height * uGridSampleParam.inShape.w
++		];
++	}
++#else
++	positionX = clamp(positionX, 0, width - 1);
++	positionY = clamp(positionY, 0, height - 1);
++	value = uInput.data[0
++		+ positionX
++		+ positionY * width
++		+ n * width * height
++		+ c * width * height * uGridSampleParam.inShape.w
++	];
++#endif
++	return value;
++}
++
++void main()
++{
++	int pos = int(gl_GlobalInvocationID.x);
++	// input output grid layout is NC4HW4
++
++	ivec4 inputShape = uGridSampleParam.inShape;
++	ivec4 outputShape = uGridSampleParam.outShape;
++	int total = outputShape.x * outputShape.y * outputShape.z * outputShape.w;
++
++	if(pos < total)
++	{
++		// get nchw num of output 
++		int x = pos % outputShape.x;
++		int tmp = pos / outputShape.x;
++		int y = tmp % outputShape.y;
++		tmp = tmp / outputShape.y;
++		int z = tmp % outputShape.z;
++		int n = tmp / outputShape.z;
++
++		// get position in grid
++		int gridPosition = n * outputShape.x * outputShape.y + y * outputShape.x + x;
++		float gridX = uGrid.data[2 * gridPosition + 0];
++		float gridY = uGrid.data[2 * gridPosition + 1];
++
++		// compute position of input
++		float a = float(uGridSampleParam.alignCorners);
++		float b = 1.0f - a;
++		float cordH = ((1 + gridY) * (inputShape.y - a) - b) * 0.5f;
++		float cordW = ((1 + gridX) * (inputShape.x - a) - b) * 0.5f;
++
++		int w0_h = int(floor(cordH));
++		int w0_w = int(floor(cordW));
++		int w1_h = w0_h + 1;
++		int w1_w = w0_w + 1;
++		vec4 oneV = vec4(1.0);
++
++		vec4 i00 = LoadSample(w0_w, w0_h, z, n);
++		vec4 i01 = LoadSample(w1_w, w0_h, z, n);
++		vec4 i10 = LoadSample(w0_w, w1_h, z, n);
++		vec4 i11 = LoadSample(w1_w, w1_h, z, n);
++
++		vec4 f0 = vec4(float(w1_w) - cordW);
++		vec4 f1 = oneV - f0;
++		vec4 h0 = vec4(float(w1_h) - cordH);
++		vec4 h1 = oneV - h0;
++		
++		vec4 i0 = i00 * f0 + i01 * f1;
++		vec4 i1 = i10 * f0 + i11 * f1;
++
++		vec4 value = i0 * h0 + i1 * h1;
++		uOutput.data[0
++			+ x
++			+ y * outputShape.x
++			+ z * outputShape.x * outputShape.y * outputShape.w
++			+ n * outputShape.x * outputShape.y
++		] = value;
++	}
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/gridSampleNearest.comp b/source/backend/vulkan/buffer/execution/glsl/gridSampleNearest.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/gridSampleNearest.comp
+@@ -0,0 +1,91 @@
++#version 450 core
++layout(std430) buffer;
++
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    vec4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    float data[];
++} uGrid;
++
++layout(set=0, binding=3) uniform gridSampleBuffer{
++	ivec4 inShape;  // inW, inH
++	ivec4 outShape; // outW, outH
++	bool alignCorners;
++}uGridSampleParam;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++vec4 LoadSample(int positionX, int positionY, int c, int n) {
++	vec4 value;
++	int width = uGridSampleParam.inShape.x;
++	int height = uGridSampleParam.inShape.y;
++#ifdef PAD_MODE_ZEROS
++	if (positionX < 0 || positionX >= width || positionY < 0 || positionY >= height) {
++		value = vec4(0.0);
++	} else {
++		value = uInput.data[0
++			+ positionX
++			+ positionY * width
++			+ n * width * height
++			+ c * width * height * uGridSampleParam.inShape.w
++		];
++	}
++#else
++	positionX = clamp(positionX, 0, width - 1);
++	positionY = clamp(positionY, 0, height - 1);
++	value = uInput.data[0
++		+ positionX
++		+ positionY * width
++		+ n * width * height
++		+ c * width * height * uGridSampleParam.inShape.w
++	];
++#endif
++	return value;
++}
++
++void main()
++{
++	int pos = int(gl_GlobalInvocationID.x);
++	// input output grid layout is NC4HW4
++
++	ivec4 inputShape = uGridSampleParam.inShape;
++	ivec4 outputShape = uGridSampleParam.outShape;
++	int total = outputShape.x * outputShape.y * outputShape.z * outputShape.w;
++
++	if(pos < total)
++	{
++		// get nchw num of output 
++		int x = pos % outputShape.x;
++		int tmp = pos / outputShape.x;
++		int y = tmp % outputShape.y;
++		tmp = tmp / outputShape.y;
++		int z = tmp % outputShape.z;
++		int n = tmp / outputShape.z;
++
++		// get position in grid
++		int gridPosition = n * outputShape.x * outputShape.y + y * outputShape.x + x;
++		float gridX = uGrid.data[2 * gridPosition + 0];
++		float gridY = uGrid.data[2 * gridPosition + 1];
++
++		// compute position of input
++		float a = float(uGridSampleParam.alignCorners);
++		float b = 1.0f - a;
++		int positionX = int(floor(((1 + gridX) * (inputShape.x - a) - b) * 0.5f + 0.5f));
++		int positionY = int(floor(((1 + gridY) * (inputShape.y - a) - b) * 0.5f + 0.5f));
++
++		vec4 value = LoadSample(positionX, positionY, z, n);
++
++		uOutput.data[0
++			+ x
++			+ y * outputShape.x
++			+ z * outputShape.x * outputShape.y * outputShape.w
++			+ n * outputShape.x * outputShape.y
++		] = value;
++	}
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/matmulunit.comp b/source/backend/vulkan/buffer/execution/glsl/matmulunit.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/matmulunit.comp
+@@ -0,0 +1,74 @@
++#version 440 core
++#define FLOAT float
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer d0{
++    FLOAT data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer s0{
++    FLOAT data[];
++} uInputA;
++
++layout(set=0, binding=2) readonly buffer s1{
++    FLOAT data[];
++} uInputB;
++
++layout(set=0, binding=3) readonly buffer s3{
++    FLOAT data[];
++} uOOffset;
++
++layout(set=0, binding=4) readonly buffer s4{
++    FLOAT data[];
++} uAOffset;
++
++layout(set=0, binding=5) readonly buffer s5{
++    FLOAT data[];
++} uBOffset;
++
++layout(set=0, binding=6) uniform constBuffer{
++    ivec4 size;
++    ivec4 stride_o;
++    ivec4 stride_a;
++    ivec4 stride_b;
++    ivec4 stride_c; // Bias
++    ivec4 step;
++    ivec4 iter;
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    int e = uConstant.size.x;
++    int l = uConstant.size.y;
++    int h = uConstant.size.z;
++    int n = uConstant.size.w;
++    int eh = e * h;
++    if (posTmp.x < eh * n)
++    {
++        int regionInsideIndex = posTmp.x % eh;
++        int regionOutsideIndex = posTmp.x / eh;
++        int X = regionInsideIndex % e;
++        int Y = regionInsideIndex / e;
++        int srcBasicOffset, dstBasicOffset;
++        ivec4 index = ivec4(regionOutsideIndex, regionOutsideIndex, regionOutsideIndex, regionOutsideIndex);
++        if (uConstant.iter.x >= 0) {
++            index.x = int(uOOffset.data[regionOutsideIndex]);
++        }
++        if (uConstant.iter.y >= 0) {
++            index.y = int(uAOffset.data[regionOutsideIndex]);
++        }
++        if (uConstant.iter.z >= 0) {
++            index.z = int(uBOffset.data[regionOutsideIndex]);
++        }
++        ivec4 offset = index * uConstant.step;
++        FLOAT value = 0.0;
++        int aOffset = offset.y + uConstant.stride_a.w + X * uConstant.stride_a.x;
++        int bOffset = offset.z + uConstant.stride_b.w + Y * uConstant.stride_b.z;
++        for (int i=0; i<l; ++i) {
++            value = value + uInputA.data[aOffset + i * uConstant.stride_a.y] * uInputB.data[bOffset + i * uConstant.stride_b.y];
++        }
++        uOutput.data[offset.x + uConstant.stride_o.w + X * uConstant.stride_o.x + Y * uConstant.stride_o.z] = value;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/matmulunit_HAS_BIAS.comp b/source/backend/vulkan/buffer/execution/glsl/matmulunit_HAS_BIAS.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/matmulunit_HAS_BIAS.comp
+@@ -0,0 +1,86 @@
++#version 440 core
++#define FLOAT float
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer d0{
++    FLOAT data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer s0{
++    FLOAT data[];
++} uInputA;
++
++layout(set=0, binding=2) readonly buffer s1{
++    FLOAT data[];
++} uInputB;
++
++layout(set=0, binding=3) readonly buffer s2{
++    FLOAT data[];
++} uInputC;
++
++layout(set=0, binding=4) readonly buffer s3{
++    FLOAT data[];
++} uOOffset;
++
++layout(set=0, binding=5) readonly buffer s4{
++    FLOAT data[];
++} uAOffset;
++
++layout(set=0, binding=6) readonly buffer s5{
++    FLOAT data[];
++} uBOffset;
++
++layout(set=0, binding=7) readonly buffer s6{
++    FLOAT data[];
++} uCOffset;
++
++layout(set=0, binding=8) uniform constBuffer{
++    ivec4 size;
++    ivec4 stride_o;
++    ivec4 stride_a;
++    ivec4 stride_b;
++    ivec4 stride_c; // Bias
++    ivec4 step;
++    ivec4 iter;
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    int e = uConstant.size.x;
++    int l = uConstant.size.y;
++    int h = uConstant.size.z;
++    int n = uConstant.size.w;
++    int eh = e * h;
++    if (posTmp.x < eh * n)
++    {
++        int regionInsideIndex = posTmp.x % eh;
++        int regionOutsideIndex = posTmp.x / eh;
++        int X = regionInsideIndex % e;
++        int Y = regionInsideIndex / e;
++        int srcBasicOffset, dstBasicOffset;
++        ivec4 index = ivec4(regionOutsideIndex, regionOutsideIndex, regionOutsideIndex, regionOutsideIndex);
++        if (uConstant.iter.x >= 0) {
++            index.x = int(uOOffset.data[regionOutsideIndex]);
++        }
++        if (uConstant.iter.y >= 0) {
++            index.y = int(uAOffset.data[regionOutsideIndex]);
++        }
++        if (uConstant.iter.z >= 0) {
++            index.z = int(uBOffset.data[regionOutsideIndex]);
++        }
++        if (uConstant.iter.w >= 0) {
++            index.w = int(uCOffset.data[regionOutsideIndex]);
++        }
++        ivec4 offset = index * uConstant.step;
++        FLOAT value = 0.0;
++        int aOffset = offset.y + uConstant.stride_a.w + X * uConstant.stride_a.x;
++        int bOffset = offset.z + uConstant.stride_b.w + Y * uConstant.stride_b.z;
++        for (int i=0; i<l; ++i) {
++            value = value + uInputA.data[aOffset + i * uConstant.stride_a.y] * uInputB.data[bOffset + i * uConstant.stride_b.y];
++        }
++        value = value + uInputC.data[offset.w + Y * uConstant.stride_c.z + X * uConstant.stride_c.x];
++        uOutput.data[offset.x + uConstant.stride_o.w + X * uConstant.stride_o.x + Y * uConstant.stride_o.z] = value;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/maxpool.comp b/source/backend/vulkan/buffer/execution/glsl/maxpool.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/maxpool.comp
+@@ -0,0 +1,63 @@
++#version 440 core
++layout(std430) buffer;
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput;
++
++
++layout(set=0, binding=2) uniform constBuffer {
++    ivec4 inputSize;
++    ivec4 outputSize;
++    ivec2 pad;
++    ivec2 kernelSize;
++    ivec2 stride;
++} uConstant;
++
++layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    ivec3 outputSize = uConstant.outputSize.xyz;
++    ivec2 spos = pos.xy*uConstant.stride-uConstant.pad;
++
++    if (all(lessThan(pos, outputSize)))
++    {
++        ivec2 inputSizeXY = uConstant.inputSize.xy;
++        FLOAT4 color = FLOAT4(-100000.0);
++        ivec2 sfxy = max(ivec2(0), -spos);
++        ivec2 efxy = min(uConstant.kernelSize, inputSizeXY-spos);
++
++        for (int fy=sfxy.y; fy<efxy.y; ++fy)
++        {
++            for (int fx=sfxy.x; fx<efxy.x; ++fx)
++            {
++                ivec2 spos_ = spos + ivec2(fx, fy);
++                FLOAT4 inputColor = uInput.data[0
++                + pos.z * uConstant.inputSize.y * uConstant.inputSize.x
++                + spos_.y * uConstant.inputSize.x
++                + spos_.x
++                ];
++                color = max(inputColor, color);
++            }
++        }
++        uOutput.data[0
++            + pos.z * uConstant.outputSize.x * uConstant.outputSize.y
++            + pos.y * uConstant.outputSize.x
++            + pos.x
++            ] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/nc4hw4Tonchw.comp b/source/backend/vulkan/buffer/execution/glsl/nc4hw4Tonchw.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/nc4hw4Tonchw.comp
+@@ -0,0 +1,79 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    float data[];
++} uOutput;
++
++
++layout(set=0, binding=1) readonly buffer sourceBuffer{
++    vec4 data[];
++}uInput;
++
++
++layout(set=0, binding=2) uniform constBuffer{
++    ivec4 size; // NCHW
++    ivec4 stride; // NCHW
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    int channelC4 = (uConstant.size.y + 3) / 4;
++    if (posTmp.x < channelC4 * uConstant.size.x * uConstant.size.z * uConstant.size.w)
++    {
++        ivec3 pos;
++        pos.z = posTmp.x % (channelC4 * uConstant.size.x);
++        int subIndex = posTmp.x / (channelC4 * uConstant.size.x);
++        pos.x = subIndex % uConstant.size.w;
++        pos.y = subIndex / uConstant.size.w;
++        int batchIndex = pos.z / channelC4;
++        int zDiv4 = pos.z % channelC4;
++
++        int lastZ = uConstant.size.y / 4;
++        int cIndex = uConstant.size.y % 4;
++
++        vec4 color = vec4(0);
++        int z = zDiv4*4;
++        int basicOffset = 0
++            + batchIndex * uConstant.stride.x
++            + z * uConstant.stride.y
++            + pos.y*uConstant.stride.z
++            + pos.x*uConstant.stride.w
++            ;
++
++        color = uInput.data[0
++            + pos.x
++            + uConstant.size.w*pos.y
++            + uConstant.size.x * uConstant.size.z*uConstant.size.w*zDiv4
++            + batchIndex*uConstant.size.z*uConstant.size.w
++            ];
++        if(zDiv4 == lastZ)
++        {
++            if(cIndex == 1)
++            {
++                uOutput.data[basicOffset+0*uConstant.stride.y] = color.r;
++            }
++            else if(cIndex == 2)
++            {
++                uOutput.data[basicOffset+0*uConstant.stride.y] = color.r;
++                uOutput.data[basicOffset+1*uConstant.stride.y] = color.g;
++            }
++            else
++            {
++                uOutput.data[basicOffset+0*uConstant.stride.y] = color.r;
++                uOutput.data[basicOffset+1*uConstant.stride.y] = color.g;
++                uOutput.data[basicOffset+2*uConstant.stride.y] = color.b;
++            }
++        }
++        else
++        {
++            uOutput.data[basicOffset+0*uConstant.stride.y] = color.r;
++            uOutput.data[basicOffset+1*uConstant.stride.y] = color.g;
++            uOutput.data[basicOffset+2*uConstant.stride.y] = color.b;
++            uOutput.data[basicOffset+3*uConstant.stride.y] = color.a;
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/nchwTonc4hw4.comp b/source/backend/vulkan/buffer/execution/glsl/nchwTonc4hw4.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/nchwTonc4hw4.comp
+@@ -0,0 +1,86 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(set=0, binding=0) readonly buffer sourceBuffer{
++    float data[];
++} uInBuffer;
++
++
++layout(set=0, binding=1, std140) writeonly buffer destBuffer{
++    vec4 data[];
++}uOutBuffer;
++
++
++layout(set=0, binding=2) uniform constBuffer{
++    ivec4 size; // NCHW
++    ivec4 stride; // NCHW
++} uConstant;
++
++layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    int channelC4 = (uConstant.size.y + 3) / 4;
++    if (posTmp.x < channelC4 * uConstant.size.x * uConstant.size.z * uConstant.size.w)
++    {
++        ivec3 pos;
++        pos.z = posTmp.x % (channelC4 * uConstant.size.x);
++        int subIndex = posTmp.x / (channelC4 * uConstant.size.x);
++        pos.x = subIndex % uConstant.size.w;
++        pos.y = subIndex / uConstant.size.w;
++        int batchIndex = pos.z / channelC4;
++        int zDiv4 = pos.z % channelC4;
++
++        int lastZ = uConstant.size.y / 4;
++        int cIndex = uConstant.size.y % 4;
++
++        vec4 color = vec4(0);
++        int z = zDiv4*4;
++        int basicOffset = 0
++            + batchIndex*uConstant.stride.x
++            + z * uConstant.stride.y
++            + pos.y * uConstant.stride.z
++            + pos.x * uConstant.stride.w
++            ;
++
++        if(zDiv4 == lastZ)
++        {
++            if(cIndex == 1)
++            {
++                color.r = uInBuffer.data[basicOffset+0];
++                color.g = 0.0;
++                color.b = 0.0;
++                color.a = 0.0;
++            }
++            else if(cIndex == 2)
++            {
++                color.r = uInBuffer.data[basicOffset+0];
++                color.g = uInBuffer.data[basicOffset+1*uConstant.stride.y];
++                color.b = 0.0;
++                color.a = 0.0;
++            }
++            else
++            {
++                color.r = uInBuffer.data[basicOffset+0];
++                color.g = uInBuffer.data[basicOffset+1*uConstant.stride.y];
++                color.b = uInBuffer.data[basicOffset+2*uConstant.stride.y];
++                color.a = 0.0;
++            }
++        }
++        else
++        {
++            color.r = uInBuffer.data[basicOffset+0];
++            color.g = uInBuffer.data[basicOffset+1*uConstant.stride.y];
++            color.b = uInBuffer.data[basicOffset+2*uConstant.stride.y];
++            color.a = uInBuffer.data[basicOffset+3*uConstant.stride.y];
++        }
++
++        uOutBuffer.data[0
++            + pos.x
++            + uConstant.size.w*pos.y
++            + uConstant.size.x * uConstant.size.z*uConstant.size.w*zDiv4
++            + batchIndex*uConstant.size.z*uConstant.size.w
++            ] = color;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/norm.comp b/source/backend/vulkan/buffer/execution/glsl/norm.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/norm.comp
+@@ -0,0 +1,60 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer s0{
++    float data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer s1{
++    float data[];
++} uInput;
++
++layout(set=0, binding=2) readonly uniform constBuffer {
++    ivec4 size; // inside, outside, 1, outside
++    vec4 eps; // eps, 1, 1, 1
++} uConstant;
++
++#ifdef LAYERNORM_SCALE
++layout(set=0, binding=3) readonly buffer s2{
++    float data[];
++} uGamman;
++
++layout(set=0, binding=4) readonly buffer s3{
++    float data[];
++} uBeta;
++#endif
++
++layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
++#define UP_DIV(x, y) (((x)+(y)-1)/(y))
++
++void main()
++{
++    int y = int(gl_GlobalInvocationID.x);
++    if (y < uConstant.size.w)
++    {
++        float scale = 1.0 / float(uConstant.size.x); 
++        float mean = 0.0;
++        for (int j=0; j<uConstant.size.x; ++j)
++        {
++            mean = mean + (uInput.data[j + y * uConstant.size.x] * scale);
++        }
++        float squaremean = 0.0f;
++        for (int j=0; j<uConstant.size.x; ++j)
++        {
++            float v = uInput.data[j + y * uConstant.size.x] - mean;
++            squaremean = squaremean + (v * v * scale);
++        }
++        squaremean = 1.0f / sqrt(squaremean + uConstant.eps.x);
++        for (int j=0; j<uConstant.size.x; ++j)
++        {
++            float v = uInput.data[j + y * uConstant.size.x];
++#ifdef LAYERNORM_SCALE
++            float dst = (v - mean) * squaremean * uGamman.data[j] + uBeta.data[j];
++#else
++            float dst = (v - mean) * squaremean;
++#endif
++            uOutput.data[j + y * uConstant.size.x] = dst;
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/onehot.comp b/source/backend/vulkan/buffer/execution/glsl/onehot.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/onehot.comp
+@@ -0,0 +1,38 @@
++#version 440 core
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    float data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    float data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    float data[];
++} uOn;
++layout(set=0, binding=3) readonly buffer sourceBuffer2{
++    float data[];
++} uOff;
++
++layout(set=0, binding=4) uniform constBuffer{
++    ivec4 size; // x: outside, depth, inside, total
++} uConstant;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    if (posTmp.x < uConstant.size.w) {
++        int inside = posTmp.x % uConstant.size.z;
++        int tmp = posTmp.x / uConstant.size.z;
++        int depth = tmp % uConstant.size.y;
++        int outside = tmp / uConstant.size.y;
++
++        float depthF = float(depth);
++        float indice = uInput.data[inside + outside * uConstant.size.z];
++        float value = (abs(indice - depthF) < 0.5) ? uOn.data[0] : uOff.data[0];
++        uOutput.data[posTmp.x] = value;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/preluWithChannel.comp b/source/backend/vulkan/buffer/execution/glsl/preluWithChannel.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/preluWithChannel.comp
+@@ -0,0 +1,44 @@
++#version 450 core
++layout(std430) buffer;
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer inputBuffer {
++    FLOAT4 data[];
++} uInput;
++
++layout(set=0, binding=2) readonly buffer KernelBuffer{
++    FLOAT4 data[];
++} uSlope;
++
++layout(set = 0, binding = 3) uniform reluBuffer{
++    ivec4 imgSize; // plane, 1, channelC4, plane * channelC4
++}uPreluParam;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++	int index = int(gl_GlobalInvocationID.x);
++	int oz = index / uPreluParam.imgSize.x;
++    if(index < uPreluParam.imgSize.w)
++	{
++		vec4 slope = uSlope.data[oz];
++		vec4 dataIn = uInput.data[index];
++		vec4 dataTemp = dataIn * slope;
++		bvec4 lessZero = bvec4(lessThan(dataIn, vec4(0.0)));
++		uOutput.data[index] = mix(dataIn, dataTemp, lessZero);
++	}
++
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/range.comp b/source/backend/vulkan/buffer/execution/glsl/range.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/range.comp
+@@ -0,0 +1,28 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    float data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    float data[];
++} uStart;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    float data[];
++} uDelta;
++
++layout(set = 0, binding = 3) uniform constBuffer {
++    ivec4 size;
++} uConst;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    int i = int(gl_GlobalInvocationID.x);
++
++    if(i < uConst.size.w) {
++        uOutput.data[i] = float(i) * uDelta.data[0] + uStart.data[0];
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/resizeBilinear.comp b/source/backend/vulkan/buffer/execution/glsl/resizeBilinear.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/resizeBilinear.comp
+@@ -0,0 +1,58 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(set = 0, binding = 0) writeonly buffer outputBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set = 0, binding = 1) readonly buffer inputBuffer{
++    vec4 data[];
++}uInput;
++
++layout(set = 0, binding = 2) uniform reluBuffer{
++    ivec4 inImgSize;
++    ivec4 outImgSize;
++    vec4 scale;
++}uResizeParam;
++
++layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
++
++#define BUFFER_LOADDATA(X, P, index) \
++	X.data[P.z * uResizeParam.inImgSize.x * uResizeParam.inImgSize.y + P.y * uResizeParam.inImgSize.x + P.x]
++
++#define BUFFER_STORE_DATA(Y, P, C) \
++	Y.data[P.z * uResizeParam.outImgSize.x * uResizeParam.outImgSize.y + P.y * uResizeParam.outImgSize.x + P.x] = C
++
++void main()
++{
++	ivec3 pos = ivec3(gl_GlobalInvocationID);
++	// input output layout is NC4HW4
++
++	ivec3 inputImgSize = uResizeParam.inImgSize.xyz;
++	ivec3 outputImgSize = uResizeParam.outImgSize.xyz;
++
++    if(pos.x < outputImgSize.x && pos.y < outputImgSize.y)
++	{
++		float srcX = float(pos.x) * uResizeParam.scale.x + uResizeParam.scale.y;
++		int x1 = int(floor(srcX));
++		int x11 = clamp(x1, 0, inputImgSize.x - 1);
++		int x12 = clamp(x1 + 1, 0, inputImgSize.x - 1);
++		vec4 factorX = vec4(srcX - float(x1));
++
++		float srcY = float(pos.y) * uResizeParam.scale.z + uResizeParam.scale.w;
++		int y1 = int(floor(srcY));
++		int y11 = clamp(y1, 0, inputImgSize.y - 1);
++		int y12 = clamp(y1 + 1, 0, inputImgSize.y - 1);
++		vec4 factorY = vec4(srcY - float(y1));
++
++		vec4 res1 = BUFFER_LOADDATA(uInput, ivec3(x11, y12, pos.z), 0);
++		vec4 res2 = BUFFER_LOADDATA(uInput, ivec3(x12, y12, pos.z), 0);
++		vec4 res3 = BUFFER_LOADDATA(uInput, ivec3(x11, y11, pos.z), 0);
++		vec4 res4 = BUFFER_LOADDATA(uInput, ivec3(x12, y11, pos.z), 0);
++		vec4 res11 = (vec4(1.0) - factorX) * res1 + factorX * res2;
++		vec4 res12 = (vec4(1.0) - factorX) * res3 + factorX * res4;
++		
++		BUFFER_STORE_DATA(uOutput, pos, factorY * res11 + (vec4(1.0) - factorY) * res12);
++	}
++
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp b/source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/resizeNearest.comp
+@@ -0,0 +1,49 @@
++#version 440 core
++layout(std430) buffer;
++
++layout(set = 0, binding = 0) writeonly buffer outputBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set = 0, binding = 1) readonly buffer inputBuffer{
++    vec4 data[];
++}uInput;
++
++layout(set = 0, binding = 2) uniform reluBuffer{
++    ivec4 inImgSize;
++    ivec4 outImgSize;
++    vec4 scale;
++}uResizeParam;
++
++layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
++
++#define BUFFER_LOADDATA(X, P, index) \
++	X.data[P.z * uResizeParam.inImgSize.x * uResizeParam.inImgSize.y + P.y * uResizeParam.inImgSize.x + P.x]
++
++#define BUFFER_STORE_DATA(Y, P, C) \
++	Y.data[P.z * uResizeParam.outImgSize.x * uResizeParam.outImgSize.y + P.y * uResizeParam.outImgSize.x + P.x] = C
++
++void main()
++{
++	ivec3 pos = ivec3(gl_GlobalInvocationID);
++	// input output layout is NC4HW4
++
++	ivec3 inputImgSize = uResizeParam.inImgSize.xyz;
++	ivec3 outputImgSize = uResizeParam.outImgSize.xyz;
++
++    if(pos.x < outputImgSize.x && pos.y < outputImgSize.y)
++	{
++		float srcX = float(pos.x) * uResizeParam.scale.x + uResizeParam.scale.y;
++		int x1 = int(floor(srcX));
++		int x11 = clamp(x1, 0, inputImgSize.x - 1);
++
++		float srcY = float(pos.y) * uResizeParam.scale.z + uResizeParam.scale.w;
++		int y1 = int(floor(srcY));
++		int y11 = clamp(y1, 0, inputImgSize.y - 1);
++
++		vec4 outValue = BUFFER_LOADDATA(uInput, ivec3(x11, y11, pos.z), 0);
++		
++		BUFFER_STORE_DATA(uOutput, pos, outValue);
++	}
++
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/roipooling.comp b/source/backend/vulkan/buffer/execution/glsl/roipooling.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/roipooling.comp
+@@ -0,0 +1,78 @@
++#version 440 core
++layout(std140) buffer;
++layout(set = 0, binding = 0) writeonly buffer outputBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set = 0, binding = 1) readonly buffer inputBuffer{
++    vec4 data[];
++}uInput;
++
++layout(set = 0, binding = 2) readonly buffer roiBuffer{
++    vec4 data[];
++}uRoI;
++
++layout(set = 0, binding = 3) uniform constBuffer
++{
++	ivec4 inputImgSize;
++	ivec4 outputImgSize;
++	float spatialScale;
++}uRoiPoolingParam;
++
++layout(local_size_x = 8, local_size_y = 8) in;
++
++void main()
++{
++	ivec3 pos = ivec3(gl_GlobalInvocationID);
++	ivec3 outputImgSize = uRoiPoolingParam.outputImgSize.xyz;
++
++	if(pos.x < outputImgSize.x && pos.y < outputImgSize.y)
++	{
++		ivec3 inputImgSize = uRoiPoolingParam.inputImgSize.xyz;
++		int roiBatchIndex = pos.z % uRoiPoolingParam.outputImgSize.w;
++		int inputZIndex = pos.z / uRoiPoolingParam.outputImgSize.w;
++		// 0, xmin, ymin, xmax, ymax
++		vec4 roiData0 = uRoI.data[roiBatchIndex];
++		vec4 roiData1 = uRoI.data[roiBatchIndex + uRoiPoolingParam.outputImgSize.w];
++		int inputBatch = int(roiData0.x);
++		int x1 = int(round(float(roiData0.y) * uRoiPoolingParam.spatialScale));
++		int y1 = int(round(float(roiData0.z) * uRoiPoolingParam.spatialScale));
++		int x2 = int(round(float(roiData0.w) * uRoiPoolingParam.spatialScale));
++		int y2 = int(round(float(roiData1.x) * uRoiPoolingParam.spatialScale));
++
++		int roiW = max(x2 - x1 + 1, 1);
++		int roiH = max(y2 - y1 + 1, 1);
++		float binSizeW = float(roiW) / float(outputImgSize.x);
++		float binSizeH = float(roiH) / float(outputImgSize.y);
++
++		int wStart = clamp(x1 + int(floor(float(pos.x) * binSizeW)), 0, inputImgSize.x);
++		int wEnd = clamp(x1 + int(ceil(float(pos.x + 1) * binSizeW)), 0, inputImgSize.x);
++		int hStart = clamp(y1 + int(floor(float(pos.y) * binSizeH)), 0, inputImgSize.y);
++		int hEnd = clamp(y1 + int(ceil(float(pos.y + 1) * binSizeH)), 0, inputImgSize.y);
++
++		bool isEmpty = (hEnd <= hStart) || (wEnd <= wStart);
++
++		int inputBasicOffset = inputBatch * uRoiPoolingParam.inputImgSize.x * uRoiPoolingParam.inputImgSize.y
++			+ inputZIndex * uRoiPoolingParam.inputImgSize.x * uRoiPoolingParam.inputImgSize.y * uRoiPoolingParam.inputImgSize.w
++			;
++		int inputStartOffset = wStart
++					+ hStart * uRoiPoolingParam.inputImgSize.x
++					+ inputBasicOffset;
++		vec4 res = isEmpty ? vec4(0.0) : uInput.data[inputStartOffset];
++		for(int i = hStart; i < hEnd; ++i)
++		{
++			for(int j = wStart; j < wEnd; ++j)
++			{
++				int inputOffset = j
++					+ i * uRoiPoolingParam.inputImgSize.x
++					+ inputBasicOffset;
++				res = max(res, uInput.data[inputOffset]);
++			}
++		}
++		uOutput.data[0
++			+ pos.x
++			+ pos.y * uRoiPoolingParam.outputImgSize.x
++			+ pos.z * uRoiPoolingParam.outputImgSize.x * uRoiPoolingParam.outputImgSize.y
++		] = res;
++	}
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/scale.comp b/source/backend/vulkan/buffer/execution/glsl/scale.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/scale.comp
+@@ -0,0 +1,39 @@
++#version 440 core
++layout(std430) buffer;
++layout(set = 0, binding = 0) writeonly buffer outputBuffer{
++    vec4 data[];
++}uOutput;
++
++layout(set = 0, binding = 1) readonly buffer inputBuffer{
++    vec4 data[];
++}uInput;
++
++layout(set = 0, binding = 2) readonly buffer scaleBuffer{
++    vec4 data[];
++}uScale;
++
++layout(set = 0, binding = 3) readonly buffer biasBuffer{
++    vec4 data[];
++}uBias;
++
++layout(set = 0, binding = 4) uniform constBuffer{
++    ivec4 imgSize;
++}uConst;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    int posIndex = int(gl_GlobalInvocationID.x);
++
++    if(posIndex < uConst.imgSize.w)
++    {
++        int channelIndex = posIndex / uConst.imgSize.x;
++        vec4 scale = uScale.data[channelIndex];
++        vec4 bias = uBias.data[channelIndex];
++
++        vec4 color = uInput.data[posIndex];
++        vec4 res = color * scale + bias;
++        uOutput.data[posIndex] = res;
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/select.comp b/source/backend/vulkan/buffer/execution/glsl/select.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/select.comp
+@@ -0,0 +1,43 @@
++#version 440 core
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    float data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    float data[];
++} uSelect;
++
++layout(set=0, binding=2) readonly buffer sourceBuffer1{
++    float data[];
++} uInput0;
++
++layout(set=0, binding=3) readonly buffer sourceBuffer2{
++    float data[];
++} uInput1;
++
++layout(set = 0, binding = 4) uniform constBuffer {
++    ivec4 size;
++} uConst;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main() {
++    int i = int(gl_GlobalInvocationID.x);
++
++    if(i < uConst.size.w) {
++        if (uSelect.data[i] > 0) {
++            if (uConst.size.y == 1) {
++                uOutput.data[i] = uInput0.data[0];
++            } else {
++                uOutput.data[i] = uInput0.data[i];
++            }
++        } else {
++            if (uConst.size.z == 1) {
++                uOutput.data[i] = uInput1.data[0];
++            } else {
++                uOutput.data[i] = uInput1.data[i];
++            }
++        }
++    }
++}
+diff --git a/source/backend/vulkan/buffer/execution/glsl/unary.comp b/source/backend/vulkan/buffer/execution/glsl/unary.comp
+--- /dev/null
++++ b/source/backend/vulkan/buffer/execution/glsl/unary.comp
+@@ -0,0 +1,133 @@
++#version 440
++#ifdef FP16
++#extension GL_AMD_gpu_shader_half_float: enable
++#define FLOAT4 f16vec4
++#define MAT4 f16mat4
++#extension GL_AMD_gpu_shader_half_float: enable
++#else
++#define FLOAT4 vec4
++#define MAT4 mat4
++#endif
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT4 data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT4 data[];
++} uInput;
++layout(set=0, binding=2) uniform constBuffer{
++    ivec4 size; // x: limit, y: channelC4*b, z:height, w:width
++    vec4 slope;
++} uConstant;
++
++//for dynamic change threads counts from outside
++// from vkCreateComputePipelines->VkComputePipelineCreateInfo->VkPipelineShaderStageCreateInfo->VkSpecializationInfo->VkSpecializationMapEntry
++// layout(local_size_x_id = 1, local_size_y_id = 2, local_size_z_id = 3) in;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    if (posTmp.x < uConstant.size.x) {
++        vec4 value = uInput.data[posTmp.x];
++#ifdef NEG
++        value = -value;
++#endif
++#ifdef EXP
++        value = exp(value);
++#endif
++#ifdef SIGN
++        value = sign(value);
++#endif
++#ifdef SQRT
++        value = sqrt(value);
++#endif
++#ifdef RSQRT
++        value = inversesqrt(value);
++#endif
++#ifdef ABS
++        value = abs(value);
++#endif
++#ifdef TANH
++        value = tanh(value);
++#endif
++#ifdef SQUARE
++        value = value * value;
++#endif
++#ifdef LOG
++        value = log(value + vec4(0.0000001));
++#endif
++#ifdef SIGMOID
++        value = 1.f / (1.f + exp(-value));
++#endif
++#ifdef TAN
++        value = tan(value);
++#endif
++#ifdef COS
++        value = cos(value);
++#endif
++#ifdef SIN
++        value = sin(value);
++#endif
++#ifdef CEIL
++        value = ceil(value);
++#endif
++#ifdef FLOOR
++        value = floor(value);
++#endif
++#ifdef EXPM1
++        value = exp(value) - FLOAT4(1);
++#endif
++#ifdef RECIPROCAL
++        value = FLOAT4(1) / value;
++#endif
++
++#ifdef SINH
++        value = sinh(value);
++#endif
++#ifdef ASINH
++        value = asinh(value);
++#endif
++#ifdef ASIN
++        value = asin(value);
++#endif
++#ifdef COSH
++        value = cosh(value);
++#endif
++#ifdef ACOSH
++        value = acosh(value);
++#endif
++#ifdef ACOS
++        value = acos(value);
++#endif
++#ifdef ATAN
++        value = atan(value);
++#endif
++#ifdef ATANH
++        value = atanh(value);
++#endif
++#ifdef LOG1P
++        value = log(FLOAT4(1) + value);
++#endif
++
++#ifdef ROUND
++        value = round(value);
++#endif
++#ifdef RELU
++        bvec4 lessZero = bvec4(lessThan(value, vec4(0.0)));
++        vec4 dataTemp = value * uConstant.slope.x;
++        value = mix(value, dataTemp, lessZero);
++#endif
++#ifdef CLAMP
++        value = clamp(value, vec4(uConstant.slope.x), vec4(uConstant.slope.y));
++#endif
++#ifdef HARDSWISH
++        const vec4 leftMask = vec4(greaterThan(value, vec4(-3.0f)));
++        const vec4 rightMask = vec4(lessThan(value, vec4(3.0f)));
++        value = leftMask*value*(rightMask*((value+3.0f)/6.0f) + 1.0f - rightMask);
++#endif
++        uOutput.data[posTmp.x] = value;
++    }
++}
+diff --git a/source/backend/vulkan/image/execution/glsl/reduce.comp b/source/backend/vulkan/image/execution/glsl/reduce.comp
+--- /dev/null
++++ b/source/backend/vulkan/image/execution/glsl/reduce.comp
+@@ -0,0 +1,61 @@
++#version 440 core
++#define FLOAT float
++
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    FLOAT data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT data[];
++} uInput;
++
++layout(set=0, binding=2) uniform constBuffer {
++    int w;//inside
++    int h;//axis
++    int c;//outside
++    float k;//For mean
++}uConst;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    ivec2 pos;
++    pos.x = posTmp.x / uConst.w;
++    pos.y = posTmp.x % uConst.w;
++    // x: index in outside, y: index in inside
++    if(pos.y < uConst.w && pos.x < uConst.c)
++    {
++        int h = uConst.h;
++        int W = uConst.w;
++        int H = uConst.h;
++        int C = uConst.c;
++        int basicOffset = pos.x * uConst.w * uConst.h + pos.y;
++        FLOAT res = uInput.data[basicOffset];
++        for(int i = 1; i < uConst.h; ++i)
++        {
++            FLOAT next = uInput.data[basicOffset + i * uConst.w];
++#ifdef VMAX
++            res = max(res, next);
++#endif
++#ifdef VMIN
++            res = min(res, next);
++#endif
++#ifdef SUM
++            res = res + next;
++#endif
++#ifdef PROD
++            res = res * next;
++#endif
++#ifdef MEAN
++            res = res + next;
++#endif
++        }
++#ifdef MEAN
++        res = res * uConst.k;
++#endif
++        uOutput.data[posTmp.x] = res;
++    }
++}
+diff --git a/source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp b/source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp
+--- /dev/null
++++ b/source/backend/vulkan/image/execution/glsl/softmaxHeight_NHWC.comp
+@@ -0,0 +1,47 @@
++#version 440 core
++layout(std430) buffer;
++layout(set=0, binding=0) buffer destbuffer{
++    float data[];
++}uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer{
++    float data[];
++}uInput;
++
++layout(set = 0, binding = 2) uniform constBuffer {
++    int w;//inside
++    int h;//axis
++    int c;//outside
++}uConst;
++
++layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
++
++void main()
++{
++    // input tensor's layout is NHWC
++    ivec3 pos = ivec3(gl_GlobalInvocationID);
++    // x: index in outside, y: index in inside
++    if(pos.y < uConst.w && pos.x < uConst.c)
++    {
++        int W = uConst.w;
++        int H = uConst.h;
++        int C = uConst.c;
++        float maxValue = -1000.0;
++        for(int i = 0; i < H; ++i)
++        {
++            int index = i * W + pos.x * H * W + pos.y;
++            maxValue = max(maxValue, uInput.data[index]);
++        }
++        float sum = 0.0;
++        for(int i = 0; i < H; ++i)
++        {
++            int index = i * W + pos.x * H * W + pos.y;
++            sum += exp(uInput.data[index] - maxValue);
++        }
++        for(int i = 0; i < H; ++i)
++        {
++            int index = i * W + pos.x * H * W + pos.y;
++            uOutput.data[index] = exp(uInput.data[index] - maxValue) / sum;
++        }
++    }
++}

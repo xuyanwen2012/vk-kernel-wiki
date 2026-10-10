@@ -1,0 +1,74 @@
+repo: alibaba/MNN
+pr: 4629
+url: https://github.com/alibaba/MNN/pull/4629
+merge_sha: ea43f4924ed388c29fb4c32981a71dc37cb1debb
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/4629/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup.comp
+  status: modified
+  sha256: 505750863dcdf2681bb6eb38e661189a6b07a721f6a71deb9e06ec1f617ea9b4
+- path: source/backend/vulkan/buffer/execution/glsl/attention_decode_q1_subgroup_hd128.comp
+  status: modified
+  sha256: ef694b6765728d01751c5744208f8fa8aca684787b31b82f24239ba4ed6f5d4f
+- path: source/backend/vulkan/buffer/execution/glsl/attention_fused.comp
+  status: modified
+  sha256: ff8300e08361c6faa3e24bd90bea8d1feb203d08252fd35950a0b058b48ca712
+- path: source/backend/vulkan/buffer/execution/glsl/attention_fused_packed.comp
+  status: modified
+  sha256: c2abb365d73e8d6c4305c7844f3c36840c5038fbb4bf12fc9a59609c731c8527
+- path: source/backend/vulkan/buffer/execution/glsl/attention_kvcache_update.comp
+  status: modified
+  sha256: 60c0eb0139e228e4da0cdbb04503cf46b210e35db097aec86393800026b821d1
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_kblock_finalize.comp
+  status: modified
+  sha256: 3b9da81c314cd3807699123da576669a4e0936c0a7064a6a898259b28c5c9e79
+- path: source/backend/vulkan/buffer/execution/glsl/attention_prefill_rearrange_q.comp
+  status: modified
+  sha256: a79faecbeb9ad2ab89954c51398780295476b0e15fa0a070521eb4255880f6e7
+- path: source/backend/vulkan/buffer/execution/glsl/binary.comp
+  status: modified
+  sha256: 18d595ab37aa2f1f802ea4cebfcac968fad2f8324dfc30a5b47ff9224a2f1671
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_silu.comp
+  status: modified
+  sha256: 37cda632be78c3568b9c2cff265c3d2c9ffd3e7759d4cf88153ece1d46d9c275
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_conv_state_update.comp
+  status: modified
+  sha256: 57c7b213d10cd89885f9da01e5214577f8a1d2598f17075bd1c9346b19758e6a
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+  status: modified
+  sha256: a7e17c5af4d54664049ac6a5f1db10ea5b16601d19289e519d56afc21cbd5b80
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+  status: modified
+  sha256: cf1d9507959235715fc7b572a2974c271897270f9fa2114dc554a5af426f54fb
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+  status: modified
+  sha256: 17333a908294c2959a480c2211c522f6ae6654e95f5b8b3d170b3bc7aca46622
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+  status: modified
+  sha256: ce639dd31e4cafd34e45fd3a55e44baace8750a2a611b15fb39b9d637b4864f1
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv.comp
+  status: added
+  sha256: afde8ecf223447a73b1f56097214d2121fd012cae5b77a21934333362523365b
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_output.comp
+  status: added
+  sha256: 99a7fdc12098c821d74dc1d198f7854687518ffa324082cfcb54cd52ffc4ba86
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_short_conv_state_update.comp
+  status: added
+  sha256: f05999a438772f6b69c1088c11b60284c3c51ab12e15c5fa1dcd04e54468e740
+- path: source/backend/vulkan/buffer/execution/glsl/norm.comp
+  status: modified
+  sha256: 450bac6c71cf063866cd6de35a0a5348bc89b5c7a99966acb2cce0efb79df832
+- path: source/backend/vulkan/buffer/execution/glsl/norm_binary.comp
+  status: added
+  sha256: bce9916ca0e444e2b3b579553a83c53ecc846367e63435fa93faa4e688e64923
+- path: source/backend/vulkan/buffer/execution/glsl/norm_opt.comp
+  status: modified
+  sha256: 7230b75054b9a339b068a894f4bd481b3ee02352711d7118610605d4d987ea30
+- path: source/backend/vulkan/buffer/execution/glsl/rope.comp
+  status: added
+  sha256: 141910a20edb76fb1b7d782a9d324fac463d152ee608b3f9d7b223be24597f26

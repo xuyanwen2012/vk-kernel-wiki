@@ -1,0 +1,56 @@
+repo: alibaba/MNN
+pr: 2839
+url: https://github.com/alibaba/MNN/pull/2839
+merge_sha: b0565d3402167fc7f85f8f8f5d4a109b6293b5f8
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/2839/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/argmax.comp
+  status: modified
+  sha256: 2cd554a92b1537b934b028ae1a54669734f8dac41132227e5f9af7bae3c6c3dc
+- path: source/backend/vulkan/buffer/execution/glsl/binary.comp
+  status: modified
+  sha256: 16463e43911b8f9b4a303d7465c9c827a959e63fe75eae8faa4e6f2c27992b2b
+- path: source/backend/vulkan/buffer/execution/glsl/binary_blit.comp
+  status: modified
+  sha256: 1f1653de12121dfbb093a35294a8245f1ff28b1c672adfdce4981382e998abf7
+- path: source/backend/vulkan/buffer/execution/glsl/binary_blit_int.comp
+  status: added
+  sha256: e5bc44e0fdd6a10ced7c0ce27d78697f5a149828a7a8b79aa7d86b9c1ed1a7f0
+- path: source/backend/vulkan/buffer/execution/glsl/binary_int.comp
+  status: added
+  sha256: 7a0960f2de7bbdecf1d28c8088e0caa1826b735ffaf915ae93962b542326c121
+- path: source/backend/vulkan/buffer/execution/glsl/blitregion.comp
+  status: modified
+  sha256: 683f7e1bee7b9a38331545709d0c1a72e99060524f059e824cabe9a88184181f
+- path: source/backend/vulkan/buffer/execution/glsl/cast_float_int.comp
+  status: added
+  sha256: 7047b46ac20d298a8fa561a8adc77af58aa7195bc78b5542a125b0139e5c1186
+- path: source/backend/vulkan/buffer/execution/glsl/cast_int_bool.comp
+  status: added
+  sha256: fdccbefb00deb9e77c866f084107a87364e4609dcd13673d08035cfd0d1237ac
+- path: source/backend/vulkan/buffer/execution/glsl/convolutionint4.comp
+  status: added
+  sha256: 1e0ea8b5b329181e04c1e325b033da021b2978e0a37d643ea1caa15b83f00fc3
+- path: source/backend/vulkan/buffer/execution/glsl/convolutionint8.comp
+  status: added
+  sha256: a58faa5f5e775c3d36c70b399c31672c993d31a4edb9781d21e27235280e1691
+- path: source/backend/vulkan/buffer/execution/glsl/onehot.comp
+  status: modified
+  sha256: bf3d7e479ed4c37147471bf522d84f81ed8c9ff45fd5e57feccd93d0aa0fb24e
+- path: source/backend/vulkan/buffer/execution/glsl/range.comp
+  status: modified
+  sha256: 2f4d99d1896bf441022e1cd9abb203d77e65178e1ed39c823c8943f7f687fdd1
+- path: source/backend/vulkan/buffer/execution/glsl/reduce_int.comp
+  status: added
+  sha256: 71f2a38f942d53fd8f42624848c72d23bd074deeb9dcb7482ad3d7b90281544b
+- path: source/backend/vulkan/buffer/execution/glsl/select.comp
+  status: modified
+  sha256: eb136307c688932a7a8d45ae544da79a7480ac2548504dcb0e37a83f02996e21
+- path: source/backend/vulkan/buffer/execution/glsl/unary_int.comp
+  status: added
+  sha256: bd90d1202a742e0c8ead39d79d9a836534ad90cb795bed4f1d06083698e67d79

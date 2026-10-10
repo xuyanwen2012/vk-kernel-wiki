@@ -1,0 +1,83 @@
+repo: alibaba/MNN
+url: https://github.com/alibaba/MNN
+commit: 9c1788748c4d8aba00f9b644f50f5c15576d7d80
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/matmul_coop.comp
+  file: matmul_coop.comp
+  sha256: 183b82aa03f3dcf6b33d869c51047020f3f000733aa889d76a56ec06585533a2
+- path: source/backend/vulkan/buffer/execution/glsl/matmul_coop_rm.comp
+  file: matmul_coop_rm.comp
+  sha256: 7f813ca2485de6011efcffb4c2cb143f497c753b4bd48f0cb309eb58a5d7dc43
+- path: source/backend/vulkan/buffer/execution/glsl/C4_to_COOP.comp
+  file: C4_to_COOP.comp
+  sha256: 7383b148c22b7a3b62edba24c22d9eaa76ae20390df2cc7e15280b5161e92531
+- path: source/backend/vulkan/buffer/execution/glsl/COOP_to_C4.comp
+  file: COOP_to_C4.comp
+  sha256: 35b8e2355d0b9a8c06b7a45859f8e8b2451b5b5034ad3fce35a30a52ec7bbe6f
+- path: source/backend/vulkan/buffer/execution/glsl/int4_weight_to_coop.comp
+  file: int4_weight_to_coop.comp
+  sha256: 6c26e392932b95d52f07a0b1e07776e634fd07901600dd93ea7c3b70e43bc0c8
+- path: source/backend/vulkan/buffer/execution/glsl/int8_weight_to_coop.comp
+  file: int8_weight_to_coop.comp
+  sha256: 0a0561c8f2aef31609a220b584d81d9139e9be88dbf15b1302e9752e76506a3a
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_coop_gemm.comp
+  file: dynamic_w8a8_coop_gemm.comp
+  sha256: 2ddcaf8cf127f801c0d0b975df46b413e33f85e746aaebe4a47bee6fafcfb8d1
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_coop_gemm_fused.comp
+  file: dynamic_w8a8_coop_gemm_fused.comp
+  sha256: e25b0b0262beaf4fce09df9c37e815dfdf07805b87349cf1311e2164bd200309
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_dequant_correction.comp
+  file: dynamic_w8a8_dequant_correction.comp
+  sha256: 7e353b01f05883d475064d2d89980a2a27e064ab32900a58601c7ff8aa9d8a32
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_int4_to_int8_unpack.comp
+  file: dynamic_int4_to_int8_unpack.comp
+  sha256: 9c61eb614fa82f3a0dbaf400efa10aefb827efdadd15aa672d59b506d6a1e8c7
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_quant_minmax.comp
+  file: dynamic_quant_minmax.comp
+  sha256: 381c27a19465732edb0ad08f81c4588b849622e78f5c690cfadd16d486957849
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_quant_reduce_minmax.comp
+  file: dynamic_quant_reduce_minmax.comp
+  sha256: 436e50d4e093dbafdda6043cd7a8f75dc9f33731da8c58ab20afb5ad099f5a3f
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_quant_pack.comp
+  file: dynamic_quant_pack.comp
+  sha256: 2d80e91b63ea8dee4052383fcdbe37bbee0bdc2c240573e57732afefda0f2f34
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_quant_reduce_sum.comp
+  file: dynamic_quant_reduce_sum.comp
+  sha256: befcae73056d51dbb692c24cdc6aad71bf1b1581d47dee6ddaffb8d8726f0ad4
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int4_weight_sumK.comp
+  file: conv1x1_int4_weight_sumK.comp
+  sha256: 936882c37bd5950a69d72f59bfab6367b70dc5d76cd0766aa1d3d5cad00e390d
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int8_weight_sumK.comp
+  file: conv1x1_int8_weight_sumK.comp
+  sha256: f5e253f1ec47b6acf4db7e1daf52aa616ce4b9665e4260cf9db07c856a2b441d
+- path: source/backend/vulkan/buffer/execution/glsl/macro.json
+  file: macro.json
+  sha256: 5002e906eb4166027aa5b021cebdfa29207feb39802cc79a3fd02554dc8dd172
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1CoopAFP16.cpp
+  file: VulkanConv1x1CoopAFP16.cpp
+  sha256: 9997f44dc90d17df49b2b12a570cf6e7c27bf5d4cb7a27ed42f80693a22f7487
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1CoopAFP16.hpp
+  file: VulkanConv1x1CoopAFP16.hpp
+  sha256: e3e81ca32499da0d957107bf09d51bcccee004da4b37c48e8e3568e058c48f2b
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1CoopA8.cpp
+  file: VulkanConv1x1CoopA8.cpp
+  sha256: caf4b0ba1cc49d036567bd62a7340c22097510aa26bedc01f7255463233acd9d
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1CoopA8.hpp
+  file: VulkanConv1x1CoopA8.hpp
+  sha256: dac769a34061ccea274c49c6028634600d01512169368f10893f95a7e503e021
+- path: source/backend/vulkan/buffer/execution/VulkanConvolution.cpp
+  file: VulkanConvolution.cpp
+  sha256: bb1cea408a711b026b05f74b5812ec234a63601375df5144b7ec6e51a73d247b
+- path: source/backend/vulkan/component/VulkanDevice.cpp
+  file: VulkanDevice.cpp
+  sha256: e699080b5c526b389db7371ab707923847ea48cf8740fb0861dcd75df8d0d92e
+- path: source/backend/vulkan/component/VulkanDevice.hpp
+  file: VulkanDevice.hpp
+  sha256: 31cc005434a05fdef82a8a57659acaa68fb5abc9c3b8de919ad8c23f1c735639
+- path: source/backend/vulkan/buffer/compiler/makeshader.py
+  file: makeshader.py
+  sha256: 9a14aa0e9a0d8c028cc26e2102876f09ee4e21cad1fac62e6005ce38eff723ee

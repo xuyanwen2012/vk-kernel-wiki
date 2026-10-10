@@ -1,0 +1,17 @@
+repo: alibaba/MNN
+pr: 4832
+url: https://github.com/alibaba/MNN/pull/4832
+merge_sha: bef71b9756a2c77549eddbe33eb97290e3b16602
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/4832/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_int4_to_int8_unpack.comp
+  status: modified
+  sha256: 7ea3866b221621c6cb2857a6bffddd27748ef620aa41799bdebd137583ea78c0
+- path: source/backend/vulkan/buffer/execution/glsl/dynamic_w8a8_coop_gemm_fused.comp
+  status: added
+  sha256: e09caf69f6ec630527f47f5d9ec4fe6f30aecc02160391ca65b120b2612cfe52

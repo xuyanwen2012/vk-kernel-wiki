@@ -1,0 +1,23 @@
+repo: alibaba/MNN
+pr: 4755
+url: https://github.com/alibaba/MNN/pull/4755
+merge_sha: a5a0e5019b44cc28050d6598fd126583c1e30ad8
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+patch_file: shaders.patch
+origin: GitHub REST API, repos/alibaba/MNN/pulls/4755/files, field 'patch'
+extraction: verbatim patch text per file; the diff/---/+++ header lines are generated
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode.comp
+  status: modified
+  sha256: 4eb37488c62a610aab2d6629ee9bffd91221a42dbb7d91c4c7c3be3af10eed70
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_decode_nosubgroup.comp
+  status: modified
+  sha256: f0405d5585d0f73298dd9a9e662a10c6d0d119e75e477b928c2a5c51e208aead
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill.comp
+  status: modified
+  sha256: 67cd65dfe7f243ca9af4c0126e276fbb63d56dd8b19e2ec50b3220e2c83ae5bb
+- path: source/backend/vulkan/buffer/execution/glsl/linear_attn_gated_delta_rule_prefill_nosubgroup.comp
+  status: modified
+  sha256: 18cca7bf1df0143281bbe8919ef806e16cc4ddfe1a57736b4db54b74c35b9c96

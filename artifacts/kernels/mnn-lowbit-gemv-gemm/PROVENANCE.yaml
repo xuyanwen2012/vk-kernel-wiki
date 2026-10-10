@@ -1,0 +1,83 @@
+repo: alibaba/MNN
+url: https://github.com/alibaba/MNN
+commit: 9c1788748c4d8aba00f9b644f50f5c15576d7d80
+license: Apache-2.0
+license_file: artifacts/prs/mnn/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2.comp
+  file: gemv_dequant_int2.comp
+  sha256: 1e3ad961b4e58b668e5e4e455fcb9932bc1d1b43d68a0bb7b116b3633d5a9e83
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int2_nosubgroup.comp
+  file: gemv_dequant_int2_nosubgroup.comp
+  sha256: 2a21c50002b66216b40d9132287495304a9fcbc9f07d73add159d15da51bf692
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3.comp
+  file: gemv_dequant_int3.comp
+  sha256: 456a76414d4d72047a6c2a501f3cc8f79e51eded0a4a6898cdda7da1785cef71
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int3_nosubgroup.comp
+  file: gemv_dequant_int3_nosubgroup.comp
+  sha256: 9e3994283c32801002361d0d191469a33fef2afdfd89dfa101a133411b1a7b0a
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int4.comp
+  file: gemv_dequant_int4.comp
+  sha256: 4b399d941cc105f5d7920ea3ffd208e389c51a47d576ff7391a72d9e7d21508a
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int4_nosubgroup.comp
+  file: gemv_dequant_int4_nosubgroup.comp
+  sha256: 95f5d2b8ab9fc771d3f243ca93779175c3c054494950ea87b83a6c16e7b8f2e7
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int8.comp
+  file: gemv_dequant_int8.comp
+  sha256: 3e354d5176f6bc4ff90e70f990856616a3df721530cabdde839e1d6b007d64d8
+- path: source/backend/vulkan/buffer/execution/glsl/gemv_dequant_int8_nosubgroup.comp
+  file: gemv_dequant_int8_nosubgroup.comp
+  sha256: 814678490a3ec997f5149a794850c295d6a4916969c3ead9f920cfc6cedbf3ad
+- path: source/backend/vulkan/buffer/execution/glsl/gemm_m8n4.comp
+  file: gemm_m8n4.comp
+  sha256: dc24cc6c6cbbe527f04e0224a203003dd29672ac333f68efe15b5c0ed980e681
+- path: source/backend/vulkan/buffer/execution/glsl/pack_a_k4m4_to_m64k4.comp
+  file: pack_a_k4m4_to_m64k4.comp
+  sha256: 6c50bcb121abd893311fc2ec1c4e13de1a30e3f68072f3dfe6f92fc4e38b33e5
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int2_weight_prepare.comp
+  file: conv1x1_int2_weight_prepare.comp
+  sha256: b1366e16833c282e589421b32844d9db7d331fdb5a7e6d070eeb6e22e1e50ee1
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int3_weight_prepare.comp
+  file: conv1x1_int3_weight_prepare.comp
+  sha256: cc3eccca27f062ecd41027f3a4a44837a2658fc523c3bc36d18776c43dc07c51
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int4_weight_prepare.comp
+  file: conv1x1_int4_weight_prepare.comp
+  sha256: ae7ea8f3182a534e1c33a14942dc9cc73017597634dfb2b9d48a9a0698e8e186
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_int8_weight_prepare.comp
+  file: conv1x1_int8_weight_prepare.comp
+  sha256: d7fd7dbd6311d57bef2798b06760637820eea63b4e4a4f19a30fac945e540573
+- path: source/backend/vulkan/buffer/execution/glsl/conv1x1_quant_meta_prepare.comp
+  file: conv1x1_quant_meta_prepare.comp
+  sha256: f1a7a9070638fb40274fe1c6babfde1c71d8461287d31b0aad2f4b5fdf15ca67
+- path: source/backend/vulkan/buffer/execution/glsl/int2_weight_to_pack.comp
+  file: int2_weight_to_pack.comp
+  sha256: 026ec607661c2ebd7a6ecf920ab7a50dc61e8b9da185be38b7b969874d5f06a6
+- path: source/backend/vulkan/buffer/execution/glsl/int3_weight_to_pack.comp
+  file: int3_weight_to_pack.comp
+  sha256: 32818d871c55c9a3b52b6e8fd397799e75f37f33a7c37e8c4416d34303329d9b
+- path: source/backend/vulkan/buffer/execution/glsl/int4_weight_to_pack.comp
+  file: int4_weight_to_pack.comp
+  sha256: a0541e586a1a308ef24be7b23715fca54493522d5a3a4dbdfca7846a725a7c00
+- path: source/backend/vulkan/buffer/execution/glsl/int8_weight_to_pack.comp
+  file: int8_weight_to_pack.comp
+  sha256: 9e994bb8d199aba429e0520843004f6d1e9c13ab9c49486fdc59cc6afaea07cc
+- path: source/backend/vulkan/buffer/execution/glsl/convolutionint4.comp
+  file: convolutionint4.comp
+  sha256: 0fa92de32f0777da318c5f59b53509439fd46ab265b14cefa715290608692fcb
+- path: source/backend/vulkan/buffer/execution/glsl/convolutionint8.comp
+  file: convolutionint8.comp
+  sha256: 1babe4017702c3e4258bd557afa2bf2305740b9aad0ea0c0d14d65814bb74a2e
+- path: source/backend/vulkan/buffer/execution/glsl/matmulunit.comp
+  file: matmulunit.comp
+  sha256: e0a1ced3b110bbe49d054ef8252f008d7098b68367b561d69be26ea025382b8c
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1General.cpp
+  file: VulkanConv1x1General.cpp
+  sha256: 35336a6ed0d6c136f5f981dc3aaaa0c49cc708fce957ad15bc1cfbed1a4c593e
+- path: source/backend/vulkan/buffer/execution/VulkanConv1x1General.hpp
+  file: VulkanConv1x1General.hpp
+  sha256: 00eeab76762fb104c55444db91d19c574599d842e313f3ed63360b72c7760c30
+- path: source/backend/vulkan/buffer/execution/VulkanMatMul.cpp
+  file: VulkanMatMul.cpp
+  sha256: 7531bd793022fa1fa2606edc2df0eba3b625dab1cff3a6cb322388750ec41330

@@ -1,0 +1,520 @@
+diff --git a/source/backend/vulkan/image/execution/glsl/argmax.comp b/source/backend/vulkan/image/execution/glsl/argmax.comp
+--- /dev/null
++++ b/source/backend/vulkan/image/execution/glsl/argmax.comp
+@@ -0,0 +1,51 @@
++#version 440 core
++#define FLOAT float
++
++layout(std430) buffer;
++layout(set=0, binding=0) writeonly buffer destBuffer{
++    int data[];
++} uOutput;
++
++layout(set=0, binding=1) readonly buffer sourceBuffer0{
++    FLOAT data[];
++} uInput;
++
++layout(set=0, binding=2) uniform constBuffer {
++    int w; //inside
++    int h; //axis
++    int c; //outside
++    float k; // 0
++}uConst;
++
++layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
++
++void main()
++{
++    ivec3 posTmp = ivec3(gl_GlobalInvocationID);
++    ivec2 pos;
++    pos.x = posTmp.x / uConst.w;
++    pos.y = posTmp.x % uConst.w;
++    // x: index in outside, y: index in inside
++    if(pos.y < uConst.w && pos.x < uConst.c)
++    {
++        int basicOffset = pos.x * uConst.w * uConst.h + pos.y;
++        FLOAT value = uInput.data[basicOffset];
++        int index = 0;
++        for(int i = 1; i < uConst.h; ++i)
++        {
++            FLOAT valueCurr = uInput.data[basicOffset + i * uConst.w];
++#ifndef ARGMIN
++            if (valueCurr > value) {
++                value = valueCurr;
++                index = i;
++            }
++#else
++            if (valueCurr < value) {
++                value = valueCurr;
++                index = i;
++            }
++#endif
++        }
++        uOutput.data[posTmp.x] = index;
++    }
++}
+diff --git a/source/backend/vulkan/image/execution/glsl/avgpool.comp b/source/backend/vulkan/image/execution/glsl/avgpool.comp
+--- a/source/backend/vulkan/image/execution/glsl/avgpool.comp
++++ b/source/backend/vulkan/image/execution/glsl/avgpool.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std140) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ 
+diff --git a/source/backend/vulkan/image/execution/glsl/binaryImage.comp b/source/backend/vulkan/image/execution/glsl/binaryImage.comp
+--- a/source/backend/vulkan/image/execution/glsl/binaryImage.comp
++++ b/source/backend/vulkan/image/execution/glsl/binaryImage.comp
+@@ -1,5 +1,5 @@
+ #version 440 core
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput0;
+ layout(set=0, binding=2) uniform sampler2D uInput1;
+ 
+diff --git a/source/backend/vulkan/image/execution/glsl/blit_image.comp b/source/backend/vulkan/image/execution/glsl/blit_image.comp
+--- a/source/backend/vulkan/image/execution/glsl/blit_image.comp
++++ b/source/backend/vulkan/image/execution/glsl/blit_image.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=2) uniform constBuffer{
+diff --git a/source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp b/source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+--- a/source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
++++ b/source/backend/vulkan/image/execution/glsl/convolutionDepthwise.comp
+@@ -1,15 +1,13 @@
+ #version 440 core
+ 
+-layout(std140) buffer;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uKernel;
+ 
+-layout(set=0, binding=2) uniform mediump sampler2D uKernel;
++layout(set=0, binding=3) uniform sampler2D uBias;
+ 
+-layout(set=0, binding=3) uniform mediump sampler2D uBias;
+-
+-layout(set=0, binding=4) uniform constBuffer {
++layout(set=0, binding=4) readonly uniform constBuffer {
+     ivec2 pad;
+     ivec2 kernelSize;
+     ivec2 stride;
+diff --git a/source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp b/source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+--- a/source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
++++ b/source/backend/vulkan/image/execution/glsl/convolutionDepthwiseMali.comp
+@@ -1,15 +1,13 @@
+ #version 440 core
+ 
+-layout(std140) buffer;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uKernel;
+ 
+-layout(set=0, binding=2) uniform mediump sampler2D uKernel;
++layout(set=0, binding=3) uniform sampler2D uBias;
+ 
+-layout(set=0, binding=3) uniform mediump sampler2D uBias;
+-
+-layout(set=0, binding=4) uniform constBuffer {
++layout(set=0, binding=4) readonly uniform constBuffer {
+     ivec2 pad;
+     ivec2 kernelSize;
+     ivec2 stride;
+diff --git a/source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp b/source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
+--- a/source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
++++ b/source/backend/vulkan/image/execution/glsl/deconvCol2Im.comp
+@@ -1,7 +1,7 @@
+ #version 440 core
+ 
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
+-layout(set=0, binding=1) writeonly uniform mediump image2D uOutput;
++layout(set=0, binding=0) uniform sampler2D uInput;
++layout(set=0, binding=1) writeonly uniform image2D uOutput;
+ 
+ layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec2 pad;
+diff --git a/source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp b/source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
+--- a/source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
++++ b/source/backend/vulkan/image/execution/glsl/deconvIm2Col.comp
+@@ -1,9 +1,9 @@
+ #version 440 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) writeonly mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uBias;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uBias;
+ 
+ layout(set=0, binding=3) readonly uniform constBuffer {
+     ivec2 pad;
+diff --git a/source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp b/source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
+--- a/source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
++++ b/source/backend/vulkan/image/execution/glsl/deconvolutionDepthwise.comp
+@@ -1,10 +1,10 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) writeonly mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uKernel;
+-layout(set=0, binding=3) uniform mediump sampler2D uBias;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uKernel;
++layout(set=0, binding=3) uniform sampler2D uBias;
+ 
+ layout(set=0, binding=4) readonly uniform constBuffer {
+     ivec2 pad;
+diff --git a/source/backend/vulkan/image/execution/glsl/fill_image.comp b/source/backend/vulkan/image/execution/glsl/fill_image.comp
+--- a/source/backend/vulkan/image/execution/glsl/fill_image.comp
++++ b/source/backend/vulkan/image/execution/glsl/fill_image.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform constBuffer{
+     vec4 value;
+     ivec4 imageSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/gemm16x16.comp b/source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+--- a/source/backend/vulkan/image/execution/glsl/gemm16x16.comp
++++ b/source/backend/vulkan/image/execution/glsl/gemm16x16.comp
+@@ -9,11 +9,11 @@
+ #define MAT4 mat4
+ #endif
+ layout(std140) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uKernel;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uKernel;
+ 
+-layout(set=0, binding=3) readonly restrict uniform constBuffer {
++layout(set=0, binding=3) readonly uniform constBuffer {
+     ivec4 outputSize;
+ }uConst;
+ 
+diff --git a/source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp b/source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
+--- a/source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
++++ b/source/backend/vulkan/image/execution/glsl/gridSampleBilinear.comp
+@@ -1,9 +1,9 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uGrid;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uGrid;
+ 
+ layout(set=0, binding=3) uniform gridSampleBuffer{
+ 	ivec4 outImgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp b/source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
+--- a/source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
++++ b/source/backend/vulkan/image/execution/glsl/gridSampleNearest.comp
+@@ -1,9 +1,9 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uGrid;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uGrid;
+ 
+ layout(set=0, binding=3) uniform gridSampleBuffer{
+ 	ivec4 outImgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/im2col.comp b/source/backend/vulkan/image/execution/glsl/im2col.comp
+--- a/source/backend/vulkan/image/execution/glsl/im2col.comp
++++ b/source/backend/vulkan/image/execution/glsl/im2col.comp
+@@ -1,8 +1,8 @@
+ #version 440 core
+ layout(std140) buffer;
+ 
+-layout(set=0, binding=0) writeonly mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec2 pad;
+diff --git a/source/backend/vulkan/image/execution/glsl/im2col1x1.comp b/source/backend/vulkan/image/execution/glsl/im2col1x1.comp
+--- a/source/backend/vulkan/image/execution/glsl/im2col1x1.comp
++++ b/source/backend/vulkan/image/execution/glsl/im2col1x1.comp
+@@ -1,8 +1,8 @@
+ #version 440 core
+ layout(std140) buffer;
+ 
+-layout(set=0, binding=0) writeonly mediump uniform image2D uOutput;
+-layout(set=0, binding=1) mediump uniform sampler2D uInput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec2 pad;
+diff --git a/source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp b/source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+--- a/source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
++++ b/source/backend/vulkan/image/execution/glsl/imageTonc4hw4.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=1) writeonly buffer destBuffer{
+     vec4 data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/imageTonchw.comp b/source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+--- a/source/backend/vulkan/image/execution/glsl/imageTonchw.comp
++++ b/source/backend/vulkan/image/execution/glsl/imageTonchw.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=1) writeonly buffer destBuffer{
+     float data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/matmul_input.comp b/source/backend/vulkan/image/execution/glsl/matmul_input.comp
+--- a/source/backend/vulkan/image/execution/glsl/matmul_input.comp
++++ b/source/backend/vulkan/image/execution/glsl/matmul_input.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ layout(set=0, binding=2) uniform offsetBuffer {
+     ivec4 size;//w/4, h/4, hLimit, w/4*h/4
+diff --git a/source/backend/vulkan/image/execution/glsl/matmul_output.comp b/source/backend/vulkan/image/execution/glsl/matmul_output.comp
+--- a/source/backend/vulkan/image/execution/glsl/matmul_output.comp
++++ b/source/backend/vulkan/image/execution/glsl/matmul_output.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ layout(set=0, binding=2) uniform offsetBuffer {
+     ivec4 size;//w/4, h/4, w, w/4*h/4
+diff --git a/source/backend/vulkan/image/execution/glsl/maxpool.comp b/source/backend/vulkan/image/execution/glsl/maxpool.comp
+--- a/source/backend/vulkan/image/execution/glsl/maxpool.comp
++++ b/source/backend/vulkan/image/execution/glsl/maxpool.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ 
+diff --git a/source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp b/source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+--- a/source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
++++ b/source/backend/vulkan/image/execution/glsl/nc4hw4toimage.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ 
+ layout(set=0, binding=1) readonly buffer destBuffer{
+     vec4 data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/nchwToimage.comp b/source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+--- a/source/backend/vulkan/image/execution/glsl/nchwToimage.comp
++++ b/source/backend/vulkan/image/execution/glsl/nchwToimage.comp
+@@ -1,6 +1,6 @@
+ #version 450 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ 
+ layout(set=0, binding=1) readonly buffer sourceBuffer{
+     float data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp b/source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
+--- a/source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
++++ b/source/backend/vulkan/image/execution/glsl/packAsImage4x4.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict highp uniform image2D uOutput;
++layout(set=0, binding=0) writeonly highp uniform image2D uOutput;
+ 
+ layout(set=0, binding=1) readonly buffer sourceBuffer{
+     vec4 data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/preluWithChannel.comp b/source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
+--- a/source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
++++ b/source/backend/vulkan/image/execution/glsl/preluWithChannel.comp
+@@ -1,9 +1,9 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
+-layout(set=0, binding=2) uniform mediump sampler2D uSlope;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
++layout(set=0, binding=2) uniform sampler2D uSlope;
+ 
+ layout(set = 0, binding = 3) uniform reluBuffer{
+     ivec4 imgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/relu.comp b/source/backend/vulkan/image/execution/glsl/relu.comp
+--- a/source/backend/vulkan/image/execution/glsl/relu.comp
++++ b/source/backend/vulkan/image/execution/glsl/relu.comp
+@@ -1,7 +1,7 @@
+ #version 450 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set = 0, binding = 2) uniform reluBuffer{
+     ivec4 imgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/relu6.comp b/source/backend/vulkan/image/execution/glsl/relu6.comp
+--- a/source/backend/vulkan/image/execution/glsl/relu6.comp
++++ b/source/backend/vulkan/image/execution/glsl/relu6.comp
+@@ -1,7 +1,7 @@
+ #version 450 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict mediump uniform image2D uOutput;
+-layout(set=0, binding=1) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
++layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set = 0, binding = 2) uniform reluBuffer{
+     ivec4 imgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/resizeBilinear.comp b/source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
+--- a/source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
++++ b/source/backend/vulkan/image/execution/glsl/resizeBilinear.comp
+@@ -1,8 +1,8 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
+-layout(set=0, binding=1) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) uniform sampler2D uInput;
++layout(set=0, binding=1) writeonly uniform image2D uOutput;
+ 
+ layout(set = 0, binding = 2) uniform reluBuffer{
+     ivec4 inImgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/resizeNearest.comp b/source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+--- a/source/backend/vulkan/image/execution/glsl/resizeNearest.comp
++++ b/source/backend/vulkan/image/execution/glsl/resizeNearest.comp
+@@ -1,8 +1,8 @@
+ #version 450 core
+ layout(std430) buffer;
+ 
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
+-layout(set=0, binding=1) writeonly restrict mediump uniform image2D uOutput;
++layout(set=0, binding=0) uniform sampler2D uInput;
++layout(set=0, binding=1) writeonly uniform image2D uOutput;
+ 
+ layout(set = 0, binding = 2) uniform reluBuffer{
+     ivec4 inImgSize;
+diff --git a/source/backend/vulkan/image/execution/glsl/roipooling.comp b/source/backend/vulkan/image/execution/glsl/roipooling.comp
+--- a/source/backend/vulkan/image/execution/glsl/roipooling.comp
++++ b/source/backend/vulkan/image/execution/glsl/roipooling.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std140) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=2) uniform sampler2D uRoI;
+diff --git a/source/backend/vulkan/image/execution/glsl/scale.comp b/source/backend/vulkan/image/execution/glsl/scale.comp
+--- a/source/backend/vulkan/image/execution/glsl/scale.comp
++++ b/source/backend/vulkan/image/execution/glsl/scale.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std140) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ 
+ layout(set = 0, binding = 2) readonly buffer scaleBuffer{
+diff --git a/source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp b/source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
+--- a/source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
++++ b/source/backend/vulkan/image/execution/glsl/unPackImage4x4.comp
+@@ -1,6 +1,6 @@
+ #version 440 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) uniform mediump sampler2D uInput;
++layout(set=0, binding=0) uniform sampler2D uInput;
+ 
+ layout(set=0, binding=1) writeonly buffer sourceBuffer{
+     vec4 data[];
+diff --git a/source/backend/vulkan/image/execution/glsl/unaryImage.comp b/source/backend/vulkan/image/execution/glsl/unaryImage.comp
+--- a/source/backend/vulkan/image/execution/glsl/unaryImage.comp
++++ b/source/backend/vulkan/image/execution/glsl/unaryImage.comp
+@@ -1,5 +1,5 @@
+ #version 440
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ layout(set=0, binding=2) uniform constBuffer{
+     ivec4 size; // x: limit, y: channelC4*b, z:height, w:width
+diff --git a/source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp b/source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
+--- a/source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
++++ b/source/backend/vulkan/image/execution/glsl/winogradTransformDest2_3_1.comp
+@@ -1,9 +1,9 @@
+ #version 450 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+ layout(set=0, binding=2) uniform sampler2D uBias;
+-layout(set=0, binding=3) readonly restrict uniform constBuffer {
++layout(set=0, binding=3) readonly uniform constBuffer {
+     ivec4 inputSize;
+     ivec4 outputSize;
+     int padX;
+@@ -12,7 +12,7 @@ layout(set=0, binding=3) readonly restrict uniform constBuffer {
+     int unitHeight;
+     int unit;
+ } uConst;
+-layout(set=0, binding=4) readonly restrict uniform offsetBuffer {
++layout(set=0, binding=4) readonly uniform offsetBuffer {
+     ivec2 offset;
+ } uOffset;
+ 
+diff --git a/source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp b/source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
+--- a/source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
++++ b/source/backend/vulkan/image/execution/glsl/winogradTransformSource2_3_1.comp
+@@ -1,8 +1,8 @@
+ #version 450 core
+ layout(std430) buffer;
+-layout(set=0, binding=0) writeonly restrict uniform image2D uOutput;
++layout(set=0, binding=0) writeonly uniform image2D uOutput;
+ layout(set=0, binding=1) uniform sampler2D uInput;
+-layout(set=0, binding=2) readonly restrict uniform constBuffer {
++layout(set=0, binding=2) readonly uniform constBuffer {
+     ivec4 inputSize;
+     ivec4 outputSize;
+     int padX;
+@@ -12,7 +12,7 @@ layout(set=0, binding=2) readonly restrict uniform constBuffer {
+     int unit;
+ } uConst;
+ 
+-layout(set=0, binding=3) readonly restrict uniform offsetBuffer {
++layout(set=0, binding=3) readonly uniform offsetBuffer {
+     ivec2 offset;
+ } uOffset;
+ int CLAMP_ADD(int x) {
