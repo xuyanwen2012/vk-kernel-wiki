@@ -61,6 +61,11 @@ architectures:
             kind: device
           arc-pro-b70:
             kind: device
+      # Generations named by upstream driver source; no device node yet.
+      meteor-lake:
+        kind: generation
+      xe3:
+        kind: generation
 
   nvidia:
     kind: vendor
@@ -69,18 +74,31 @@ architectures:
         kind: device
       jetson-orin:
         kind: device
+      # Generations named by upstream driver source; no device node yet.
+      turing:
+        kind: generation
+      ampere:
+        kind: generation
+      blackwell:
+        kind: generation
 
   qualcomm:
     kind: vendor
     children:
       adreno-840:
         kind: device
+      # Generation named by upstream driver source; no device node yet.
+      adreno-7xx:
+        kind: generation
 
   arm:
     kind: vendor
     children:
       mali-g1:
         kind: device
+      # Generation named by upstream driver source; no device node yet.
+      bifrost:
+        kind: generation
 
   # Reserved vendor node. Intentionally empty.
   samsung:

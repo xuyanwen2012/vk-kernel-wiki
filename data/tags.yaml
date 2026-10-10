@@ -20,6 +20,7 @@ hardware_features:
   - subgroup-size               # default subgroup size of the device
   - subgroup-size-control       # VK_EXT_subgroup_size_control (required size per pipeline)
   - wave64                      # adapters whose native subgroup is 64 lanes
+  - subgroup-operations         # GL_KHR_shader_subgroup operations a driver exposes (VkPhysicalDeviceSubgroupProperties)
   - shared-memory-limit         # maxComputeSharedMemorySize
   - storage-buffer              # tensor stored as a buffer (SSBO)
   - storage-texture3d           # tensor stored as a 3D texture
@@ -110,6 +111,7 @@ languages:
   - cpp
   - c
   - python
+  - rust                        # NAK, the NVK shader compiler in Mesa
 
 confidence:
   - verified
