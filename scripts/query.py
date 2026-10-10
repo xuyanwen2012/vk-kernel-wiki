@@ -25,8 +25,9 @@ order is decided here), in order of precedence:
 1. Coverage: pages matching more of the query terms come first, so pages that
    match ALL the terms precede every partial match.
 2. Field strength, summed over the terms: a term in the title or id outweighs
-   one in a vocabulary field (tags and the like), which outweighs a body-only
-   match.
+   one in a vocabulary field (tags and the like), which outweighs one reached
+   only through an alias expansion (the page carries the canonical term but
+   not the spelling that was typed), which outweighs a body-only match.
 3. Subject focus: when the query names an architecture node (as a term or with
    --architecture), a page tagged only with that vendor's nodes precedes a
    page that lists it among other vendors, which precedes a page that merely
@@ -138,8 +139,13 @@ def detect_page_type(fm, path):
 # merely carries both as tags (generated pull-request pages get a tag for every
 # shader file they touch).
 LEVEL_TITLE = 6     # the typed term is in the title or the id
-LEVEL_FIELD = 4     # the typed term is in a vocabulary field
+LEVEL_FIELD = 4     # the typed term is in a vocabulary field, or the page is tagged with the
+                    # alias's canonical term AND has the typed term in its body
+LEVEL_EXPANDED = 3  # the page only carries the alias's canonical term (title, id or field)
 LEVEL_BODY = 2      # found in body text only
+
+# Longest alias, in whitespace-separated tokens, looked up as a phrase.
+MAX_ALIAS_TOKENS = 5
 
 # Authority classes (ranking rule 4), lower sorts first.
 AUTHORITY_WIKI, AUTHORITY_CURATED, AUTHORITY_GENERATED = 0, 1, 2
@@ -154,22 +160,35 @@ def tokenize_query(query_args):
 def build_terms(tokens):
     """Turn query tokens into scoring terms.
 
-    Each term keeps the literal token and the canonical term the alias map
-    points it to, if any; both spellings count as the term. `node` is the
-    architecture node the term names, if any.
+    Each term keeps the literal token and the canonical terms it expands to:
+    the token's own alias target, and the target of every multi-word alias
+    ("matrix cores", "Arc B580") that the token is part of. The literal is
+    scored on its own and above its expansion, so a vendor-specific spelling
+    (DPAS, WMMA) still finds the page that literally discusses it instead of
+    being flattened into the generic canonical tag. `node` is the architecture
+    node the term names, if any.
     """
     aliases = load_alias_expansions()
-    terms = []
-    for tok in tokens:
-        term = {"literal": tok.lower(), "expansions": [], "node": None}
+    terms = [{"literal": tok.lower(), "expansions": [], "node": None} for tok in tokens]
+
+    def attach(term, canonical):
+        canonical_l = canonical.lower()
+        if arch_policy.is_known(canonical_l):
+            term["node"] = term["node"] or canonical_l
+        if canonical_l != term["literal"] and canonical_l not in term["expansions"]:
+            term["expansions"].append(canonical_l)
+
+    for term in terms:
         canonical = aliases.get(term["literal"])
         if canonical:
-            canonical_l = canonical.lower()
-            if arch_policy.is_known(canonical_l):
-                term["node"] = canonical_l
-            if canonical_l != term["literal"]:
-                term["expansions"].append(canonical_l)
-        terms.append(term)
+            attach(term, canonical)
+    for size in range(min(MAX_ALIAS_TOKENS, len(terms)), 1, -1):
+        for start in range(len(terms) - size + 1):
+            span = terms[start:start + size]
+            canonical = aliases.get(" ".join(t["literal"] for t in span))
+            if canonical:
+                for term in span:
+                    attach(term, canonical)
     return terms
 
 
@@ -240,17 +259,21 @@ def score_page(fm, body, terms):
 
     coverage = strength = fine = 0
     for term in terms:
-        spellings = [term["literal"]] + term["expansions"]
+        literal = term["literal"]
+        in_body = literal in body_lower
+        expanded = any(c in head_text or c in field_text for c in term["expansions"])
         # Tagged with the named node or one of its descendants: the page is
         # about that architecture, whatever spelling the query used.
         about_node = bool(term["node"]) and (
             term["node"] in archs or any(d in archs for d in arch_policy.descendants(term["node"]))
         )
-        if any(v in head_text for v in spellings):
+        if literal in head_text:
             level = LEVEL_TITLE
-        elif about_node or any(v in field_text for v in spellings):
+        elif literal in field_text or about_node or (expanded and in_body):
             level = LEVEL_FIELD
-        elif any(v in body_lower for v in spellings):
+        elif expanded:
+            level = LEVEL_EXPANDED
+        elif in_body or any(c in body_lower for c in term["expansions"]):
             level = LEVEL_BODY
         else:
             continue
@@ -258,7 +281,7 @@ def score_page(fm, body, terms):
         strength += level
 
         best = 0
-        for variant in spellings:
+        for variant in [literal] + term["expansions"]:
             variant_score = min(body_lower.count(variant), 3)
             if variant in head_text:
                 variant_score += 10

@@ -5,6 +5,14 @@
 ## Canonical terms are either vocabulary terms from data/tags.yaml or nodes of
 ## the architecture tree in data/architectures.yaml.
 ## No alias may map to two canonical terms (compared case-insensitively).
+##
+## How an alias is used (scripts/query.py):
+## - `--tag <alias>` is exactly `--tag <canonical>`.
+## - As a free-text keyword, an alias matches pages that carry the canonical
+##   term, but the typed spelling is scored on its own and ranks higher. A
+##   vendor's name for its matrix unit or instruction (WMMA, DPAS, XMX, "matrix
+##   cores", "tensor cores", wave32) can therefore be an alias of the generic
+##   term without hiding the page that is specifically about it.
 
 # Architecture nodes — vendors
 amd:

@@ -1863,9 +1863,8 @@ def fixture_page(title, body="FIXTURE body.", **fields):
     return "\n".join(lines)
 
 
-class RankingTest(TempRoots):
-    """Ordering rules of free-text queries. Each test builds a throwaway root
-    whose pages differ only in the property under test."""
+class RankingRoots(TempRoots):
+    """Throwaway roots of synthetic pages, and query.py's order over them."""
 
     def make_root(self, pages):
         root = self.copy_root(TESTS_DIR / "no-such-pages")
@@ -1880,6 +1879,11 @@ class RankingTest(TempRoots):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.last_stderr = proc.stderr
         return proc.stdout.split()
+
+
+class RankingTest(RankingRoots):
+    """Ordering rules of free-text queries. Each test builds a throwaway root
+    whose pages differ only in the property under test."""
 
     def test_pages_matching_all_terms_come_before_partial_matches(self):
         root = self.make_root({
@@ -1981,6 +1985,65 @@ class RankingTest(TempRoots):
         root = self.make_root({"sources/docs/a.md": fixture_page("zebra", id="doc-a")})
         proc = run_script("query.py", "zebra", "--compact", root=root)
         self.assertEqual(proc.stdout, "# 1 result(s)\n\n  [source-doc] doc-a: FIXTURE zebra  (sources/docs/a.md)\n")
+
+
+class AliasRankingTest(RankingRoots):
+    """A vendor's name for its matrix unit is an alias of the generic term. It
+    must still find the page that is specifically about it."""
+
+    def test_literal_spelling_outranks_the_alias_expansion(self):
+        generic = dict(tags=["cooperative-matrix"], hardware_features=["cooperative-matrix"])
+        root = self.make_root({
+            "wiki/kernels/a-generic.md": fixture_page(
+                "cooperative-matrix kernel", id="kernel-a", type="kernel",
+                body="cooperative-matrix " * 5, **generic),
+            "sources/docs/b-generic.md": fixture_page("cooperative-matrix notes", id="doc-b", **generic),
+            "sources/prs/fixture/c-mentions.md": fixture_page(
+                "plain", id="pr-fixture-1", body="Emits DPAS on this path.", **generic),
+            "sources/docs/d-specific.md": fixture_page("DPAS instruction", id="doc-d", **generic),
+            "sources/docs/e-untagged-mention.md": fixture_page("plain", id="doc-e", body="see dpas"),
+        })
+        paths = self.ranked(root, "DPAS")
+        self.assertEqual(paths, [
+            "sources/docs/d-specific.md",          # names it in the title
+            "sources/prs/fixture/c-mentions.md",   # generic tag, and mentions it
+            "wiki/kernels/a-generic.md",           # generic tag only: reached through the alias
+            "sources/docs/b-generic.md",
+            "sources/docs/e-untagged-mention.md",  # mention only
+        ])
+        # As a tag filter the alias is exactly its canonical term.
+        self.assertEqual(set(self.ranked(root, "--tag", "DPAS")), set(paths[:4]))
+        self.assertEqual(set(self.ranked(root, "--tag", "DPAS")),
+                         set(self.ranked(root, "--tag", "cooperative-matrix")))
+
+    def test_multi_word_alias_expands_as_a_phrase(self):
+        root = self.make_root({
+            "sources/docs/a-generic.md": fixture_page("plain", id="doc-a", tags=["cooperative-matrix"]),
+            "sources/docs/b-specific.md": fixture_page(
+                "Using the Matrix Cores", id="doc-b", tags=["cooperative-matrix"]),
+            "sources/docs/c-device.md": fixture_page("plain", id="doc-c", architectures=["arc-b580"]),
+        })
+        self.assertEqual(self.ranked(root, "matrix cores"),
+                         ["sources/docs/b-specific.md", "sources/docs/a-generic.md"])
+        # Both words of the alias reach the page tagged with the canonical
+        # term, whether the phrase is one argument or two.
+        self.assertEqual(self.ranked(root, "tensor", "cores")[-1], "sources/docs/a-generic.md")
+        self.assertEqual(self.ranked(root, "Arc B580"), ["sources/docs/c-device.md"])
+
+    def test_real_repo_vendor_unit_names_find_their_pages(self):
+        for query, page in (
+            ("DPAS", "sources/docs/intel-igc-visa-dpas.md"),
+            ("WMMA", "sources/docs/gpuopen-wmma-on-rdna3.md"),
+            ("XMX", "sources/docs/intel-oneapi-gpu-guide-xmx.md"),
+            ("matrix cores", "sources/docs/gpuopen-matrix-cores-rdna4.md"),
+        ):
+            with self.subTest(query=query):
+                proc = run_script("query.py", query, "--paths-only", "--limit", "2")
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                self.assertIn(page, proc.stdout.split())
+        # The generic pages are still returned, after the specific ones.
+        proc = run_script("query.py", "DPAS", "--paths-only", "--limit", "10000")
+        self.assertIn("wiki/hardware/cooperative-matrix-rdna3.md", proc.stdout.split())
 
 
 if __name__ == "__main__":
