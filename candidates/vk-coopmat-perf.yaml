@@ -1,0 +1,180 @@
+repo: jeffbolznv/vk_cooperative_matrix_perf
+keywords_used:
+- is:merged
+license: MIT
+license_path: LICENSE
+shader_path_markers:
+- shaders/
+host_path_markers:
+- src/
+searched_at: '2026-10-10'
+cutoff_date: '2026-10-10'
+total_candidates: 14
+included: 10
+deferred: 0
+excluded: 4
+prs:
+- number: 5
+  title: Check bfloat16 coopmat support
+  author: GinShio
+  merged_at: '2025-06-09'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/5
+  decision: include
+  rule: manual-kernel-selection-or-tuning
+  reason: 'include (manual review of title, description and changed paths): the host checks whether the device supports bfloat16 cooperative matrices before it selects that kernel variant: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 6
+  title: Add support for VK_EXT_shader_float8
+  author: jeffbolznv
+  merged_at: '2025-06-10'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/6
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: shaders/shmem.comp, shaders/tiled.comp, shaders/workgroup.comp'
+  evidence_paths:
+  - shaders/shmem.comp
+  - shaders/tiled.comp
+  - shaders/workgroup.comp
+- number: 7
+  title: Skip cooperative-matrix combinations with no bundled shader
+  author: Indie-Siggi
+  merged_at: '2026-06-05'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/7
+  decision: include
+  rule: manual-kernel-selection-or-tuning
+  reason: 'include (manual review of title, description and changed paths): which advertised cooperative-matrix type combinations select a kernel variant; the description reports the combinations a named
+    driver and device advertise: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 8
+  title: Throw a real exception (not a bare throw) on Vulkan errors
+  author: Indie-Siggi
+  merged_at: '2026-06-05'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/8
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): error handling only: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 9
+  title: Enable subgroupSizeControl and computeFullSubgroups features
+  author: Indie-Siggi
+  merged_at: '2026-06-05'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/9
+  decision: include
+  rule: manual-kernel-selection-or-tuning
+  reason: 'include (manual review of title, description and changed paths): enables the features that make the pipelines'' required subgroup size and full-subgroups request valid: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 10
+  title: Only launch workgroup-scope matrices at the advertised workgroupInvocations
+  author: Indie-Siggi
+  merged_at: '2026-06-12'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/10
+  decision: include
+  rule: manual-kernel-selection-or-tuning
+  reason: 'include (manual review of title, description and changed paths): workgroup-scope kernels are launched only at the advertised workgroupInvocations; the description reports the value a named driver
+    and device advertise: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 11
+  title: 'bugfix: introduce vulkan command pipeline barrier for pipelines with more than 1 GEMM dispatch'
+  author: FelixKrall
+  merged_at: '2026-06-16'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/11
+  decision: include
+  rule: manual-kernel-selection-or-tuning
+  reason: 'include (manual review of title, description and changed paths): changes what the benchmark''s throughput figure measures (no overlap between GEMM dispatches): src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 12
+  title: cleanups/fixes
+  author: jeffbolznv
+  merged_at: '2026-06-23'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/12
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: shaders/shmem.comp'
+  evidence_paths:
+  - shaders/shmem.comp
+- number: 14
+  title: Add option to disable C operand
+  author: jeffbolznv
+  merged_at: '2026-08-05'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/14
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: shaders/shmem.comp, shaders/workgroup.comp'
+  evidence_paths:
+  - shaders/shmem.comp
+  - shaders/workgroup.comp
+- number: 15
+  title: use higher entropy values so data compresses less (more realistic)
+  author: jeffbolznv
+  merged_at: '2026-08-05'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/15
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): benchmark input data only: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 17
+  title: add --repeat command line option
+  author: jeffbolznv
+  merged_at: '2026-08-09'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/17
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): command-line option only: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 18
+  title: don't redownload input matrices for each tile size
+  author: jeffbolznv
+  merged_at: '2026-08-09'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/18
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): host-side download of input matrices only: src/vk_cooperative_matrix_perf.cpp'
+  evidence_paths:
+  - src/vk_cooperative_matrix_perf.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 19
+  title: Add configurable workgroup raster swizzle.
+  author: jeffbolznv
+  merged_at: '2026-08-10'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/19
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: shaders/workgroup.comp'
+  evidence_paths:
+  - shaders/workgroup.comp
+- number: 20
+  title: mark inputs readonly
+  author: jeffbolznv
+  merged_at: '2026-08-11'
+  url: https://github.com/jeffbolznv/vk_cooperative_matrix_perf/pull/20
+  decision: include
+  rule: glsl-shader-source
+  reason: 'include: GLSL shader source added or modified: shaders/shmem.comp, shaders/workgroup.comp'
+  evidence_paths:
+  - shaders/shmem.comp
+  - shaders/workgroup.comp

@@ -1,0 +1,36 @@
+diff --git a/shaders/shmem.comp b/shaders/shmem.comp
+--- a/shaders/shmem.comp
++++ b/shaders/shmem.comp
+@@ -30,6 +30,8 @@
+ #extension GL_EXT_buffer_reference : enable
+ #extension GL_EXT_control_flow_attributes : enable
+ #extension GL_EXT_bfloat16 : enable
++#extension GL_EXT_float_e5m2 : enable
++#extension GL_EXT_float_e4m3 : enable
+ 
+ // M/N/K values filled out at pipeline creation time
+ layout(constant_id = 0) const uint lM = 1;
+diff --git a/shaders/tiled.comp b/shaders/tiled.comp
+--- a/shaders/tiled.comp
++++ b/shaders/tiled.comp
+@@ -30,6 +30,8 @@
+ #extension GL_EXT_buffer_reference : enable
+ #extension GL_EXT_control_flow_attributes : enable
+ #extension GL_EXT_bfloat16 : enable
++#extension GL_EXT_float_e5m2 : enable
++#extension GL_EXT_float_e4m3 : enable
+ 
+ // M/N/K values filled out at pipeline creation time
+ layout(constant_id = 0) const uint lM = 1;
+diff --git a/shaders/workgroup.comp b/shaders/workgroup.comp
+--- a/shaders/workgroup.comp
++++ b/shaders/workgroup.comp
+@@ -30,6 +30,8 @@
+ #extension GL_EXT_shader_explicit_arithmetic_types : enable
+ #extension GL_EXT_buffer_reference : enable
+ #extension GL_EXT_bfloat16 : enable
++#extension GL_EXT_float_e5m2 : enable
++#extension GL_EXT_float_e4m3 : enable
+ 
+ // M/N/K values filled out at pipeline creation time
+ layout(constant_id = 0) const uint lM = 1;
