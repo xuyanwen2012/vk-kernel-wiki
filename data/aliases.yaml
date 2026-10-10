@@ -88,6 +88,9 @@ cooperative-matrix:
   - "cooperative matrix"
   - VK_KHR_cooperative_matrix
   - GL_KHR_cooperative_matrix
+  - VK_EXT_cooperative_matrix_maintenance1
+  - VK_QCOM_cooperative_matrix_conversion
+  - vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR
 
 int8-cooperative-matrix:
   - "int8 coopmat"
@@ -99,11 +102,13 @@ cooperative-matrix2:
   - "cooperative matrix 2"
   - VK_NV_cooperative_matrix2
   - GL_NV_cooperative_matrix2
+  - VK_NV_cooperative_matrix_decode_vector
 
 coopmat-shape:
   - "coopmat shape"
   - "coopmat shapes"
   - "MMA shape"
+  - VkCooperativeMatrixPropertiesKHR
 
 coopmat-fp32-accumulator:
   - "fp32 accumulator coopmat"
@@ -116,6 +121,10 @@ subgroup-size:
 subgroup-size-control:
   - "subgroup size control"
   - VK_EXT_subgroup_size_control
+  - VkPhysicalDeviceSubgroupSizeControlProperties
+  - subgroupSizeControl
+  - ALLOW_VARYING_SUBGROUP_SIZE
+  - "varying subgroup size"
 
 wave64:
   - "wave 64"
@@ -167,6 +176,38 @@ specialization-constants:
   - "specialization constant"
   - local_size_x_id
 
+full-subgroups:
+  - "full subgroups"
+  - computeFullSubgroups
+  - REQUIRE_FULL_SUBGROUPS
+  - VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT
+
+subgroup-operations:
+  - "subgroup operations"
+  - GL_KHR_shader_subgroup
+  - subgroupSupportedOperations
+  - subgroupBallot
+  - subgroupShuffle
+  - subgroupAdd
+
+workgroup-size-limit:
+  - maxComputeWorkGroupSize
+  - maxComputeWorkGroupInvocations
+  - "local workgroup size"
+
+control-barrier:
+  - "control barrier"
+  - OpControlBarrier
+  - subgroupBarrier
+  - "split barrier"
+  - VK_EXT_shader_split_barrier
+
+memory-model:
+  - "memory model"
+  - "Vulkan memory model"
+  - "data race"
+  - vulkanMemoryModel
+
 # Techniques
 workgroup-tile-sizing:
   - WG_TILE_M
@@ -186,6 +227,8 @@ subgroup-grid:
 required-subgroup-size:
   - SUBGROUP_SIZE
   - "required subgroup size"
+  - requiredSubgroupSize
+  - VkPipelineShaderStageRequiredSubgroupSizeCreateInfo
 
 mma-shape-selection:
   - MMA_M
@@ -217,6 +260,8 @@ shared-memory-fence:
   - "lds-fence"
   - "coopmat-lds-fence"
   - "LDS fence"
+  - memoryBarrierShared
+  - "memory barrier"
 
 fragment-contiguous-layout:
   - FRAG_LAYOUT
