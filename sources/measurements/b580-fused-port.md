@@ -34,6 +34,10 @@ raw_data:
     locator: openspec/changes/sarc-1.5-b580-fused-port/results/b580/screens/screen5-select.csv
     description: "Selection screen: kernel time per layer of the parent and of the fused variants, per model"
   - repo: https://github.com/sarc-acl/executorch
+    commit: 319e2ad34e28bcb77691036c7966ac9867e60065
+    locator: openspec/changes/sarc-1.5-campaign-playbook/report/tuning-overview.html
+    description: "Campaign overview page (branch topic/campaign-playbook): line 248 is the known-defect note, which reports a re-run on this device with the full-subgroups flag on 2026-10-10; the note gives no driver version and the raw data of that re-run is not published"
+  - repo: https://github.com/sarc-acl/executorch
     commit: a434a49623600f168089173a964efc79661ac286
     locator: openspec/changes/sarc-1.5-b580-fused-port/results/b580/compile/topic4-fused-kernels.txt
     description: "Compiler statistics dump of the fused pipelines"
@@ -390,4 +394,12 @@ cooperative-matrix pipeline of every device, the shipped ones included:
   8da4w) and 0.99396 / 0.99448 / 0.99177 / 0.99621 / 0.99918 / 0.99533 (`s2-c1`), from `decode/decode.csv`:
   0.1 to 1.5 % slower, inside the +-2 % band, below 1 in all
   twelve readings. Decode does not run the fused kernel.
+```
+
+## Later note on the full-subgroups flag (campaign overview page, another branch of the same repository)
+
+Locator: `openspec/changes/sarc-1.5-campaign-playbook/report/tuning-overview.html`, line 248 (commit `319e2ad34e28bcb77691036c7966ac9867e60065`)
+
+```text
+    <div class="note"><h3>Known defect: pipelines lack the full-subgroups flag</h3><p>The Vulkan specification requires compute pipelines of this kind, which depend on full subgroups, to be created with the "full subgroups" flag. None of the cooperative matrix pipelines on the branches carries it, including the released ones and those of the fused kernels. On 2026-10-09 the owner decided to record this as a known defect and to fix it once, in the release zone, before any merge. What is known: every gate passes on the drivers used, and both arms of every comparison between SARC configurations on this page (parent and candidate, and the released kernels against the tuned ones) create their pipelines the same way, without the flag, so those comparisons are like for like. In the comparisons against unmodified ExecuTorch and against llama.cpp only the SARC side has the defect. Measured on one device so far: on 2026-10-10 the flag was added on the Arc B580 (release-zone change on a local branch, not merged) and the build was gated and timed again. The validation message for this rule went from 28 occurrences to none, the SPIR-V is unchanged, all 444 compared logits vectors are byte-identical in both configurations checked, and speed is unchanged by the rule written before the session (final configuration: geometric mean −0.04 %, largest cell −0.88 %, inside the ±2 % band). A static check found no kernel variant on any device whose local size conflicts with the flag. What is not known: the other devices have not been re-measured with the flag; that is still to be done before any merge. The validation layer reports seven other messages on both builds (among them a memory-model feature that is not enabled); they are recorded with the B580 result and are not addressed here. The RX 7900 XTX's campaign additionally found that some kernels declare more workgroup shared memory than the limit AMDVLK reports, among them one released 4w kernel. The driver accepts these pipelines and every gate passes; the largest overrun is in the parent's kernel table, so both arms of that campaign's comparisons have it. Whether staying within the reported limit changes the timing has not been measured. This item will be handled before merging, together with the full-subgroups flag (F1).</p></div>
 ```

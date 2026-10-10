@@ -240,3 +240,14 @@ Where the one-subgroup assumption is enforced: (1) the local size is the variant
 returns unless `gl_NumSubgroups == 1` and `gl_SubgroupSize == 32`. The copy pass `kvt` has no shared memory and
 writes each element of the copies from exactly one invocation.
 ```
+
+## Arithmetic
+
+Locator: `openspec/changes/sarc-1.5-4070ti-fused-port/proposal.md`, lines 148-151 (commit `8f8c44e22e2d8c62a6a192f00e252f8768486b0d`)
+
+```text
+Arithmetic: scores and the attention x V accumulation are fp32 cooperative-matrix accumulators as in the
+parent's kernels; the score is rounded to fp16 once (store to `Psh`), e is computed in fp32 against the running
+maximum and rounded to fp16 for the matrix multiply, the row sum and the final division are fp32. The summation
+order differs from the three-kernel path, so the candidate is judged by the reference-error rule (D3).
+```
