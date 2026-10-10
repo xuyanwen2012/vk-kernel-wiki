@@ -30,7 +30,7 @@ Scope: one kernel (`technique-fused-attention-kernel`), ported from the Radeon 7
 | Property | RDNA3 (source kernel) | Xe2 (ported kernel) | Citation |
 |---|---|---|---|
 | fp16 matrix shape M x N x K | 16 x 16 x 16, one constant `MMA = 16` | 8 x 16 x 16 only ("ANV exposes fp16 8 x 16 x 16 only"); three constants `MMA_M = 8`, `MMA_N = 16`, `MMA_K = 16` | [meas-b580-fused-port: proposal.md, line 73] |
-| Subgroup size the kernel runs with | 32, not required by the pipeline (device default 64, minimum 32 on the 780M) | 16, required by the pipeline; "Intel runs 8, 16 or 32 lanes" | [meas-b580-fused-port: proposal.md, line 78] [meas-780m-vulkaninfo: sources/measurements/780m-vulkaninfo/vulkaninfo-profile-radv-mesa-25.2.7.json, lines 1232 and 1340-1341] |
+| Subgroup size the kernel runs with | written for 32; not required by the pipeline, and the size the driver actually ran it with is unverified (device default 64, minimum 32 on the 780M) | 16, required by the pipeline; "Intel runs 8, 16 or 32 lanes" | [meas-b580-fused-port: proposal.md, line 78] [meas-780m-vulkaninfo: sources/measurements/780m-vulkaninfo/vulkaninfo-profile-radv-mesa-25.2.7.json, lines 1232 and 1340-1341] |
 | Registers per thread as the compiler reports them | not the limit in the source kernel | 128 registers = 4096 bytes of 16-lane values | [meas-b580-fused-port: proposal.md, lines 88-89] |
 | Shared-memory limit | 780M value on `hw-cooperative-matrix-rdna3` | 49152 bytes | [meas-b580-fused-port: proposal.md, line 111] |
 
