@@ -1,0 +1,258 @@
+repo: KhronosGroup/SPIRV-Tools
+license: Apache-2.0
+license_path: LICENSE
+scope_mode: driver
+keywords_used:
+- cooperative matrix
+- coopmat
+- cooperative_matrix
+driver_path_markers:
+- source/
+topic_patterns:
+- cooperative[ _-]?matri|coop[ _-]?mat
+searched_at: '2026-10-10'
+cutoff_date: '2026-10-10'
+total_candidates: 18
+included: 8
+deferred: 0
+excluded: 10
+prs:
+- number: 2404
+  title: Add validation for SPV_NV_cooperative_matrix
+  author: jeffbolznv
+  merged_at: '2019-02-25'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/2404
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): the NV predecessor extension, superseded by SPV_KHR_cooperative_matrix (#5286)'
+  evidence_paths:
+  - source/assembly_grammar.cpp
+  - source/opcode.cpp
+  - source/opt/reflect.h
+  - source/val/validate_arithmetics.cpp
+  - source/val/validate_composites.cpp
+  - source/val/validate_constants.cpp
+  - source/val/validate_conversion.cpp
+  - source/val/validate_id.cpp
+  - source/val/validate_memory.cpp
+  - source/val/validate_scopes.cpp
+  - source/val/validate_type.cpp
+  - source/val/validation_state.cpp
+  - source/val/validation_state.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4502
+  title: Fix validation message for cooperative matrix column type
+  author: dneto0
+  merged_at: '2021-09-10'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/4502
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): message wording for the NV predecessor extension'
+  evidence_paths:
+  - source/val/validate_type.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 5286
+  title: SPV_KHR_cooperative_matrix
+  author: archimedus
+  merged_at: '2023-06-22'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/5286
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/assembly_grammar.cpp, source/binary.cpp, source/opcode.cpp, source/operand.cpp, source/opt/type_manager.cpp,
+    source/opt/types.cpp, source/opt/types.h, source/text.cpp, source/val/validate_arithmetics.cpp, source/val/validate_composites.cpp, source/val/validate_constants.cpp, source/val/validate_conversion.cpp,
+    source/val/validate_id.cpp, source/val/validate_memory.cpp, source/val/validate_type.cpp, source/val/validation_state.cpp, source/val/validation_state.h'
+  evidence_paths:
+  - source/assembly_grammar.cpp
+  - source/binary.cpp
+  - source/opcode.cpp
+  - source/operand.cpp
+  - source/opt/type_manager.cpp
+  - source/opt/types.cpp
+  - source/opt/types.h
+  - source/text.cpp
+  - source/val/validate_arithmetics.cpp
+  - source/val/validate_composites.cpp
+  - source/val/validate_constants.cpp
+  - source/val/validate_conversion.cpp
+  - source/val/validate_id.cpp
+  - source/val/validate_memory.cpp
+  - source/val/validate_type.cpp
+  - source/val/validation_state.cpp
+  - source/val/validation_state.h
+- number: 5301
+  title: 'spirv-val: Label SPV_KHR_cooperative_matrix VUID'
+  author: spencer-lunarg
+  merged_at: '2023-07-04'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/5301
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): VUID label only'
+  evidence_paths:
+  - source/val/validate_memory.cpp
+  - source/val/validation_state.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 5720
+  title: Add knowledge of cooperative matrices
+  author: s-perron
+  merged_at: '2024-06-26'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/5720
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/opt/aggressive_dead_code_elim_pass.cpp, source/opt/folding_rules.cpp, source/opt/local_access_chain_convert_pass.cpp,
+    source/opt/local_single_block_elim_pass.cpp, source/opt/local_single_store_elim_pass.cpp, source/opt/mem_pass.cpp'
+  evidence_paths:
+  - source/opt/aggressive_dead_code_elim_pass.cpp
+  - source/opt/folding_rules.cpp
+  - source/opt/local_access_chain_convert_pass.cpp
+  - source/opt/local_single_block_elim_pass.cpp
+  - source/opt/local_single_store_elim_pass.cpp
+  - source/opt/mem_pass.cpp
+- number: 5736
+  title: Support SPV_KHR_untyped_pointers
+  author: alan-baker
+  merged_at: '2024-07-17'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/5736
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 5777
+  title: Validate presence of Stride operand to OpCooperativeMatrix{Load,Store}KHR
+  author: kpet
+  merged_at: '2024-08-29'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/5777
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/val/validate_memory.cpp'
+  evidence_paths:
+  - source/val/validate_memory.cpp
+- number: 6057
+  title: Add SPV_KHR_bfloat16 support
+  author: AMD-dwang
+  merged_at: '2025-04-09'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6057
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 6252
+  title: SPV_QCOM_cooperative_matrix_conversion support
+  author: wooyoungqcom
+  merged_at: '2025-08-20'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6252
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/val/validate.cpp, source/val/validate.h, source/val/validate_composites.cpp, source/val/validate_conversion.cpp,
+    source/val/validate_extensions.cpp, source/val/validation_state.h'
+  evidence_paths:
+  - source/val/validate.cpp
+  - source/val/validate.h
+  - source/val/validate_composites.cpp
+  - source/val/validate_conversion.cpp
+  - source/val/validate_extensions.cpp
+  - source/val/validation_state.h
+- number: 6408
+  title: 'spirv-val: add support for SPV_ARM_cooperative_matrix_layouts'
+  author: kpet
+  merged_at: '2025-11-18'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6408
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/val/validate_memory.cpp'
+  evidence_paths:
+  - source/val/validate_memory.cpp
+- number: 6442
+  title: 'spirv-val: Check for CoopMat scope'
+  author: spencer-lunarg
+  merged_at: '2025-11-30'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6442
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/val/validate_type.cpp, source/val/validation_state.cpp'
+  evidence_paths:
+  - source/val/validate_type.cpp
+  - source/val/validation_state.cpp
+- number: 6571
+  title: Optimize `SPV_EXT_opacity_micromap` and `SPV_EXT_shader_invocation_reorder`
+  author: MarijnS95
+  merged_at: '2026-03-11'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6571
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 6693
+  title: Validate SPV_NV_cooperative_matrix_decode_vector
+  author: jeffbolznv
+  merged_at: '2026-05-15'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6693
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): NV decode-vector extension, outside the KHR kernel path'
+  evidence_paths:
+  - source/opt/ir_context.cpp
+  - source/val/validate_memory.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 6707
+  title: 'val: Detect additional unsupported arithmetic ops in invalid_type_pass'
+  author: jeffbolznv
+  merged_at: '2026-05-20'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6707
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 6714
+  title: '[opt] Pass to convert to untyped pointers'
+  author: alan-baker
+  merged_at: '2026-08-14'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6714
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 6825
+  title: Validate SPV_EXT_cooperative_matrix_maintenance1
+  author: jeffbolznv
+  merged_at: '2026-08-05'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6825
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/operand.cpp, source/opt/ir_context.cpp, source/val/validate_annotation.cpp, source/val/validate_arithmetics.cpp,
+    source/val/validate_conversion.cpp, source/val/validate_function.cpp, source/val/validate_memory.cpp, source/val/validation_state.cpp, source/val/validation_state.h'
+  evidence_paths:
+  - source/operand.cpp
+  - source/opt/ir_context.cpp
+  - source/val/validate_annotation.cpp
+  - source/val/validate_arithmetics.cpp
+  - source/val/validate_conversion.cpp
+  - source/val/validate_function.cpp
+  - source/val/validate_memory.cpp
+  - source/val/validation_state.cpp
+  - source/val/validation_state.h
+- number: 6884
+  title: 'spirv-val: Update test to use SPV_EXT_cooperative_matrix_maintenance1'
+  author: spencer-lunarg
+  merged_at: '2026-09-11'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6884
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): test update only'
+  evidence_paths:
+  - source/opt/convert_to_untyped.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 6924
+  title: 'spirv-val: Validate CoopMat MulAdd float with Signed operand'
+  author: spencer-lunarg
+  merged_at: '2026-10-06'
+  url: https://github.com/KhronosGroup/SPIRV-Tools/pull/6924
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: source/val/validate_arithmetics.cpp'
+  evidence_paths:
+  - source/val/validate_arithmetics.cpp

@@ -78,6 +78,10 @@ rtx-4070:
   - "RTX 4070"
   - "GeForce RTX 4070"
 
+arc-a770:
+  - A770
+  - "Arc A770"
+
 rtx-4070-ti-super:
   - "4070 Ti SUPER"
   - "RTX 4070 Ti SUPER"

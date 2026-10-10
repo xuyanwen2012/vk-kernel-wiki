@@ -148,3 +148,11 @@ bundles:
   - shaders/compile.bat
   - src/vk_cooperative_matrix_perf.cpp
   - README.md
+- id: adreno-cooperative-matrix-sample
+  ledger: adreno-samples
+  commit: 584f0528d46d120a73b4f7bbd0102abfb358220b
+  files:
+  - samples/cooperative_matrix/README.md
+  - samples/cooperative_matrix/code/main/runtime_shaders/MxM_Basic.hpp
+  - samples/cooperative_matrix/code/main/runtime_shaders/MxM_VecToMat.hpp
+  - samples/cooperative_matrix/code/main/runtime_shaders/Conv.hpp

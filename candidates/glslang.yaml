@@ -1,0 +1,378 @@
+repo: KhronosGroup/glslang
+scope_mode: driver
+keywords_used:
+- cooperative matrix
+- coopmat
+- cooperative_matrix
+driver_path_markers:
+- glslang/
+- SPIRV/
+topic_patterns:
+- cooperative[ _-]?matri|coop[ _-]?mat
+searched_at: '2026-10-10'
+cutoff_date: '2026-10-10'
+total_candidates: 24
+included: 8
+deferred: 0
+excluded: 16
+prs:
+- number: 1701
+  title: Implement GL_NV_cooperative_matrix
+  author: jeffbolznv
+  merged_at: '2019-02-26'
+  url: https://github.com/KhronosGroup/glslang/pull/1701
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): the NV predecessor extension, superseded by GL_KHR_cooperative_matrix (#3248)'
+  evidence_paths:
+  - SPIRV/GLSL.ext.NV.h
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/SpvBuilder.cpp
+  - SPIRV/SpvBuilder.h
+  - SPIRV/doc.cpp
+  - SPIRV/spirv.hpp
+  - SPIRV/spvIR.h
+  - glslang/Include/Types.h
+  - glslang/Include/arrays.h
+  - glslang/Include/intermediate.h
+  - glslang/MachineIndependent/Constant.cpp
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/Intermediate.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/ParseHelper.h
+  - glslang/MachineIndependent/Scan.cpp
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  - glslang/MachineIndependent/glslang.y
+  - glslang/MachineIndependent/glslang_tab.cpp
+  - glslang/MachineIndependent/glslang_tab.cpp.h
+  - glslang/MachineIndependent/intermOut.cpp
+  - glslang/MachineIndependent/localintermediate.h
+  - glslang/MachineIndependent/parseVersions.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 1702
+  title: Update SPIRV-Tools known good
+  author: greg-lunarg
+  merged_at: '2019-02-21'
+  url: https://github.com/KhronosGroup/glslang/pull/1702
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 1713
+  title: Fix NV_EXTENSIONS-disabled build
+  author: jeffbolznv
+  merged_at: '2019-02-28'
+  url: https://github.com/KhronosGroup/glslang/pull/1713
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 1787
+  title: Support GL_NV_shader_sm_builtins
+  author: dgkoch
+  merged_at: '2019-06-10'
+  url: https://github.com/KhronosGroup/glslang/pull/1787
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 1876
+  title: GL_NV_integer_cooperative_matrix support
+  author: jeffbolznv
+  merged_at: '2019-08-28'
+  url: https://github.com/KhronosGroup/glslang/pull/1876
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): the NV predecessor extension, superseded by GL_KHR_cooperative_matrix (#3248)'
+  evidence_paths:
+  - SPIRV/GlslangToSpv.cpp
+  - glslang/Include/Types.h
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/Scan.cpp
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  - glslang/MachineIndependent/glslang.m4
+  - glslang/MachineIndependent/glslang.y
+  - glslang/MachineIndependent/glslang_tab.cpp
+  - glslang/MachineIndependent/glslang_tab.cpp.h
+  - glslang/MachineIndependent/parseVersions.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3248
+  title: Implement support for GL_KHR_cooperative_matrix extension
+  author: archimedus
+  merged_at: '2023-07-26'
+  url: https://github.com/KhronosGroup/glslang/pull/3248
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: SPIRV/GLSL.ext.KHR.h, SPIRV/GlslangToSpv.cpp, SPIRV/SPVRemapper.cpp, SPIRV/SpvBuilder.cpp, SPIRV/SpvBuilder.h,
+    SPIRV/doc.cpp, SPIRV/doc.h, SPIRV/spirv.hpp, glslang/Include/BaseTypes.h, glslang/Include/Types.h, glslang/Include/arrays.h, glslang/Include/intermediate.h, glslang/MachineIndependent/Initialize.cpp,
+    glslang/MachineIndependent/Intermediate.cpp, glslang/MachineIndependent/ParseHelper.cpp, glslang/MachineIndependent/ParseHelper.h, glslang/MachineIndependent/Scan.cpp, glslang/MachineIndependent/Versions.cpp,
+    glslang/MachineIndependent/Versions.h, glslang/MachineIndependent/glslang.m4, glslang/MachineIndependent/glslang.y, glslang/MachineIndependent/glslang_tab.cpp, glslang/MachineIndependent/glslang_tab.cpp.h,
+    glslang/MachineIndependent/intermOut.cpp, glslang/MachineIndependent/parseVersions.h'
+  evidence_paths:
+  - SPIRV/GLSL.ext.KHR.h
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/SPVRemapper.cpp
+  - SPIRV/SpvBuilder.cpp
+  - SPIRV/SpvBuilder.h
+  - SPIRV/doc.cpp
+  - SPIRV/doc.h
+  - SPIRV/spirv.hpp
+  - glslang/Include/BaseTypes.h
+  - glslang/Include/Types.h
+  - glslang/Include/arrays.h
+  - glslang/Include/intermediate.h
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/Intermediate.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/ParseHelper.h
+  - glslang/MachineIndependent/Scan.cpp
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  - glslang/MachineIndependent/glslang.m4
+  - glslang/MachineIndependent/glslang.y
+  - glslang/MachineIndependent/glslang_tab.cpp
+  - glslang/MachineIndependent/glslang_tab.cpp.h
+  - glslang/MachineIndependent/intermOut.cpp
+  - glslang/MachineIndependent/parseVersions.h
+- number: 3374
+  title: Align spirv.hpp to SPIRV-Headers for SPV_KHR_cooperative_matrix
+  author: kpet
+  merged_at: '2023-10-25'
+  url: https://github.com/KhronosGroup/glslang/pull/3374
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): header alignment only, no change to generated code'
+  evidence_paths:
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/doc.cpp
+  - SPIRV/spirv.hpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3550
+  title: Fix issues of the interaction between cooperative_matrix and spirv_intrinsics
+  author: amdrexu
+  merged_at: '2024-03-21'
+  url: https://github.com/KhronosGroup/glslang/pull/3550
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): interaction with spirv_intrinsics, not used by kernel shaders'
+  evidence_paths:
+  - glslang/Include/Types.h
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/glslang.y
+  - glslang/MachineIndependent/glslang_tab.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3618
+  title: Add support for the ARM extended matrix layout
+  author: silverclaw
+  merged_at: '2024-06-11'
+  url: https://github.com/KhronosGroup/glslang/pull/3618
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 3743
+  title: Fix nonsemantic debuginfo line attribution for cooperative matrix
+  author: jeffbolznv
+  merged_at: '2024-09-30'
+  url: https://github.com/KhronosGroup/glslang/pull/3743
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): debug-info line attribution only'
+  evidence_paths:
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/SpvBuilder.cpp
+  - SPIRV/SpvBuilder.h
+  - SPIRV/spirv.hpp
+  - SPIRV/spvIR.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3900
+  title: Fix crash calling coopMatLoadTensorNV on an array element
+  author: jeffbolznv
+  merged_at: '2025-03-13'
+  url: https://github.com/KhronosGroup/glslang/pull/3900
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): NV tensor-addressing load path only'
+  evidence_paths:
+  - glslang/MachineIndependent/ParseHelper.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3967
+  title: Allow spec constant matrix use
+  author: GinShio
+  merged_at: '2025-08-26'
+  url: https://github.com/KhronosGroup/glslang/pull/3967
+  decision: include
+  rule: manual-compiler-code-generation
+  reason: 'include (manual review of title, description and changed paths): lets the matrix-use template parameter be a specialization constant; changes SPIR-V generation for cooperative-matrix types'
+  evidence_paths: []
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 3978
+  title: Move E_SPV_ARM_cooperative_matrix_layouts into GLSL.ext.ARM.h
+  author: svenvh
+  merged_at: '2025-06-23'
+  url: https://github.com/KhronosGroup/glslang/pull/3978
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): header move only'
+  evidence_paths:
+  - SPIRV/GLSL.ext.ARM.h
+  - SPIRV/GLSL.ext.EXT.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4007
+  title: Fix bug in handling slice of array being passed cooperative matrix load/store functions and strengthen error checks.
+  author: alelenv
+  merged_at: '2025-07-29'
+  url: https://github.com/KhronosGroup/glslang/pull/4007
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: glslang/MachineIndependent/ParseHelper.cpp'
+  evidence_paths:
+  - glslang/MachineIndependent/ParseHelper.cpp
+- number: 4022
+  title: Add checks to coopMatMulAdd
+  author: mmoult
+  merged_at: '2025-11-19'
+  url: https://github.com/KhronosGroup/glslang/pull/4022
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: SPIRV/GlslangToSpv.cpp, glslang/Include/arrays.h, glslang/MachineIndependent/ParseHelper.cpp'
+  evidence_paths:
+  - SPIRV/GlslangToSpv.cpp
+  - glslang/Include/arrays.h
+  - glslang/MachineIndependent/ParseHelper.cpp
+- number: 4023
+  title: Add support for GLSL_QCOM_cooperative_matrix_conversion
+  author: wooyoungqcom
+  merged_at: '2025-08-21'
+  url: https://github.com/KhronosGroup/glslang/pull/4023
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: SPIRV/GLSL.ext.QCOM.h, SPIRV/GlslangToSpv.cpp, SPIRV/doc.cpp, SPIRV/spirv.hpp11, glslang/Include/intermediate.h,
+    glslang/MachineIndependent/Initialize.cpp, glslang/MachineIndependent/Intermediate.cpp, glslang/MachineIndependent/ParseHelper.cpp, glslang/MachineIndependent/ParseHelper.h, glslang/MachineIndependent/Versions.cpp,
+    glslang/MachineIndependent/Versions.h, glslang/MachineIndependent/intermOut.cpp, glslang/MachineIndependent/parseVersions.h'
+  evidence_paths:
+  - SPIRV/GLSL.ext.QCOM.h
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/doc.cpp
+  - SPIRV/spirv.hpp11
+  - glslang/Include/intermediate.h
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/Intermediate.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/ParseHelper.h
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  - glslang/MachineIndependent/intermOut.cpp
+  - glslang/MachineIndependent/parseVersions.h
+- number: 4090
+  title: Fix spv.coopmat_armlayout.comp test
+  author: kpet
+  merged_at: '2025-11-17'
+  url: https://github.com/KhronosGroup/glslang/pull/4090
+  decision: exclude
+  rule: no-driver-path
+  reason: 'exclude: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ but none of the 2 changed file(s) is under a driver path'
+  evidence_paths: []
+- number: 4123
+  title: Fix OpStore of BDA to align to 8
+  author: spencer-lunarg
+  merged_at: '2026-05-07'
+  url: https://github.com/KhronosGroup/glslang/pull/4123
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 4220
+  title: Initial support for NonSemantic.Shader.DebugInfo 101
+  author: dnovillo
+  merged_at: '2026-04-28'
+  url: https://github.com/KhronosGroup/glslang/pull/4220
+  decision: exclude
+  rule: no-topic-in-title
+  reason: 'exclude: the title matches no topic pattern'
+  evidence_paths: []
+- number: 4251
+  title: Only use cooperative matrix conversions when needed
+  author: gorazd-sumkovski-arm
+  merged_at: '2026-05-07'
+  url: https://github.com/KhronosGroup/glslang/pull/4251
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: SPIRV/GlslangToSpv.cpp'
+  evidence_paths:
+  - SPIRV/GlslangToSpv.cpp
+- number: 4275
+  title: Implement GL_NV_cooperative_matrix_decode_vector
+  author: jeffbolznv
+  merged_at: '2026-05-21'
+  url: https://github.com/KhronosGroup/glslang/pull/4275
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): NV decode-vector extension, outside the KHR kernel path'
+  evidence_paths:
+  - SPIRV/GLSL.ext.NV.h
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/doc.cpp
+  - SPIRV/spirv.hpp11
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4280
+  title: Add error for coopmat *= scalar with bf16/fp8.
+  author: jeffbolznv
+  merged_at: '2026-06-02'
+  url: https://github.com/KhronosGroup/glslang/pull/4280
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: glslang/MachineIndependent/Intermediate.cpp'
+  evidence_paths:
+  - glslang/MachineIndependent/Intermediate.cpp
+- number: 4282
+  title: Fix missing GL_NV_cooperative_matrix_decode_vector define
+  author: jeffbolznv
+  merged_at: '2026-05-22'
+  url: https://github.com/KhronosGroup/glslang/pull/4282
+  decision: exclude
+  rule: manual-out-of-scope
+  reason: 'exclude (manual review of title, description and changed paths): follow-up define for the NV decode-vector extension'
+  evidence_paths:
+  - glslang/MachineIndependent/Versions.cpp
+  decision_source: manual
+  reviewed_at: '2026-10-10'
+- number: 4371
+  title: Implement GL_EXT_cooperative_matrix_maintenance1
+  author: jeffbolznv
+  merged_at: '2026-08-13'
+  url: https://github.com/KhronosGroup/glslang/pull/4371
+  decision: include
+  rule: driver-source-on-topic
+  reason: 'include: title matches /cooperative[ _-]?matri|coop[ _-]?mat/ and driver source changed: SPIRV/GLSL.ext.EXT.h, SPIRV/GlslangToSpv.cpp, SPIRV/doc.cpp, SPIRV/spirv.hpp11, glslang/Include/arrays.h,
+    glslang/Include/intermediate.h, glslang/MachineIndependent/Initialize.cpp, glslang/MachineIndependent/ParseHelper.cpp, glslang/MachineIndependent/Versions.cpp, glslang/MachineIndependent/Versions.h,
+    glslang/MachineIndependent/intermOut.cpp, glslang/MachineIndependent/localintermediate.h'
+  evidence_paths:
+  - SPIRV/GLSL.ext.EXT.h
+  - SPIRV/GlslangToSpv.cpp
+  - SPIRV/doc.cpp
+  - SPIRV/spirv.hpp11
+  - glslang/Include/arrays.h
+  - glslang/Include/intermediate.h
+  - glslang/MachineIndependent/Initialize.cpp
+  - glslang/MachineIndependent/ParseHelper.cpp
+  - glslang/MachineIndependent/Versions.cpp
+  - glslang/MachineIndependent/Versions.h
+  - glslang/MachineIndependent/intermOut.cpp
+  - glslang/MachineIndependent/localintermediate.h
