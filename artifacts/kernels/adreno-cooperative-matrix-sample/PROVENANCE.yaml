@@ -1,0 +1,20 @@
+repo: SnapdragonGameStudios/adreno-gpu-vulkan-code-sample-framework
+url: https://github.com/SnapdragonGameStudios/adreno-gpu-vulkan-code-sample-framework
+commit: 584f0528d46d120a73b4f7bbd0102abfb358220b
+license: BSD-3-Clause
+license_file: artifacts/prs/adreno-samples/LICENSE
+retrieved_at: '2026-10-10'
+extraction: complete files, byte for byte, at the commit above
+files:
+- path: samples/cooperative_matrix/README.md
+  file: README.md
+  sha256: 04e0aeab2714196c59a9fd9f25e9b64deddb91c10e355ed1b81399cc20202614
+- path: samples/cooperative_matrix/code/main/runtime_shaders/MxM_Basic.hpp
+  file: MxM_Basic.hpp
+  sha256: bc4676b485b1f0ff8de912e54a97cb07fa5b20be2ed8e68782ce07b294d5bcdf
+- path: samples/cooperative_matrix/code/main/runtime_shaders/MxM_VecToMat.hpp
+  file: MxM_VecToMat.hpp
+  sha256: 5e080be0e66631d475b5d84807a8cf9ea1cb8c209e342955702e210c72903f59
+- path: samples/cooperative_matrix/code/main/runtime_shaders/Conv.hpp
+  file: Conv.hpp
+  sha256: bf4fdfb45bed15c8a59b707440c6bd9e8cd51dacab9103f6cc92a8c4761827b7

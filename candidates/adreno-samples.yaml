@@ -1,0 +1,19 @@
+repo: SnapdragonGameStudios/adreno-gpu-vulkan-code-sample-framework
+license: BSD-3-Clause
+license_path: LICENSE.txt
+keywords_used:
+- cooperative matrix
+- cooperative_matrix
+shader_path_markers:
+- samples/cooperative_matrix/shaders/
+embedded_shader_path_markers:
+- samples/cooperative_matrix/code/main/runtime_shaders/
+host_path_markers:
+- samples/cooperative_matrix/code/
+searched_at: '2026-10-10'
+cutoff_date: '2026-10-10'
+total_candidates: 0
+included: 0
+deferred: 0
+excluded: 0
+prs: []
